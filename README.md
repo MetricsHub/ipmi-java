@@ -1,12 +1,12 @@
 # IPMI Java Client
-![GitHub release (with filter)](https://img.shields.io/github/v/release/sentrysoftware/ipmi)
-![Build](https://img.shields.io/github/actions/workflow/status/sentrysoftware/ipmi/deploy.yml)
-![GitHub top language](https://img.shields.io/github/languages/top/sentrysoftware/ipmi)
-![License](https://img.shields.io/github/license/sentrysoftware/ipmi)
+![GitHub release (with filter)](https://img.shields.io/github/v/release/metricshub/ipmi-java)
+![Build](https://img.shields.io/github/actions/workflow/status/metricshub/ipmi-java/deploy.yml)
+![GitHub top language](https://img.shields.io/github/languages/top/metricshub/ipmi-java)
+![License](https://img.shields.io/github/license/metricshub/ipmi-java)
 
 This project is a fork of the excellent [IPMI Library for Java by Verax Systems](https://veraxsystems.com/ipmi-library-for-java/) ([see also](https://en.wikipedia.org/wiki/Verax_IPMI)). It is however not related to [another fork by rbuckland](https://github.com/rbuckland/ipmilib).
 
-See **[Project Documentation](https://sentrysoftware.org/ipmi)** and the [Javadoc](https://sentrysoftware.org/ipmi/apidocs) for more information on how to use this library in your code.
+See **[Project Documentation](https://metricshub.org/ipmi-java)** and the [Javadoc](https://metricshub.org/ipmi-java/apidocs) for more information on how to use this library in your code.
 
 The IPMI Java Client is a library that communicates with the IPMI host, fetches Field Replaceable Units (FRUs) and Sensors information then reports these information as a text output.
 

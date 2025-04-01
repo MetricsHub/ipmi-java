@@ -2,12 +2,12 @@
 	<modelVersion>4.0.0</modelVersion>
 
 	<parent>
-		<groupId>org.sentrysoftware</groupId>
+		<groupId>org.metricshub</groupId>
 		<artifactId>oss-parent</artifactId>
 		<version>2</version>
 	</parent>
 
-	<groupId>org.sentrysoftware</groupId>
+	<groupId>org.metricshub</groupId>
 	<artifactId>ipmi</artifactId>
 	<version>1.2.01-SNAPSHOT</version>
 
@@ -15,11 +15,11 @@
 	<description>IPMI Client Library for Java</description>
 
 	<organization>
-		<name>Sentry Software</name>
-		<url>https://sentrysoftware.com</url>
+		<name>MetricsHub</name>
+		<url>https://metricshub.com</url>
 	</organization>
 
-	<url>https://sentrysoftware.org/ipmi</url>
+	<url>https://metricshub.org/ipmi-java</url>
 	<inceptionYear>2023</inceptionYear>
 
 	<licenses>
@@ -32,33 +32,26 @@
 
 	<issueManagement>
 		<system>GitHub</system>
-		<url>https://github.com/sentrysoftware/ipmi/issues/</url>
+		<url>https://github.com/metricshub/ipmi-java/issues/</url>
 	</issueManagement>
 
 	<scm>
-		<connection>scm:git:https://github.com/sentrysoftware/ipmi.git</connection>
-		<url>https://github.com/sentrysoftware/ipmi</url>
+		<connection>scm:git:https://github.com/metricshub/ipmi-java.git</connection>
+		<url>https://github.com/metricshub/ipmi-java</url>
 		<tag>HEAD</tag>
 	</scm>
 
 	<developers>
 		<developer>
 			<name>Bertrand Martin (@bertysentry)</name>
-			<email>bertrand@sentrysoftware.com</email>
+			<email>bertrand@metricshub.com</email>
 			<roles>
 				<role>maintainer</role>
 			</roles>
 		</developer>
 		<developer>
 			<name>Nassim Boutekedjiret (@NassimBtk)</name>
-			<email>nassim@sentrysoftware.com</email>
-			<roles>
-				<role>maintainer</role>
-			</roles>
-		</developer>
-		<developer>
-			<name>Kawtar Bakour (@KawtarBK9)</name>
-			<email>kawtar@sentrysoftware.com</email>
+			<email>nassim@metricshub.com</email>
 			<roles>
 				<role>maintainer</role>
 			</roles>
