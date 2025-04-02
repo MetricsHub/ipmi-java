@@ -8,10 +8,9 @@ Add IPMI in the list of dependencies in your [Maven **pom.xml**](https://maven.a
 
 ```xml
 <dependencies>
-	<!-- [...] -->
 	<dependency>
-		<groupId>org.sentrysoftware</groupId>
-		<artifactId>ipmi</artifactId>
+		<groupId>${project.groupId}</groupId>
+		<artifactId>${project.artifactId}</artifactId>
 		<version>${project.version}</version>
 	</dependency>
 </dependencies>
@@ -21,6 +20,12 @@ Invoke the IPMI Client:
 
 ```java
 
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeoutException;
+import org.metricshub.ipmi.client.IpmiClient;
+import org.metricshub.ipmi.client.IpmiClientConfiguration;
+
+public class IpmiMain {
 	public static void main(String[] args) throws InterruptedException, ExecutionException, TimeoutException {
 
 		final String hostname = "my-host";
@@ -30,7 +35,7 @@ Invoke the IPMI Client:
 		final byte[] bmcKey = null;
 		final long timeout = 120;
 		// Set pingPeriod to 0 to turn off keep-alive messages sent to the remote host.
-		final pingPeriod = 30000;
+		final long pingPeriod = 30000;
 
 		// Instantiates a new IPMI client configuration using the credentials above
 		final IpmiClientConfiguration ipmiClientConfiguration = new IpmiClientConfiguration(
@@ -39,7 +44,8 @@ Invoke the IPMI Client:
 			password,
 			bmcKey,
 			noAuth,
-			timeout
+			timeout,
+			pingPeriod
 		);
 
 		// Get the Chassis' status
@@ -54,5 +60,7 @@ Invoke the IPMI Client:
 		System.out.println("Sensors:");
 		System.out.println(sensorsResult);
 	}
+}
+
 ```
 
