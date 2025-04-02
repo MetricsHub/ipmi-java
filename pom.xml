@@ -7,8 +7,7 @@
 		<version>2</version>
 	</parent>
 
-	<groupId>org.metricshub</groupId>
-	<artifactId>ipmi</artifactId>
+	<artifactId>ipmi-java</artifactId>
 	<version>1.2.01-SNAPSHOT</version>
 
 	<name>IPMI Java Client</name>

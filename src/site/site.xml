@@ -21,6 +21,7 @@
 	
 		<links>
 			<item name="Fork on GitHub" href="${project.scm.url}" />
+			<item name="MetricsHub&reg;" href="https://metricshub.com" />
 		</links>
 
 		<menu name="User Documentation">
