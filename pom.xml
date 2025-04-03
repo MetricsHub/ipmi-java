@@ -8,7 +8,7 @@
 	</parent>
 
 	<artifactId>ipmi-java</artifactId>
-	<version>1.2.01-SNAPSHOT</version>
+	<version>1.2.02-SNAPSHOT</version>
 
 	<name>IPMI Java Client</name>
 	<description>IPMI Client Library for Java</description>
@@ -70,7 +70,7 @@
 
 		<!-- Reproducible Build -->
 		<!-- See https://maven.apache.org/guides/mini/guide-reproducible-builds.html -->
-		<project.build.outputTimestamp>2025-02-11T09:20:48Z</project.build.outputTimestamp>
+		<project.build.outputTimestamp>2025-04-03T12:06:07Z</project.build.outputTimestamp>
 	</properties>
 
 	<dependencyManagement>
