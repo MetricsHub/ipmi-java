@@ -15,19 +15,6 @@ on:
         description: Open SSH session in the runner
         required: false
         default: false
-      uploadCheckstyleReport:
-        type: string
-        description: "Enable the upload of any Checkstyle report created by Maven"
-        default: "false"
-      uploadPMDReport:
-        type: string
-        description: "Enable the upload of any PMD report created by Maven"
-        default: "false"
-      uploadSpotbugsReport:
-        type: string
-        description: "Enable the upload of any Spotbugs report created by Maven"
-        default: "false"
-
 
 jobs:
   build:
@@ -36,3 +23,6 @@ jobs:
       jdkVersion: "17"
       debug: ${{ github.event_name == 'workflow_dispatch' && inputs.debug }}
       ssh: ${{ github.event_name == 'workflow_dispatch' && inputs.ssh }}
+      uploadCheckstyleReport: false
+      uploadPMDReport: false
+      uploadSpotbugsReport: false
