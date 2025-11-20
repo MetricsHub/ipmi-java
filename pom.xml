@@ -8,7 +8,7 @@
 	</parent>
 
 	<artifactId>ipmi-java</artifactId>
-	<version>1.2.02</version>
+	<version>1.2.03-SNAPSHOT</version>
 
 	<name>IPMI Java Client</name>
 	<description>IPMI Client Library for Java</description>
@@ -37,7 +37,7 @@
 	<scm>
 		<connection>scm:git:https://github.com/metricshub/ipmi-java.git</connection>
 		<url>https://github.com/metricshub/ipmi-java</url>
-		<tag>v1.2.02</tag>
+		<tag>HEAD</tag>
 	</scm>
 
 	<developers>
@@ -70,7 +70,7 @@
 
 		<!-- Reproducible Build -->
 		<!-- See https://maven.apache.org/guides/mini/guide-reproducible-builds.html -->
-		<project.build.outputTimestamp>2025-11-20T18:40:21Z</project.build.outputTimestamp>
+		<project.build.outputTimestamp>2025-11-20T18:41:44Z</project.build.outputTimestamp>
 	</properties>
 
 	<dependencyManagement>
