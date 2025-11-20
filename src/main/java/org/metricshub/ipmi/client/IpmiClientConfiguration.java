@@ -1,7 +1,5 @@
 package org.metricshub.ipmi.client;
 
-import org.metricshub.ipmi.core.common.Constants;
-
 /*-
  * ╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲
  * IPMI Java Client
@@ -23,6 +21,8 @@ import org.metricshub.ipmi.core.common.Constants;
  * <http://www.gnu.org/licenses/lgpl-3.0.html>.
  * ╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱
  */
+
+import org.metricshub.ipmi.core.common.Constants;
 
 /**
  * IPMI configuration including the required credentials that need to be used to establish the
