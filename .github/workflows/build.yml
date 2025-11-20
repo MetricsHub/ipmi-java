@@ -16,7 +16,7 @@ on:
         required: false
         default: false
 permissions:
-  contents: read
+  contents: write
   checks: write
   pull-requests: write
 
