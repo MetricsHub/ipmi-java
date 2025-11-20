@@ -15,7 +15,11 @@ on:
         description: Open SSH session in the runner
         required: false
         default: false
-        
+permissions:
+  contents: read
+  checks: write
+  pull-requests: write
+
 jobs:
   build:
     uses: metricshub/workflows/.github/workflows/maven-build.yml@v4
