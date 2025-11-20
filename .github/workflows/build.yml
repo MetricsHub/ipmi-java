@@ -23,6 +23,3 @@ jobs:
       jdkVersion: "17"
       debug: ${{ github.event_name == 'workflow_dispatch' && inputs.debug }}
       ssh: ${{ github.event_name == 'workflow_dispatch' && inputs.ssh }}
-      uploadCheckstyleReport: false
-      uploadPMDReport: false
-      uploadSpotbugsReport: false
