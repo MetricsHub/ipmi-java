@@ -1,5 +1,7 @@
 package org.metricshub.ipmi.client;
 
+import org.metricshub.ipmi.core.common.Constants;
+
 /*-
  * ╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲
  * IPMI Java Client
@@ -34,6 +36,7 @@ public class IpmiClientConfiguration {
 	private char[] password;
 	private byte[] bmcKey;
 	private boolean skipAuth;
+	private int port = Constants.IPMI_PORT;
 	private long timeout;
 	private long pingPeriod = -1;
 
@@ -55,6 +58,23 @@ public class IpmiClientConfiguration {
 		this.bmcKey = bmcKey;
 		this.skipAuth = skipAuth;
 		this.timeout = timeout;
+	}
+
+	/**
+	 * Instantiates a new {@link IpmiClientConfiguration} in order to query the IPMI host.
+	 * 
+	 * @param hostname IP Address or host name of the remote IPMI host.
+	 * @param port UDP port number of the remote IPMI host.
+	 * @param username Name used to establish the connection with the host via the IPMI protocol.
+	 * @param password Password used to establish the connection with the host via the IPMI protocol.
+	 * @param bmcKey   The key that should be provided if the two-key authentication is enabled, null otherwise.
+	 * @param skipAuth Whether the client should skip authentication
+	 * @param timeout  Timeout used for each IPMI request.
+	 */
+	public IpmiClientConfiguration(String hostname, int port, String username, char[] password,
+			byte[] bmcKey, boolean skipAuth, long timeout) {
+		this(hostname, username, password, bmcKey, skipAuth, timeout);
+		this.port = port;
 	}
 
 	/**
@@ -91,6 +111,24 @@ public class IpmiClientConfiguration {
 	 */
 	public void setHostname(String hostname) {
 		this.hostname = hostname;
+	}
+
+	/**
+	 * Returns the UDP port number of the remote IPMI host.
+	 * 
+	 * @return UDP port number of the remote IPMI host.
+	 */
+	public int getPort() {
+		return port;
+	}
+
+	/**
+	 * Sets the UDP port number of the remote IPMI host.
+	 * 
+	 * @param port UDP port number of the remote IPMI host.
+	 */
+	public void setPort(int port) {
+		this.port = port;
 	}
 
 	/**
