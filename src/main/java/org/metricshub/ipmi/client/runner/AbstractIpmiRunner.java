@@ -101,7 +101,7 @@ public abstract class AbstractIpmiRunner<T> implements AutoCloseable, Callable<T
 			authenticate();
 		} else {
 			handle = connector.createConnection(InetAddress.getByName(ipmiConfiguration.getHostname()),
-					Connection.getDefaultCipherSuite(), PrivilegeLevel.User);
+					ipmiConfiguration.getPort(), Connection.getDefaultCipherSuite(), PrivilegeLevel.User);
 		}
 
 		// Start the session, provide user name and password, and optionally the
@@ -122,7 +122,8 @@ public abstract class AbstractIpmiRunner<T> implements AutoCloseable, Callable<T
 		// the handle will be needed to identify it among other connections
 		// (target IP address isn't enough, since we can handle multiple
 		// connections to the same host)
-		handle = connector.createConnection(InetAddress.getByName(ipmiConfiguration.getHostname()));
+		handle = connector.createConnection(InetAddress.getByName(ipmiConfiguration.getHostname()),
+				ipmiConfiguration.getPort());
 
 		// Get available cipher suites list via getAvailableCipherSuites and
 		// pick one of them that will be used further in the session.
