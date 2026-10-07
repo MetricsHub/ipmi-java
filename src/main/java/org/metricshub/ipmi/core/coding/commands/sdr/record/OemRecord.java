@@ -37,17 +37,23 @@ public class OemRecord extends SensorRecord {
     protected void populateTypeSpecficValues(byte[] recordData,
             SensorRecord record) {
 
+        // Vendor-specific record types (C1h-FFh) don't necessarily follow the
+        // C0h layout (3-byte manufacturer ID + data), so guard every offset.
         byte[] buffer = new byte[4];
 
-        System.arraycopy(recordData, 5, buffer, 0, 3);
+        if (recordData.length >= 8) {
+            System.arraycopy(recordData, 5, buffer, 0, 3);
+        }
 
         buffer[3] = 0;
 
         setManufacturerId(TypeConverter.littleEndianByteArrayToInt(buffer));
 
-        byte[] data = new byte[recordData.length - 8];
+        byte[] data = new byte[Math.max(0, recordData.length - 8)];
 
-        System.arraycopy(recordData, 8, data, 0, data.length);
+        if (data.length > 0) {
+            System.arraycopy(recordData, 8, data, 0, data.length);
+        }
 
         setOemData(data);
     }

@@ -40,13 +40,17 @@ import org.metricshub.ipmi.core.coding.protocol.AuthenticationType;
 import org.metricshub.ipmi.core.coding.security.CipherSuite;
 import org.metricshub.ipmi.core.common.TypeConverter;
 import org.metricshub.ipmi.core.connection.Connection;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * This abstract class implements common features required by FRUs, Sensor and Chassis Status runners.
- * 
- * @param <T> Represent the data type managed by the runner 
+ *
+ * @param <T> Represent the data type managed by the runner
  */
 public abstract class AbstractIpmiRunner<T> implements AutoCloseable, Callable<T> {
+
+	private static final Logger LOGGER = LoggerFactory.getLogger(AbstractIpmiRunner.class);
 
 	private static final int DEFAULT_LOCAL_UDP_PORT = 0;
 
@@ -192,13 +196,11 @@ public abstract class AbstractIpmiRunner<T> implements AutoCloseable, Callable<T
 			GetSdrResponseData data = (GetSdrResponseData) connector.sendMessage(handle,
 					new GetSdr(IpmiVersion.V20, handle.getCipherSuite(), AuthenticationType.RMCPPlus, reservationId, nextRecId));
 
-			// If getting whole record succeeded we create SensorRecord from
-			// received data...
-			SensorRecord sensorDataToPopulate = SensorRecord.populateSensorRecord(data.getSensorRecordData());
-
-			// ... and update the ID of the next record
+			// Advance to the next record first, so that a record we cannot
+			// decode never stalls the whole repository walk
 			nextRecId = data.getNextRecordId();
-			return sensorDataToPopulate;
+
+			return decodeRecord(data.getSensorRecordData());
 
 		} catch (IPMIException e) {
 
@@ -236,7 +238,7 @@ public abstract class AbstractIpmiRunner<T> implements AutoCloseable, Callable<T
 
 		byte[] bytes = new byte[recSize];
 
-		System.arraycopy(data.getSensorRecordData(), 0, bytes, 0, data.getSensorRecordData().length);
+		System.arraycopy(data.getSensorRecordData(), 0, bytes, 0, Math.min(recSize, data.getSensorRecordData().length));
 
 		// We get the rest of the record in chunks (watch out for
 		// exceeding the record size, since this will result in BMC's
@@ -257,13 +259,25 @@ public abstract class AbstractIpmiRunner<T> implements AutoCloseable, Callable<T
 			read += bytesToRead;
 		}
 
-		// Finally we populate the sensor record with the gathered
-		// data...
-		SensorRecord sensorDataToPopulate = SensorRecord.populateSensorRecord(bytes);
-
-		// ... and update the ID of the next record
+		// Advance to the next record, then decode the gathered data
 		nextRecId = data.getNextRecordId();
 
-		return sensorDataToPopulate;
+		return decodeRecord(bytes);
+	}
+
+	/**
+	 * Decode a raw SDR record. A record the library cannot model (unknown or malformed type) is logged and skipped
+	 * instead of aborting the whole repository walk.
+	 *
+	 * @param recordData Raw bytes of the SDR record
+	 * @return {@link SensorRecord} instance or <code>null</code> if the record cannot be decoded
+	 */
+	private SensorRecord decodeRecord(byte[] recordData) {
+		try {
+			return SensorRecord.populateSensorRecord(recordData);
+		} catch (RuntimeException e) {
+			LOGGER.warn("Skipping undecodable SDR record before id {} on {}: {}", nextRecId, ipmiConfiguration.getHostname(), e.getMessage());
+			return null;
+		}
 	}
 }
