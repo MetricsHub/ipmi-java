@@ -29,152 +29,153 @@ import org.metricshub.ipmi.core.coding.protocol.AuthenticationType;
 
 /**
  * A wrapper for Get Channel Authentication Capabilities command response
+ *
  * @see GetChannelAuthenticationCapabilities
  */
 public class GetChannelAuthenticationCapabilitiesResponseData implements ResponseData {
-    /**
-     * Channel number that the Authentication Capabilities is being returned for.
-     */
-    private byte channelNumber;
+	/**
+	 * Channel number that the Authentication Capabilities is being returned for.
+	 */
+	private byte channelNumber;
 
-    /**
-     * IPMI v2.0 support.
-     */
-    private boolean ipmiv20Support;
+	/**
+	 * IPMI v2.0 support.
+	 */
+	private boolean ipmiv20Support;
 
-    /**
-     * Authentication Types supported for requested privilege level.
-     */
-    private Collection<AuthenticationType> authenticationTypes;
+	/**
+	 * Authentication Types supported for requested privilege level.
+	 */
+	private Collection<AuthenticationType> authenticationTypes;
 
-    /**
-     * BMC key used for authentication. If false, then BMC uses user key. 
-     */
-    private boolean kgEnabled;
+	/**
+	 * BMC key used for authentication. If false, then BMC uses user key.
+	 */
+	private boolean kgEnabled;
 
-    /**
-     * If Mer-message Authentication is enabled, packets to the BMC must be authenticated per Authentication Type used
-     * to activate the session, and User Level Authentication setting, following. Otherwise, Authentication Type 'None'
-     * accepted for packets to the BMC after the session has been activated.
-     */
-    private boolean perMessageAuthenticationEnabled;
+	/**
+	 * If Mer-message Authentication is enabled, packets to the BMC must be authenticated per Authentication Type used
+	 * to activate the session, and User Level Authentication setting, following. Otherwise, Authentication Type 'None'
+	 * accepted for packets to the BMC after the session has been activated.
+	 */
+	private boolean perMessageAuthenticationEnabled;
 
-    /**
-     * If User Level Authentication is enabled, User Level commands must be authenticated per Authentication Type used
-     * to activate the session. Otherwise, Authentication Type 'none' accepted for User Level commands to the BMC.
-     */
-    private boolean userLevelAuthenticationEnabled;
+	/**
+	 * If User Level Authentication is enabled, User Level commands must be authenticated per Authentication Type used
+	 * to activate the session. Otherwise, Authentication Type 'none' accepted for User Level commands to the BMC.
+	 */
+	private boolean userLevelAuthenticationEnabled;
 
-    /**
-     * One or more users are enabled that have non-null usernames
-     */
-    private boolean nonNullUsernamesEnabled;
+	/**
+	 * One or more users are enabled that have non-null usernames
+	 */
+	private boolean nonNullUsernamesEnabled;
 
-    /**
-     * One or more users that have a null username, but non-null password, are presently enabled
-     */
-    private boolean nullUsernamesEnabled;
+	/**
+	 * One or more users that have a null username, but non-null password, are presently enabled
+	 */
+	private boolean nullUsernamesEnabled;
 
-    /**
-     * A user that has a null username and null password is presently enabled
-     */
-    private boolean anonymusLoginEnabled;
+	/**
+	 * A user that has a null username and null password is presently enabled
+	 */
+	private boolean anonymusLoginEnabled;
 
-    /**
-     * IANA Enterprise Number for OEM/Organization that specified the particular OEM Authentication Type for RMCP.
-     */
-    private int oemId;
+	/**
+	 * IANA Enterprise Number for OEM/Organization that specified the particular OEM Authentication Type for RMCP.
+	 */
+	private int oemId;
 
-    /**
-     * Additional OEM-specific information for the OEM Authentication Type for RMCP.
-     */
-    private byte oemData;
+	/**
+	 * Additional OEM-specific information for the OEM Authentication Type for RMCP.
+	 */
+	private byte oemData;
 
-    public void setChannelNumber(byte channelNumber) {
-        this.channelNumber = channelNumber;
-    }
+	public void setChannelNumber(byte channelNumber) {
+		this.channelNumber = channelNumber;
+	}
 
-    public byte getChannelNumber() {
-        return channelNumber;
-    }
+	public byte getChannelNumber() {
+		return channelNumber;
+	}
 
-    public void setIpmiv20Support(boolean ipmiv20Support) {
-        this.ipmiv20Support = ipmiv20Support;
-    }
+	public void setIpmiv20Support(boolean ipmiv20Support) {
+		this.ipmiv20Support = ipmiv20Support;
+	}
 
-    public boolean isIpmiv20Support() {
-        return ipmiv20Support;
-    }
+	public boolean isIpmiv20Support() {
+		return ipmiv20Support;
+	}
 
-    public void setAuthenticationTypes(Collection<AuthenticationType> authenticationTypes) {
-        this.authenticationTypes = authenticationTypes;
-    }
+	public void setAuthenticationTypes(Collection<AuthenticationType> authenticationTypes) {
+		this.authenticationTypes = authenticationTypes;
+	}
 
-    public Collection<AuthenticationType> getAuthenticationTypes() {
-        return authenticationTypes;
-    }
+	public Collection<AuthenticationType> getAuthenticationTypes() {
+		return authenticationTypes;
+	}
 
-    public void setKgEnabled(boolean kgEnabled) {
-        this.kgEnabled = kgEnabled;
-    }
+	public void setKgEnabled(boolean kgEnabled) {
+		this.kgEnabled = kgEnabled;
+	}
 
-    public boolean isKgEnabled() {
-        return kgEnabled;
-    }
+	public boolean isKgEnabled() {
+		return kgEnabled;
+	}
 
-    public void setPerMessageAuthenticationEnabled(boolean perMessageAuthenticationEnabled) {
-        this.perMessageAuthenticationEnabled = perMessageAuthenticationEnabled;
-    }
+	public void setPerMessageAuthenticationEnabled(boolean perMessageAuthenticationEnabled) {
+		this.perMessageAuthenticationEnabled = perMessageAuthenticationEnabled;
+	}
 
-    public boolean isPerMessageAuthenticationEnabled() {
-        return perMessageAuthenticationEnabled;
-    }
+	public boolean isPerMessageAuthenticationEnabled() {
+		return perMessageAuthenticationEnabled;
+	}
 
-    public void setUserLevelAuthenticationEnabled(boolean userLevelAuthenticationEnabled) {
-        this.userLevelAuthenticationEnabled = userLevelAuthenticationEnabled;
-    }
+	public void setUserLevelAuthenticationEnabled(boolean userLevelAuthenticationEnabled) {
+		this.userLevelAuthenticationEnabled = userLevelAuthenticationEnabled;
+	}
 
-    public boolean isUserLevelAuthenticationEnabled() {
-        return userLevelAuthenticationEnabled;
-    }
+	public boolean isUserLevelAuthenticationEnabled() {
+		return userLevelAuthenticationEnabled;
+	}
 
-    public void setNonNullUsernamesEnabled(boolean nonNullUsernamesEnabled) {
-        this.nonNullUsernamesEnabled = nonNullUsernamesEnabled;
-    }
+	public void setNonNullUsernamesEnabled(boolean nonNullUsernamesEnabled) {
+		this.nonNullUsernamesEnabled = nonNullUsernamesEnabled;
+	}
 
-    public boolean isNonNullUsernamesEnabled() {
-        return nonNullUsernamesEnabled;
-    }
+	public boolean isNonNullUsernamesEnabled() {
+		return nonNullUsernamesEnabled;
+	}
 
-    public void setNullUsernamesEnabled(boolean nullUsernamesEnabled) {
-        this.nullUsernamesEnabled = nullUsernamesEnabled;
-    }
+	public void setNullUsernamesEnabled(boolean nullUsernamesEnabled) {
+		this.nullUsernamesEnabled = nullUsernamesEnabled;
+	}
 
-    public boolean isNullUsernamesEnabled() {
-        return nullUsernamesEnabled;
-    }
+	public boolean isNullUsernamesEnabled() {
+		return nullUsernamesEnabled;
+	}
 
-    public void setAnonymusLoginEnabled(boolean anonymusLoginEnabled) {
-        this.anonymusLoginEnabled = anonymusLoginEnabled;
-    }
+	public void setAnonymusLoginEnabled(boolean anonymusLoginEnabled) {
+		this.anonymusLoginEnabled = anonymusLoginEnabled;
+	}
 
-    public boolean isAnonymusLoginEnabled() {
-        return anonymusLoginEnabled;
-    }
+	public boolean isAnonymusLoginEnabled() {
+		return anonymusLoginEnabled;
+	}
 
-    public void setOemId(int oemId) {
-        this.oemId = oemId;
-    }
+	public void setOemId(int oemId) {
+		this.oemId = oemId;
+	}
 
-    public int getOemId() {
-        return oemId;
-    }
+	public int getOemId() {
+		return oemId;
+	}
 
-    public void setOemData(byte oemData) {
-        this.oemData = oemData;
-    }
+	public void setOemData(byte oemData) {
+		this.oemData = oemData;
+	}
 
-    public byte getOemData() {
-        return oemData;
-    }
+	public byte getOemData() {
+		return oemData;
+	}
 }

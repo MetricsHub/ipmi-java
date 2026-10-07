@@ -39,58 +39,59 @@ import java.io.IOException;
  */
 public class SolMessageHandler extends MessageHandler {
 
-    private static final Logger logger = LoggerFactory.getLogger(SolMessageHandler.class);
+	private static final Logger LOGGER = LoggerFactory.getLogger(SolMessageHandler.class);
 
-    public SolMessageHandler(Connection connection, int timeout) throws IOException {
-        super(connection, timeout, SolMessage.MIN_SEQUENCE_NUMBER, SolMessage.MAX_SEQUENCE_NUMBER);
-    }
+	public SolMessageHandler(Connection connection, int timeout) throws IOException {
+		super(connection, timeout, SolMessage.MIN_SEQUENCE_NUMBER, SolMessage.MAX_SEQUENCE_NUMBER);
+	}
 
-    /**
-     * Assuming that given message is SOL message, reads both data and acknowledge information from it,
-     * notifying registered listeners about incoming data.
-     *
-     * @param message
-     *          received IPMI message.
-     */
-    @Override
-    protected void handleIncomingMessageInternal(Ipmiv20Message message) {
-        SolInboundMessage payload = (SolInboundMessage) message.getPayload();
+	/**
+	 * Assuming that given message is SOL message, reads both data and acknowledge information from it,
+	 * notifying registered listeners about incoming data.
+	 *
+	 * @param message
+	 *        received IPMI message.
+	 */
+	@Override
+	protected void handleIncomingMessageInternal(Ipmiv20Message message) {
+		SolInboundMessage payload = (SolInboundMessage) message.getPayload();
 
-        if (payload.isAcknowledgeMessage()) {
-            handleIncomingAcknowledgeMessage(message, payload);
-        }
+		if (payload.isAcknowledgeMessage()) {
+			handleIncomingAcknowledgeMessage(message, payload);
+		}
 
-        if (payload.isDataCarrier()) {
-            handleIncomingDataMessage(payload);
-        }
-    }
+		if (payload.isDataCarrier()) {
+			handleIncomingDataMessage(payload);
+		}
+	}
 
-    private void handleIncomingAcknowledgeMessage(Ipmiv20Message message, SolInboundMessage payload) {
-        PayloadCoder coder = messageQueue.getMessageFromQueue(payload.getAckNackSequenceNumber());
-        int tag = payload.getAckNackSequenceNumber();
+	private void handleIncomingAcknowledgeMessage(Ipmiv20Message message, SolInboundMessage payload) {
+		PayloadCoder coder = getMessageQueue().getMessageFromQueue(payload.getAckNackSequenceNumber());
+		int tag = payload.getAckNackSequenceNumber();
 
-        logger.debug("Received message with tag " + tag);
+		LOGGER.debug("Received message with tag " + tag);
 
-        if (coder == null) {
-            logger.debug("No message tagged with " + tag + " in queue. Dropping orphan message.");
-            return;
-        }
+		if (coder == null) {
+			LOGGER.debug("No message tagged with " + tag + " in queue. Dropping orphan message.");
+			return;
+		}
 
-        try {
-            ResponseData responseData = coder.getResponseData(message);
-            connection.notifyResponseListeners(connection.getHandle(), tag, responseData, null);
-        } catch (Exception e) {
-            connection.notifyResponseListeners(connection.getHandle(), tag, null, e);
-        }
+		try {
+			ResponseData responseData = coder.getResponseData(message);
+			getConnection().notifyResponseListeners(getConnection().getHandle(), tag, responseData, null);
+		} catch (Exception e) {
+			getConnection().notifyResponseListeners(getConnection().getHandle(), tag, null, e);
+		}
 
-        // Remove message from queue only when it was fully or partially acknowledged. Otherwise, we want to keep it in queue for further retries
-        if (payload.getStatusField().getAckState() == SolAckState.ACK || payload.getAcceptedCharacterCount() > 0) {
-            messageQueue.remove(payload.getAckNackSequenceNumber());
-        }
-    }
+		// Remove message from queue only when it was fully or partially acknowledged. Otherwise, we want to keep it in
+		// queue for further retries
+		if (payload.getStatusField().getAckState() == SolAckState.ACK || payload.getAcceptedCharacterCount() > 0) {
+			getMessageQueue().remove(payload.getAckNackSequenceNumber());
+		}
+	}
 
-    private void handleIncomingDataMessage(SolInboundMessage payload) {
-        connection.notifyRequestListeners(payload);
-    }
+	private void handleIncomingDataMessage(SolInboundMessage payload) {
+		getConnection().notifyRequestListeners(payload);
+	}
 
 }

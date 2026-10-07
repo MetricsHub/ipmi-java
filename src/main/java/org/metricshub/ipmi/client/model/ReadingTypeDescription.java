@@ -22,7 +22,10 @@ package org.metricshub.ipmi.client.model;
  * ╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱
  */
 
+// This class is a lookup table over (almost) every ReadingType constant
+// CHECKSTYLE.OFF: AvoidStarImport
 import static org.metricshub.ipmi.core.coding.commands.sdr.record.ReadingType.*;
+// CHECKSTYLE.ON: AvoidStarImport
 
 import java.util.Collections;
 import java.util.EnumMap;
@@ -33,12 +36,11 @@ import org.metricshub.ipmi.core.coding.commands.sdr.record.ReadingType;
 /**
  * {@link ReadingType} mapping to match the IPMIUtil event sensor types (states)
  */
-public class ReadingTypeDescription {
+public final class ReadingTypeDescription {
 
 	private static final String PREDICTIVE_FAILURE = "Predictive failure";
 
-	private ReadingTypeDescription() {
-	}
+	private ReadingTypeDescription() {}
 
 	private static final Map<ReadingType, String> READING_TYPE_TO_DESCRIPTION;
 
@@ -56,11 +58,13 @@ public class ReadingTypeDescription {
 		map.put(SlotConnectorReadyForDeviceInstallation, "Ready for Device Installation");
 		map.put(PxeBootRequested, "User requested PXE boot");
 		map.put(FruActive, "Active");
-		map.put(InvalidUsernameOrPassword, "Invalid Username Or Password"); // No correspondence found in ipmiTool code - Update MS_HW_IpmiTool.hdf (Awk)
+		map.put(InvalidUsernameOrPassword, "Invalid Username Or Password"); // No correspondence found in ipmiTool code -
+																																				// Update MS_HW_IpmiTool.hdf (Awk)
 		map.put(SlotConnectorReadyForDeviceRemoval, "Ready for Device Removal");
 		map.put(AutomaticBootToDiagnostic, "Automatic boot to diagnostic");
 		map.put(FruDeactivationRequested, "Deactivation Requested");
-		map.put(InvalidPasswordDisable, "Invalid Password Disable"); // No correspondence found in ipmiTool code - Update MS_HW_IpmiTool.hdf (Awk)
+		map.put(InvalidPasswordDisable, "Invalid Password Disable"); // No correspondence found in ipmiTool code - Update
+																																	// MS_HW_IpmiTool.hdf (Awk)
 		map.put(EntityPresent, "Device Present");
 		map.put(SlotPowerOff, "Slot Power is Off");
 		map.put(SoftwareInitiatedHardReset, "OS initiated hard reset");
@@ -95,13 +99,15 @@ public class ReadingTypeDescription {
 		map.put(ProcessorDisabled, "Disabled");
 		map.put(ConsistencyOrParityCheckInProgress, "Parity Check In Progress");
 		map.put(TerminatorPresenceDetected, "Terminator presence detected");
-		map.put(SecureModeViolationAttempt, "Secure Mode Violation Attempt"); // No correspondence found in ipmiTool code - Update MS_HW_IpmiTool.hdf (Awk)
+		map.put(SecureModeViolationAttempt, "Secure Mode Violation Attempt"); // No correspondence found in ipmiTool code -
+																																					// Update MS_HW_IpmiTool.hdf (Awk)
 		map.put(OsGracefulStop, "OS graceful stop");
 		map.put(InCriticalArray, "In Critical Array");
 		map.put(ProcessorAutomaticallyThrottled, "Throttled");
 		map.put(PreBootUserPasswordViolation, "Pre-boot password violation - user password");
 		map.put(OsGracefulShutdown, "OS graceful shutdown");
-		map.put(MachineCheckException, "Machine Check Exception"); // No correspondence found in ipmiTool code - Update MS_HW_IpmiTool.hdf (Awk)
+		map.put(MachineCheckException, "Machine Check Exception"); // No correspondence found in ipmiTool code - Update
+																																// MS_HW_IpmiTool.hdf (Awk)
 		map.put(PreBootSetupPasswordViolation, "Pre-boot password violation - setup password");
 		map.put(SoftOsShutdown, "PEF initiated soft shutdown");
 		map.put(PreBootNetworkPasswordViolation, "Pre-boot password violation - network boot password");
@@ -120,7 +126,8 @@ public class ReadingTypeDescription {
 		map.put(MemoryConfigurationError, "Configuration Error");
 		map.put(SpareMemoryUnit, "Spare");
 		map.put(MemoryAutomaticallyThrottled, "Throttled");
-		map.put(MemoryCriticalOvertemperature, "Critical Overtemperature"); // No correspondence found in ipmiTool code - Update MS_HW_IpmiTool.hdf (Awk)
+		map.put(MemoryCriticalOvertemperature, "Critical Overtemperature"); // No correspondence found in ipmiTool code -
+																																				// Update MS_HW_IpmiTool.hdf (Awk)
 		map.put(SystemReconfigured, "System Reconfigured");
 		map.put(OemSystemBootEvent, "OEM System boot event");
 		map.put(ABootCompleted, "A: boot completed");
@@ -188,7 +195,15 @@ public class ReadingTypeDescription {
 		map.put(TransitionToCriticalFromLessSevere, "Transition to Critical from less severe");
 		map.put(SelAlmostFull, "Log almost full");
 		map.put(TransitionToNonRecoverableFromLessSevere, "Transition to Non-recoverable from less severe");
-		map.put(CorrectableMachineCheckErrorLoggingDisabled, "Correctable Machine Check Error Logging Disabled"); // No correspondence found in ipmiTool code - Update MS_HW_IpmiTool.hdf (Awk)
+		map.put(CorrectableMachineCheckErrorLoggingDisabled, "Correctable Machine Check Error Logging Disabled"); // No
+																																																							// correspondence
+																																																							// found
+																																																							// in
+																																																							// ipmiTool
+																																																							// code -
+																																																							// Update
+																																																							// MS_HW_IpmiTool.hdf
+																																																							// (Awk)
 		map.put(TransitionToNonCriticalFromMoreSevere, "Transition to Non-critical from more severe");
 		map.put(TransitionToCriticalFromNonRecoverable, "Transition to Critical from Non-recoverable");
 		map.put(SlotConnectorDeviceRemovalRequest, "Device Removal Request");
@@ -210,7 +225,8 @@ public class ReadingTypeDescription {
 		map.put(SuccessfulSoftwareOrFWChangeDetected, "Firmware or software change success");
 		map.put(InFailedArray, "In Failed Array");
 		map.put(RebuildRemapInProgress, "Rebuild In Progress");
-		map.put(CorrectableMachineCheckError, "Correctable Machine Check Error"); // No correspondence found in ipmiTool code - Update MS_HW_IpmiTool.hdf (Awk)
+		map.put(CorrectableMachineCheckError, "Correctable Machine Check Error"); // No correspondence found in ipmiTool
+																																							// code - Update MS_HW_IpmiTool.hdf (Awk)
 		map.put(RebuildRemapAborted, "Rebuild Aborted");
 		map.put(Ierr, "IERR");
 		map.put(ChipsetSoftPowerControlFailure, "Soft-power control failure");
@@ -234,7 +250,10 @@ public class ReadingTypeDescription {
 		map.put(AcpiS2SleepingProcessorContextLost, "S2: sleeping, processor context lost");
 		map.put(PowerSupplyFailureDetected, "Failure detected");
 		map.put(TimerInterrupt, "Timer interrupt");
-		map.put(AcpiS3SleepingProcessorContextLostMemoryRetained, "S3: sleeping, processor & hw context lost, memory retained");
+		map
+				.put(
+						AcpiS3SleepingProcessorContextLostMemoryRetained,
+						"S3: sleeping, processor & hw context lost, memory retained");
 		map.put(PowerSupplyPredictiveFailure, PREDICTIVE_FAILURE);
 		map.put(NonRedundant_SufficientResourcesFromInsufficientResources, "Non-Redundant: Sufficient from Insufficient");
 		map.put(AcpiS4NonVolatileSleep, "S4: non-volatile sleep/suspend-to-disk");
@@ -286,7 +305,8 @@ public class ReadingTypeDescription {
 
 	/**
 	 * @param readingType The {@link ReadingType} key
-	 * @return {@link String} value extracted from the internal lookup matching the output of IPMIUtil and the java verax IPMI lib
+	 * @return {@link String} value extracted from the internal lookup matching the output of IPMIUtil and the java verax
+	 *         IPMI lib
 	 */
 	public static String getReadingType(ReadingType readingType) {
 		return READING_TYPE_TO_DESCRIPTION.get(readingType);

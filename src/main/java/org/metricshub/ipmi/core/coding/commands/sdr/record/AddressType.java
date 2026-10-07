@@ -29,47 +29,50 @@ public enum AddressType {
 	/**
 	 * IPMB Slave Address
 	 */
-    IpmbSlaveAddress(AddressType.IPMBSLAVEADDRESS),
-    /**
-     * System Software ID
-     */
-    SystemSoftwareId(AddressType.SYSTEMSOFTWAREID),
-    ;
-    private static final int IPMBSLAVEADDRESS = 0;
-    private static final int SYSTEMSOFTWAREID = 1;
+	IpmbSlaveAddress(AddressType.IPMBSLAVEADDRESS),
+	/**
+	 * System Software ID
+	 */
+	SystemSoftwareId(AddressType.SYSTEMSOFTWAREID),
+	;
 
-    private int code;
+	private static final int IPMBSLAVEADDRESS = 0;
+	private static final int SYSTEMSOFTWAREID = 1;
 
-    /**
-     * Creates a new {@link AddressType}
-     * @param code address type code
-     */
-    AddressType(int code) {
-        this.code = code;
-    }
+	private int code;
 
-    /**
-     * Get address code
-     * @return int value
-     */
-    public int getCode() {
-        return code;
-    }
+	/**
+	 * Creates a new {@link AddressType}
+	 *
+	 * @param code address type code
+	 */
+	AddressType(int code) {
+		this.code = code;
+	}
 
-    /**
-     * Parse the given int value and return the corresponding {@link AddressType}
-     * 
-     * @param value address type value as int
-     * @return {@link AddressType} instance
-     */
-    public static AddressType parseInt(int value) {
-        switch(value) {
-        case IPMBSLAVEADDRESS:
-            return IpmbSlaveAddress;
-        case SYSTEMSOFTWAREID:
-            return SystemSoftwareId;
-        default:
-            throw new IllegalArgumentException("Invalid value: " + value);
-        }
-    }
+	/**
+	 * Get address code
+	 *
+	 * @return int value
+	 */
+	public int getCode() {
+		return code;
+	}
+
+	/**
+	 * Parse the given int value and return the corresponding {@link AddressType}
+	 *
+	 * @param value address type value as int
+	 * @return {@link AddressType} instance
+	 */
+	public static AddressType parseInt(int value) {
+		switch (value) {
+		case IPMBSLAVEADDRESS:
+			return IpmbSlaveAddress;
+		case SYSTEMSOFTWAREID:
+			return SystemSoftwareId;
+		default:
+			throw new IllegalArgumentException("Invalid value: " + value);
+		}
+	}
 }

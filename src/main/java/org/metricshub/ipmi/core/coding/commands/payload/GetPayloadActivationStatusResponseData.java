@@ -33,69 +33,69 @@ import java.util.List;
  */
 public class GetPayloadActivationStatusResponseData implements ResponseData {
 
-    /**
-     * Number of instances of given payload type that can be simultaneously activated on BMC.
-     */
-    private byte instanceCapacity;
+	/**
+	 * Number of instances of given payload type that can be simultaneously activated on BMC.
+	 */
+	private byte instanceCapacity;
 
-    /**
-     * List of instance ID's that are still available (not activated).
-     */
-    private List<Byte> availableInstances;
+	/**
+	 * List of instance ID's that are still available (not activated).
+	 */
+	private List<Byte> availableInstances;
 
-    public byte getInstanceCapacity() {
-        return instanceCapacity;
-    }
+	public byte getInstanceCapacity() {
+		return instanceCapacity;
+	}
 
-    public void setInstanceCapacity(byte instanceCapacity) {
-        this.instanceCapacity = instanceCapacity;
-    }
+	public void setInstanceCapacity(byte instanceCapacity) {
+		this.instanceCapacity = instanceCapacity;
+	}
 
-    public List<Byte> getAvailableInstances() {
-        List<Byte> actuallyAvailableInstances = new LinkedList<Byte>();
+	public List<Byte> getAvailableInstances() {
+		List<Byte> actuallyAvailableInstances = new LinkedList<Byte>();
 
-        for (Byte instanceId : availableInstances) {
-            if (instanceId <= instanceCapacity) {
-                actuallyAvailableInstances.add(instanceId);
-            }
-        }
+		for (Byte instanceId : availableInstances) {
+			if (instanceId <= instanceCapacity) {
+				actuallyAvailableInstances.add(instanceId);
+			}
+		}
 
-        return actuallyAvailableInstances;
-    }
+		return actuallyAvailableInstances;
+	}
 
-    public void setAvailableInstances(byte[] availableInstancesData) {
-        this.availableInstances = getAvailableInstancesFromBytes(availableInstancesData);
-    }
+	public void setAvailableInstances(byte[] availableInstancesData) {
+		this.availableInstances = getAvailableInstancesFromBytes(availableInstancesData);
+	}
 
-    private List<Byte> getAvailableInstancesFromBytes(byte[] availableInstancesData) {
-        List<Byte> result = new LinkedList<Byte>();
+	private List<Byte> getAvailableInstancesFromBytes(byte[] availableInstancesData) {
+		List<Byte> result = new LinkedList<Byte>();
 
-        List<Byte> instancesFromFirstByte = checkForAvailableInstancesInByte(availableInstancesData[0], 0);
-        List<Byte> instancesFromSecondByte = checkForAvailableInstancesInByte(availableInstancesData[1], 8);
+		List<Byte> instancesFromFirstByte = checkForAvailableInstancesInByte(availableInstancesData[0], 0);
+		List<Byte> instancesFromSecondByte = checkForAvailableInstancesInByte(availableInstancesData[1], 8);
 
-        result.addAll(instancesFromFirstByte);
-        result.addAll(instancesFromSecondByte);
+		result.addAll(instancesFromFirstByte);
+		result.addAll(instancesFromSecondByte);
 
-        return result;
-    }
+		return result;
+	}
 
-    private List<Byte> checkForAvailableInstancesInByte(byte availableInstancesByte, int instanceIdOffset) {
-        List<Byte> result = new LinkedList<Byte>();
+	private List<Byte> checkForAvailableInstancesInByte(byte availableInstancesByte, int instanceIdOffset) {
+		List<Byte> result = new LinkedList<Byte>();
 
-        for (int i = 0; i < 8; ++i) {
-            if (!TypeConverter.isBitSetOnPosition(i, availableInstancesByte)) {
-                result.add((byte) (i + 1 + instanceIdOffset));
-            }
-        }
+		for (int i = 0; i < 8; ++i) {
+			if (!TypeConverter.isBitSetOnPosition(i, availableInstancesByte)) {
+				result.add((byte) (i + 1 + instanceIdOffset));
+			}
+		}
 
-        return result;
-    }
+		return result;
+	}
 
-    @Override
-    public String toString() {
-        return "GetPayloadActivationStatusResponseData{" +
-                "instanceCapacity=" + getInstanceCapacity() +
-                ", availableInstances=" + getAvailableInstances() +
-                '}';
-    }
+	@Override
+	public String toString() {
+		return "GetPayloadActivationStatusResponseData{" +
+				"instanceCapacity=" + getInstanceCapacity() +
+				", availableInstances=" + getAvailableInstances() +
+				'}';
+	}
 }

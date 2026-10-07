@@ -73,16 +73,17 @@ public abstract class AuthenticationAlgorithm {
 	/**
 	 * Checks value of the Key Exchange Authentication Code in RAKP messages
 	 *
-	 * @param data     - The base for authentication algorithm. Depends on RAKP
-	 *                 Message.
-	 * @param key      - the Key Exchange Authentication Code to check.
+	 * @param data - The base for authentication algorithm. Depends on RAKP
+	 *        Message.
+	 * @param key - the Key Exchange Authentication Code to check.
 	 * @param password - password of the user establishing a session
 	 * @return True if authentication check was successful, false otherwise.
 	 * @throws NoSuchAlgorithmException when initiation of the algorithm fails
-	 * @throws InvalidKeyException      when creating of the algorithm key fails
+	 * @throws InvalidKeyException when creating of the algorithm key fails
 	 */
 	public boolean checkKeyExchangeAuthenticationCode(byte[] data, byte[] key, String password)
-			throws NoSuchAlgorithmException, InvalidKeyException {
+			throws NoSuchAlgorithmException,
+			InvalidKeyException {
 		byte[] check = getKeyExchangeAuthenticationCode(data, password);
 		return Arrays.equals(check, key);
 	}
@@ -90,14 +91,15 @@ public abstract class AuthenticationAlgorithm {
 	/**
 	 * Calculates value of the Key Exchange Authentication Code in RAKP messages
 	 *
-	 * @param data     - The base for authentication algorithm. Depends on RAKP
-	 *                 Message.
+	 * @param data - The base for authentication algorithm. Depends on RAKP
+	 *        Message.
 	 * @param password - password of the user establishing a session
 	 * @throws NoSuchAlgorithmException when initiation of the algorithm fails
-	 * @throws InvalidKeyException      when creating of the algorithm key fails
+	 * @throws InvalidKeyException when creating of the algorithm key fails
 	 */
 	public byte[] getKeyExchangeAuthenticationCode(byte[] data, String password)
-			throws NoSuchAlgorithmException, InvalidKeyException {
+			throws NoSuchAlgorithmException,
+			InvalidKeyException {
 
 		final byte[] key = password.getBytes();
 
@@ -110,21 +112,22 @@ public abstract class AuthenticationAlgorithm {
 	/**
 	 * Validates Integrity Check Value in RAKP Message 4.
 	 *
-	 * @param data      - The base for authentication algorithm.
+	 * @param data - The base for authentication algorithm.
 	 * @param reference - The Integrity Check Value to validate.
-	 * @param sik       - The Session Integrity Key generated on base of RAKP
-	 *                  Messages 1 and 2.
+	 * @param sik - The Session Integrity Key generated on base of RAKP
+	 *        Messages 1 and 2.
 	 * @see Rakp1#calculateSik(org.metricshub.ipmi.core.coding.commands.session.Rakp1ResponseData)
 	 * @return True if integrity check was successful, false otherwise.
 	 * @throws NoSuchAlgorithmException when initiation of the algorithm fails
-	 * @throws InvalidKeyException      when creating of the algorithm key fails
+	 * @throws InvalidKeyException when creating of the algorithm key fails
 	 */
 	public boolean doIntegrityCheck(byte[] data, byte[] reference, byte[] sik)
-			throws InvalidKeyException, NoSuchAlgorithmException {
+			throws InvalidKeyException,
+			NoSuchAlgorithmException {
 
 		SecretKeySpec sKey = new SecretKeySpec(sik, getAlgorithmName());
 		mac.init(sKey);
-		
+
 		final int integrityCheckLength = getIntegrityCheckBaseLength();
 		final byte[] result = new byte[integrityCheckLength];
 

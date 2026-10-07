@@ -1,6 +1,7 @@
 /**
- * IPMI protocol decoder classes. 
- * To implement custom IPMI protocol decoder implement {@link org.metricshub.ipmi.core.coding.protocol.decoder.IpmiDecoder} interface.
+ * IPMI protocol decoder classes.
+ * To implement custom IPMI protocol decoder implement
+ * {@link org.metricshub.ipmi.core.coding.protocol.decoder.IpmiDecoder} interface.
  */
 package org.metricshub.ipmi.core.coding.protocol.decoder;
 /*-

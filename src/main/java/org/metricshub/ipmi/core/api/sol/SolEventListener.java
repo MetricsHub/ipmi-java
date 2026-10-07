@@ -1,4 +1,4 @@
-package  org.metricshub.ipmi.core.api.sol;
+package org.metricshub.ipmi.core.api.sol;
 
 /*-
  * ╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲
@@ -33,26 +33,29 @@ import java.util.Set;
  */
 public interface SolEventListener {
 
-    /**
-     * Process event sent proactively by remote server.
-     *
-     * @param statuses
-     *          statuses indicated by remote server
-     */
-    void processRequestEvent(Set<SolStatus> statuses);
+	/**
+	 * Process event sent proactively by remote server.
+	 *
+	 * @param statuses
+	 *        statuses indicated by remote server
+	 */
+	void processRequestEvent(Set<SolStatus> statuses);
 
-    /**
-     * Process event sent by remote server as a response for some outbound message.
-     *
-     * @param statuses
-     *          statuses indicated by remote server
-     * @param correspondingRequestData
-     *          data from message, that caused this event to be fired.
-     *          Can be empty array if message didn't contain character data.
-     * @param correspondingRequestOperations
-     *          set of operations invoked on remote server's serial port that caused this event to be fired.
-     *          Can be empty set if corresponding request message didn't contain any operations to be invoked
-     */
-    void processResponseEvent(Set<SolStatus> statuses, byte[] correspondingRequestData, Set<SolOperation> correspondingRequestOperations);
+	/**
+	 * Process event sent by remote server as a response for some outbound message.
+	 *
+	 * @param statuses
+	 *        statuses indicated by remote server
+	 * @param correspondingRequestData
+	 *        data from message, that caused this event to be fired.
+	 *        Can be empty array if message didn't contain character data.
+	 * @param correspondingRequestOperations
+	 *        set of operations invoked on remote server's serial port that caused this event to be fired.
+	 *        Can be empty set if corresponding request message didn't contain any operations to be invoked
+	 */
+	void processResponseEvent(
+			Set<SolStatus> statuses,
+			byte[] correspondingRequestData,
+			Set<SolOperation> correspondingRequestOperations);
 
 }

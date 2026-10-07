@@ -28,77 +28,78 @@ import java.util.HashSet;
 import java.util.Set;
 
 /**
- * {@link SolOutboundOperationField} is a transfer object for operation sent by this application to remote system in {@link SolOutboundMessage}.
+ * {@link SolOutboundOperationField} is a transfer object for operation sent by this application to remote system in
+ * {@link SolOutboundMessage}.
  */
 public class SolOutboundOperationField {
 
-    /**
-     * Acknowledge state of {@link SolMessage} that this message is response for.
-     */
-    private final SolAckState ackState;
+	/**
+	 * Acknowledge state of {@link SolMessage} that this message is response for.
+	 */
+	private final SolAckState ackState;
 
-    /**
-     * Set of operations to invoke on BMC.
-     */
-    private final Set<SolOperation> operations;
+	/**
+	 * Set of operations to invoke on BMC.
+	 */
+	private final Set<SolOperation> operations;
 
-    /**
-     * Creates new instance of {@link SolOutboundOperationField} filled with given data.
-     *
-     * @param ackState
-     *          Acknowledge state carried by this object
-     * @param operations
-     *          Set of SOL specific operations for outbound message
-     */
-    public SolOutboundOperationField(SolAckState ackState, Set<SolOperation> operations) {
-        this.ackState = ackState;
-        this.operations = operations;
-    }
+	/**
+	 * Creates new instance of {@link SolOutboundOperationField} filled with given data.
+	 *
+	 * @param ackState
+	 *        Acknowledge state carried by this object
+	 * @param operations
+	 *        Set of SOL specific operations for outbound message
+	 */
+	public SolOutboundOperationField(SolAckState ackState, Set<SolOperation> operations) {
+		this.ackState = ackState;
+		this.operations = operations;
+	}
 
-    /**
-     * Creates new instance of {@link SolOutboundOperationField} from raw byte.
-     *
-     * @param raw
-     *          byte carrying information about SOL operations
-     */
-    public SolOutboundOperationField(byte raw) {
-        this.ackState = SolAckState.extractFromByte(raw);
-        this.operations = extractOperationsFromByte(raw);
-    }
+	/**
+	 * Creates new instance of {@link SolOutboundOperationField} from raw byte.
+	 *
+	 * @param raw
+	 *        byte carrying information about SOL operations
+	 */
+	public SolOutboundOperationField(byte raw) {
+		this.ackState = SolAckState.extractFromByte(raw);
+		this.operations = extractOperationsFromByte(raw);
+	}
 
-    protected Set<SolOperation> extractOperationsFromByte(byte raw) {
-        Set<SolOperation> result = new HashSet<SolOperation>();
+	protected Set<SolOperation> extractOperationsFromByte(byte raw) {
+		Set<SolOperation> result = new HashSet<SolOperation>();
 
-        for (SolOperation operation : SolOperation.values()) {
-            if (TypeConverter.isBitSetOnPosition(operation.getOperationNumber(), raw)) {
-                result.add(operation);
-            }
-        }
+		for (SolOperation operation : SolOperation.values()) {
+			if (TypeConverter.isBitSetOnPosition(operation.getOperationNumber(), raw)) {
+				result.add(operation);
+			}
+		}
 
-        return result;
-    }
+		return result;
+	}
 
-    public Set<SolOperation> getOperations() {
-        return operations;
-    }
+	public Set<SolOperation> getOperations() {
+		return operations;
+	}
 
-    public SolAckState getAckState() {
-        return ackState;
-    }
+	public SolAckState getAckState() {
+		return ackState;
+	}
 
-    /**
-     * Convert this object to it's raw, byte representation.
-     */
-    public byte convertToByte() {
-        byte value = (byte) 0;
+	/**
+	 * Convert this object to it's raw, byte representation.
+	 */
+	public byte convertToByte() {
+		byte value = (byte) 0;
 
-       value = ackState.encodeInByte(value);
+		value = ackState.encodeInByte(value);
 
-        for (SolOperation operation : operations) {
-            value = TypeConverter.setBitOnPosition(operation.getOperationNumber(), value);
-        }
+		for (SolOperation operation : operations) {
+			value = TypeConverter.setBitOnPosition(operation.getOperationNumber(), value);
+		}
 
-        return value;
-    }
+		return value;
+	}
 
 }

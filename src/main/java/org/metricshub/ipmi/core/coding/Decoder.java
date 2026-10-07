@@ -39,40 +39,48 @@ import java.security.NoSuchAlgorithmException;
  */
 public final class Decoder {
 
-    /**
-     * Decodes raw data into {@link ResponseData} - a wrapper class for
-     * message-specific response data.
-     *
-     * @param data
-     *            - raw RMCP packet to be decoded
-     * @param protocolDecoder
-     *            - instance of {@link IpmiDecoder} class for decoding of the
-     *            IPMI session header and (if present) IPMI LAN packet. If IPMI
-     *            LAN packet is present, {@link Protocolv15Decoder} or
-     *            {@link Protocolv20Decoder} should be used (depending on IPMI
-     *            protocol version used). Otherwise,
-     *            {@link PlainCommandv20Decoder} should be used.
-     * @param payloadCoder
-     *            - instance of {@link PayloadCoder} class used for wrapping
-     *            payload into message-dependent {@link ResponseData} object.
-     * @return {@link ResponseData}
-     * @throws IPMIException
-     *             when request to the server fails.
-     * @see CompletionCode
-     * @throws IllegalArgumentException
-     *             when data is corrupted
-     * @throws NoSuchAlgorithmException
-     *             - when authentication, confidentiality or integrity algorithm
-     *             fails.
-     * @throws InvalidKeyException
-     *             when creating of the authentication algorithm key fails
-     */
-    public static ResponseData decode(byte[] data, IpmiDecoder protocolDecoder,
-            PayloadCoder payloadCoder) throws IPMIException, NoSuchAlgorithmException, InvalidKeyException {
-        return payloadCoder.getResponseData(protocolDecoder.decode(RmcpDecoder
-                .decode(data)));
-    }
+	/**
+	 * Decodes raw data into {@link ResponseData} - a wrapper class for
+	 * message-specific response data.
+	 *
+	 * @param data
+	 *        - raw RMCP packet to be decoded
+	 * @param protocolDecoder
+	 *        - instance of {@link IpmiDecoder} class for decoding of the
+	 *        IPMI session header and (if present) IPMI LAN packet. If IPMI
+	 *        LAN packet is present, {@link Protocolv15Decoder} or
+	 *        {@link Protocolv20Decoder} should be used (depending on IPMI
+	 *        protocol version used). Otherwise,
+	 *        {@link PlainCommandv20Decoder} should be used.
+	 * @param payloadCoder
+	 *        - instance of {@link PayloadCoder} class used for wrapping
+	 *        payload into message-dependent {@link ResponseData} object.
+	 * @return {@link ResponseData}
+	 * @throws IPMIException
+	 *         when request to the server fails.
+	 * @see CompletionCode
+	 * @throws IllegalArgumentException
+	 *         when data is corrupted
+	 * @throws NoSuchAlgorithmException
+	 *         - when authentication, confidentiality or integrity algorithm
+	 *         fails.
+	 * @throws InvalidKeyException
+	 *         when creating of the authentication algorithm key fails
+	 */
+	public static ResponseData decode(
+			byte[] data,
+			IpmiDecoder protocolDecoder,
+			PayloadCoder payloadCoder)
+			throws IPMIException,
+			NoSuchAlgorithmException,
+			InvalidKeyException {
+		return payloadCoder
+				.getResponseData(
+						protocolDecoder
+								.decode(
+										RmcpDecoder
+												.decode(data)));
+	}
 
-    private Decoder() {
-    }
+	private Decoder() {}
 }

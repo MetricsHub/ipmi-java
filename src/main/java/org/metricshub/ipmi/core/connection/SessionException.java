@@ -27,7 +27,7 @@ package org.metricshub.ipmi.core.connection;
  */
 public class SessionException extends Exception {
 
-    public SessionException(String message, Throwable cause) {
-        super(message, cause);
-    }
+	public SessionException(String message, Throwable cause) {
+		super(message, cause);
+	}
 }

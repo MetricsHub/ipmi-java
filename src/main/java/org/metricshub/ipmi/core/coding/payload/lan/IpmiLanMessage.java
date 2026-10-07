@@ -29,109 +29,127 @@ import org.metricshub.ipmi.core.common.TypeConverter;
  * A wrapper class for IPMI LAN message
  */
 public abstract class IpmiLanMessage extends IpmiPayload {
-    public static final int MIN_SEQUENCE_NUMBER = 1;
-    public static final int MAX_SEQUENCE_NUMBER = 63;
+	public static final int MIN_SEQUENCE_NUMBER = 1;
+	public static final int MAX_SEQUENCE_NUMBER = 63;
 
-    private byte responderAddress;
+	private byte responderAddress;
 
-    protected byte networkFunction;
+	private byte networkFunction;
 
-    private byte responderLogicalUnitNumber;
+	private byte responderLogicalUnitNumber;
 
-    private byte requesterAddress;
+	private byte requesterAddress;
 
-    private byte requesterLogicalUnitNumber;
-    
-    private byte sequenceNumber;
+	private byte requesterLogicalUnitNumber;
 
-    private byte command;
+	private byte sequenceNumber;
 
-    public void setResponderAddress(byte responderAddress) {
-        this.responderAddress = responderAddress;
-    }
+	private byte command;
 
-    public byte getResponderAddress() {
-        return responderAddress;
-    }
+	public void setResponderAddress(byte responderAddress) {
+		this.responderAddress = responderAddress;
+	}
 
-    public void setNetworkFunction(NetworkFunction networkFunction) {
-        this.networkFunction = TypeConverter.intToByte(networkFunction.getCode());
-    }
+	public byte getResponderAddress() {
+		return responderAddress;
+	}
 
-    public NetworkFunction getNetworkFunction() {
-        return NetworkFunction.parseInt(TypeConverter.byteToInt(networkFunction));
-    }
+	public void setNetworkFunction(NetworkFunction networkFunction) {
+		this.networkFunction = TypeConverter.intToByte(networkFunction.getCode());
+	}
 
-    public void setResponderLogicalUnitNumber(byte responderLogicalUnitNumber) {
-        this.responderLogicalUnitNumber = responderLogicalUnitNumber;
-    }
+	public NetworkFunction getNetworkFunction() {
+		return NetworkFunction.parseInt(TypeConverter.byteToInt(networkFunction));
+	}
 
-    public byte getResponderLogicalUnitNumber() {
-        return responderLogicalUnitNumber;
-    }
+	/**
+	 * Sets the raw network function code (6 bits), which may not map to a known {@link NetworkFunction}.
+	 *
+	 * @param networkFunctionCode the network function code
+	 */
+	protected void setNetworkFunctionCode(byte networkFunctionCode) {
+		this.networkFunction = networkFunctionCode;
+	}
 
-    public void setSequenceNumber(byte sequenceAddress) {
-        this.sequenceNumber = sequenceAddress;
-    }
+	/**
+	 * Returns the raw network function code (6 bits).
+	 *
+	 * @return the network function code
+	 */
+	protected byte getNetworkFunctionCode() {
+		return networkFunction;
+	}
 
-    public byte getSequenceNumber() {
-        return sequenceNumber;
-    }
+	public void setResponderLogicalUnitNumber(byte responderLogicalUnitNumber) {
+		this.responderLogicalUnitNumber = responderLogicalUnitNumber;
+	}
 
-    public void setRequesterAddress(byte requesterAddress) {
-        this.requesterAddress = requesterAddress;
-    }
+	public byte getResponderLogicalUnitNumber() {
+		return responderLogicalUnitNumber;
+	}
 
-    public byte getRequesterAddress() {
-        return requesterAddress;
-    }
+	public void setSequenceNumber(byte sequenceAddress) {
+		this.sequenceNumber = sequenceAddress;
+	}
 
-    public void setRequesterLogicalUnitNumber(byte requesterLogicalUnitNumber) {
-        this.requesterLogicalUnitNumber = requesterLogicalUnitNumber;
-    }
+	public byte getSequenceNumber() {
+		return sequenceNumber;
+	}
 
-    public byte getRequesterLogicalUnitNumber() {
-        return requesterLogicalUnitNumber;
-    }
+	public void setRequesterAddress(byte requesterAddress) {
+		this.requesterAddress = requesterAddress;
+	}
 
-    public void setCommand(byte command) {
-        this.command = command;
-    }
+	public byte getRequesterAddress() {
+		return requesterAddress;
+	}
 
-    public byte getCommand() {
-        return command;
-    }
-    
-    /**
-     * Gets expected size of LAN message in bytes.
-     */
-    @Override
-    public abstract int getPayloadLength();
-    
-    /**
-     * Converts IpmiLanMessage to byte array. 
-     */
-    @Override
-    public abstract byte[] getPayloadData();
-        
-    protected byte getChecksum1(byte[] message) {
-        int checksum = 0;
-        for(int i = 0; i < 2; ++i) {
-            checksum = (checksum + TypeConverter.byteToInt(message[i])) % 256;
-        }
-        return (byte) -TypeConverter.intToByte(checksum);
-    }
-    
-    protected byte getChecksum2(byte[] message) {
-        int checksum = 0;
-        for(int i = 3; i < message.length-1; ++i) {
-            checksum = ((checksum + TypeConverter.byteToInt(message[i])) % 256);
-        }
-        return (byte)-TypeConverter.intToByte(checksum);
-    }
-    
-    @Override
-    public byte[] getIpmiCommandData() {
-        return getData();
-    }
+	public void setRequesterLogicalUnitNumber(byte requesterLogicalUnitNumber) {
+		this.requesterLogicalUnitNumber = requesterLogicalUnitNumber;
+	}
+
+	public byte getRequesterLogicalUnitNumber() {
+		return requesterLogicalUnitNumber;
+	}
+
+	public void setCommand(byte command) {
+		this.command = command;
+	}
+
+	public byte getCommand() {
+		return command;
+	}
+
+	/**
+	 * Gets expected size of LAN message in bytes.
+	 */
+	@Override
+	public abstract int getPayloadLength();
+
+	/**
+	 * Converts IpmiLanMessage to byte array.
+	 */
+	@Override
+	public abstract byte[] getPayloadData();
+
+	protected byte getChecksum1(byte[] message) {
+		int checksum = 0;
+		for (int i = 0; i < 2; ++i) {
+			checksum = (checksum + TypeConverter.byteToInt(message[i])) % 256;
+		}
+		return (byte) -TypeConverter.intToByte(checksum);
+	}
+
+	protected byte getChecksum2(byte[] message) {
+		int checksum = 0;
+		for (int i = 3; i < message.length - 1; ++i) {
+			checksum = ((checksum + TypeConverter.byteToInt(message[i])) % 256);
+		}
+		return (byte) -TypeConverter.intToByte(checksum);
+	}
+
+	@Override
+	public byte[] getIpmiCommandData() {
+		return getData();
+	}
 }

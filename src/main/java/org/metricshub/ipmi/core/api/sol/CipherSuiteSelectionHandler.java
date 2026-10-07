@@ -27,17 +27,18 @@ import org.metricshub.ipmi.core.coding.security.CipherSuite;
 import java.util.List;
 
 /**
- * Interface for {@link CipherSuite} selection handler to choose among available {@link CipherSuite}s returned by the server.
+ * Interface for {@link CipherSuite} selection handler to choose among available {@link CipherSuite}s returned by the
+ * server.
  */
 public interface CipherSuiteSelectionHandler {
 
-    /**
-     * Chooses one {@link CipherSuite} among list of available {@link CipherSuite}s, to be used during IPMI connection.
-     *
-     * @param availableCipherSuites
-     *          {@link CipherSuite}s returned by the server as avaialble to use.
-     * @return chosen cipher suite
-     */
-    CipherSuite choose(List<CipherSuite> availableCipherSuites);
+	/**
+	 * Chooses one {@link CipherSuite} among list of available {@link CipherSuite}s, to be used during IPMI connection.
+	 *
+	 * @param availableCipherSuites
+	 *        {@link CipherSuite}s returned by the server as avaialble to use.
+	 * @return chosen cipher suite
+	 */
+	CipherSuite choose(List<CipherSuite> availableCipherSuites);
 
 }

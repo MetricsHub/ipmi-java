@@ -31,7 +31,6 @@ import org.metricshub.ipmi.core.coding.security.CipherSuite;
 import org.metricshub.ipmi.core.coding.security.ConfidentialityNone;
 import org.metricshub.ipmi.core.common.TypeConverter;
 
-
 import java.security.InvalidKeyException;
 import java.util.Arrays;
 
@@ -43,249 +42,273 @@ import org.slf4j.LoggerFactory;
  */
 public class Protocolv20Decoder extends ProtocolDecoder {
 
-    private static Logger logger = LoggerFactory.getLogger(Protocolv20Decoder.class);
-    
-    private CipherSuite cipherSuite;
+	private static Logger logger = LoggerFactory.getLogger(Protocolv20Decoder.class);
 
-    /**
-     * Initiates IPMI v2.0 packet decoder.
-     *
-     * @param cipherSuite
-     *            - {@link CipherSuite} that will be used to decode the message
-     */
-    public Protocolv20Decoder(CipherSuite cipherSuite) {
-        super();
-        this.cipherSuite = cipherSuite;
-    }
+	private CipherSuite cipherSuite;
 
-    /**
-     * Decodes IPMI v2.0 message fields.
-     *
-     * @param rmcpMessage
-     *            - RMCP message to decode.
-     * @return decoded message
-     * @see Ipmiv20Message
-     * @throws IllegalArgumentException
-     *             when delivered RMCP message does not contain encapsulated
-     *             IPMI message or when AuthCode field is incorrect (integrity
-     *             check fails).
-     * @throws InvalidKeyException
-     *             - when initiation of the integrity algorithm fails
-     */
-    @Override
-    public IpmiMessage decode(RmcpMessage rmcpMessage) throws InvalidKeyException {
-        Ipmiv20Message message = new Ipmiv20Message(
-                cipherSuite.getConfidentialityAlgorithm());
+	/**
+	 * Initiates IPMI v2.0 packet decoder.
+	 *
+	 * @param cipherSuite
+	 *        - {@link CipherSuite} that will be used to decode the message
+	 */
+	public Protocolv20Decoder(CipherSuite cipherSuite) {
+		super();
+		this.cipherSuite = cipherSuite;
+	}
 
-        byte[] raw = rmcpMessage.getData();
+	/**
+	 * Decodes IPMI v2.0 message fields.
+	 *
+	 * @param rmcpMessage
+	 *        - RMCP message to decode.
+	 * @return decoded message
+	 * @see Ipmiv20Message
+	 * @throws IllegalArgumentException
+	 *         when delivered RMCP message does not contain encapsulated
+	 *         IPMI message or when AuthCode field is incorrect (integrity
+	 *         check fails).
+	 * @throws InvalidKeyException
+	 *         - when initiation of the integrity algorithm fails
+	 */
+	@Override
+	public IpmiMessage decode(RmcpMessage rmcpMessage) throws InvalidKeyException {
+		Ipmiv20Message message = new Ipmiv20Message(
+				cipherSuite.getConfidentialityAlgorithm());
 
-        message.setAuthenticationType(decodeAuthenticationType(raw[0]));
+		byte[] raw = rmcpMessage.getData();
 
-        message.setPayloadEncrypted(decodeEncryption(raw[1]));
+		message.setAuthenticationType(decodeAuthenticationType(raw[0]));
 
-        message.setPayloadAuthenticated(decodeAuthentication(raw[1]));
+		message.setPayloadEncrypted(decodeEncryption(raw[1]));
 
-        message.setPayloadType(decodePayloadType(raw[1]));
+		message.setPayloadAuthenticated(decodeAuthentication(raw[1]));
 
-        int offset = 2;
+		message.setPayloadType(decodePayloadType(raw[1]));
 
-        if (message.getPayloadType() == PayloadType.Oem) {
-            message.setOemIANA(decodeOEMIANA(raw));
-            offset += 4;
+		int offset = 2;
 
-            message.setOemPayloadID(decodeOEMPayloadId(raw, offset));
-            offset += 2;
-        }
+		if (message.getPayloadType() == PayloadType.Oem) {
+			message.setOemIANA(decodeOEMIANA(raw));
+			offset += 4;
 
-        message.setSessionID(decodeSessionID(raw, offset));
-        offset += 4;
+			message.setOemPayloadID(decodeOEMPayloadId(raw, offset));
+			offset += 2;
+		}
 
-        message.setSessionSequenceNumber(decodeSessionSequenceNumber(raw,
-                offset));
-        offset += 4;
+		message.setSessionID(decodeSessionID(raw, offset));
+		offset += 4;
 
-        int payloadLength = decodePayloadLength(raw, offset);
-        offset += 2;
+		message
+				.setSessionSequenceNumber(
+						decodeSessionSequenceNumber(
+								raw,
+								offset));
+		offset += 4;
 
-        if (message.isPayloadEncrypted()) {
-            message.setPayload(decodePayload(raw, offset, payloadLength,
-                    message.getConfidentialityAlgorithm(), message.getPayloadType()));
-        } else {
-            message.setPayload(decodePayload(raw, offset, payloadLength,
-                    new ConfidentialityNone(), message.getPayloadType()));
-        }
+		int payloadLength = decodePayloadLength(raw, offset);
+		offset += 2;
 
-        offset += payloadLength;
+		if (message.isPayloadEncrypted()) {
+			message
+					.setPayload(
+							decodePayload(
+									raw,
+									offset,
+									payloadLength,
+									message.getConfidentialityAlgorithm(),
+									message.getPayloadType()));
+		} else {
+			message
+					.setPayload(
+							decodePayload(
+									raw,
+									offset,
+									payloadLength,
+									new ConfidentialityNone(),
+									message.getPayloadType()));
+		}
 
-        if (message.getAuthenticationType() != AuthenticationType.None
-                && !(message.getAuthenticationType() == AuthenticationType.RMCPPlus && !message
-                        .isPayloadAuthenticated())
-                && message.getSessionID() != 0) {
-            offset = skipIntegrityPAD(raw, offset);
-            message.setAuthCode(decodeAuthCode(raw, offset));
-            if (!validateAuthCode(raw, offset)) {
-                logger.warn("Integrity check failed");
-            }
-        }
+		offset += payloadLength;
 
-        return message;
-    }
+		if (message.getAuthenticationType() != AuthenticationType.None
+				&& !(message.getAuthenticationType() == AuthenticationType.RMCPPlus
+						&& !message
+								.isPayloadAuthenticated())
+				&& message.getSessionID() != 0) {
+			offset = skipIntegrityPAD(raw, offset);
+			message.setAuthCode(decodeAuthCode(raw, offset));
+			if (!validateAuthCode(raw, offset)) {
+				logger.warn("Integrity check failed");
+			}
+		}
 
-    /**
-     * Decodes first bit of Payload Type.
-     *
-     * @param payloadType
-     * @return True if payload is encrypted, false otherwise.
-     */
-    private boolean decodeEncryption(byte payloadType) {
-        return (payloadType & TypeConverter.intToByte(0x80)) != 0;
-    }
+		return message;
+	}
 
-    /**
-     * Decodes second bit of Payload Type.
-     *
-     * @param payloadType
-     * @return True if payload is authenticated, false otherwise.
-     */
-    public boolean decodeAuthentication(byte payloadType) {
-        return (payloadType & TypeConverter.intToByte(0x40)) != 0;
-    }
+	/**
+	 * Decodes first bit of Payload Type.
+	 *
+	 * @param payloadType
+	 * @return True if payload is encrypted, false otherwise.
+	 */
+	private boolean decodeEncryption(byte payloadType) {
+		return (payloadType & TypeConverter.intToByte(0x80)) != 0;
+	}
 
-    public static PayloadType decodePayloadType(byte payloadType) {
-        return PayloadType.parseInt(TypeConverter.intToByte(payloadType
-                & TypeConverter.intToByte(0x3f)));
-    }
+	/**
+	 * Decodes second bit of Payload Type.
+	 *
+	 * @param payloadType
+	 * @return True if payload is authenticated, false otherwise.
+	 */
+	public boolean decodeAuthentication(byte payloadType) {
+		return (payloadType & TypeConverter.intToByte(0x40)) != 0;
+	}
 
-    /**
-     * Decodes OEM IANA.
-     *
-     * @param rawMessage
-     *            - Byte array holding whole message data.
-     * @return OEM IANA number.
-     */
-    private int decodeOEMIANA(byte[] rawMessage) {
-        byte[] oemIANA = new byte[4];
+	public static PayloadType decodePayloadType(byte payloadType) {
+		return PayloadType
+				.parseInt(
+						TypeConverter
+								.intToByte(
+										payloadType
+												& TypeConverter.intToByte(0x3f)));
+	}
 
-        System.arraycopy(rawMessage, 3, oemIANA, 0, 3);
-        oemIANA[3] = 0;
+	/**
+	 * Decodes OEM IANA.
+	 *
+	 * @param rawMessage
+	 *        - Byte array holding whole message data.
+	 * @return OEM IANA number.
+	 */
+	private int decodeOEMIANA(byte[] rawMessage) {
+		byte[] oemIANA = new byte[4];
 
-        return TypeConverter.littleEndianByteArrayToInt(oemIANA);
-    }
+		System.arraycopy(rawMessage, 3, oemIANA, 0, 3);
+		oemIANA[3] = 0;
 
-    /**
-     * Decodes OEM payload ID. To implement manufacturer-specific OEM Payload ID
-     * decoding, override this function.
-     *
-     * @param rawMessage
-     *            - Byte array holding whole message data.
-     * @param offset
-     *            - Offset to OEM payload ID in header.
-     * @return Decoded OEM payload ID.
-     */
-    protected Object decodeOEMPayloadId(byte[] rawMessage, int offset) {
-        byte[] oemPayload = new byte[2];
+		return TypeConverter.littleEndianByteArrayToInt(oemIANA);
+	}
 
-        System.arraycopy(rawMessage, offset, oemPayload, 0, 2);
+	/**
+	 * Decodes OEM payload ID. To implement manufacturer-specific OEM Payload ID
+	 * decoding, override this function.
+	 *
+	 * @param rawMessage
+	 *        - Byte array holding whole message data.
+	 * @param offset
+	 *        - Offset to OEM payload ID in header.
+	 * @return Decoded OEM payload ID.
+	 */
+	protected Object decodeOEMPayloadId(byte[] rawMessage, int offset) {
+		byte[] oemPayload = new byte[2];
 
-        return oemPayload;
-    }
+		System.arraycopy(rawMessage, offset, oemPayload, 0, 2);
 
-    @Override
-    protected int decodePayloadLength(byte[] rawData, int offset) {
-        byte[] payloadLength = new byte[4];
-        System.arraycopy(rawData, offset, payloadLength, 0, 2);
-        payloadLength[2] = 0;
-        payloadLength[3] = 0;
+		return oemPayload;
+	}
 
-        return TypeConverter.littleEndianByteArrayToInt(payloadLength);
-    }
+	@Override
+	protected int decodePayloadLength(byte[] rawData, int offset) {
+		byte[] payloadLength = new byte[4];
+		System.arraycopy(rawData, offset, payloadLength, 0, 2);
+		payloadLength[2] = 0;
+		payloadLength[3] = 0;
 
-    /**
-     * Skips the integrity pad and pad length fields.
-     *
-     * @param rawMessage
-     *            - Byte array holding whole message data.
-     * @param offset
-     *            - Offset to integrity pad.
-     * @return Offset to Auth Code
-     * @throws IndexOutOfBoundsException
-     *             when message is corrupted and pad length does not appear
-     *             after integrity pad or length is incorrect.
-     */
-    private int skipIntegrityPAD(final byte[] rawMessage, final int offset) {
-        int skip = 0;
-        while (TypeConverter.byteToInt(rawMessage[offset + skip]) == 0xff) {
-            ++skip;
-        }
-        int length = TypeConverter.byteToInt(rawMessage[offset + skip]);
-        if (length != skip) {
-            throw new IndexOutOfBoundsException("Message is corrupted.");
-        }
+		return TypeConverter.littleEndianByteArrayToInt(payloadLength);
+	}
 
-        int currentOffset = offset + skip + 2; // skip pad length and next header fields
-        if (currentOffset >= rawMessage.length) {
-            throw new IndexOutOfBoundsException("Message is corrupted.");
-        }
-        return currentOffset;
-    }
+	/**
+	 * Skips the integrity pad and pad length fields.
+	 *
+	 * @param rawMessage
+	 *        - Byte array holding whole message data.
+	 * @param offset
+	 *        - Offset to integrity pad.
+	 * @return Offset to Auth Code
+	 * @throws IndexOutOfBoundsException
+	 *         when message is corrupted and pad length does not appear
+	 *         after integrity pad or length is incorrect.
+	 */
+	private int skipIntegrityPAD(final byte[] rawMessage, final int offset) {
+		int skip = 0;
+		while (TypeConverter.byteToInt(rawMessage[offset + skip]) == 0xff) {
+			++skip;
+		}
+		int length = TypeConverter.byteToInt(rawMessage[offset + skip]);
+		if (length != skip) {
+			throw new IndexOutOfBoundsException("Message is corrupted.");
+		}
 
-    /**
-     * Decodes the Auth Code.
-     *
-     * @param rawMessage
-     *            - Byte array holding whole message data.
-     * @param offset
-     *            - Offset to auth code.
-     * @return Auth Code
-     * @throws IndexOutOfBoundsException
-     *             when message is corrupted and pad length does not appear
-     *             after integrity pad or length is incorrect.
-     */
-    private byte[] decodeAuthCode(byte[] rawMessage, int offset) {
-        byte[] authCode = new byte[rawMessage.length - offset];
-        System.arraycopy(rawMessage, offset, authCode, 0, authCode.length);
-        return authCode;
-    }
+		int currentOffset = offset + skip + 2; // skip pad length and next header fields
+		if (currentOffset >= rawMessage.length) {
+			throw new IndexOutOfBoundsException("Message is corrupted.");
+		}
+		return currentOffset;
+	}
 
-    /**
-     * Checks if Auth Code of the received message is valid
-     *
-     * @param rawMessage
-     *            - received message
-     * @param offset
-     *            - offset to the AuthCode field in the message
-     * @return True if AuthCode is correct, false otherwise.
-     * @throws InvalidKeyException
-     *             - when initiation of the integrity algorithm fails
-     */
-    private boolean validateAuthCode(byte[] rawMessage, int offset) {
-        byte[] base = new byte[offset];
+	/**
+	 * Decodes the Auth Code.
+	 *
+	 * @param rawMessage
+	 *        - Byte array holding whole message data.
+	 * @param offset
+	 *        - Offset to auth code.
+	 * @return Auth Code
+	 * @throws IndexOutOfBoundsException
+	 *         when message is corrupted and pad length does not appear
+	 *         after integrity pad or length is incorrect.
+	 */
+	private byte[] decodeAuthCode(byte[] rawMessage, int offset) {
+		byte[] authCode = new byte[rawMessage.length - offset];
+		System.arraycopy(rawMessage, offset, authCode, 0, authCode.length);
+		return authCode;
+	}
 
-        System.arraycopy(rawMessage, 0, base, 0, offset);
+	/**
+	 * Checks if Auth Code of the received message is valid
+	 *
+	 * @param rawMessage
+	 *        - received message
+	 * @param offset
+	 *        - offset to the AuthCode field in the message
+	 * @return True if AuthCode is correct, false otherwise.
+	 * @throws InvalidKeyException
+	 *         - when initiation of the integrity algorithm fails
+	 */
+	private boolean validateAuthCode(byte[] rawMessage, int offset) {
+		byte[] base = new byte[offset];
 
-        byte[] authCode = null;
+		System.arraycopy(rawMessage, 0, base, 0, offset);
 
-        if (rawMessage.length > offset) {
-            authCode = new byte[rawMessage.length - offset];
-            System.arraycopy(rawMessage, offset, authCode, 0, authCode.length);
-        }
+		byte[] authCode = null;
 
-        return Arrays.equals(authCode, cipherSuite.getIntegrityAlgorithm()
-                .generateAuthCode(base));
-    }
+		if (rawMessage.length > offset) {
+			authCode = new byte[rawMessage.length - offset];
+			System.arraycopy(rawMessage, offset, authCode, 0, authCode.length);
+		}
 
-    /**
-     * Decodes session ID.
-     *
-     * @param message
-     *            - message to get session ID from
-     * @return Session ID.
-     */
-    public static int decodeSessionID(RmcpMessage message) {
-        int offset = 2;
-        if (decodePayloadType(message.getData()[1]) == PayloadType.Oem) {
-            offset += 6;
-        }
-        return decodeSessionID(message.getData(), offset);
-    }
+		return Arrays
+				.equals(
+						authCode,
+						cipherSuite
+								.getIntegrityAlgorithm()
+								.generateAuthCode(base));
+	}
+
+	/**
+	 * Decodes session ID.
+	 *
+	 * @param message
+	 *        - message to get session ID from
+	 * @return Session ID.
+	 */
+	public static int decodeSessionID(RmcpMessage message) {
+		int offset = 2;
+		if (decodePayloadType(message.getData()[1]) == PayloadType.Oem) {
+			offset += 6;
+		}
+		return decodeSessionID(message.getData(), offset);
+	}
 }

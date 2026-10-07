@@ -26,12 +26,12 @@ package org.metricshub.ipmi.core.coding.commands;
  * Describes IPMI version
  */
 public enum IpmiVersion {
-    /**
-     * IPMI v1.5
-     */
-    V15,
-    /**
-     * IPMI v2.0
-     */
-    V20,
+	/**
+	 * IPMI v1.5
+	 */
+	V15,
+	/**
+	 * IPMI v2.0
+	 */
+	V20,
 }

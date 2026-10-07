@@ -1,5 +1,6 @@
 /**
- * Includes the IPMI data model for Field Replaceable Unit (FRU) and Sensor devices to be managed by the {@link org.metricshub.ipmi.client.IpmiResultConverter} class.<br>
+ * Includes the IPMI data model for Field Replaceable Unit (FRU) and Sensor devices to be managed by the
+ * {@link org.metricshub.ipmi.client.IpmiResultConverter} class.<br>
  */
 package org.metricshub.ipmi.client.model;
 /*-

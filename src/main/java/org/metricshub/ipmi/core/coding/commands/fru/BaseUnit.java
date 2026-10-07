@@ -26,44 +26,46 @@ package org.metricshub.ipmi.core.coding.commands.fru;
  * Represents unit which is used to access FRU
  */
 public enum BaseUnit {
-    Bytes(BaseUnit.BYTES), Words(BaseUnit.WORDS), ;
-    private static final int BYTES = 0;
-    private static final int WORDS = 1;
-    private static final int BYTESIZE = 1;
-    private static final int WORDSIZE = 16;
+	Bytes(BaseUnit.BYTES),
+	Words(BaseUnit.WORDS),;
 
-    private int code;
+	private static final int BYTES = 0;
+	private static final int WORDS = 1;
+	private static final int BYTESIZE = 1;
+	private static final int WORDSIZE = 16;
 
-    BaseUnit(int code) {
-        this.code = code;
-    }
+	private int code;
 
-    public int getCode() {
-        return code;
-    }
+	BaseUnit(int code) {
+		this.code = code;
+	}
 
-    public static BaseUnit parseInt(int value) {
-        switch (value) {
-        case BYTES:
-            return Bytes;
-        case WORDS:
-            return Words;
-        default:
-            throw new IllegalArgumentException("Invalid value: " + value);
-        }
-    }
+	public int getCode() {
+		return code;
+	}
 
-    /**
-     * Returns size of the unit in bytes.
-     */
-    public int getSize() {
-        switch (this) {
-        case Bytes:
-            return BYTESIZE;
-        case Words:
-            return WORDSIZE;
-        default:
-            throw new IllegalArgumentException("Invalid value: " + this);
-        }
-    }
+	public static BaseUnit parseInt(int value) {
+		switch (value) {
+		case BYTES:
+			return Bytes;
+		case WORDS:
+			return Words;
+		default:
+			throw new IllegalArgumentException("Invalid value: " + value);
+		}
+	}
+
+	/**
+	 * Returns size of the unit in bytes.
+	 */
+	public int getSize() {
+		switch (this) {
+		case Bytes:
+			return BYTESIZE;
+		case Words:
+			return WORDSIZE;
+		default:
+			throw new IllegalArgumentException("Invalid value: " + this);
+		}
+	}
 }

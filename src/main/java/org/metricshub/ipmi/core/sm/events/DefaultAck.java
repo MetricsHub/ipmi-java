@@ -27,7 +27,7 @@ import org.metricshub.ipmi.core.sm.states.State;
 
 /**
  * Default message for acknowledging received IPMI responses. Performs a few {@link State} transitions.
- * 
+ *
  * @see StateMachine
  */
 public class DefaultAck extends StateMachineEvent {

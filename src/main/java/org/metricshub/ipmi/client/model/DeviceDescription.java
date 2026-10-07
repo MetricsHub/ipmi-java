@@ -31,10 +31,9 @@ import org.metricshub.ipmi.core.coding.commands.sdr.record.EntityId;
 /**
  * {@link EntityId} mapping to match the IPMIUtil C code.
  */
-public class DeviceDescription {
+public final class DeviceDescription {
 
-	private DeviceDescription() {
-	}
+	private DeviceDescription() {}
 
 	private static final Map<EntityId, String> ENTITY_ID_TO_ENTITY_DESCRIPTION;
 
@@ -105,7 +104,8 @@ public class DeviceDescription {
 
 	/**
 	 * @param entityId The {@link EntityId} key
-	 * @return {@link String} value extracted from the internal lookup matching the output of IPMIUtil and the java verax IPMI lib
+	 * @return {@link String} value extracted from the internal lookup matching the output of IPMIUtil and the java verax
+	 *         IPMI lib
 	 */
 	public static String getDeviceType(EntityId entityId) {
 		return entityId != null ? ENTITY_ID_TO_ENTITY_DESCRIPTION.getOrDefault(entityId, entityId.name()) : null;

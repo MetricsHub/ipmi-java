@@ -26,15 +26,15 @@ import org.metricshub.ipmi.core.sm.actions.StateMachineAction;
 
 /**
  * An interface for listener of the {@link StateMachine}
- * 
+ *
  * @see StateMachine#register(MachineObserver)
  */
 public interface MachineObserver {
-    /**
-     * Notifies observer of action performed by the State Machine.
-     *
-     * @param action
-     *            - action performed
-     */
-    void notify(StateMachineAction action);
+	/**
+	 * Notifies observer of action performed by the State Machine.
+	 *
+	 * @param action
+	 *        - action performed
+	 */
+	void notify(StateMachineAction action);
 }

@@ -31,11 +31,14 @@ import org.metricshub.ipmi.core.coding.commands.sdr.record.SensorRecord;
 /**
  * Wraps Sensor information:
  * <ul>
- * <li>The Sensor record which can be either {@link CompactSensorRecord} or {@link FullSensorRecord}. Note that the compact sensor record is
- * used to discover and collect the state of the devices, where the full sensor record is used to collect the devices reading values, i.e.
+ * <li>The Sensor record which can be either {@link CompactSensorRecord} or {@link FullSensorRecord}. Note that the
+ * compact sensor record is
+ * used to discover and collect the state of the devices, where the full sensor record is used to collect the devices
+ * reading values, i.e.
  * temperature, power consumption, voltage, ...etc.</li>
  * <li>The sensor reading response data wrapping the reading value</li>
- * <li>The states of the sensor record formatted as the following: <em>$sensorName=$state|$sensorName=$state|...|$sensorName=$state</em></li>
+ * <li>The states of the sensor record formatted as the following:
+ * <em>$sensorName=$state|$sensorName=$state|...|$sensorName=$state</em></li>
  * </ul>
  */
 public class Sensor {

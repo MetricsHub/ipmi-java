@@ -1,6 +1,6 @@
 /**
  * The UDP transport layer.
- * 
+ *
  * @see org.metricshub.ipmi.core.transport.UdpMessenger
  */
 package org.metricshub.ipmi.core.transport;

@@ -26,57 +26,58 @@ import org.metricshub.ipmi.core.coding.commands.ResponseData;
 
 /**
  * A wrapper for RAKP 2 message.
+ *
  * @see Rakp1
  */
 public class Rakp1ResponseData implements ResponseData {
 
-    private byte messageTag;
+	private byte messageTag;
 
-    private byte statusCode;
+	private byte statusCode;
 
-    private int remoteConsoleSessionId;
+	private int remoteConsoleSessionId;
 
-    private byte[] managedSystemRandomNumber;
+	private byte[] managedSystemRandomNumber;
 
-    private byte[] managedSystemGuid;
+	private byte[] managedSystemGuid;
 
-    public void setMessageTag(byte messageTag) {
-        this.messageTag = messageTag;
-    }
+	public void setMessageTag(byte messageTag) {
+		this.messageTag = messageTag;
+	}
 
-    public byte getMessageTag() {
-        return messageTag;
-    }
+	public byte getMessageTag() {
+		return messageTag;
+	}
 
-    public void setStatusCode(byte statusCode) {
-        this.statusCode = statusCode;
-    }
+	public void setStatusCode(byte statusCode) {
+		this.statusCode = statusCode;
+	}
 
-    public byte getStatusCode() {
-        return statusCode;
-    }
+	public byte getStatusCode() {
+		return statusCode;
+	}
 
-    public void setRemoteConsoleSessionId(int remoteConsoleSessionId) {
-        this.remoteConsoleSessionId = remoteConsoleSessionId;
-    }
+	public void setRemoteConsoleSessionId(int remoteConsoleSessionId) {
+		this.remoteConsoleSessionId = remoteConsoleSessionId;
+	}
 
-    public int getRemoteConsoleSessionId() {
-        return remoteConsoleSessionId;
-    }
+	public int getRemoteConsoleSessionId() {
+		return remoteConsoleSessionId;
+	}
 
-    public void setManagedSystemGuid(byte[] managedSystemGuid) {
-        this.managedSystemGuid = managedSystemGuid;
-    }
+	public void setManagedSystemGuid(byte[] managedSystemGuid) {
+		this.managedSystemGuid = managedSystemGuid;
+	}
 
-    public byte[] getManagedSystemGuid() {
-        return managedSystemGuid;
-    }
+	public byte[] getManagedSystemGuid() {
+		return managedSystemGuid;
+	}
 
-    public void setManagedSystemRandomNumber(byte[] randomNumber) {
-        this.managedSystemRandomNumber = randomNumber;
-    }
+	public void setManagedSystemRandomNumber(byte[] randomNumber) {
+		this.managedSystemRandomNumber = randomNumber;
+	}
 
-    public byte[] getManagedSystemRandomNumber() {
-        return managedSystemRandomNumber;
-    }
+	public byte[] getManagedSystemRandomNumber() {
+		return managedSystemRandomNumber;
+	}
 }

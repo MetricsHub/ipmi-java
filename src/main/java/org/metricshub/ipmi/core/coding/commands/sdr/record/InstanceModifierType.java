@@ -23,28 +23,31 @@ package org.metricshub.ipmi.core.coding.commands.sdr.record;
  */
 
 public enum InstanceModifierType {
-    Numeric(InstanceModifierType.NUMERIC),
-    Alpha(InstanceModifierType.ALPHA),
-    ;
-    private static final int NUMERIC = 0;
-    private static final int ALPHA = 1;
+	Numeric(InstanceModifierType.NUMERIC),
+	Alpha(InstanceModifierType.ALPHA),
+	;
 
-    private int code;
+	private static final int NUMERIC = 0;
+	private static final int ALPHA = 1;
 
-    InstanceModifierType(int code) {
-        this.code = code;
-    }
-    public int getCode() {
-        return code;
-    }
-    public static InstanceModifierType parseInt(int value) {
-        switch(value) {
-        case NUMERIC:
-            return Numeric;
-        case ALPHA:
-            return Alpha;
-        default:
-            throw new IllegalArgumentException("Invalid value: " + value);
-        }
-    }
+	private int code;
+
+	InstanceModifierType(int code) {
+		this.code = code;
+	}
+
+	public int getCode() {
+		return code;
+	}
+
+	public static InstanceModifierType parseInt(int value) {
+		switch (value) {
+		case NUMERIC:
+			return Numeric;
+		case ALPHA:
+			return Alpha;
+		default:
+			throw new IllegalArgumentException("Invalid value: " + value);
+		}
+	}
 }

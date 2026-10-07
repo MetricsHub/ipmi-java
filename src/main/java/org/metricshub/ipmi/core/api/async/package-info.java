@@ -1,6 +1,6 @@
 /**
  * The asynchronous API.
- * 
+ *
  * @see org.metricshub.ipmi.core.api.async.IpmiAsyncConnector
  */
 package org.metricshub.ipmi.core.api.async;

@@ -48,7 +48,6 @@ public class Fru {
 	}
 
 	/**
-	 *
 	 * @return Current {@link FruDeviceLocatorRecord} instance
 	 */
 	public FruDeviceLocatorRecord getFruLocator() {
@@ -56,7 +55,6 @@ public class Fru {
 	}
 
 	/**
-	 *
 	 * @return Current {@link FruRecord} instance
 	 */
 	public List<FruRecord> getFruRecords() {

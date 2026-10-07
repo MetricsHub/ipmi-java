@@ -25,7 +25,7 @@ package org.metricshub.ipmi.core.sm.actions;
 import org.metricshub.ipmi.core.sm.StateMachine;
 
 /**
- * Abstract for external action of the {@link StateMachine} 
+ * Abstract for external action of the {@link StateMachine}
  */
 public abstract class StateMachineAction {
 

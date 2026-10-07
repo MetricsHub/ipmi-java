@@ -42,144 +42,153 @@ import org.slf4j.LoggerFactory;
  */
 public class InboundSolMessageListener implements InboundMessageListener {
 
-    private static final Logger logger = LoggerFactory.getLogger(InboundSolMessageListener.class);
+	private static final Logger LOGGER = LoggerFactory.getLogger(InboundSolMessageListener.class);
 
-    static final int BUFFER_CAPACITY = 2048;
+	static final int BUFFER_CAPACITY = 2048;
 
-    private final ByteBuffer buffer = new ByteBuffer(BUFFER_CAPACITY);
-    private final IpmiConnector connector;
-    private final ConnectionHandle connectionHandle;
-    private final List<SolEventListener> eventListeners;
+	private final ByteBuffer buffer = new ByteBuffer(BUFFER_CAPACITY);
+	private final IpmiConnector connector;
+	private final ConnectionHandle connectionHandle;
+	private final List<SolEventListener> eventListeners;
 
-    private SolInboundMessage waitingMessage;
+	private SolInboundMessage waitingMessage;
 
-    public InboundSolMessageListener(IpmiConnector connector, ConnectionHandle connectionHandle,
-                                     List<SolEventListener> eventListeners) {
-        this.connector = connector;
-        this.connectionHandle = connectionHandle;
-        this.eventListeners = eventListeners;
-    }
+	public InboundSolMessageListener(IpmiConnector connector, ConnectionHandle connectionHandle,
+			List<SolEventListener> eventListeners) {
+		this.connector = connector;
+		this.connectionHandle = connectionHandle;
+		this.eventListeners = eventListeners;
+	}
 
-    @Override
-    public boolean isPayloadSupported(IpmiPayload payload) {
-        return payload instanceof SolInboundMessage;
-    }
+	@Override
+	public boolean isPayloadSupported(IpmiPayload payload) {
+		return payload instanceof SolInboundMessage;
+	}
 
-    @Override
-    public void notify(IpmiPayload payload) {
-        if (isPayloadSupported(payload)) {
-            SolInboundMessage solPayload = (SolInboundMessage) payload;
+	@Override
+	public void notify(IpmiPayload payload) {
+		if (isPayloadSupported(payload)) {
+			SolInboundMessage solPayload = (SolInboundMessage) payload;
 
-            byte[] characterData = solPayload.getData();
+			byte[] characterData = solPayload.getData();
 
-            if (messageHasCharacterData(characterData)) {
-                processCharacterData(solPayload, characterData);
-            }
+			if (messageHasCharacterData(characterData)) {
+				processCharacterData(solPayload, characterData);
+			}
 
-            Set<SolStatus> statuses = solPayload.getStatusField().getStatuses();
+			Set<SolStatus> statuses = solPayload.getStatusField().getStatuses();
 
-            if (messageHasStatuses(statuses)) {
-                processStatuses(statuses);
-            }
-        }
-    }
+			if (messageHasStatuses(statuses)) {
+				processStatuses(statuses);
+			}
+		}
+	}
 
-    private void processCharacterData(SolInboundMessage solPayload, byte[] characterData) {
-        if (noSpaceForDataInBuffer(characterData)) {
-            sendNack(solPayload);
-        } else {
-            buffer.write(characterData);
+	private void processCharacterData(SolInboundMessage solPayload, byte[] characterData) {
+		if (noSpaceForDataInBuffer(characterData)) {
+			sendNack(solPayload);
+		} else {
+			buffer.write(characterData);
 
-            sendAck(solPayload, characterData);
-        }
-    }
+			sendAck(solPayload, characterData);
+		}
+	}
 
-    private void processStatuses(Set<SolStatus> statuses) {
-        for (SolEventListener listener : eventListeners) {
-            listener.processRequestEvent(statuses);
-        }
-    }
+	private void processStatuses(Set<SolStatus> statuses) {
+		for (SolEventListener listener : eventListeners) {
+			listener.processRequestEvent(statuses);
+		}
+	}
 
-    private boolean noSpaceForDataInBuffer(byte[] characterData) {
-        return characterData.length > buffer.remainingSpace();
-    }
+	private boolean noSpaceForDataInBuffer(byte[] characterData) {
+		return characterData.length > buffer.remainingSpace();
+	}
 
-    private boolean messageHasCharacterData(byte[] characterData) {
-        return characterData != null && characterData.length > 0;
-    }
+	private boolean messageHasCharacterData(byte[] characterData) {
+		return characterData != null && characterData.length > 0;
+	}
 
-    private boolean messageHasStatuses(Set<SolStatus> statuses) {
-        return statuses != null && !statuses.isEmpty();
-    }
+	private boolean messageHasStatuses(Set<SolStatus> statuses) {
+		return statuses != null && !statuses.isEmpty();
+	}
 
-    private void sendNack(SolInboundMessage solPayload) {
-        if (solPayload.getSequenceNumber() != 0) {
-            try {
-                SolCoder solNack = new SolCoder(solPayload.getSequenceNumber(), (byte) 0,
-                        SolAckState.NACK, connectionHandle.getCipherSuite());
-                connector.sendOneWayMessage(connectionHandle, solNack);
+	private void sendNack(SolInboundMessage solPayload) {
+		if (solPayload.getSequenceNumber() != 0) {
+			try {
+				SolCoder solNack = new SolCoder(
+						solPayload.getSequenceNumber(),
+						(byte) 0,
+						SolAckState.NACK,
+						connectionHandle.getCipherSuite());
+				connector.sendOneWayMessage(connectionHandle, solNack);
 
-                synchronized (buffer) {
-                    waitingMessage = solPayload;
-                }
-            } catch (Exception e) {
-                logger.error("Could not send NACK for packet " + solPayload.getSequenceNumber(), e);
-            }
-        }
-    }
+				synchronized (buffer) {
+					waitingMessage = solPayload;
+				}
+			} catch (Exception e) {
+				LOGGER.error("Could not send NACK for packet " + solPayload.getSequenceNumber(), e);
+			}
+		}
+	}
 
-    private void sendAck(SolInboundMessage solPayload, byte[] characterData) {
-        if (solPayload.getSequenceNumber() != 0) {
-            try {
-                SolCoder solAck = new SolCoder(solPayload.getSequenceNumber(), (byte) characterData.length,
-                        SolAckState.ACK, connectionHandle.getCipherSuite());
-                connector.sendOneWayMessage(connectionHandle, solAck);
+	private void sendAck(SolInboundMessage solPayload, byte[] characterData) {
+		if (solPayload.getSequenceNumber() != 0) {
+			try {
+				SolCoder solAck = new SolCoder(
+						solPayload.getSequenceNumber(),
+						(byte) characterData.length,
+						SolAckState.ACK,
+						connectionHandle.getCipherSuite());
+				connector.sendOneWayMessage(connectionHandle, solAck);
 
-                synchronized (buffer) {
-                    waitingMessage = null;
-                }
-            } catch (Exception e) {
-                logger.error("Could not send ACK for packet " + solPayload.getSequenceNumber(), e);
-            }
-        }
-    }
+				synchronized (buffer) {
+					waitingMessage = null;
+				}
+			} catch (Exception e) {
+				LOGGER.error("Could not send ACK for packet " + solPayload.getSequenceNumber(), e);
+			}
+		}
+	}
 
-    private void sendResumeAck(SolInboundMessage solPayload) {
-        try {
-            SolCoder solResumeAck = new SolCoder(solPayload.getSequenceNumber(), (byte) 0,
-                    SolAckState.ACK, connectionHandle.getCipherSuite());
-            connector.sendOneWayMessage(connectionHandle, solResumeAck);
-        } catch (Exception e) {
-            logger.error("Could not send Resume ACK for packet " + solPayload.getSequenceNumber(), e);
-        }
-    }
+	private void sendResumeAck(SolInboundMessage solPayload) {
+		try {
+			SolCoder solResumeAck = new SolCoder(
+					solPayload.getSequenceNumber(),
+					(byte) 0,
+					SolAckState.ACK,
+					connectionHandle.getCipherSuite());
+			connector.sendOneWayMessage(connectionHandle, solResumeAck);
+		} catch (Exception e) {
+			LOGGER.error("Could not send Resume ACK for packet " + solPayload.getSequenceNumber(), e);
+		}
+	}
 
-    /**
-     * Attempts to read given number of bytes from this {@link ByteBuffer}.
-     * If buffer currently contains less bytes than requested, this method reads only available number of bytes.
-     *
-     * @param numberOfBytes
-     *          requested number of bytes to read
-     * @return actual bytes that could be read from this buffer.
-     */
-    public byte[] readBytes(int numberOfBytes) {
-        byte[] result = buffer.read(numberOfBytes);
+	/**
+	 * Attempts to read given number of bytes from this {@link ByteBuffer}.
+	 * If buffer currently contains less bytes than requested, this method reads only available number of bytes.
+	 *
+	 * @param numberOfBytes
+	 *        requested number of bytes to read
+	 * @return actual bytes that could be read from this buffer.
+	 */
+	public byte[] readBytes(int numberOfBytes) {
+		byte[] result = buffer.read(numberOfBytes);
 
-        synchronized (buffer) {
-            if (waitingMessage != null && waitingMessage.getData().length <= buffer.remainingSpace()) {
-                sendResumeAck(waitingMessage);
-            }
-        }
+		synchronized (buffer) {
+			if (waitingMessage != null && waitingMessage.getData().length <= buffer.remainingSpace()) {
+				sendResumeAck(waitingMessage);
+			}
+		}
 
-        return result;
-    }
+		return result;
+	}
 
-    /**
-     * Returns number of incoming bytes that are available to read from the buffer.
-     *
-     * @return number of available bytes to read
-     */
-    public int getAvailableBytesCount() {
-        return buffer.size();
-    }
+	/**
+	 * Returns number of incoming bytes that are available to read from the buffer.
+	 *
+	 * @return number of available bytes to read
+	 */
+	public int getAvailableBytesCount() {
+		return buffer.size();
+	}
 }

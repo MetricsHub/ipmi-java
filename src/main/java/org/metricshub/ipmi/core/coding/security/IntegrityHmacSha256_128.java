@@ -22,10 +22,13 @@ package org.metricshub.ipmi.core.coding.security;
  * ╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱
  */
 
+// Name mirrors the IPMI 2.0 integrity algorithm name (HMAC-xxx-nn); kept for API compatibility
+// CHECKSTYLE.OFF: TypeName
 /**
  * HMAC-SHA256-128 integrity algorithm.
  */
 public class IntegrityHmacSha256_128 extends IntegrityAlgorithm {
+	// CHECKSTYLE.ON: TypeName
 
 	private static final String ALGORITHM_NAME = "HmacSHA256";
 

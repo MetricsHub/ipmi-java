@@ -24,8 +24,7 @@ package org.metricshub.ipmi.core.coding.rmcp;
 
 /**
  * Supported versions of RMCP protocol
- *
  */
 public enum RmcpVersion {
-    RMCP1_0,
+	RMCP1_0,
 }

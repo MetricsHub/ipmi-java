@@ -31,63 +31,75 @@ import java.security.NoSuchAlgorithmException;
  * implement constructor(byte[]).
  */
 public abstract class ConfidentialityAlgorithm {
-    protected byte[] sik;
 
-    /**
-     * Initializes Confidentiality Algorithm
-     *
-     * @param sik
-     *            - Session Integrity Key calculated during the opening of the
-     *            session or user password if 'one-key' logins are enabled.
-     * @param authenticationAlgorithm
-     *           - Algorithm used for authentication.
-     * @throws InvalidKeyException
-     *             - when initiation of the algorithm fails
-     * @throws NoSuchAlgorithmException
-     *             - when initiation of the algorithm fails
-     * @throws NoSuchPaddingException
-     *             - when initiation of the algorithm fails
-     */
-    public void initialize(byte[] sik, AuthenticationAlgorithm authenticationAlgorithm) throws InvalidKeyException,
-            NoSuchAlgorithmException, NoSuchPaddingException {
-        this.sik = sik;
-    }
+	private byte[] sik;
 
-    /**
-     * Returns the algorithm's ID.
-     */
-    public abstract byte getCode();
+	/**
+	 * Initializes Confidentiality Algorithm
+	 *
+	 * @param key
+	 *        - Session Integrity Key calculated during the opening of the
+	 *        session or user password if 'one-key' logins are enabled.
+	 * @param authenticationAlgorithm
+	 *        - Algorithm used for authentication.
+	 * @throws InvalidKeyException
+	 *         - when initiation of the algorithm fails
+	 * @throws NoSuchAlgorithmException
+	 *         - when initiation of the algorithm fails
+	 * @throws NoSuchPaddingException
+	 *         - when initiation of the algorithm fails
+	 */
+	public void initialize(byte[] key, AuthenticationAlgorithm authenticationAlgorithm)
+			throws InvalidKeyException,
+			NoSuchAlgorithmException,
+			NoSuchPaddingException {
+		this.sik = key;
+	}
 
-    /**
-     * Encrypts the data.
-     *
-     * @param data
-     *            - payload to be encrypted
-     * @return encrypted data encapsulated in COnfidentiality Header and
-     *         Trailer.
-     * @throws InvalidKeyException
-     *             - when initiation of the algorithm fails
-     */
-    public abstract byte[] encrypt(byte[] data) throws InvalidKeyException;
+	/**
+	 * Returns the Session Integrity Key passed to {@link #initialize(byte[], AuthenticationAlgorithm)}.
+	 *
+	 * @return the Session Integrity Key, or null if not initialized
+	 */
+	protected byte[] getSik() {
+		return sik;
+	}
 
-    /**
-     * Decrypts the data.
-     *
-     * @param data
-     *            - encrypted data encapsulated in COnfidentiality Header and
-     *            Trailer.
-     * @return decrypted data.
-     * @throws IllegalArgumentException
-     *             - when initiation of the algorithm fails
-     */
-    public abstract byte[] decrypt(byte[] data);
+	/**
+	 * Returns the algorithm's ID.
+	 */
+	public abstract byte getCode();
 
-    /**
-     * Calculates size of the confidentiality header and trailer specific for
-     * the algorithm.
-     *
-     * @param payloadSize
-     *            - size of the data that will be encrypted
-     */
-    public abstract int getConfidentialityOverheadSize(int payloadSize);
+	/**
+	 * Encrypts the data.
+	 *
+	 * @param data
+	 *        - payload to be encrypted
+	 * @return encrypted data encapsulated in COnfidentiality Header and
+	 *         Trailer.
+	 * @throws InvalidKeyException
+	 *         - when initiation of the algorithm fails
+	 */
+	public abstract byte[] encrypt(byte[] data) throws InvalidKeyException;
+
+	/**
+	 * Decrypts the data.
+	 *
+	 * @param data
+	 *        - encrypted data encapsulated in COnfidentiality Header and
+	 *        Trailer.
+	 * @return decrypted data.
+	 * @throws IllegalArgumentException
+	 *         - when initiation of the algorithm fails
+	 */
+	public abstract byte[] decrypt(byte[] data);
+
+	/**
+	 * Calculates size of the confidentiality header and trailer specific for
+	 * the algorithm.
+	 *
+	 * @param payloadSize
+	 *        - size of the data that will be encrypted
+	 */
+	public abstract int getConfidentialityOverheadSize(int payloadSize);
 }

@@ -32,46 +32,46 @@ import org.slf4j.LoggerFactory;
 
 public final class PropertiesManager {
 
-    private static PropertiesManager instance;
+	private static PropertiesManager instance;
 
-    private Map<String, String> properties;
+	private Map<String, String> properties;
 
-    private Logger logger = LoggerFactory.getLogger(PropertiesManager.class);
+	private Logger logger = LoggerFactory.getLogger(PropertiesManager.class);
 
-    private PropertiesManager() {
-        properties = new HashMap<String, String>();
+	private PropertiesManager() {
+		properties = new HashMap<String, String>();
 
-        loadProperties("/connection.properties");
-        loadProperties("/vxipmi.properties");
-    }
+		loadProperties("/connection.properties");
+		loadProperties("/vxipmi.properties");
+	}
 
-    public static PropertiesManager getInstance() {
-        if (instance == null) {
-            instance = new PropertiesManager();
-        }
-        return instance;
-    }
+	public static PropertiesManager getInstance() {
+		if (instance == null) {
+			instance = new PropertiesManager();
+		}
+		return instance;
+	}
 
-    private void loadProperties(String name) {
-        try {
-            Properties props = new Properties();
-            props.load(getClass().getResourceAsStream(name));
+	private void loadProperties(String name) {
+		try {
+			Properties props = new Properties();
+			props.load(getClass().getResourceAsStream(name));
 
-            for (Object key : props.keySet()) {
-                this.properties.put(key.toString(), props.getProperty(key.toString()));
-            }
+			for (Object key : props.keySet()) {
+				this.properties.put(key.toString(), props.getProperty(key.toString()));
+			}
 
-        } catch (IOException e) {
-            logger.error(e.getMessage(), e);
-        }
-    }
+		} catch (IOException e) {
+			logger.error(e.getMessage(), e);
+		}
+	}
 
-    public String getProperty(String key) {
-        logger.info("Getting " + key + ": " + properties.get(key));
-        return properties.get(key);
-    }
+	public String getProperty(String key) {
+		logger.info("Getting " + key + ": " + properties.get(key));
+		return properties.get(key);
+	}
 
-    public void setProperty(String key, String value) {
-        properties.put(key, value);
-    }
+	public void setProperty(String key, String value) {
+		properties.put(key, value);
+	}
 }

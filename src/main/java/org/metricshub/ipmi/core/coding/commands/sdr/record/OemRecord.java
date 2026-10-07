@@ -29,60 +29,61 @@ import org.metricshub.ipmi.core.common.TypeConverter;
  */
 public class OemRecord extends SensorRecord {
 
-    /**
-     * Size of the common SDR record header (record ID, SDR version, record type, record length).
-     */
-    private static final int HEADER_LENGTH = 5;
+	/**
+	 * Size of the common SDR record header (record ID, SDR version, record type, record length).
+	 */
+	private static final int HEADER_LENGTH = 5;
 
-    /**
-     * Size of the manufacturer ID field in a C0h OEM record.
-     */
-    private static final int MANUFACTURER_ID_LENGTH = 3;
+	/**
+	 * Size of the manufacturer ID field in a C0h OEM record.
+	 */
+	private static final int MANUFACTURER_ID_LENGTH = 3;
 
-    private int manufacturerId;
+	private int manufacturerId;
 
-    private byte[] oemData;
+	private byte[] oemData;
 
-    @Override
-    protected void populateTypeSpecficValues(byte[] recordData,
-            SensorRecord record) {
+	@Override
+	protected void populateTypeSpecficValues(
+			byte[] recordData,
+			SensorRecord record) {
 
-        // Only the C0h OEM record has a defined layout (3-byte manufacturer ID
-        // followed by OEM data). Vendor-defined record types C1h-FFh carry an
-        // unknown layout, so keep their whole type-specific payload and leave
-        // the manufacturer ID at 0 (unknown).
-        int dataOffset = HEADER_LENGTH;
+		// Only the C0h OEM record has a defined layout (3-byte manufacturer ID
+		// followed by OEM data). Vendor-defined record types C1h-FFh carry an
+		// unknown layout, so keep their whole type-specific payload and leave
+		// the manufacturer ID at 0 (unknown).
+		int dataOffset = HEADER_LENGTH;
 
-        if (recordData[3] == RecordTypes.OEM_RECORD && recordData.length >= HEADER_LENGTH + MANUFACTURER_ID_LENGTH) {
-            byte[] buffer = new byte[4];
-            System.arraycopy(recordData, HEADER_LENGTH, buffer, 0, MANUFACTURER_ID_LENGTH);
-            setManufacturerId(TypeConverter.littleEndianByteArrayToInt(buffer));
-            dataOffset += MANUFACTURER_ID_LENGTH;
-        }
+		if (recordData[3] == RecordTypes.OEM_RECORD && recordData.length >= HEADER_LENGTH + MANUFACTURER_ID_LENGTH) {
+			byte[] buffer = new byte[4];
+			System.arraycopy(recordData, HEADER_LENGTH, buffer, 0, MANUFACTURER_ID_LENGTH);
+			setManufacturerId(TypeConverter.littleEndianByteArrayToInt(buffer));
+			dataOffset += MANUFACTURER_ID_LENGTH;
+		}
 
-        byte[] data = new byte[Math.max(0, recordData.length - dataOffset)];
+		byte[] data = new byte[Math.max(0, recordData.length - dataOffset)];
 
-        if (data.length > 0) {
-            System.arraycopy(recordData, dataOffset, data, 0, data.length);
-        }
+		if (data.length > 0) {
+			System.arraycopy(recordData, dataOffset, data, 0, data.length);
+		}
 
-        setOemData(data);
-    }
+		setOemData(data);
+	}
 
-    public int getManufacturerId() {
-        return manufacturerId;
-    }
+	public int getManufacturerId() {
+		return manufacturerId;
+	}
 
-    public void setManufacturerId(int manufacturerId) {
-        this.manufacturerId = manufacturerId;
-    }
+	public void setManufacturerId(int manufacturerId) {
+		this.manufacturerId = manufacturerId;
+	}
 
-    public byte[] getOemData() {
-        return oemData;
-    }
+	public byte[] getOemData() {
+		return oemData;
+	}
 
-    public void setOemData(byte[] oemData) {
-        this.oemData = oemData;
-    }
+	public void setOemData(byte[] oemData) {
+		this.oemData = oemData;
+	}
 
 }

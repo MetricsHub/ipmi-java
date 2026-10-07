@@ -29,20 +29,20 @@ import org.metricshub.ipmi.core.api.async.ConnectionHandle;
  */
 public class Session {
 
-    private final int sessionId;
-    private final ConnectionHandle connectionHandle;
+	private final int sessionId;
+	private final ConnectionHandle connectionHandle;
 
-    public Session(int sessionId, ConnectionHandle connectionHandle) {
-        this.sessionId = sessionId;
-        this.connectionHandle = connectionHandle;
-    }
+	public Session(int sessionId, ConnectionHandle connectionHandle) {
+		this.sessionId = sessionId;
+		this.connectionHandle = connectionHandle;
+	}
 
-    public int getSessionId() {
-        return sessionId;
-    }
+	public int getSessionId() {
+		return sessionId;
+	}
 
-    public ConnectionHandle getConnectionHandle() {
-        return connectionHandle;
-    }
+	public ConnectionHandle getConnectionHandle() {
+		return connectionHandle;
+	}
 
 }

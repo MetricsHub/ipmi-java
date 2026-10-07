@@ -31,9 +31,9 @@ package org.metricshub.ipmi.core.coding.commands.sdr.record;
 @Deprecated
 public class BmcMessageChannelInfoRecord extends SensorRecord {
 
-    @Override
-    protected void populateTypeSpecficValues(byte[] recordData, SensorRecord record) {
-        // No specific values for this record type
-    }
+	@Override
+	protected void populateTypeSpecficValues(byte[] recordData, SensorRecord record) {
+		// No specific values for this record type
+	}
 
 }

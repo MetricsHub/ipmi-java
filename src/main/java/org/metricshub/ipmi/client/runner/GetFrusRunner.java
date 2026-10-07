@@ -59,7 +59,8 @@ public class GetFrusRunner extends AbstractIpmiRunner<List<Fru>> {
 	private static final int DEFAULT_FRU_ID = 0;
 
 	/**
-	 * Size of data transmitted in single ReadFru command. Bigger values will improve performance. If server is returning "Invalid data field in
+	 * Size of data transmitted in single ReadFru command. Bigger values will improve performance. If server is returning
+	 * "Invalid data field in
 	 * Request." error during ReadFru command, FRU_READ_PACKET_SIZE should be decreased.
 	 */
 	private static final int FRU_READ_PACKET_SIZE = 16;
@@ -79,7 +80,7 @@ public class GetFrusRunner extends AbstractIpmiRunner<List<Fru>> {
 		// Id 0 indicates first record in SDR. Next IDs can be retrieved from
 		// records - they are organized in a list and there is no BMC command to
 		// get all of them.
-		nextRecId = 0;
+		setNextRecId(0);
 
 		// Some BMCs allow getting sensor records without reservation, so we try
 		// to do it that way first
@@ -90,7 +91,7 @@ public class GetFrusRunner extends AbstractIpmiRunner<List<Fru>> {
 
 		// We get sensor data until we encounter ID = 65535 which means that
 		// this record is the last one.
-		while (nextRecId < MAX_REPO_RECORD_ID) {
+		while (getNextRecId() < MAX_REPO_RECORD_ID) {
 
 			SensorRecord sensorRecord = null;
 
@@ -116,8 +117,11 @@ public class GetFrusRunner extends AbstractIpmiRunner<List<Fru>> {
 				// happen many times during getting all sensors, since BMC can't
 				// manage parallel sessions and invalidates old one if new one
 				// appears.
-				reservationId = ((ReserveSdrRepositoryResponseData) connector.sendMessage(handle,
-						new ReserveSdrRepository(IpmiVersion.V20, handle.getCipherSuite(), AuthenticationType.RMCPPlus))).getReservationId();
+				reservationId = ((ReserveSdrRepositoryResponseData) getConnector()
+						.sendMessage(
+								getHandle(),
+								new ReserveSdrRepository(IpmiVersion.V20, getHandle().getCipherSuite(), AuthenticationType.RMCPPlus)))
+						.getReservationId();
 			}
 
 		}
@@ -126,14 +130,19 @@ public class GetFrusRunner extends AbstractIpmiRunner<List<Fru>> {
 	}
 
 	/**
-	 * Process the given sensor record and create the system board FRU record. The new {@link Fru} is added to th FRU list <code>result</code>
-	 * 
-	 * @param result                List of {@link Fru} instance to append
-	 * @param sensorRecord          The sensor record to process
+	 * Process the given sensor record and create the system board FRU record. The new {@link Fru} is added to th FRU list
+	 * <code>result</code>
+	 *
+	 * @param result List of {@link Fru} instance to append
+	 * @param sensorRecord The sensor record to process
 	 * @param systemBoardFruRecords The system board Fru records
 	 * @throws Exception
 	 */
-	private void processFruRecord(final List<Fru> result, final SensorRecord sensorRecord, final List<FruRecord> systemBoardFruRecords) throws Exception {
+	private void processFruRecord(
+			final List<Fru> result,
+			final SensorRecord sensorRecord,
+			final List<FruRecord> systemBoardFruRecords)
+			throws Exception {
 		try {
 			// Process the FRU record
 			Fru fru = null;
@@ -147,38 +156,40 @@ public class GetFrusRunner extends AbstractIpmiRunner<List<Fru>> {
 						fru = new Fru(fruLocator, fruRecords);
 					}
 				}
-			} else if (!systemBoardFruRecords.isEmpty()
-					&& !systemBoardFruUpdated
-					&& sensorRecord instanceof CompactSensorRecord
-					&& ((CompactSensorRecord) sensorRecord).getEntityId().equals(EntityId.SystemBoard)) {
+			} else
+				if (!systemBoardFruRecords.isEmpty()
+						&& !systemBoardFruUpdated
+						&& sensorRecord instanceof CompactSensorRecord
+						&& ((CompactSensorRecord) sensorRecord).getEntityId().equals(EntityId.SystemBoard)) {
 
-				// Since we can only access the SystemBoard components,
-				// we need to build the FruDeviceLocatorRecord for SystemBoard instance. 
+							// Since we can only access the SystemBoard components,
+							// we need to build the FruDeviceLocatorRecord for SystemBoard instance.
 
-				// OK this can be one of the SystemBoard sensors
-				CompactSensorRecord compactSensorRecord = (CompactSensorRecord) sensorRecord;
+							// OK this can be one of the SystemBoard sensors
+							CompactSensorRecord compactSensorRecord = (CompactSensorRecord) sensorRecord;
 
-				BoardInfo boardInfo = systemBoardFruRecords.stream()
-						.filter(BoardInfo.class::isInstance)
-						.map(BoardInfo.class::cast)
-						.findFirst()
-						.orElse(null);
+							BoardInfo boardInfo = systemBoardFruRecords
+									.stream()
+									.filter(BoardInfo.class::isInstance)
+									.map(BoardInfo.class::cast)
+									.findFirst()
+									.orElse(null);
 
-				if (boardInfo != null) {
+							if (boardInfo != null) {
 
-					// Create the Fru locator
-					FruDeviceLocatorRecord locator = new FruDeviceLocatorRecord();
-					locator.setFruEntityId(EntityId.SystemBoard.getCode());
-					locator.setFruEntityInstance(compactSensorRecord.getEntityInstanceNumber());
-					locator.setName(boardInfo.getBoardProductName() + " " + compactSensorRecord.getEntityInstanceNumber());
+								// Create the Fru locator
+								FruDeviceLocatorRecord locator = new FruDeviceLocatorRecord();
+								locator.setFruEntityId(EntityId.SystemBoard.getCode());
+								locator.setFruEntityInstance(compactSensorRecord.getEntityInstanceNumber());
+								locator.setName(boardInfo.getBoardProductName() + " " + compactSensorRecord.getEntityInstanceNumber());
 
-					fru = new Fru(locator, systemBoardFruRecords);
+								fru = new Fru(locator, systemBoardFruRecords);
 
-					// OK, now we are good!
-					systemBoardFruUpdated = true;
+								// OK, now we are good!
+								systemBoardFruUpdated = true;
 
-				}
-			}
+							}
+						}
 
 			// Add the Fru instance
 			if (fru != null) {
@@ -193,7 +204,7 @@ public class GetFrusRunner extends AbstractIpmiRunner<List<Fru>> {
 
 	/**
 	 * Get the FRU records for the given FRU identifier <code>fruId</code>
-	 * 
+	 *
 	 * @param fruId The unique identifier of the FRU
 	 * @return new List of {@link FruRecord} instances
 	 * @throws Exception
@@ -202,8 +213,14 @@ public class GetFrusRunner extends AbstractIpmiRunner<List<Fru>> {
 		List<ReadFruDataResponseData> fruData = new ArrayList<>();
 
 		// get the FRU Inventory Area info
-		GetFruInventoryAreaInfoResponseData info = (GetFruInventoryAreaInfoResponseData) connector.sendMessage(handle,
-				new GetFruInventoryAreaInfo(IpmiVersion.V20, handle.getCipherSuite(), AuthenticationType.RMCPPlus, fruId));
+		GetFruInventoryAreaInfoResponseData info = (GetFruInventoryAreaInfoResponseData) getConnector()
+				.sendMessage(
+						getHandle(),
+						new GetFruInventoryAreaInfo(
+								IpmiVersion.V20,
+								getHandle().getCipherSuite(),
+								AuthenticationType.RMCPPlus,
+								fruId));
 
 		int size = info.getFruInventoryAreaSize();
 		BaseUnit unit = info.getFruUnit();
@@ -217,8 +234,17 @@ public class GetFrusRunner extends AbstractIpmiRunner<List<Fru>> {
 			}
 			try {
 				// get single package od FRU data
-				ReadFruDataResponseData data = (ReadFruDataResponseData) connector.sendMessage(handle,
-						new ReadFruData(IpmiVersion.V20, handle.getCipherSuite(), AuthenticationType.RMCPPlus, fruId, unit, i, fruReadPacketSize));
+				ReadFruDataResponseData data = (ReadFruDataResponseData) getConnector()
+						.sendMessage(
+								getHandle(),
+								new ReadFruData(
+										IpmiVersion.V20,
+										getHandle().getCipherSuite(),
+										AuthenticationType.RMCPPlus,
+										fruId,
+										unit,
+										i,
+										fruReadPacketSize));
 
 				fruData.add(data);
 
@@ -229,8 +255,13 @@ public class GetFrusRunner extends AbstractIpmiRunner<List<Fru>> {
 
 		try {
 			// after collecting all the data, we can combine and parse it
-			return ReadFruData.decodeFruData(fruData).stream()
-					.filter(fruRecord -> fruRecord instanceof BoardInfo || fruRecord instanceof ChassisInfo || fruRecord instanceof ProductInfo)
+			return ReadFruData
+					.decodeFruData(fruData)
+					.stream()
+					.filter(
+							fruRecord -> fruRecord instanceof BoardInfo
+									|| fruRecord instanceof ChassisInfo
+									|| fruRecord instanceof ProductInfo)
 					.collect(Collectors.toList());
 
 		} catch (Exception e) {

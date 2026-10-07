@@ -29,16 +29,16 @@ import org.metricshub.ipmi.core.coding.security.ConfidentialityNone;
  */
 public class Ipmiv15Message extends IpmiMessage {
 
-    public Ipmiv15Message() {
-        setConfidentialityAlgorithm(new ConfidentialityNone());
-    }
+	public Ipmiv15Message() {
+		setConfidentialityAlgorithm(new ConfidentialityNone());
+	}
 
-    @Override
-    public void setAuthenticationType(AuthenticationType authenticationType) {
-        if (authenticationType == AuthenticationType.RMCPPlus) {
-            throw new IllegalArgumentException(
-                    "IPMIv1.5 does not support RMCP+");
-        }
-        super.setAuthenticationType(authenticationType);
-    }
+	@Override
+	public void setAuthenticationType(AuthenticationType authenticationType) {
+		if (authenticationType == AuthenticationType.RMCPPlus) {
+			throw new IllegalArgumentException(
+					"IPMIv1.5 does not support RMCP+");
+		}
+		super.setAuthenticationType(authenticationType);
+	}
 }

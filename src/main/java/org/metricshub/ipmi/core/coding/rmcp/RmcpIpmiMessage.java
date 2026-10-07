@@ -26,15 +26,16 @@ package org.metricshub.ipmi.core.coding.rmcp;
  * A wrapper class for ASF ping message.
  */
 public class RmcpIpmiMessage extends RmcpMessage {
-    /**
-     * Prepares a ready to send ASF IPMI message.
-     * @param ipmiMessage - IPMI message encoded as a byte array.
-     */
-    public RmcpIpmiMessage(byte[] ipmiMessage) {
-        setVersion(RmcpVersion.RMCP1_0);
-        setSequenceNumber(0xff);
-        setClassOfMessage(RmcpClassOfMessage.Ipmi);
-        setData(ipmiMessage);
-    }
+	/**
+	 * Prepares a ready to send ASF IPMI message.
+	 *
+	 * @param ipmiMessage - IPMI message encoded as a byte array.
+	 */
+	public RmcpIpmiMessage(byte[] ipmiMessage) {
+		setVersion(RmcpVersion.RMCP1_0);
+		setSequenceNumber(0xff);
+		setClassOfMessage(RmcpClassOfMessage.Ipmi);
+		setData(ipmiMessage);
+	}
 
 }

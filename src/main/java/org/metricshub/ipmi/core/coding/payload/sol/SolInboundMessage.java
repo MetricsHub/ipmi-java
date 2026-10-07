@@ -27,29 +27,30 @@ package org.metricshub.ipmi.core.coding.payload.sol;
  */
 public class SolInboundMessage extends SolMessage {
 
-    /**
-     * Status field in {@link SolMessage} BMC -> Remote Console payload.
-     */
-    private final SolInboundStatusField statusField;
+	/**
+	 * Status field in {@link SolMessage} BMC -> Remote Console payload.
+	 */
+	private final SolInboundStatusField statusField;
 
-    public SolInboundMessage(byte sequenceNumber, byte ackNackSequenceNumber, byte acceptedCharacterCount, SolInboundStatusField statusField) {
-        super(sequenceNumber, ackNackSequenceNumber, acceptedCharacterCount, statusField.convertToByte());
-        this.statusField = statusField;
-    }
+	public SolInboundMessage(byte sequenceNumber, byte ackNackSequenceNumber, byte acceptedCharacterCount,
+			SolInboundStatusField statusField) {
+		super(sequenceNumber, ackNackSequenceNumber, acceptedCharacterCount, statusField.convertToByte());
+		this.statusField = statusField;
+	}
 
-    public SolInboundMessage(byte[] rawData) {
-        super(rawData[0], rawData[1], rawData[2], rawData[3]);
+	public SolInboundMessage(byte[] rawData) {
+		super(rawData[0], rawData[1], rawData[2], rawData[3]);
 
-        if (rawData.length > PAYLOAD_HEADER_LENGTH) {
-            byte[] characterData = new byte[rawData.length - PAYLOAD_HEADER_LENGTH];
-            System.arraycopy(rawData, PAYLOAD_HEADER_LENGTH, characterData, 0, characterData.length);
-            setData(characterData);
-        }
+		if (rawData.length > PAYLOAD_HEADER_LENGTH) {
+			byte[] characterData = new byte[rawData.length - PAYLOAD_HEADER_LENGTH];
+			System.arraycopy(rawData, PAYLOAD_HEADER_LENGTH, characterData, 0, characterData.length);
+			setData(characterData);
+		}
 
-        this.statusField = new SolInboundStatusField(rawData[3]);
-    }
+		this.statusField = new SolInboundStatusField(rawData[3]);
+	}
 
-    public SolInboundStatusField getStatusField() {
-        return statusField;
-    }
+	public SolInboundStatusField getStatusField() {
+		return statusField;
+	}
 }

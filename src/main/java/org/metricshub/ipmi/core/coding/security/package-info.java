@@ -1,8 +1,11 @@
 /**
  * Authentication, confidentiality and integrity algorithms.
- * To implement custom authentication algorithm extend {@link org.metricshub.ipmi.core.coding.security.AuthenticationAlgorithm} class. 
- * To implement custom confidentiality algorithm extend {@link org.metricshub.ipmi.core.coding.security.ConfidentialityAlgorithm} class.
- * To implement custom integrity algorithm extend {@link org.metricshub.ipmi.core.coding.security.IntegrityAlgorithm} class.
+ * To implement custom authentication algorithm extend
+ * {@link org.metricshub.ipmi.core.coding.security.AuthenticationAlgorithm} class.
+ * To implement custom confidentiality algorithm extend
+ * {@link org.metricshub.ipmi.core.coding.security.ConfidentialityAlgorithm} class.
+ * To implement custom integrity algorithm extend {@link org.metricshub.ipmi.core.coding.security.IntegrityAlgorithm}
+ * class.
  */
 package org.metricshub.ipmi.core.coding.security;
 /*-

@@ -1,5 +1,5 @@
 /**
- * The package containing asynchronous API message classes. 
+ * The package containing asynchronous API message classes.
  */
 package org.metricshub.ipmi.core.api.async.messages;
 /*-

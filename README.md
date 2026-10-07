@@ -10,12 +10,32 @@ See **[Project Documentation](https://metricshub.org/ipmi-java)** and the [Javad
 
 The IPMI Java Client is a library that communicates with the IPMI host, fetches Field Replaceable Units (FRUs) and Sensors information then reports these information as a text output.
 
+## Upgrading
+
+Version 1.2.03 makes the `protected` fields of the protocol classes (`AbstractIpmiRunner`, `MessageHandler`, `IpmiLanMessage`, `ConfidentialityAlgorithm`, `IntegrityAlgorithm`) `private`. Subclasses must use the new `protected` accessors instead; see [Upgrading from 1.2.02](https://metricshub.org/ipmi-java/#upgrading-from-1-2-02) for the list. The `IpmiClient` API is unchanged.
+
 ## Build instructions
 
 This is a simple Maven project. Build with:
 
 ```bash
 mvn verify
+```
+
+## Code format
+
+The code is formatted with the MetricsHub Eclipse formatter profile ([metricshub-eclipse-formatter.xml](metricshub-eclipse-formatter.xml), shared with the other MetricsHub Java projects), and the build fails on unformatted code. Simply run the below command before committing:
+
+```bash
+mvn formatter:format
+```
+
+The build also fails on [Checkstyle](checkstyle.xml) violations. A justified violation can be suppressed with `// CHECKSTYLE.OFF: <RuleName>` and `// CHECKSTYLE.ON: <RuleName>` comments.
+
+To ignore the whole-tree reformat commit in `git blame`, run once:
+
+```bash
+git config blame.ignoreRevsFile .git-blame-ignore-revs
 ```
 
 ## Release instructions

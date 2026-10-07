@@ -27,27 +27,27 @@ package org.metricshub.ipmi.core.common;
  */
 public class MessageReader {
 
-    private final byte[] message;
-    private int pointer = 0;
+	private final byte[] message;
+	private int pointer = 0;
 
-    /**
-     * Create new instance of {@link MessageReader}, that will operate on given message.
-     */
-    public MessageReader(byte[] message) {
-        if (message == null) {
-            throw new NullPointerException("Message cannot be null");
-        }
+	/**
+	 * Create new instance of {@link MessageReader}, that will operate on given message.
+	 */
+	public MessageReader(byte[] message) {
+		if (message == null) {
+			throw new NullPointerException("Message cannot be null");
+		}
 
-        this.message = message;
-    }
+		this.message = message;
+	}
 
-    public byte[] readNextField(int fieldLength) {
-        byte[] fieldData = new byte[fieldLength];
-        System.arraycopy(message, pointer, fieldData, 0, fieldLength);
+	public byte[] readNextField(int fieldLength) {
+		byte[] fieldData = new byte[fieldLength];
+		System.arraycopy(message, pointer, fieldData, 0, fieldLength);
 
-        pointer += fieldLength;
+		pointer += fieldLength;
 
-        return fieldData;
-    }
+		return fieldData;
+	}
 
 }

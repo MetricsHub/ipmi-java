@@ -51,12 +51,12 @@ public class FruDevice {
 	@Override
 	public String toString() {
 		return new StringBuilder("FRU;")
-			.append(vendor)
-			.append(";")
-			.append(model)
-			.append(";")
-			.append(serialNumber)
-			.toString();
+				.append(vendor)
+				.append(";")
+				.append(model)
+				.append(";")
+				.append(serialNumber)
+				.toString();
 	}
 
 }

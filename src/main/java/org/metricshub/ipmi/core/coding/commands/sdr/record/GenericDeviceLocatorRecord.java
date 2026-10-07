@@ -31,145 +31,146 @@ import org.metricshub.ipmi.core.common.TypeConverter;
  */
 public class GenericDeviceLocatorRecord extends SensorRecord {
 
-    private int deviceAccessAddress;
+	private int deviceAccessAddress;
 
-    private int deviceSlaveAddress;
+	private int deviceSlaveAddress;
 
-    private int channelNumber;
+	private int channelNumber;
 
-    private int accessLun;
+	private int accessLun;
 
-    private int busId;
+	private int busId;
 
-    private int addressSpan;
+	private int addressSpan;
 
-    private DeviceType deviceType;
+	private DeviceType deviceType;
 
-    private int deviceTypeModifier;
+	private int deviceTypeModifier;
 
-    private int entityId;
+	private int entityId;
 
-    private int entityInstance;
+	private int entityInstance;
 
-    private String name;
+	private String name;
 
-    @Override
-    protected void populateTypeSpecficValues(byte[] recordData,
-            SensorRecord record) {
+	@Override
+	protected void populateTypeSpecficValues(
+			byte[] recordData,
+			SensorRecord record) {
 
-        setDeviceAccessAddress((TypeConverter.byteToInt(recordData[5]) & 0xfe) >> 1);
+		setDeviceAccessAddress((TypeConverter.byteToInt(recordData[5]) & 0xfe) >> 1);
 
-        setDeviceSlaveAddress((TypeConverter.byteToInt(recordData[6]) & 0xfe) >> 1);
+		setDeviceSlaveAddress((TypeConverter.byteToInt(recordData[6]) & 0xfe) >> 1);
 
-        setChannelNumber(((TypeConverter.byteToInt(recordData[6]) & 0x1) << 3)
-                | ((TypeConverter.byteToInt(recordData[7]) & 0xe0) >> 5));
+		setChannelNumber(
+				((TypeConverter.byteToInt(recordData[6]) & 0x1) << 3)
+						| ((TypeConverter.byteToInt(recordData[7]) & 0xe0) >> 5));
 
-        setAccessLun((TypeConverter.byteToInt(recordData[7]) & 0x18) >> 3);
+		setAccessLun((TypeConverter.byteToInt(recordData[7]) & 0x18) >> 3);
 
-        setBusId(TypeConverter.byteToInt(recordData[7]) & 0x3);
+		setBusId(TypeConverter.byteToInt(recordData[7]) & 0x3);
 
-        setAddressSpan(TypeConverter.byteToInt(recordData[8]) & 0x3);
+		setAddressSpan(TypeConverter.byteToInt(recordData[8]) & 0x3);
 
-        setDeviceType(DeviceType.parseInt(TypeConverter.byteToInt(recordData[10])));
-        setDeviceTypeModifier(TypeConverter.byteToInt(recordData[11]));
+		setDeviceType(DeviceType.parseInt(TypeConverter.byteToInt(recordData[10])));
+		setDeviceTypeModifier(TypeConverter.byteToInt(recordData[11]));
 
-        setEntityId(TypeConverter.byteToInt(recordData[12]));
-        setEntityInstance(TypeConverter.byteToInt(recordData[13]));
+		setEntityId(TypeConverter.byteToInt(recordData[12]));
+		setEntityInstance(TypeConverter.byteToInt(recordData[13]));
 
+		byte[] nameData = new byte[recordData.length - 17];
 
-        byte[] nameData = new byte[recordData.length - 17];
+		System.arraycopy(recordData, 17, nameData, 0, nameData.length);
 
-        System.arraycopy(recordData, 17, nameData, 0, nameData.length);
+		setName(decodeName(recordData[16], nameData));
+	}
 
-        setName(decodeName(recordData[16], nameData));
-    }
+	public int getDeviceAccessAddress() {
+		return deviceAccessAddress;
+	}
 
-    public int getDeviceAccessAddress() {
-        return deviceAccessAddress;
-    }
+	public void setDeviceAccessAddress(int deviceAccessAddress) {
+		this.deviceAccessAddress = deviceAccessAddress;
+	}
 
-    public void setDeviceAccessAddress(int deviceAccessAddress) {
-        this.deviceAccessAddress = deviceAccessAddress;
-    }
+	public int getDeviceSlaveAddress() {
+		return deviceSlaveAddress;
+	}
 
-    public int getDeviceSlaveAddress() {
-        return deviceSlaveAddress;
-    }
+	public void setDeviceSlaveAddress(int deviceSlaveAddress) {
+		this.deviceSlaveAddress = deviceSlaveAddress;
+	}
 
-    public void setDeviceSlaveAddress(int deviceSlaveAddress) {
-        this.deviceSlaveAddress = deviceSlaveAddress;
-    }
+	public int getChannelNumber() {
+		return channelNumber;
+	}
 
-    public int getChannelNumber() {
-        return channelNumber;
-    }
+	public void setChannelNumber(int channelNumber) {
+		this.channelNumber = channelNumber;
+	}
 
-    public void setChannelNumber(int channelNumber) {
-        this.channelNumber = channelNumber;
-    }
+	public int getAccessLun() {
+		return accessLun;
+	}
 
-    public int getAccessLun() {
-        return accessLun;
-    }
+	public void setAccessLun(int accessLun) {
+		this.accessLun = accessLun;
+	}
 
-    public void setAccessLun(int accessLun) {
-        this.accessLun = accessLun;
-    }
+	public int getBusId() {
+		return busId;
+	}
 
-    public int getBusId() {
-        return busId;
-    }
+	public void setBusId(int busId) {
+		this.busId = busId;
+	}
 
-    public void setBusId(int busId) {
-        this.busId = busId;
-    }
+	public int getAddressSpan() {
+		return addressSpan;
+	}
 
-    public int getAddressSpan() {
-        return addressSpan;
-    }
+	public void setAddressSpan(int addressSpan) {
+		this.addressSpan = addressSpan;
+	}
 
-    public void setAddressSpan(int addressSpan) {
-        this.addressSpan = addressSpan;
-    }
+	public DeviceType getDeviceType() {
+		return deviceType;
+	}
 
-    public DeviceType getDeviceType() {
-        return deviceType;
-    }
+	public void setDeviceType(DeviceType deviceType) {
+		this.deviceType = deviceType;
+	}
 
-    public void setDeviceType(DeviceType deviceType) {
-        this.deviceType = deviceType;
-    }
+	public int getDeviceTypeModifier() {
+		return deviceTypeModifier;
+	}
 
-    public int getDeviceTypeModifier() {
-        return deviceTypeModifier;
-    }
+	public void setDeviceTypeModifier(int deviceTypeModifier) {
+		this.deviceTypeModifier = deviceTypeModifier;
+	}
 
-    public void setDeviceTypeModifier(int deviceTypeModifier) {
-        this.deviceTypeModifier = deviceTypeModifier;
-    }
+	public int getEntityId() {
+		return entityId;
+	}
 
-    public int getEntityId() {
-        return entityId;
-    }
+	public void setEntityId(int entityId) {
+		this.entityId = entityId;
+	}
 
-    public void setEntityId(int entityId) {
-        this.entityId = entityId;
-    }
+	public int getEntityInstance() {
+		return entityInstance;
+	}
 
-    public int getEntityInstance() {
-        return entityInstance;
-    }
+	public void setEntityInstance(int entityInstance) {
+		this.entityInstance = entityInstance;
+	}
 
-    public void setEntityInstance(int entityInstance) {
-        this.entityInstance = entityInstance;
-    }
+	public String getName() {
+		return name;
+	}
 
-    public String getName() {
-        return name;
-    }
-
-    public void setName(String name) {
-        this.name = name;
-    }
+	public void setName(String name) {
+		this.name = name;
+	}
 
 }

@@ -29,85 +29,86 @@ import org.metricshub.ipmi.core.coding.security.ConfidentialityAlgorithm;
  * Wrapper class for IPMI message
  */
 public abstract class IpmiMessage {
-    private AuthenticationType authenticationType;
+	private AuthenticationType authenticationType;
 
-    private int sessionSequenceNumber;
-    
-    private int sessionID;
+	private int sessionSequenceNumber;
 
-    private byte[] authCode;
+	private int sessionID;
 
-    private IpmiPayload payload;
-    
-    private int payloadLength;
-    
-    /**
-     * Confidentiality Algorithm used for encryption and decryption.
-     */
-    private ConfidentialityAlgorithm confidentialityAlgorithm;
+	private byte[] authCode;
 
-    public void setAuthenticationType(AuthenticationType authenticationType) {
-        this.authenticationType = authenticationType;
-    }
+	private IpmiPayload payload;
 
-    public AuthenticationType getAuthenticationType() {
-        return authenticationType;
-    }
+	private int payloadLength;
 
-    public void setSessionSequenceNumber(int sessionSequenceNumber) {
-        this.sessionSequenceNumber = sessionSequenceNumber;
-    }
+	/**
+	 * Confidentiality Algorithm used for encryption and decryption.
+	 */
+	private ConfidentialityAlgorithm confidentialityAlgorithm;
 
-    public int getSessionSequenceNumber() {
-        return sessionSequenceNumber;
-    }
+	public void setAuthenticationType(AuthenticationType authenticationType) {
+		this.authenticationType = authenticationType;
+	}
 
-    public void setSessionID(int sessionID) {
-        this.sessionID = sessionID;
-    }
+	public AuthenticationType getAuthenticationType() {
+		return authenticationType;
+	}
 
-    public int getSessionID() {
-        return sessionID;
-    }
+	public void setSessionSequenceNumber(int sessionSequenceNumber) {
+		this.sessionSequenceNumber = sessionSequenceNumber;
+	}
 
-    public void setAuthCode(byte[] authCode) {
-        this.authCode = authCode;
-    }
+	public int getSessionSequenceNumber() {
+		return sessionSequenceNumber;
+	}
 
-    public byte[] getAuthCode() {
-        return authCode;
-    }
+	public void setSessionID(int sessionID) {
+		this.sessionID = sessionID;
+	}
 
-    /**
-     * Sets {@link #payload} and {@link #payloadLength}
-     * @param payload
-     */
-    public void setPayload(IpmiPayload payload) {
-        setPayloadLength(payload.getPayloadLength());
-        this.payload = payload;
-    }
+	public int getSessionID() {
+		return sessionID;
+	}
 
-    public IpmiPayload getPayload() {
-        return payload;
-    }
+	public void setAuthCode(byte[] authCode) {
+		this.authCode = authCode;
+	}
 
-    public void setPayloadLength(int payloadLength) {
-        this.payloadLength = payloadLength;
-    }
+	public byte[] getAuthCode() {
+		return authCode;
+	}
 
-    /**
-     * @return Length of the UNENCRYPTED payload.
-     */
-    public int getPayloadLength() {
-        return payloadLength;
-    }
+	/**
+	 * Sets {@link #payload} and {@link #payloadLength}
+	 *
+	 * @param payload
+	 */
+	public void setPayload(IpmiPayload payload) {
+		setPayloadLength(payload.getPayloadLength());
+		this.payload = payload;
+	}
 
-    public void setConfidentialityAlgorithm(ConfidentialityAlgorithm confidentialityAlgorithm) {
-        this.confidentialityAlgorithm = confidentialityAlgorithm;
-    }
+	public IpmiPayload getPayload() {
+		return payload;
+	}
 
-    public ConfidentialityAlgorithm getConfidentialityAlgorithm() {
-        return confidentialityAlgorithm;
-    }
+	public void setPayloadLength(int payloadLength) {
+		this.payloadLength = payloadLength;
+	}
+
+	/**
+	 * @return Length of the UNENCRYPTED payload.
+	 */
+	public int getPayloadLength() {
+		return payloadLength;
+	}
+
+	public void setConfidentialityAlgorithm(ConfidentialityAlgorithm confidentialityAlgorithm) {
+		this.confidentialityAlgorithm = confidentialityAlgorithm;
+	}
+
+	public ConfidentialityAlgorithm getConfidentialityAlgorithm() {
+		return confidentialityAlgorithm;
+	}
 
 }

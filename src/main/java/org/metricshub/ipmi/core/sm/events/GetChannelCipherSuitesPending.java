@@ -33,14 +33,16 @@ import org.metricshub.ipmi.core.sm.states.State;
  * Performed in {@link CiphersWaiting} {@link State} indcates that not all
  * available {@link CipherSuite}s were received from the remote system and more
  * {@link GetChannelCipherSuites} commands are needed.
- * 
+ *
  * @see StateMachine
  */
 public class GetChannelCipherSuitesPending extends Default {
 
-    public GetChannelCipherSuitesPending(int sequenceNumber) {
-        super(CipherSuite.getEmpty(), sequenceNumber,
-                PrivilegeLevel.MaximumAvailable);
-    }
+	public GetChannelCipherSuitesPending(int sequenceNumber) {
+		super(
+				CipherSuite.getEmpty(),
+				sequenceNumber,
+				PrivilegeLevel.MaximumAvailable);
+	}
 
 }

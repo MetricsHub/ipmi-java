@@ -41,31 +41,44 @@ import org.metricshub.ipmi.core.sm.events.StateMachineEvent;
  */
 public class Ciphers extends State {
 
-    @Override
-    public void doTransition(StateMachine stateMachine,
-            StateMachineEvent machineEvent) {
-        if (machineEvent instanceof Default) {
-            Default event = (Default) machineEvent;
-            GetChannelAuthenticationCapabilities authCap = new GetChannelAuthenticationCapabilities(
-                    IpmiVersion.V15, IpmiVersion.V20, event.getCipherSuite(),
-                    event.getPrivilegeLevel(), TypeConverter.intToByte(0xe));
-            try {
-                stateMachine.setCurrent(new AuthcapWaiting(event.getSequenceNumber()));
-                stateMachine.sendMessage(Encoder.encode(
-                        new Protocolv15Encoder(), authCap, event.getSequenceNumber(),0,0));
-            } catch (Exception e) {
-                stateMachine.setCurrent(this);
-                stateMachine.doExternalAction(new ErrorAction(e));
-            }
-        } else {
-            stateMachine.doExternalAction(new ErrorAction(
-                    new IllegalArgumentException("Invalid transition")));
-        }
-    }
+	@Override
+	public void doTransition(
+			StateMachine stateMachine,
+			StateMachineEvent machineEvent) {
+		if (machineEvent instanceof Default) {
+			Default event = (Default) machineEvent;
+			GetChannelAuthenticationCapabilities authCap = new GetChannelAuthenticationCapabilities(
+					IpmiVersion.V15,
+					IpmiVersion.V20,
+					event.getCipherSuite(),
+					event.getPrivilegeLevel(),
+					TypeConverter.intToByte(0xe));
+			try {
+				stateMachine.setCurrent(new AuthcapWaiting(event.getSequenceNumber()));
+				stateMachine
+						.sendMessage(
+								Encoder
+										.encode(
+												new Protocolv15Encoder(),
+												authCap,
+												event.getSequenceNumber(),
+												0,
+												0));
+			} catch (Exception e) {
+				stateMachine.setCurrent(this);
+				stateMachine.doExternalAction(new ErrorAction(e));
+			}
+		} else {
+			stateMachine
+					.doExternalAction(
+							new ErrorAction(
+									new IllegalArgumentException("Invalid transition")));
+		}
+	}
 
-    @Override
-    public void doAction(StateMachine stateMachine, RmcpMessage message) {
-        // No action is needed
-    }
+	@Override
+	public void doAction(StateMachine stateMachine, RmcpMessage message) {
+		// No action is needed
+	}
 
 }

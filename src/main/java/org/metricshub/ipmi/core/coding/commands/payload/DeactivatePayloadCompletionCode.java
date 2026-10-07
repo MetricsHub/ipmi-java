@@ -27,33 +27,32 @@ package org.metricshub.ipmi.core.coding.commands.payload;
  */
 public enum DeactivatePayloadCompletionCode {
 
-    PAYLOAD_ALREADY_DEACTIVATED(0x80, "Payload already deactivated"),
-    PAYLOAD_TYPE_IS_DISABLED(0x81, "Given payload type is not configured to be enabled for activation");
+	PAYLOAD_ALREADY_DEACTIVATED(0x80, "Payload already deactivated"),
+	PAYLOAD_TYPE_IS_DISABLED(0x81, "Given payload type is not configured to be enabled for activation");
 
+	private final int code;
+	private final String message;
 
-    private final int code;
-    private final String message;
+	DeactivatePayloadCompletionCode(int code, String message) {
+		this.code = code;
+		this.message = message;
+	}
 
-    DeactivatePayloadCompletionCode(int code, String message) {
-        this.code = code;
-        this.message = message;
-    }
+	public int getCode() {
+		return code;
+	}
 
-    public int getCode() {
-        return code;
-    }
+	public String getMessage() {
+		return message;
+	}
 
-    public String getMessage() {
-        return message;
-    }
+	public static DeactivatePayloadCompletionCode parseInt(int code) {
+		for (DeactivatePayloadCompletionCode completionCode : values()) {
+			if (completionCode.getCode() == code) {
+				return completionCode;
+			}
+		}
 
-    public static DeactivatePayloadCompletionCode parseInt(int code) {
-        for (DeactivatePayloadCompletionCode completionCode : values()) {
-            if (completionCode.getCode() == code) {
-                return completionCode;
-            }
-        }
-
-        return null;
-    }
+		return null;
+	}
 }

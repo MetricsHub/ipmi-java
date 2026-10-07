@@ -9,7 +9,7 @@ class DeviceDescriptionTest {
 
 	@Test
 	void testGetDeviceType() {
-		for (EntityId entityId: EntityId.values()) {
+		for (EntityId entityId : EntityId.values()) {
 			assertNotNull(DeviceDescription.getDeviceType(entityId));
 		}
 	}

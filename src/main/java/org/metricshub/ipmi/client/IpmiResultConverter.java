@@ -49,7 +49,7 @@ import org.metricshub.ipmi.core.coding.commands.sdr.record.FruDeviceLocatorRecor
 import org.metricshub.ipmi.core.coding.commands.sdr.record.FullSensorRecord;
 import org.metricshub.ipmi.core.coding.commands.sdr.record.SensorUnit;
 
-public class IpmiResultConverter {
+public final class IpmiResultConverter {
 
 	private static final double NO_READING = 255d;
 
@@ -58,33 +58,32 @@ public class IpmiResultConverter {
 	private static final DoubleFunction<Double> FAHRENHEIT_TO_CELSIUS_CONVERSION_FUNCTION = v -> (v - 32.0) * 0.5556;
 	private static final DoubleFunction<Double> KELVIN_TO_CELSIUS_CONVERSION_FUNCTION = v -> v - 273.15;
 
-	private IpmiResultConverter() {
-	}
+	private IpmiResultConverter() {}
 
 	/**
 	 * Convert the given List of FRUs and Sensors to a {@link String} result (semicolon-separated values)
 	 *
-	 * @param frus    The list of Field Replaceable Units (FRU) we wish to format as the following: <br>
-	 *                <em>FRU;$vendor;$model;$serialNumber</em>
+	 * @param frus The list of Field Replaceable Units (FRU) we wish to format as the following: <br>
+	 *        <em>FRU;$vendor;$model;$serialNumber</em>
 	 * @param sensors The list of sensor records (Compact or Full) we wish to format as the following: <br>
-	 *                <ul>
-	 *                  <li><b>States:</b>
-	 *                    <em>$deviceType;$deviceId;$deviceUniqueId;$vendor;$model;$serialNumber;$sensorName=$state|$sensorName=$state...</em>
-	 *                  </li>
-	 *                 <li><b>Readings:</b>
-	 *                   <ul>
-	 *                     <li><em>Temperature;$sensorId;$sensorName;$sensorUniqueId;$value;$threshold1;$threshold2</em></li>
-	 *                     <li><em>Voltage;$sensorId;$sensorName;$sensorUniqueId;$value;$threshold1;$threshold2</em></li>
-	 *                     <li><em>Fan;$sensorId;$sensorName;$sensorUniqueId;$value;$threshold1;$threshold2</em></li>
-	 *                     <li><em>Current;$sensorId;$sensorName;$sensorUniqueId;$value</em></li>
-	 *                     <li><em>PowerConsumption;$sensorId;$sensorName;$sensorUniqueId;$value</em></li>
-	 *                     <li><em>Energy;$sensorId;$sensorName;$sensorUniqueId;$value</em></li>
-	 *                   </ul>
-	 *                 </li>
-	 *                </ul>
+	 *        <ul>
+	 *        <li><b>States:</b>
+	 *        <em>$deviceType;$deviceId;$deviceUniqueId;$vendor;$model;$serialNumber;$sensorName=$state|$sensorName=$state...</em>
+	 *        </li>
+	 *        <li><b>Readings:</b>
+	 *        <ul>
+	 *        <li><em>Temperature;$sensorId;$sensorName;$sensorUniqueId;$value;$threshold1;$threshold2</em></li>
+	 *        <li><em>Voltage;$sensorId;$sensorName;$sensorUniqueId;$value;$threshold1;$threshold2</em></li>
+	 *        <li><em>Fan;$sensorId;$sensorName;$sensorUniqueId;$value;$threshold1;$threshold2</em></li>
+	 *        <li><em>Current;$sensorId;$sensorName;$sensorUniqueId;$value</em></li>
+	 *        <li><em>PowerConsumption;$sensorId;$sensorName;$sensorUniqueId;$value</em></li>
+	 *        <li><em>Energy;$sensorId;$sensorName;$sensorUniqueId;$value</em></li>
+	 *        </ul>
+	 *        </li>
+	 *        </ul>
 	 * @return String value
 	 */
-	public static final String convertResult(final List<Fru> frus, final List<Sensor> sensors) {
+	public static String convertResult(final List<Fru> frus, final List<Sensor> sensors) {
 
 		// FRU id to FRU Device used when processing the sensors
 		Map<String, FruDevice> frusLookup = new HashMap<>();
@@ -98,13 +97,15 @@ public class IpmiResultConverter {
 		// Process the sensor readings
 		Stream<String> sensorReadings = processSensorReadings(sensors);
 
-		return Stream.of(fruRecords, sensorStates, sensorReadings)
-			.flatMap(Function.identity())
-			.collect(Collectors.joining("\n"));
+		return Stream
+				.of(fruRecords, sensorStates, sensorReadings)
+				.flatMap(Function.identity())
+				.collect(Collectors.joining("\n"));
 	}
 
 	/**
-	 * Process the given sensors. Extracts only the full sensors then handle each full sensor to extract the reading value. E.g. PowerConsumption
+	 * Process the given sensors. Extracts only the full sensors then handle each full sensor to extract the reading
+	 * value. E.g. PowerConsumption
 	 *
 	 * @param sensors The sensor list we wish to process
 	 * @return The stream of the sensor readings
@@ -112,18 +113,21 @@ public class IpmiResultConverter {
 	private static Stream<String> processSensorReadings(final List<Sensor> sensors) {
 
 		// Parse each full sensor as it should define the reading value and
-		return sensors.stream()
-			.filter(Sensor::isFull)
-			.filter(sensor -> sensor.getData() != null && sensor.getRecord() != null)
-			.map(IpmiResultConverter::extractFullSensorReadingValue)
-			.filter(Objects::nonNull);
+		return sensors
+				.stream()
+				.filter(Sensor::isFull)
+				.filter(sensor -> sensor.getData() != null && sensor.getRecord() != null)
+				.map(IpmiResultConverter::extractFullSensorReadingValue)
+				.filter(Objects::nonNull);
 	}
 
 	/**
-	 * Handle a Full sensor to extract the reading value (temperature, voltage, Fan speed, current, power consumption, energy).
+	 * Handle a Full sensor to extract the reading value (temperature, voltage, Fan speed, current, power consumption,
+	 * energy).
 	 *
 	 * @param fullSensor The full sensor we wish to process
-	 * @return The sensor reading as semicolon-separated values. E.g. Temperature;0001;Ambient Temp;Front Panel Board 1;22.0;38;41
+	 * @return The sensor reading as semicolon-separated values. E.g. Temperature;0001;Ambient Temp;Front Panel Board
+	 *         1;22.0;38;41
 	 */
 	private static String extractFullSensorReadingValue(final Sensor fullSensor) {
 
@@ -178,68 +182,85 @@ public class IpmiResultConverter {
 		}
 	}
 
-
 	/**
 	 * Get the energy row using the given fields.
 	 *
-	 * @param sensorId       The id of the sensor
-	 * @param sensorName     The name of the sensor
-	 * @param value          The value to set
+	 * @param sensorId The id of the sensor
+	 * @param sensorName The name of the sensor
+	 * @param value The value to set
 	 * @param sensorUniqueId The sensor unique id ($type $deviceId)
 	 * @return The energy sensor reading record formatted as <em>Energy;$sensorId;$sensorName;$sensorUniqueId;$value</em>
 	 */
-	private static String energyRow(final String sensorId, final String sensorName,
-			final double value, final String sensorUniqueId) {
+	private static String energyRow(
+			final String sensorId,
+			final String sensorName,
+			final double value,
+			final String sensorUniqueId) {
 		return String.join(";", "Energy", sensorId, sensorName, sensorUniqueId, String.valueOf(value));
 	}
 
 	/**
 	 * Get the power consumption row using the given fields.
 	 *
-	 * @param sensorId       The id of the sensor
-	 * @param sensorName     The name of the sensor
-	 * @param value          The value to set
+	 * @param sensorId The id of the sensor
+	 * @param sensorName The name of the sensor
+	 * @param value The value to set
 	 * @param sensorUniqueId The sensor unique id ($type $deviceId)
-	 * @return The power consumption sensor reading record formatted as: <em>PowerConsumption;$sensorId;$sensorName;$sensorUniqueId;$value</em>
+	 * @return The power consumption sensor reading record formatted as:
+	 *         <em>PowerConsumption;$sensorId;$sensorName;$sensorUniqueId;$value</em>
 	 */
-	private static String powerConsumptionRow(final String sensorId, final String sensorName,
-			final 	double value, final  String sensorUniqueId) {
+	private static String powerConsumptionRow(
+			final String sensorId,
+			final String sensorName,
+			final double value,
+			final String sensorUniqueId) {
 		return String.join(";", "PowerConsumption", sensorId, sensorName, sensorUniqueId, String.valueOf(value));
 	}
 
 	/**
 	 * Get the current row reading using the given fields.
 	 *
-	 * @param sensorId       The id of the sensor
-	 * @param sensorName     The name of the sensor
-	 * @param value          The value to set
+	 * @param sensorId The id of the sensor
+	 * @param sensorName The name of the sensor
+	 * @param value The value to set
 	 * @param sensorUniqueId The sensor unique id ($type $deviceId)
 	 * @return Current sensor reading record formatted as: <em>Current;$sensorId;$sensorName;$sensorUniqueId;$value</em>
 	 */
-	private static String currentRow(final String sensorId, final String sensorName,
-			final double value, final String sensorUniqueId) {
+	private static String currentRow(
+			final String sensorId,
+			final String sensorName,
+			final double value,
+			final String sensorUniqueId) {
 		return String.join(";", "Current", sensorId, sensorName, sensorUniqueId, String.valueOf(value));
 	}
 
 	/**
 	 * Get the fan speed row using the given fields.
 	 *
-	 * @param sensor         The full sensor record used to extract the threshold 1 and threshold 2.
-	 *                       <ol>
-	 *                       <li><b>Threshold 1</b> is the <em>LowerCriticalThreshold</em> otherwise we get the
-	 *                       <em>LowerNonRecoverableThreshold</em>.</li>
-	 *                       <li><b>Threshold 2</b> is the <em>LowerNonCriticalThreshold</em></li>
-	 *                       </ol>
-	 * @param sensorId       The id of the sensor
-	 * @param sensorName     The name of the sensor
-	 * @param value          The value to set
+	 * @param sensor The full sensor record used to extract the threshold 1 and threshold 2.
+	 *        <ol>
+	 *        <li><b>Threshold 1</b> is the <em>LowerCriticalThreshold</em> otherwise we get the
+	 *        <em>LowerNonRecoverableThreshold</em>.</li>
+	 *        <li><b>Threshold 2</b> is the <em>LowerNonCriticalThreshold</em></li>
+	 *        </ol>
+	 * @param sensorId The id of the sensor
+	 * @param sensorName The name of the sensor
+	 * @param value The value to set
 	 * @param sensorUniqueId The sensor unique id ($type $deviceId)
-	 * @return The Fan speed sensor reading record formatted as: Fan;$sensorId;$sensorName;$sensorUniqueId;$value;$threshold1;$threshold2</em>
+	 * @return The Fan speed sensor reading record formatted as:
+	 *         Fan;$sensorId;$sensorName;$sensorUniqueId;$value;$threshold1;$threshold2</em>
 	 */
-	private static String fanSpeedRow(final FullSensorRecord sensor, final String sensorId,
-			final String sensorName, final double value, final String sensorUniqueId) {
+	private static String fanSpeedRow(
+			final FullSensorRecord sensor,
+			final String sensorId,
+			final String sensorName,
+			final double value,
+			final String sensorUniqueId) {
 
-		String threshold1 = getAvailableThreshold(IDENTITY_FUNCTION, sensor.getLowerCriticalThreshold(), sensor.getLowerNonRecoverableThreshold());
+		String threshold1 = getAvailableThreshold(
+				IDENTITY_FUNCTION,
+				sensor.getLowerCriticalThreshold(),
+				sensor.getLowerNonRecoverableThreshold());
 
 		String threshold2 = getThresholdValue(IDENTITY_FUNCTION, sensor.getLowerNonCriticalThreshold());
 
@@ -249,50 +270,76 @@ public class IpmiResultConverter {
 	/**
 	 * Get the voltage row using the given fields.
 	 *
-	 * @param sensor         The full sensor record used to extract the threshold 1 and threshold 2.
-	 *                       <ol>
-	 *                       <li><b>Threshold 1</b> is the <em>LowerNonCriticalThreshold</em> otherwise we get the
-	 *                       <em>LowerCriticalThreshold</em>.</li>
-	 *                       <li><b>Threshold 2</b> is the <em>UpperNonCriticalThreshold</em> otherwise we get the
-	 *                       <em>UpperCriticalThreshold</em>, if both thresholds are not available then we get the
-	 *                       <em>UpperNonRecoverableThreshold</em></li>
-	 *                       </ol>
-	 * @param sensorId       The id of the sensor
-	 * @param sensorName     The name of the sensor
-	 * @param value          The value to set
+	 * @param sensor The full sensor record used to extract the threshold 1 and threshold 2.
+	 *        <ol>
+	 *        <li><b>Threshold 1</b> is the <em>LowerNonCriticalThreshold</em> otherwise we get the
+	 *        <em>LowerCriticalThreshold</em>.</li>
+	 *        <li><b>Threshold 2</b> is the <em>UpperNonCriticalThreshold</em> otherwise we get the
+	 *        <em>UpperCriticalThreshold</em>, if both thresholds are not available then we get the
+	 *        <em>UpperNonRecoverableThreshold</em></li>
+	 *        </ol>
+	 * @param sensorId The id of the sensor
+	 * @param sensorName The name of the sensor
+	 * @param value The value to set
 	 * @param sensorUniqueId The sensor unique id ($type $deviceId)
-	 * @return Voltage sensor reading record formatted as: <em>Voltage;$sensorId;$sensorName;$sensorUniqueId;$value;$threshold1;$threshold2</em>
+	 * @return Voltage sensor reading record formatted as:
+	 *         <em>Voltage;$sensorId;$sensorName;$sensorUniqueId;$value;$threshold1;$threshold2</em>
 	 */
-	private static String voltageRow(final FullSensorRecord sensor, final String sensorId,
-			final String sensorName, final double value, final String sensorUniqueId) {
+	private static String voltageRow(
+			final FullSensorRecord sensor,
+			final String sensorId,
+			final String sensorName,
+			final double value,
+			final String sensorUniqueId) {
 
-		String threshold1 = getAvailableThreshold(VOLTAGE_CONVERSION_FUNCTION, sensor.getLowerNonCriticalThreshold(), sensor.getLowerCriticalThreshold(),
+		String threshold1 = getAvailableThreshold(
+				VOLTAGE_CONVERSION_FUNCTION,
+				sensor.getLowerNonCriticalThreshold(),
+				sensor.getLowerCriticalThreshold(),
 				sensor.getLowerNonRecoverableThreshold());
 
-		String threshold2 = getAvailableThreshold(VOLTAGE_CONVERSION_FUNCTION, sensor.getUpperNonCriticalThreshold(), sensor.getUpperCriticalThreshold(),
+		String threshold2 = getAvailableThreshold(
+				VOLTAGE_CONVERSION_FUNCTION,
+				sensor.getUpperNonCriticalThreshold(),
+				sensor.getUpperCriticalThreshold(),
 				sensor.getUpperNonRecoverableThreshold());
 
-		return String.join(";", "Voltage", sensorId, sensorName, sensorUniqueId, String.valueOf(value * 1000), threshold1, threshold2);
+		return String
+				.join(
+						";",
+						"Voltage",
+						sensorId,
+						sensorName,
+						sensorUniqueId,
+						String.valueOf(value * 1000),
+						threshold1,
+						threshold2);
 	}
 
 	/**
 	 * Get the temperature row using the given fields.
 	 *
-	 * @param sensor         The full sensor record used to extract the threshold 1 and threshold 2.
-	 *                       <ol>
-	 *                       <li><b>Threshold 1</b> is the <em>UpperNonCriticalThreshold</em>.</li>
-	 *                       <li><b>Threshold 2</b> is the <em>UpperCriticalThreshold</em> otherwise we get the
-	 *                       <em>UpperNonRecoverableThreshold</em></li>
-	 *                       </ol>
-	 * @param sensorId       The id of the sensor
-	 * @param sensorName     The name of the sensor
-	 * @param value          The value to set, always converted to Degrees Celsius
-	 * @param unit           The unit used to convert Fahrenheit to Celsius or Kelvin to Celsius
+	 * @param sensor The full sensor record used to extract the threshold 1 and threshold 2.
+	 *        <ol>
+	 *        <li><b>Threshold 1</b> is the <em>UpperNonCriticalThreshold</em>.</li>
+	 *        <li><b>Threshold 2</b> is the <em>UpperCriticalThreshold</em> otherwise we get the
+	 *        <em>UpperNonRecoverableThreshold</em></li>
+	 *        </ol>
+	 * @param sensorId The id of the sensor
+	 * @param sensorName The name of the sensor
+	 * @param value The value to set, always converted to Degrees Celsius
+	 * @param unit The unit used to convert Fahrenheit to Celsius or Kelvin to Celsius
 	 * @param sensorUniqueId The sensor unique id ($type $deviceId)
-	 * @return Temperature sensor reading record formatted as: <em>Temperature;$sensorId;$sensorName;$sensorUniqueId;$value;$threshold1;$threshold2</em>
+	 * @return Temperature sensor reading record formatted as:
+	 *         <em>Temperature;$sensorId;$sensorName;$sensorUniqueId;$value;$threshold1;$threshold2</em>
 	 */
-	private static String temperatureRow(final FullSensorRecord sensor, final String sensorId,
-			final String sensorName, double value, final SensorUnit unit, final String sensorUniqueId) {
+	private static String temperatureRow(
+			final FullSensorRecord sensor,
+			final String sensorId,
+			final String sensorName,
+			double value,
+			final SensorUnit unit,
+			final String sensorUniqueId) {
 
 		DoubleFunction<Double> conversionFunction = IDENTITY_FUNCTION;
 		if (SensorUnit.DegreesF.equals(unit)) {
@@ -304,21 +351,27 @@ public class IpmiResultConverter {
 		}
 
 		String threshold1 = getThresholdValue(conversionFunction, sensor.getUpperNonCriticalThreshold());
-		String threshold2 = getAvailableThreshold(conversionFunction, sensor.getUpperCriticalThreshold(), sensor.getUpperNonRecoverableThreshold());
+		String threshold2 = getAvailableThreshold(
+				conversionFunction,
+				sensor.getUpperCriticalThreshold(),
+				sensor.getUpperNonRecoverableThreshold());
 
 		value = conversionFunction.apply(value);
 
-		return String.join(";", "Temperature", sensorId, sensorName, sensorUniqueId, String.valueOf(value), threshold1, threshold2);
+		return String
+				.join(";", "Temperature", sensorId, sensorName, sensorUniqueId, String.valueOf(value), threshold1, threshold2);
 	}
 
 	/**
 	 * Process the sensor states
 	 *
-	 * @param sensors        The sensor list we wish to process
-	 * @param frusLookup     The FRUs lookup used to extract vendor, model and serial number
+	 * @param sensors The sensor list we wish to process
+	 * @param frusLookup The FRUs lookup used to extract vendor, model and serial number
 	 * @return The stream of sensor records including sensor states
 	 */
-	private static Stream<String> processSensorStates(final List<Sensor> sensors, final Map<String, FruDevice> frusLookup) {
+	private static Stream<String> processSensorStates(
+			final List<Sensor> sensors,
+			final Map<String, FruDevice> frusLookup) {
 
 		Map<String, String> sensorEntries = new LinkedHashMap<>();
 
@@ -331,11 +384,14 @@ public class IpmiResultConverter {
 	 * Extract the sensor state and format the result as the following: <br>
 	 * <em>$deviceType;$deviceId;$deviceUniqueId;$vendor;$model;$serialNumber;$sensorName=$state|$sensorName=$state...</em>
 	 *
-	 * @param sensor        The sensor we wish to extract its states
-	 * @param frusLookup    The FRUs lookup that should contain sensor metadata, vendor, model and serial number
+	 * @param sensor The sensor we wish to extract its states
+	 * @param frusLookup The FRUs lookup that should contain sensor metadata, vendor, model and serial number
 	 * @param sensorEntries The sensor entries used to append existing device states
 	 */
-	private static void extractSensorStates(final Sensor sensor, final Map<String, FruDevice> frusLookup, final Map<String, String> sensorEntries) {
+	private static void extractSensorStates(
+			final Sensor sensor,
+			final Map<String, FruDevice> frusLookup,
+			final Map<String, String> sensorEntries) {
 		// Get the sensor states
 		String states = sensor.getStates();
 
@@ -346,7 +402,10 @@ public class IpmiResultConverter {
 		Byte deviceId = sensor.getDeviceId();
 
 		// Bypass sensors with no state asserted
-		if (Utils.isBlank(states) || states.toLowerCase().contains("=device absent") || deviceId == null || Utils.isBlank(deviceType)) {
+		if (Utils.isBlank(states)
+				|| states.toLowerCase().contains("=device absent")
+				|| deviceId == null
+				|| Utils.isBlank(deviceType)) {
 			return;
 		}
 
@@ -383,10 +442,11 @@ public class IpmiResultConverter {
 	/**
 	 * Process the given list of FRUs
 	 *
-	 * @param frus           The list of Field Replaceable Units (FRU) we wish to format as the following: <br>
-	 *                       <em>FRU;$vendor;$model;$serialNumber</em>
-	 * @param frusLookup     The frusLookup used to store the FRUs indexed by the unique identifier in order to easily fetch them at the sensors
-	 *                       processing step.
+	 * @param frus The list of Field Replaceable Units (FRU) we wish to format as the following: <br>
+	 *        <em>FRU;$vendor;$model;$serialNumber</em>
+	 * @param frusLookup The frusLookup used to store the FRUs indexed by the unique identifier in order to easily fetch
+	 *        them at the sensors
+	 *        processing step.
 	 * @return The stream of the FRU record including very good, good and poor FRUs
 	 */
 	private static Stream<String> processFrus(final List<Fru> frus, final Map<String, FruDevice> frusLookup) {
@@ -411,7 +471,9 @@ public class IpmiResultConverter {
 			EntityId entityId = EntityId.parseInt(fruLocator.getFruEntityId());
 
 			// Build the FRU unique id
-			String deviceUniqueId = buildDeviceUniqueId(DeviceDescription.getDeviceType(entityId), fruLocator.getFruEntityInstance());
+			String deviceUniqueId = buildDeviceUniqueId(
+					DeviceDescription.getDeviceType(entityId),
+					fruLocator.getFruEntityInstance());
 
 			FruDevice fruDevice;
 
@@ -434,7 +496,8 @@ public class IpmiResultConverter {
 		}
 
 		// Return good and poor FRU list
-		return Stream.of(veryGoodFruList, goodFruList, poorFruList)
+		return Stream
+				.of(veryGoodFruList, goodFruList, poorFruList)
 				.flatMap(Collection::stream)
 				.map(FruDevice::toString);
 	}
@@ -454,8 +517,9 @@ public class IpmiResultConverter {
 	 * Create the intermediary {@link FruDevice} object from the {@link BoardInfo} located in the {@link Fru} instance.
 	 *
 	 * @param poorFruList Poor FRU list to update
-	 * @param fru         The {@link Fru} instance from which we extract the {@link BoardInfo} which gives us some information about the model,
-	 *                    vendor and serial
+	 * @param fru The {@link Fru} instance from which we extract the {@link BoardInfo} which gives us some information
+	 *        about the model,
+	 *        vendor and serial
 	 * @return a new instance of {@link FruDevice} or <code>null</code> if the vendor or the model cannot be collected
 	 */
 	private static FruDevice createFruDeviceFromBoardInfo(final LinkedList<FruDevice> poorFruList, final Fru fru) {
@@ -478,24 +542,29 @@ public class IpmiResultConverter {
 		FruDevice fruDevice = null;
 		// vendor or model ?
 		if (!Utils.isEmpty(vendor) || !Utils.isEmpty(model)) {
-			fruDevice  = new FruDevice(vendor, model, serialNumber);
+			fruDevice = new FruDevice(vendor, model, serialNumber);
 			poorFruList.addLast(fruDevice);
 		}
 		return fruDevice;
 	}
 
 	/**
-	 * Create a new {@link FruDevice} from the given {@link ProductInfo} instance. Then update the very good, good or poor FRU list
+	 * Create a new {@link FruDevice} from the given {@link ProductInfo} instance. Then update the very good, good or poor
+	 * FRU list
 	 *
 	 * @param veryGoodFruList Very good FRU List
-	 * @param goodFruList     Second position, good FRU List
-	 * @param poorFruList     The last position, poor FRU list
-	 * @param entityId        The {@link EntityId} of the FRU device, {@link EntityId} simply shows the entity id
-	 * @param productInfo     The {@link ProductInfo} instance which is the best option when extracting FRU information
+	 * @param goodFruList Second position, good FRU List
+	 * @param poorFruList The last position, poor FRU list
+	 * @param entityId The {@link EntityId} of the FRU device, {@link EntityId} simply shows the entity id
+	 * @param productInfo The {@link ProductInfo} instance which is the best option when extracting FRU information
 	 * @return new {@link FruDevice} instance
 	 */
-	private static FruDevice createFruDeviceFromProductInfo(final LinkedList<FruDevice> veryGoodFruList, final LinkedList<FruDevice> goodFruList,
-			LinkedList<FruDevice> poorFruList, EntityId entityId, ProductInfo productInfo) {
+	private static FruDevice createFruDeviceFromProductInfo(
+			final LinkedList<FruDevice> veryGoodFruList,
+			final LinkedList<FruDevice> goodFruList,
+			LinkedList<FruDevice> poorFruList,
+			EntityId entityId,
+			ProductInfo productInfo) {
 
 		String vendor = Utils.getValueOrEmpty(productInfo.getManufacturerName());
 		String model = Utils.getValueOrEmpty(productInfo.getProductName());
@@ -526,8 +595,9 @@ public class IpmiResultConverter {
 
 	/**
 	 * Combine Serial Number and Part Number
+	 *
 	 * @param serialNumber Serial number of the FRU device
-	 * @param partNumber   Part Number, product board number or real part number of the FRU device
+	 * @param partNumber Part Number, product board number or real part number of the FRU device
 	 * @return {@link String} value
 	 */
 	private static String combineSerialNumberAndPartNumber(String serialNumber, final String partNumber) {
@@ -540,17 +610,16 @@ public class IpmiResultConverter {
 	}
 
 	/**
-	 *
 	 * @param entityId The {@link EntityId} instance defining the type of the device
 	 * @return <code>true</code> if the EntityId is a panel
 	 */
 	private static boolean isFruPanel(final EntityId entityId) {
-		return EntityId.FrontPanelBoard.equals(entityId) || EntityId.BackPanelBoard.equals(entityId)
+		return EntityId.FrontPanelBoard.equals(entityId)
+				|| EntityId.BackPanelBoard.equals(entityId)
 				|| EntityId.ChassisBackPanelBoard.equals(entityId);
 	}
 
 	/**
-	 *
 	 * @param entityId The {@link EntityId} instance defining the type of the device
 	 * @return <code>true</code> if the EntityId is the system
 	 */
@@ -568,7 +637,8 @@ public class IpmiResultConverter {
 
 	/**
 	 * @param <T>
-	 * @param fruRecords List of {@link FruRecord} instances containing {@link BoardInfo} and {@link ProductInfo} instances
+	 * @param fruRecords List of {@link FruRecord} instances containing {@link BoardInfo} and {@link ProductInfo}
+	 *        instances
 	 * @param clazz
 	 * @return The first matching instance
 	 */
@@ -577,7 +647,8 @@ public class IpmiResultConverter {
 			return null;
 		}
 
-		return fruRecords.stream()
+		return fruRecords
+				.stream()
 				.filter(clazz::isInstance)
 				.map(clazz::cast)
 				.findFirst()
@@ -589,7 +660,7 @@ public class IpmiResultConverter {
 	 * Get the threshold value as String
 	 *
 	 * @param conversionFunction The conversion function used to convert the threshold value
-	 * @param threshold          The double value returned by the IPMI Full record
+	 * @param threshold The double value returned by the IPMI Full record
 	 * @return String value
 	 */
 	private static String getThresholdValue(final DoubleFunction<Double> conversionFunction, double threshold) {
@@ -598,12 +669,13 @@ public class IpmiResultConverter {
 
 	/**
 	 * @param conversionFunction The conversion function used to convert the threshold value
-	 * @param thresholds         The array of the threshold values
+	 * @param thresholds The array of the threshold values
 	 * @return The first available threshold in <code>thresholds</code>
 	 */
 	private static String getAvailableThreshold(final DoubleFunction<Double> conversionFunction, double... thresholds) {
 
-		return Arrays.stream(thresholds)
+		return Arrays
+				.stream(thresholds)
 				.filter(threshold -> threshold != 0.0)
 				.mapToObj(threshold -> getThresholdValue(conversionFunction, threshold))
 				.findFirst()

@@ -34,17 +34,17 @@ class AbstractIpmiRunnerTest {
 
 	@Test
 	void decodeRecordReturnsOemRecordForVendorDefinedType() {
-		assertInstanceOf(OemRecord.class, RUNNER.decodeRecord(record(0xd0, new byte[] {1, 2, 3})));
+		assertInstanceOf(OemRecord.class, RUNNER.decodeRecord(record(0xd0, new byte[] { 1, 2, 3 })));
 	}
 
 	@Test
 	void decodeRecordSkipsRecordsItCannotDecodeInsteadOfThrowing() {
 		// reserved (non-OEM) record type
-		assertNull(RUNNER.decodeRecord(record(0x05, new byte[] {1})));
+		assertNull(RUNNER.decodeRecord(record(0x05, new byte[] { 1 })));
 		// shorter than the SDR header
-		assertNull(RUNNER.decodeRecord(new byte[] {0x00}));
+		assertNull(RUNNER.decodeRecord(new byte[] { 0x00 }));
 		// full sensor record whose body is missing: decoder runs out of bytes
-		assertNull(RUNNER.decodeRecord(record(0x01, new byte[] {1, 2, 3})));
+		assertNull(RUNNER.decodeRecord(record(0x01, new byte[] { 1, 2, 3 })));
 	}
 
 	@Test
@@ -61,14 +61,14 @@ class AbstractIpmiRunnerTest {
 
 	@Test
 	void isTruncatedDetectsWholeRecordResponsesShorterThanDeclared() {
-		byte[] complete = record(0xd0, new byte[] {1, 2, 3, 4, 5});
+		byte[] complete = record(0xd0, new byte[] { 1, 2, 3, 4, 5 });
 		assertFalse(AbstractIpmiRunner.isTruncated(complete));
 
 		byte[] truncated = new byte[complete.length - 2];
 		System.arraycopy(complete, 0, truncated, 0, truncated.length);
 		assertTrue(AbstractIpmiRunner.isTruncated(truncated), "declared length 5 but only 3 payload bytes returned");
 
-		assertTrue(AbstractIpmiRunner.isTruncated(new byte[] {0x00, 0x00, 0x51}), "header itself is incomplete");
+		assertTrue(AbstractIpmiRunner.isTruncated(new byte[] { 0x00, 0x00, 0x51 }), "header itself is incomplete");
 		assertTrue(AbstractIpmiRunner.isTruncated(null));
 	}
 }

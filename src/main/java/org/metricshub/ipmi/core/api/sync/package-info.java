@@ -1,8 +1,8 @@
 /**
  * The library's API.<br>
- * 
- * For synchronous API see {@link org.metricshub.ipmi.core.api.sync}, for asynchronous API see {@link org.metricshub.ipmi.core.api.async}
- * 
+ * For synchronous API see {@link org.metricshub.ipmi.core.api.sync}, for asynchronous API see
+ * {@link org.metricshub.ipmi.core.api.async}
+ *
  * @see org.metricshub.ipmi.core.api.sync
  * @see org.metricshub.ipmi.core.api.async
  */

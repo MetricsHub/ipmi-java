@@ -29,28 +29,29 @@ package org.metricshub.ipmi.core.coding.payload;
  */
 public class PlainMessage extends IpmiPayload {
 
-    @Override
-    public byte[] getPayloadData() {
-        return getData();
-    }
+	@Override
+	public byte[] getPayloadData() {
+		return getData();
+	}
 
-    @Override
-    public int getPayloadLength() {
-        return getData().length;
-    }
+	@Override
+	public int getPayloadLength() {
+		return getData().length;
+	}
 
-    /**
-     * Creates IPMI payload.
-     * @param data
-     * - byte array containing payload for IPMI message.
-     */
-    public PlainMessage(byte[] data) {
-        setData(data);
-    }
+	/**
+	 * Creates IPMI payload.
+	 *
+	 * @param data
+	 *        - byte array containing payload for IPMI message.
+	 */
+	public PlainMessage(byte[] data) {
+		setData(data);
+	}
 
-    @Override
-    public byte[] getIpmiCommandData() {
-        return getData();
-    }
+	@Override
+	public byte[] getIpmiCommandData() {
+		return getData();
+	}
 
 }
