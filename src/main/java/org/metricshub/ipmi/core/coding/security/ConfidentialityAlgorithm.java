@@ -32,10 +32,12 @@ import java.security.NoSuchAlgorithmException;
  */
 public abstract class ConfidentialityAlgorithm {
 
+	private byte[] sik;
+
 	/**
 	 * Initializes Confidentiality Algorithm
 	 *
-	 * @param sik
+	 * @param key
 	 *        - Session Integrity Key calculated during the opening of the
 	 *        session or user password if 'one-key' logins are enabled.
 	 * @param authenticationAlgorithm
@@ -47,11 +49,20 @@ public abstract class ConfidentialityAlgorithm {
 	 * @throws NoSuchPaddingException
 	 *         - when initiation of the algorithm fails
 	 */
-	public void initialize(byte[] sik, AuthenticationAlgorithm authenticationAlgorithm)
+	public void initialize(byte[] key, AuthenticationAlgorithm authenticationAlgorithm)
 			throws InvalidKeyException,
 			NoSuchAlgorithmException,
 			NoSuchPaddingException {
-		// Nothing to keep: subclasses derive their key from sik
+		this.sik = key;
+	}
+
+	/**
+	 * Returns the Session Integrity Key passed to {@link #initialize(byte[], AuthenticationAlgorithm)}.
+	 *
+	 * @return the Session Integrity Key, or null if not initialized
+	 */
+	protected byte[] getSik() {
+		return sik;
 	}
 
 	/**

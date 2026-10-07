@@ -87,6 +87,13 @@ public abstract class AbstractIpmiRunner<T> implements AutoCloseable, Callable<T
 	private int nextRecId;
 
 	/**
+	 * @return the {@link IpmiClientConfiguration} this runner was created with
+	 */
+	protected IpmiClientConfiguration getIpmiConfiguration() {
+		return ipmiConfiguration;
+	}
+
+	/**
 	 * @return the {@link IpmiConnector} created by {@link #startSession()}
 	 */
 	protected IpmiConnector getConnector() {

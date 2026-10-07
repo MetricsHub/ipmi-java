@@ -80,6 +80,15 @@ public abstract class IntegrityAlgorithm {
 	}
 
 	/**
+	 * Returns the Session Integrity Key passed to {@link #initialize(byte[])}.
+	 *
+	 * @return the Session Integrity Key, or null if not initialized
+	 */
+	protected byte[] getSik() {
+		return sik;
+	}
+
+	/**
 	 * Returns the algorithm's ID.
 	 */
 	public abstract byte getCode();
