@@ -61,6 +61,24 @@ public abstract class MessageHandler {
 		return connection;
 	}
 
+	/**
+	 * Returns the highest sequence number received so far (sliding window state).
+	 *
+	 * @return the last received sequence number
+	 */
+	protected int getLastReceivedSequenceNumber() {
+		return lastReceivedSequenceNumber;
+	}
+
+	/**
+	 * Sets the highest sequence number received so far (sliding window state).
+	 *
+	 * @param lastReceivedSequenceNumber the last received sequence number
+	 */
+	protected void setLastReceivedSequenceNumber(int lastReceivedSequenceNumber) {
+		this.lastReceivedSequenceNumber = lastReceivedSequenceNumber;
+	}
+
 	public MessageHandler(Connection connection, int timeout, int minSequenceNumber, int maxSequenceNumber) {
 		this.messageQueue = new MessageQueue(connection, timeout, minSequenceNumber, maxSequenceNumber);
 		this.connection = connection;
