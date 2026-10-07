@@ -27,42 +27,7 @@ import org.metricshub.ipmi.core.common.TypeConverter;
 /**
  * Wrapper class for Full Sensor Record format
  */
-public class FullSensorRecord extends SensorRecord {
-
-	private byte sensorOwnerId;
-
-	private AddressType addressType;
-
-	private byte channelNumber;
-
-	private byte sensorOwnerLun;
-
-	private byte sensorNumber;
-
-	private EntityId entityId;
-
-	/**
-	 * Entity is physical if true, logical otherwise.
-	 */
-	private boolean entityPhysical;
-
-	private byte entityInstanceNumber;
-
-	private boolean hysteresisReadable;
-
-	private boolean thresholdsReadable;
-
-	private SensorType sensorType;
-
-	private int eventReadingType;
-
-	private RateUnit rateUnit;
-
-	private ModifierUnitUsage modifierUnitUsage;
-
-	private SensorUnit sensorBaseUnit;
-
-	private SensorUnit sensorModifierUnit;
+public class FullSensorRecord extends AbstractSensorRecord {
 
 	private double m;
 
@@ -73,8 +38,6 @@ public class FullSensorRecord extends SensorRecord {
 	private double accuracy;
 
 	private int rExp;
-
-	private SensorDirection sensorDirection;
 
 	private double nominalReading;
 
@@ -98,8 +61,6 @@ public class FullSensorRecord extends SensorRecord {
 
 	private double lowerNonCriticalThreshold;
 
-	private String name;
-
 	private byte sensorUnits1;
 
 	private int linearization;
@@ -108,83 +69,8 @@ public class FullSensorRecord extends SensorRecord {
 	protected void populateTypeSpecficValues(
 			byte[] recordData,
 			SensorRecord record) {
-		setSensorOwnerId(
-				TypeConverter
-						.intToByte(
-								(TypeConverter
-										.byteToInt(recordData[5])
-										& 0xfe) >> 1));
-
-		setAddressType(
-				AddressType
-						.parseInt(
-								TypeConverter
-										.byteToInt(recordData[5])
-										& 0x01));
-
-		setChannelNumber(
-				TypeConverter
-						.intToByte(
-								(TypeConverter
-										.byteToInt(recordData[6])
-										& 0xf0) >> 4));
-
-		setSensorOwnerLun(
-				TypeConverter
-						.intToByte(
-								TypeConverter
-										.byteToInt(recordData[6])
-										& 0x3));
-
-		setSensorNumber(recordData[7]);
-
-		setEntityId(EntityId.parseInt(TypeConverter.byteToInt(recordData[8])));
-
-		setEntityPhysical((TypeConverter.byteToInt(recordData[9]) & 0x80) == 0);
-
-		setEntityInstanceNumber(
-				TypeConverter
-						.intToByte(
-								TypeConverter
-										.byteToInt(recordData[9])
-										& 0x7f));
-
-		int hysteresis = (TypeConverter.byteToInt(recordData[11]) & 0x30) >> 4;
-		setHysteresisReadable(isFieldReadable(hysteresis));
-
-		int thresholds = (TypeConverter.byteToInt(recordData[11]) & 0xc) >> 2;
-		setThresholdsReadable(isFieldReadable(thresholds));
-
-		setSensorType(
-				SensorType
-						.parseInt(
-								TypeConverter
-										.byteToInt(recordData[12])));
-
-		setEventReadingType(TypeConverter.byteToInt(recordData[13]));
-
-		setRateUnit(
-				RateUnit
-						.parseInt((TypeConverter.byteToInt(recordData[20]) & 0x38) >> 3));
-
-		setModifierUnitUsage(
-				ModifierUnitUsage
-						.parseInt(
-								(TypeConverter
-										.byteToInt(recordData[20])
-										& 0x6) >> 1));
-
-		setSensorBaseUnit(
-				SensorUnit
-						.parseInt(
-								TypeConverter
-										.byteToInt(recordData[21])));
-
-		setSensorModifierUnit(
-				SensorUnit
-						.parseInt(
-								TypeConverter
-										.byteToInt(recordData[22])));
+		populateSensorHeader(recordData, 12);
+		populateCapabilitiesAndUnits(recordData);
 
 		int calcM = TypeConverter.byteToInt(recordData[24]);
 
@@ -287,146 +173,9 @@ public class FullSensorRecord extends SensorRecord {
 			}
 		}
 
-		byte[] nameData = new byte[recordData.length - 48];
-
-		System.arraycopy(recordData, 48, nameData, 0, nameData.length);
-
-		setName(decodeName(recordData[47], nameData));
+		populateName(recordData, 47);
 
 		linearization = TypeConverter.byteToInt(recordData[23]) & 0x7f;
-	}
-
-	private boolean isFieldReadable(int field) {
-		return field == 1 /* field readable */
-				|| field == 2 /* field readable & settable */;
-	}
-
-	public void setSensorOwnerId(byte sensorOwnerId) {
-		this.sensorOwnerId = sensorOwnerId;
-	}
-
-	public byte getSensorOwnerId() {
-		return sensorOwnerId;
-	}
-
-	public AddressType getAddressType() {
-		return addressType;
-	}
-
-	public void setAddressType(AddressType addressType) {
-		this.addressType = addressType;
-	}
-
-	public byte getChannelNumber() {
-		return channelNumber;
-	}
-
-	public void setChannelNumber(byte channelNumber) {
-		this.channelNumber = channelNumber;
-	}
-
-	public byte getSensorOwnerLun() {
-		return sensorOwnerLun;
-	}
-
-	public void setSensorOwnerLun(byte sensorOwnerLun) {
-		this.sensorOwnerLun = sensorOwnerLun;
-	}
-
-	public byte getSensorNumber() {
-		return sensorNumber;
-	}
-
-	public void setSensorNumber(byte sensorNumber) {
-		this.sensorNumber = sensorNumber;
-	}
-
-	public EntityId getEntityId() {
-		return entityId;
-	}
-
-	public void setEntityId(EntityId entityId) {
-		this.entityId = entityId;
-	}
-
-	public boolean isEntityPhysical() {
-		return entityPhysical;
-	}
-
-	public void setEntityPhysical(boolean entityPhysical) {
-		this.entityPhysical = entityPhysical;
-	}
-
-	public byte getEntityInstanceNumber() {
-		return entityInstanceNumber;
-	}
-
-	public void setEntityInstanceNumber(byte entityInstanceNumber) {
-		this.entityInstanceNumber = entityInstanceNumber;
-	}
-
-	public boolean isHysteresisReadable() {
-		return hysteresisReadable;
-	}
-
-	public void setHysteresisReadable(boolean hysteresisReadable) {
-		this.hysteresisReadable = hysteresisReadable;
-	}
-
-	public boolean isThresholdsReadable() {
-		return thresholdsReadable;
-	}
-
-	public void setThresholdsReadable(boolean thresholdsReadable) {
-		this.thresholdsReadable = thresholdsReadable;
-	}
-
-	public SensorType getSensorType() {
-		return sensorType;
-	}
-
-	public void setSensorType(SensorType sensorType) {
-		this.sensorType = sensorType;
-	}
-
-	public int getEventReadingType() {
-		return eventReadingType;
-	}
-
-	public void setEventReadingType(int eventReadingType) {
-		this.eventReadingType = eventReadingType;
-	}
-
-	public RateUnit getRateUnit() {
-		return rateUnit;
-	}
-
-	public void setRateUnit(RateUnit rateUnit) {
-		this.rateUnit = rateUnit;
-	}
-
-	public ModifierUnitUsage getModifierUnitUsage() {
-		return modifierUnitUsage;
-	}
-
-	public void setModifierUnitUsage(ModifierUnitUsage modifierUnitUsage) {
-		this.modifierUnitUsage = modifierUnitUsage;
-	}
-
-	public SensorUnit getSensorBaseUnit() {
-		return sensorBaseUnit;
-	}
-
-	public void setSensorBaseUnit(SensorUnit sensorBaseUnit) {
-		this.sensorBaseUnit = sensorBaseUnit;
-	}
-
-	public SensorUnit getSensorModifierUnit() {
-		return sensorModifierUnit;
-	}
-
-	public void setSensorModifierUnit(SensorUnit sensorModifierUnit) {
-		this.sensorModifierUnit = sensorModifierUnit;
 	}
 
 	private double getM() {
@@ -467,14 +216,6 @@ public class FullSensorRecord extends SensorRecord {
 
 	private int getrExp() {
 		return rExp;
-	}
-
-	public SensorDirection getSensorDirection() {
-		return sensorDirection;
-	}
-
-	public void setSensorDirection(SensorDirection sensorDirection) {
-		this.sensorDirection = sensorDirection;
 	}
 
 	public double getNominalReading() {
@@ -565,14 +306,6 @@ public class FullSensorRecord extends SensorRecord {
 
 	public void setLowerNonCriticalThreshold(double lowerNonCriticalThreshold) {
 		this.lowerNonCriticalThreshold = lowerNonCriticalThreshold;
-	}
-
-	public String getName() {
-		return name;
-	}
-
-	public void setName(String name) {
-		this.name = name;
 	}
 
 	/**

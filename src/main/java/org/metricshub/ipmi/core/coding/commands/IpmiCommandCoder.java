@@ -23,8 +23,10 @@ package org.metricshub.ipmi.core.coding.commands;
  */
 
 import org.metricshub.ipmi.core.coding.PayloadCoder;
+import org.metricshub.ipmi.core.coding.payload.CompletionCode;
 import org.metricshub.ipmi.core.coding.payload.IpmiPayload;
 import org.metricshub.ipmi.core.coding.payload.PlainMessage;
+import org.metricshub.ipmi.core.coding.payload.lan.IPMIException;
 import org.metricshub.ipmi.core.coding.payload.lan.IpmiLanResponse;
 import org.metricshub.ipmi.core.coding.payload.lan.NetworkFunction;
 import org.metricshub.ipmi.core.coding.protocol.AuthenticationType;
@@ -73,6 +75,28 @@ public abstract class IpmiCommandCoder extends PayloadCoder {
 		} else {
 			return false;
 		}
+	}
+
+	/**
+	 * Checks that the message is a successful response to this command.
+	 *
+	 * @param message {@link IpmiMessage} wrapping the IPMI response
+	 * @return the IPMI command data of the response
+	 * @throws IllegalArgumentException when the message is not an IPMI LAN response to this command
+	 * @throws IPMIException when the completion code of the response is not {@link CompletionCode#Ok}
+	 */
+	protected byte[] validateResponse(IpmiMessage message) throws IPMIException {
+		if (!isCommandResponse(message)) {
+			throw new IllegalArgumentException("This is not a response for " + getClass().getSimpleName() + " command");
+		}
+		if (!(message.getPayload() instanceof IpmiLanResponse)) {
+			throw new IllegalArgumentException("Invalid response payload");
+		}
+		IpmiLanResponse response = (IpmiLanResponse) message.getPayload();
+		if (response.getCompletionCode() != CompletionCode.Ok) {
+			throw new IPMIException(response.getCompletionCode());
+		}
+		return response.getIpmiCommandData();
 	}
 
 	/**

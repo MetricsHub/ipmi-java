@@ -26,11 +26,9 @@ import org.metricshub.ipmi.core.coding.commands.CommandCodes;
 import org.metricshub.ipmi.core.coding.commands.IpmiCommandCoder;
 import org.metricshub.ipmi.core.coding.commands.IpmiVersion;
 import org.metricshub.ipmi.core.coding.commands.ResponseData;
-import org.metricshub.ipmi.core.coding.payload.CompletionCode;
 import org.metricshub.ipmi.core.coding.payload.IpmiPayload;
 import org.metricshub.ipmi.core.coding.payload.lan.IPMIException;
 import org.metricshub.ipmi.core.coding.payload.lan.IpmiLanRequest;
-import org.metricshub.ipmi.core.coding.payload.lan.IpmiLanResponse;
 import org.metricshub.ipmi.core.coding.payload.lan.NetworkFunction;
 import org.metricshub.ipmi.core.coding.protocol.AuthenticationType;
 import org.metricshub.ipmi.core.coding.protocol.IpmiMessage;
@@ -87,20 +85,7 @@ public class ReserveSdrRepository extends IpmiCommandCoder {
 			throws IPMIException,
 			NoSuchAlgorithmException,
 			InvalidKeyException {
-		if (!isCommandResponse(message)) {
-			throw new IllegalArgumentException(
-					"This is not a response for Reserve SDR Repository command");
-		}
-		if (!(message.getPayload() instanceof IpmiLanResponse)) {
-			throw new IllegalArgumentException("Invalid response payload");
-		}
-		if (((IpmiLanResponse) message.getPayload()).getCompletionCode() != CompletionCode.Ok) {
-			throw new IPMIException(
-					((IpmiLanResponse) message.getPayload())
-							.getCompletionCode());
-		}
-
-		byte[] raw = message.getPayload().getIpmiCommandData();
+		byte[] raw = validateResponse(message);
 
 		if (raw == null || raw.length != 2) {
 			throw new IllegalArgumentException(
