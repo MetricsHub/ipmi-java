@@ -1,6 +1,7 @@
 /**
  * The library for communicating with server via IPMI protocol. <br>
  * The API is included in {@link org.metricshub.ipmi.core.api}
+ *
  * @see org.metricshub.ipmi.core.api
  */
 package org.metricshub.ipmi.core;

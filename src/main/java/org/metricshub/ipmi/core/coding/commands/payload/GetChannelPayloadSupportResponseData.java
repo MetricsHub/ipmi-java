@@ -34,74 +34,89 @@ import java.util.Set;
  */
 public class GetChannelPayloadSupportResponseData implements ResponseData {
 
-    /**
-     * Byte that carries information about supported Standard Payload Types.
-     */
-    private byte standardPayloads;
+	/**
+	 * Byte that carries information about supported Standard Payload Types.
+	 */
+	private byte standardPayloads;
 
-    /**
-     * Byte that carries information about supported Session Setup Payload Types.
-     */
-    private byte sessionSetupPayloads;
+	/**
+	 * Byte that carries information about supported Session Setup Payload Types.
+	 */
+	private byte sessionSetupPayloads;
 
-    /**
-     * Byte that carries information about supported OEM Payload Types.
-     */
-    private byte oemPayloads;
+	/**
+	 * Byte that carries information about supported OEM Payload Types.
+	 */
+	private byte oemPayloads;
 
-    /**
-     * Set of supported {@link PayloadType}s.
-     */
-    private Set<PayloadType> supportedPayloads;
+	/**
+	 * Set of supported {@link PayloadType}s.
+	 */
+	private Set<PayloadType> supportedPayloads;
 
-    public void setStandardPayloads(byte standardPayloads) {
-        this.standardPayloads = standardPayloads;
-    }
+	public void setStandardPayloads(byte standardPayloads) {
+		this.standardPayloads = standardPayloads;
+	}
 
-    public void setSessionSetupPayloads(byte sessionSetupPayloads) {
-        this.sessionSetupPayloads = sessionSetupPayloads;
-    }
+	public void setSessionSetupPayloads(byte sessionSetupPayloads) {
+		this.sessionSetupPayloads = sessionSetupPayloads;
+	}
 
-    public void setOemPayloads(byte oemPayloads) {
-        this.oemPayloads = oemPayloads;
-    }
+	public void setOemPayloads(byte oemPayloads) {
+		this.oemPayloads = oemPayloads;
+	}
 
-    public Set<PayloadType> getSupportedPayloads() {
-        if (supportedPayloads == null) {
-            initializeSupportedPayloads();
-        }
+	public Set<PayloadType> getSupportedPayloads() {
+		if (supportedPayloads == null) {
+			initializeSupportedPayloads();
+		}
 
-        return supportedPayloads;
-    }
+		return supportedPayloads;
+	}
 
-    /**
-     * Reads raw data from standardPayloads, sessionSetupPayloads and oemPayloads bytes and converts it to the {@link Set}
-     * of supported {@link PayloadType}s
-     */
-    private void initializeSupportedPayloads() {
-        supportedPayloads = new HashSet<PayloadType>();
+	/**
+	 * Reads raw data from standardPayloads, sessionSetupPayloads and oemPayloads bytes and converts it to the {@link Set}
+	 * of supported {@link PayloadType}s
+	 */
+	private void initializeSupportedPayloads() {
+		supportedPayloads = new HashSet<PayloadType>();
 
-        lookForGivenPayloads(standardPayloads, PayloadType.Ipmi, PayloadType.Sol, PayloadType.Oem);
-        lookForGivenPayloads(sessionSetupPayloads, PayloadType.RmcpOpenSessionRequest, PayloadType.RmcpOpenSessionResponse,
-                PayloadType.Rakp1, PayloadType.Rakp2, PayloadType.Rakp3, PayloadType.Rakp4);
-        lookForGivenPayloads(oemPayloads, PayloadType.Oem0, PayloadType.Oem1, PayloadType.Oem2,
-                PayloadType.Oem3, PayloadType.Oem4, PayloadType.Oem5, PayloadType.Oem6, PayloadType.Oem7);
-    }
+		lookForGivenPayloads(standardPayloads, PayloadType.Ipmi, PayloadType.Sol, PayloadType.Oem);
+		lookForGivenPayloads(
+				sessionSetupPayloads,
+				PayloadType.RmcpOpenSessionRequest,
+				PayloadType.RmcpOpenSessionResponse,
+				PayloadType.Rakp1,
+				PayloadType.Rakp2,
+				PayloadType.Rakp3,
+				PayloadType.Rakp4);
+		lookForGivenPayloads(
+				oemPayloads,
+				PayloadType.Oem0,
+				PayloadType.Oem1,
+				PayloadType.Oem2,
+				PayloadType.Oem3,
+				PayloadType.Oem4,
+				PayloadType.Oem5,
+				PayloadType.Oem6,
+				PayloadType.Oem7);
+	}
 
-    /**
-     * Checks if given payload types are enabled into given byte. If some of them is, adds this type to the output supportedPayloads.
-     *
-     * @param payloadsByte
-     *          - byte carrying information about specific enabled payload types
-     * @param types
-     *          - array of types that we want to search in given byte
-     */
-    private void lookForGivenPayloads(byte payloadsByte, PayloadType... types) {
-        for (int i = 0; i < types.length; i++) {
-            if (TypeConverter.isBitSetOnPosition(i, payloadsByte)) {
-                supportedPayloads.add(types[i]);
-            }
-        }
-    }
+	/**
+	 * Checks if given payload types are enabled into given byte. If some of them is, adds this type to the output
+	 * supportedPayloads.
+	 *
+	 * @param payloadsByte
+	 *        - byte carrying information about specific enabled payload types
+	 * @param types
+	 *        - array of types that we want to search in given byte
+	 */
+	private void lookForGivenPayloads(byte payloadsByte, PayloadType... types) {
+		for (int i = 0; i < types.length; i++) {
+			if (TypeConverter.isBitSetOnPosition(i, payloadsByte)) {
+				supportedPayloads.add(types[i]);
+			}
+		}
+	}
 
 }

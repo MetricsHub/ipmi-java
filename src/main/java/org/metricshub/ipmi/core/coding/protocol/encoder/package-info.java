@@ -1,6 +1,7 @@
 /**
  * IPMI protocol encoder classes.
- * To implement custom protocol encoder, implement {@link org.metricshub.ipmi.core.coding.protocol.encoder.IpmiEncoder} interface.
+ * To implement custom protocol encoder, implement {@link org.metricshub.ipmi.core.coding.protocol.encoder.IpmiEncoder}
+ * interface.
  */
 package org.metricshub.ipmi.core.coding.protocol.encoder;
 /*-

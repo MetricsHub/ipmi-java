@@ -27,19 +27,20 @@ package org.metricshub.ipmi.core.coding.payload.sol;
  */
 public class SolOutboundMessage extends SolMessage {
 
-    /**
-     * Operation field in {@link SolMessage} Remote Console -> BMC payload.
-     */
-    private final SolOutboundOperationField operationField;
+	/**
+	 * Operation field in {@link SolMessage} Remote Console -> BMC payload.
+	 */
+	private final SolOutboundOperationField operationField;
 
-    public SolOutboundMessage(byte sequenceNumber, byte ackNackSequenceNumber, byte acceptedCharacterCount, SolOutboundOperationField operationField) {
-        super(sequenceNumber, ackNackSequenceNumber, acceptedCharacterCount, operationField.convertToByte());
+	public SolOutboundMessage(byte sequenceNumber, byte ackNackSequenceNumber, byte acceptedCharacterCount,
+			SolOutboundOperationField operationField) {
+		super(sequenceNumber, ackNackSequenceNumber, acceptedCharacterCount, operationField.convertToByte());
 
-        this.operationField = operationField;
-    }
+		this.operationField = operationField;
+	}
 
-    public SolOutboundOperationField getOperationField() {
-        return operationField;
-    }
+	public SolOutboundOperationField getOperationField() {
+		return operationField;
+	}
 
 }

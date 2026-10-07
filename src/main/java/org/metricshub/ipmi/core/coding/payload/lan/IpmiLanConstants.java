@@ -27,22 +27,22 @@ import org.metricshub.ipmi.core.common.TypeConverter;
 /**
  * Set of constants.
  * Byte constants are encoded as pseudo unsigned bytes.
- * IpmiLanConstants doesn't use {@link TypeConverter} because 
+ * IpmiLanConstants doesn't use {@link TypeConverter} because
  * fields need to be runtime constants.
+ *
  * @see TypeConverter#byteToInt(byte)
  * @see TypeConverter#intToByte(int)
  */
 public final class IpmiLanConstants {
-    /**
-     * The address of the BMC.
-     */
-    public static final byte BMC_ADDRESS = 0x20;
-    
-    /**
-     * The address of the remote console.
-     */
-    public static final byte REMOTE_CONSOLE_ADDRESS = (byte) (0x81 - 256); 
-    
-    private IpmiLanConstants() {
-    }
+	/**
+	 * The address of the BMC.
+	 */
+	public static final byte BMC_ADDRESS = 0x20;
+
+	/**
+	 * The address of the remote console.
+	 */
+	public static final byte REMOTE_CONSOLE_ADDRESS = (byte) (0x81 - 256);
+
+	private IpmiLanConstants() {}
 }

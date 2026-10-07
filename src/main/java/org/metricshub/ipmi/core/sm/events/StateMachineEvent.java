@@ -27,5 +27,4 @@ import org.metricshub.ipmi.core.sm.StateMachine;
 /**
  * Abstract for an event of the {@link StateMachine}.
  */
-public abstract class StateMachineEvent {
-}
+public abstract class StateMachineEvent {}

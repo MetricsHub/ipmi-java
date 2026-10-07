@@ -30,49 +30,49 @@ import org.metricshub.ipmi.core.coding.commands.ResponseData;
  * Wrapper for Get SEL Info response
  */
 public class GetSelInfoResponseData implements ResponseData {
-    private int selVersion;
+	private int selVersion;
 
-    private int entriesCount;
+	private int entriesCount;
 
-    /**
-     * Most recent addition timestamp.
-     */
-    private Date additionTimestamp;
+	/**
+	 * Most recent addition timestamp.
+	 */
+	private Date additionTimestamp;
 
-    /**
-     * Most recent erase timestamp.
-     */
-    private Date eraseTimestamp;
+	/**
+	 * Most recent erase timestamp.
+	 */
+	private Date eraseTimestamp;
 
-    public int getSelVersion() {
-        return selVersion;
-    }
+	public int getSelVersion() {
+		return selVersion;
+	}
 
-    public void setSelVersion(int selVersion) {
-        this.selVersion = selVersion;
-    }
+	public void setSelVersion(int selVersion) {
+		this.selVersion = selVersion;
+	}
 
-    public int getEntriesCount() {
-        return entriesCount;
-    }
+	public int getEntriesCount() {
+		return entriesCount;
+	}
 
-    public void setEntriesCount(int entriesCount) {
-        this.entriesCount = entriesCount;
-    }
+	public void setEntriesCount(int entriesCount) {
+		this.entriesCount = entriesCount;
+	}
 
-    public Date getAdditionTimestamp() {
-        return additionTimestamp;
-    }
+	public Date getAdditionTimestamp() {
+		return additionTimestamp;
+	}
 
-    public void setAdditionTimestamp(Date additionTimestamp) {
-        this.additionTimestamp = additionTimestamp;
-    }
+	public void setAdditionTimestamp(Date additionTimestamp) {
+		this.additionTimestamp = additionTimestamp;
+	}
 
-    public Date getEraseTimestamp() {
-        return eraseTimestamp;
-    }
+	public Date getEraseTimestamp() {
+		return eraseTimestamp;
+	}
 
-    public void setEraseTimestamp(Date eraseTimestamp) {
-        this.eraseTimestamp = eraseTimestamp;
-    }
+	public void setEraseTimestamp(Date eraseTimestamp) {
+		this.eraseTimestamp = eraseTimestamp;
+	}
 }

@@ -27,13 +27,13 @@ package org.metricshub.ipmi.core.sm.actions;
  */
 public class ErrorAction extends StateMachineAction {
 
-    private Exception exception;
+	private Exception exception;
 
-    public ErrorAction(Exception e) {
-        exception = e;
-    }
+	public ErrorAction(Exception e) {
+		exception = e;
+	}
 
-    public Exception getException() {
-        return exception;
-    }
+	public Exception getException() {
+		return exception;
+	}
 }

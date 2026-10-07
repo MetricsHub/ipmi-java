@@ -78,13 +78,14 @@ public class Utils {
 	 * @param callable
 	 * @param timeout
 	 * @return {@link T} result returned by the callable
-	 *
 	 * @throws InterruptedException
 	 * @throws ExecutionException
 	 * @throws TimeoutException
 	 */
 	public static <T> T execute(final AbstractIpmiRunner<T> callable, long timeout)
-			throws InterruptedException, ExecutionException, TimeoutException {
+			throws InterruptedException,
+			ExecutionException,
+			TimeoutException {
 
 		final ExecutorService executorService = Executors.newSingleThreadExecutor();
 		final Future<T> future = executorService.submit(callable);

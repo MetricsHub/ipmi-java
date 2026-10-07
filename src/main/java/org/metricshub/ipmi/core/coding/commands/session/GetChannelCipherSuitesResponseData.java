@@ -29,23 +29,23 @@ import org.metricshub.ipmi.core.coding.commands.ResponseData;
  */
 public class GetChannelCipherSuitesResponseData implements ResponseData {
 
-    private byte channelNumber;
+	private byte channelNumber;
 
-    private byte[] cipherSuiteData;
+	private byte[] cipherSuiteData;
 
-    public void setChannelNumber(byte channelNumber) {
-        this.channelNumber = channelNumber;
-    }
+	public void setChannelNumber(byte channelNumber) {
+		this.channelNumber = channelNumber;
+	}
 
-    public byte getChannelNumber() {
-        return channelNumber;
-    }
+	public byte getChannelNumber() {
+		return channelNumber;
+	}
 
-    public void setCipherSuiteData(byte[] cipherSuiteData) {
-        this.cipherSuiteData = cipherSuiteData;
-    }
+	public void setCipherSuiteData(byte[] cipherSuiteData) {
+		this.cipherSuiteData = cipherSuiteData;
+	}
 
-    public byte[] getCipherSuiteData() {
-        return cipherSuiteData;
-    }
+	public byte[] getCipherSuiteData() {
+		return cipherSuiteData;
+	}
 }

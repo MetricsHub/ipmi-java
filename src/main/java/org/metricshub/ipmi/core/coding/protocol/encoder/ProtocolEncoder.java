@@ -31,94 +31,94 @@ import org.metricshub.ipmi.core.common.TypeConverter;
  */
 public abstract class ProtocolEncoder implements IpmiEncoder {
 
-    protected byte encodeAuthenticationType(
-            AuthenticationType authenticationType) {
-        return TypeConverter.intToByte(authenticationType.getCode());
-    }
+	protected byte encodeAuthenticationType(
+			AuthenticationType authenticationType) {
+		return TypeConverter.intToByte(authenticationType.getCode());
+	}
 
-    /**
-     * Converts integer value into byte array using little endian convention and
-     * inserts it into message at given offset.
-     *
-     * @param value
-     * @param message
-     *            - IPMI message being created
-     * @param offset
-     * @throws IndexOutOfBoundsException
-     *             when message is too short to hold value at given offset
-     */
-    protected void encodeInt(int value, byte[] message, int offset) {
-        byte[] array = TypeConverter.intToLittleEndianByteArray(value);
+	/**
+	 * Converts integer value into byte array using little endian convention and
+	 * inserts it into message at given offset.
+	 *
+	 * @param value
+	 * @param message
+	 *        - IPMI message being created
+	 * @param offset
+	 * @throws IndexOutOfBoundsException
+	 *         when message is too short to hold value at given offset
+	 */
+	protected void encodeInt(int value, byte[] message, int offset) {
+		byte[] array = TypeConverter.intToLittleEndianByteArray(value);
 
-        if (array.length + offset > message.length) {
-            throw new IndexOutOfBoundsException("Message is too short");
-        }
+		if (array.length + offset > message.length) {
+			throw new IndexOutOfBoundsException("Message is too short");
+		}
 
-        System.arraycopy(array, 0, message, offset, array.length);
-    }
+		System.arraycopy(array, 0, message, offset, array.length);
+	}
 
-    /**
-     * Encodes session sequence number and inserts it into message at given
-     * offset.
-     *
-     * @param value
-     * @param message
-     *            - IPMI message being created
-     * @param offset
-     * @throws IndexOutOfBoundsException
-     *             when message is too short to hold value at given offset
-     */
-    protected void encodeSessionSequenceNumber(int value, byte[] message, int offset) {
-        encodeInt(value, message, offset);
-    }
+	/**
+	 * Encodes session sequence number and inserts it into message at given
+	 * offset.
+	 *
+	 * @param value
+	 * @param message
+	 *        - IPMI message being created
+	 * @param offset
+	 * @throws IndexOutOfBoundsException
+	 *         when message is too short to hold value at given offset
+	 */
+	protected void encodeSessionSequenceNumber(int value, byte[] message, int offset) {
+		encodeInt(value, message, offset);
+	}
 
-    /**
-     * Encodes session id and inserts it into message at given offset.
-     *
-     * @param value
-     * @param message
-     *            - IPMI message being created
-     * @param offset
-     * @throws IndexOutOfBoundsException
-     *             when message is too short to hold value at given offset
-     */
-    protected void encodeSessionId(int value, byte[] message, int offset) {
-        encodeInt(value, message, offset);
-    }
+	/**
+	 * Encodes session id and inserts it into message at given offset.
+	 *
+	 * @param value
+	 * @param message
+	 *        - IPMI message being created
+	 * @param offset
+	 * @throws IndexOutOfBoundsException
+	 *         when message is too short to hold value at given offset
+	 */
+	protected void encodeSessionId(int value, byte[] message, int offset) {
+		encodeInt(value, message, offset);
+	}
 
-    /**
-     * Encodes payload length and inserts it into message at given offset.
-     *
-     * @param value
-     * @param message
-     *            - IPMI message being created
-     * @param offset
-     * @throws IndexOutOfBoundsException
-     *             when message is too short to hold value at given offset
-     */
-    protected abstract void encodePayloadLength(int value, byte[] message, int offset);
+	/**
+	 * Encodes payload length and inserts it into message at given offset.
+	 *
+	 * @param value
+	 * @param message
+	 *        - IPMI message being created
+	 * @param offset
+	 * @throws IndexOutOfBoundsException
+	 *         when message is too short to hold value at given offset
+	 */
+	protected abstract void encodePayloadLength(int value, byte[] message, int offset);
 
-    /**
-     * Encodes payload and inserts it into message at given offset. <br>
-     * When payload == null it will not be inserted.
-     *
-     * @param payload
-     *            - IPMI payload to encode.
-     * @param message
-     *            - IPMI message being created.
-     * @param offset
-     * @throws IndexOutOfBoundsException
-     *             when message is too short to hold value at given offset
-     * @return offset + encoded message length
-     */
-    protected int encodePayload(byte[] payload, byte[] message, int offset) {
-        if (payload == null) {
-            return offset;
-        }
-        if (payload.length + offset > message.length) {
-            throw new IndexOutOfBoundsException("Message is too short");
-        }
-        System.arraycopy(payload, 0, message, offset, payload.length);
-        return offset + payload.length;
-    }
+	/**
+	 * Encodes payload and inserts it into message at given offset. <br>
+	 * When payload == null it will not be inserted.
+	 *
+	 * @param payload
+	 *        - IPMI payload to encode.
+	 * @param message
+	 *        - IPMI message being created.
+	 * @param offset
+	 * @throws IndexOutOfBoundsException
+	 *         when message is too short to hold value at given offset
+	 * @return offset + encoded message length
+	 */
+	protected int encodePayload(byte[] payload, byte[] message, int offset) {
+		if (payload == null) {
+			return offset;
+		}
+		if (payload.length + offset > message.length) {
+			throw new IndexOutOfBoundsException("Message is too short");
+		}
+		System.arraycopy(payload, 0, message, offset, payload.length);
+		return offset + payload.length;
+	}
 }

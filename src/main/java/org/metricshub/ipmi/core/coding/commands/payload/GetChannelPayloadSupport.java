@@ -46,109 +46,118 @@ import static org.metricshub.ipmi.core.coding.commands.CommandCodes.GET_CHANNEL_
  */
 public class GetChannelPayloadSupport extends IpmiCommandCoder {
 
-    private byte channelNumber;
+	private byte channelNumber;
 
-    /**
-     * Initiates class for decoding.
-     */
-    public GetChannelPayloadSupport() {
-        super(IpmiVersion.V20, new CipherSuite((byte) 0, (byte) 0, (byte) 0, (byte) 0), AuthenticationType.RMCPPlus);
-    }
+	/**
+	 * Initiates class for decoding.
+	 */
+	public GetChannelPayloadSupport() {
+		super(IpmiVersion.V20, new CipherSuite((byte) 0, (byte) 0, (byte) 0, (byte) 0), AuthenticationType.RMCPPlus);
+	}
 
-    /**
-     * Initiates class for both encoding and decoding.
-     *
-     * @param channelNumber
-     *            - must be 0h-Bh or Eh-Fh <br>
-     *            Eh = retrieve information for channel this request was issued
-     *            on
-     */
-    public GetChannelPayloadSupport(byte channelNumber) {
-        super(IpmiVersion.V20, new CipherSuite((byte) 0, (byte) 0, (byte) 0, (byte) 0), AuthenticationType.RMCPPlus);
-        setChannelNumber(channelNumber);
-    }
+	/**
+	 * Initiates class for both encoding and decoding.
+	 *
+	 * @param channelNumber
+	 *        - must be 0h-Bh or Eh-Fh <br>
+	 *        Eh = retrieve information for channel this request was issued
+	 *        on
+	 */
+	public GetChannelPayloadSupport(byte channelNumber) {
+		super(IpmiVersion.V20, new CipherSuite((byte) 0, (byte) 0, (byte) 0, (byte) 0), AuthenticationType.RMCPPlus);
+		setChannelNumber(channelNumber);
+	}
 
-    /**
-     * Initiates class for both encoding and decoding.
-     *
-     * @param channelNumber
-     *            - must be 0h-Bh or Eh-Fh <br>
-     *            Eh = retrieve information for channel this request was issued
-     *            on
-     * @param cipherSuite
-     *            - {@link CipherSuite} containing authentication,
-     *            confidentiality and integrity algorithms for this session.
-     * @param authenticationType
-     *            - Type of authentication used. Must be RMCPPlus for IPMI v2.0.
-     */
-    public GetChannelPayloadSupport(byte channelNumber, CipherSuite cipherSuite, AuthenticationType authenticationType) {
-        super(IpmiVersion.V20, cipherSuite, authenticationType);
-        setChannelNumber(channelNumber);
-    }
+	/**
+	 * Initiates class for both encoding and decoding.
+	 *
+	 * @param channelNumber
+	 *        - must be 0h-Bh or Eh-Fh <br>
+	 *        Eh = retrieve information for channel this request was issued
+	 *        on
+	 * @param cipherSuite
+	 *        - {@link CipherSuite} containing authentication,
+	 *        confidentiality and integrity algorithms for this session.
+	 * @param authenticationType
+	 *        - Type of authentication used. Must be RMCPPlus for IPMI v2.0.
+	 */
+	public GetChannelPayloadSupport(byte channelNumber, CipherSuite cipherSuite, AuthenticationType authenticationType) {
+		super(IpmiVersion.V20, cipherSuite, authenticationType);
+		setChannelNumber(channelNumber);
+	}
 
-    public byte getChannelNumber() {
-        return channelNumber;
-    }
+	public byte getChannelNumber() {
+		return channelNumber;
+	}
 
-    /**
-     * Sets the channel number that will be put into IPMI command.
-     *
-     * @param channelNumber
-     *            - must be 0h-Bh or Eh-Fh <br>
-     *            Eh = retrieve information for channel this request was issued
-     *            on
-     * @throws IllegalArgumentException
-     */
-    public void setChannelNumber(int channelNumber) {
-        if (channelNumber < 0 || channelNumber > 0xF || channelNumber == 0xC
-                || channelNumber == 0xD) {
-            throw new IllegalArgumentException("Invalid channel number");
-        }
-        this.channelNumber = TypeConverter.intToByte(channelNumber);
-    }
+	/**
+	 * Sets the channel number that will be put into IPMI command.
+	 *
+	 * @param channelNumber
+	 *        - must be 0h-Bh or Eh-Fh <br>
+	 *        Eh = retrieve information for channel this request was issued
+	 *        on
+	 * @throws IllegalArgumentException
+	 */
+	public void setChannelNumber(int channelNumber) {
+		if (channelNumber < 0
+				|| channelNumber > 0xF
+				|| channelNumber == 0xC
+				|| channelNumber == 0xD) {
+			throw new IllegalArgumentException("Invalid channel number");
+		}
+		this.channelNumber = TypeConverter.intToByte(channelNumber);
+	}
 
-    @Override
-    public byte getCommandCode() {
-        return GET_CHANNEL_PAYLOAD_SUPPORT;
-    }
+	@Override
+	public byte getCommandCode() {
+		return GET_CHANNEL_PAYLOAD_SUPPORT;
+	}
 
-    @Override
-    public NetworkFunction getNetworkFunction() {
-        return NetworkFunction.ApplicationRequest;
-    }
+	@Override
+	public NetworkFunction getNetworkFunction() {
+		return NetworkFunction.ApplicationRequest;
+	}
 
-    @Override
-    protected IpmiPayload preparePayload(int sequenceNumber) throws NoSuchAlgorithmException, InvalidKeyException {
-        byte[] requestData = new byte[1];
+	@Override
+	protected IpmiPayload preparePayload(int sequenceNumber) throws NoSuchAlgorithmException, InvalidKeyException {
+		byte[] requestData = new byte[1];
 
-        requestData[0] = channelNumber;
+		requestData[0] = channelNumber;
 
-        return new IpmiLanRequest(getNetworkFunction(), getCommandCode(), requestData, TypeConverter.intToByte(sequenceNumber));
-    }
+		return new IpmiLanRequest(
+				getNetworkFunction(),
+				getCommandCode(),
+				requestData,
+				TypeConverter.intToByte(sequenceNumber));
+	}
 
-    @Override
-    public ResponseData getResponseData(IpmiMessage message) throws IPMIException, NoSuchAlgorithmException, InvalidKeyException {
-        if (!isCommandResponse(message)) {
-            throw new IllegalArgumentException("This is not a response for Get Payload Info command");
-        }
+	@Override
+	public ResponseData getResponseData(IpmiMessage message)
+			throws IPMIException,
+			NoSuchAlgorithmException,
+			InvalidKeyException {
+		if (!isCommandResponse(message)) {
+			throw new IllegalArgumentException("This is not a response for Get Payload Info command");
+		}
 
-        if (!(message.getPayload() instanceof IpmiLanResponse)) {
-            throw new IllegalArgumentException("Invalid response payload");
-        }
+		if (!(message.getPayload() instanceof IpmiLanResponse)) {
+			throw new IllegalArgumentException("Invalid response payload");
+		}
 
-        if (((IpmiLanResponse) message.getPayload()).getCompletionCode() != CompletionCode.Ok) {
-            throw new IPMIException(((IpmiLanResponse) message.getPayload()).getCompletionCode());
-        }
+		if (((IpmiLanResponse) message.getPayload()).getCompletionCode() != CompletionCode.Ok) {
+			throw new IPMIException(((IpmiLanResponse) message.getPayload()).getCompletionCode());
+		}
 
-        GetChannelPayloadSupportResponseData data = new GetChannelPayloadSupportResponseData();
+		GetChannelPayloadSupportResponseData data = new GetChannelPayloadSupportResponseData();
 
-        byte[] responseData = message.getPayload().getData();
+		byte[] responseData = message.getPayload().getData();
 
-        data.setStandardPayloads(responseData[0]);
-        data.setSessionSetupPayloads(responseData[1]);
-        data.setOemPayloads(responseData[2]);
+		data.setStandardPayloads(responseData[0]);
+		data.setSessionSetupPayloads(responseData[1]);
+		data.setOemPayloads(responseData[2]);
 
-        return data;
-    }
+		return data;
+	}
 
 }

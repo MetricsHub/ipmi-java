@@ -1,5 +1,5 @@
 /**
- * Base package of the IPMI client library for Java 
+ * Base package of the IPMI client library for Java
  */
 package org.metricshub.ipmi;
 /*-

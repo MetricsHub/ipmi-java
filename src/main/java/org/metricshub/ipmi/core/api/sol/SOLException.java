@@ -30,10 +30,10 @@ public class SOLException extends Exception {
 	private static final long serialVersionUID = 1L;
 
 	public SOLException(String message) {
-        super(message);
-    }
+		super(message);
+	}
 
-    public SOLException(String message, Throwable cause) {
-        super(message, cause);
-    }
+	public SOLException(String message, Throwable cause) {
+		super(message, cause);
+	}
 }

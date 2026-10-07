@@ -28,70 +28,69 @@ import org.metricshub.ipmi.core.coding.commands.ResponseData;
  * Wrapper for Get SDR Repository Info response.
  */
 public class GetSdrRepositoryInfoResponseData implements ResponseData {
-    /**
-     * Version number of the SDR command set for the SDR Device.
-     */
-    private int sdrVersion;
+	/**
+	 * Version number of the SDR command set for the SDR Device.
+	 */
+	private int sdrVersion;
 
-    /**
-     * Number of records in the SDR Repository
-     */
-    private int recordCount;
+	/**
+	 * Number of records in the SDR Repository
+	 */
+	private int recordCount;
 
-    /**
-     * Most recent addition timestamp.
-     */
-    private int addTimestamp;
+	/**
+	 * Most recent addition timestamp.
+	 */
+	private int addTimestamp;
 
-    /**
-     * Most recent erase (delete or clear) timestamp.
-     */
-    private int delTimestamp;
+	/**
+	 * Most recent erase (delete or clear) timestamp.
+	 */
+	private int delTimestamp;
 
-    /**
-     * Reserve SDR Repository command supported
-     */
-    private boolean reserveSupported;
+	/**
+	 * Reserve SDR Repository command supported
+	 */
+	private boolean reserveSupported;
 
-    public void setSdrVersion(int sdrVersion) {
-        this.sdrVersion = sdrVersion;
-    }
+	public void setSdrVersion(int sdrVersion) {
+		this.sdrVersion = sdrVersion;
+	}
 
-    public int getSdrVersion() {
-        return sdrVersion;
-    }
+	public int getSdrVersion() {
+		return sdrVersion;
+	}
 
-    public void setRecordCount(int recordCount) {
-        this.recordCount = recordCount;
-    }
+	public void setRecordCount(int recordCount) {
+		this.recordCount = recordCount;
+	}
 
-    public int getRecordCount() {
-        return recordCount;
-    }
+	public int getRecordCount() {
+		return recordCount;
+	}
 
-    public void setAddTimestamp(int addTimestamp) {
-        this.addTimestamp = addTimestamp;
-    }
+	public void setAddTimestamp(int addTimestamp) {
+		this.addTimestamp = addTimestamp;
+	}
 
-    public int getAddTimestamp() {
-        return addTimestamp;
-    }
+	public int getAddTimestamp() {
+		return addTimestamp;
+	}
 
-    public void setDelTimestamp(int delTimestamp) {
-        this.delTimestamp = delTimestamp;
-    }
+	public void setDelTimestamp(int delTimestamp) {
+		this.delTimestamp = delTimestamp;
+	}
 
-    public int getDelTimestamp() {
-        return delTimestamp;
-    }
+	public int getDelTimestamp() {
+		return delTimestamp;
+	}
 
-    public void setReserveSupported(boolean reserveSupported) {
-        this.reserveSupported = reserveSupported;
-    }
+	public void setReserveSupported(boolean reserveSupported) {
+		this.reserveSupported = reserveSupported;
+	}
 
-    public boolean isReserveSupported() {
-        return reserveSupported;
-    }
-
+	public boolean isReserveSupported() {
+		return reserveSupported;
+	}
 
 }

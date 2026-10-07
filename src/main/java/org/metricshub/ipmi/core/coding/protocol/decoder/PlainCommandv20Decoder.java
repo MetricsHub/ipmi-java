@@ -35,21 +35,24 @@ import org.metricshub.ipmi.core.coding.security.ConfidentialityAlgorithm;
  */
 public class PlainCommandv20Decoder extends Protocolv20Decoder {
 
-    public PlainCommandv20Decoder(CipherSuite cipherSuite) {
-        super(cipherSuite);
-    }
+	public PlainCommandv20Decoder(CipherSuite cipherSuite) {
+		super(cipherSuite);
+	}
 
-    /**
-     *
-     * @return Payload decoded into {@link PlainMessage}.
-     */
-    @Override
-    protected IpmiPayload decodePayload(byte[] rawData, int offset, int length,
-            ConfidentialityAlgorithm confidentialityAlgorithm, PayloadType payloadType) {
-        byte[] payload = new byte[length];
+	/**
+	 * @return Payload decoded into {@link PlainMessage}.
+	 */
+	@Override
+	protected IpmiPayload decodePayload(
+			byte[] rawData,
+			int offset,
+			int length,
+			ConfidentialityAlgorithm confidentialityAlgorithm,
+			PayloadType payloadType) {
+		byte[] payload = new byte[length];
 
-        System.arraycopy(rawData, offset, payload, 0, length);
+		System.arraycopy(rawData, offset, payload, 0, length);
 
-        return new PlainMessage(confidentialityAlgorithm.decrypt(payload));
-    }
+		return new PlainMessage(confidentialityAlgorithm.decrypt(payload));
+	}
 }

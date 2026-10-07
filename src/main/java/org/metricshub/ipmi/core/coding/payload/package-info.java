@@ -1,6 +1,7 @@
 /**
- * The IPMI payload encoders and decoders. 
- * To implement custom payload encoder/decoder, extend {@link org.metricshub.ipmi.core.coding.payload.IpmiPayload} class.
+ * The IPMI payload encoders and decoders.
+ * To implement custom payload encoder/decoder, extend {@link org.metricshub.ipmi.core.coding.payload.IpmiPayload}
+ * class.
  */
 package org.metricshub.ipmi.core.coding.payload;
 /*-

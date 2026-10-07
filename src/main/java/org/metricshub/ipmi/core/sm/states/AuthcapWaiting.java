@@ -39,54 +39,67 @@ import org.metricshub.ipmi.core.sm.events.Timeout;
 
 /**
  * Waiting for the {@link GetChannelAuthenticationCapabilities} response. <br>
- * 
- * Transition to: <ul> <li>{@link Ciphers} on {@link Timeout} </li><li>{@link Authcap} on
- * {@link AuthenticationCapabilitiesReceived}</li></ul>.
+ * Transition to:
+ * <ul>
+ * <li>{@link Ciphers} on {@link Timeout}</li>
+ * <li>{@link Authcap} on
+ * {@link AuthenticationCapabilitiesReceived}</li>
+ * </ul>
+ * .
  */
 public class AuthcapWaiting extends State {
 
-    private int tag;
+	private int tag;
 
-    /**
-     * Instantiates a new {@link AuthcapWaiting} using the given tag 
-     * @param tag int value representing the authentication capabilities
-     */
-    public AuthcapWaiting(int tag) {
-        this.tag = tag;
-    }
+	/**
+	 * Instantiates a new {@link AuthcapWaiting} using the given tag
+	 *
+	 * @param tag int value representing the authentication capabilities
+	 */
+	public AuthcapWaiting(int tag) {
+		this.tag = tag;
+	}
 
-    @Override
-    public void doTransition(StateMachine stateMachine,
-            StateMachineEvent machineEvent) {
-        if (machineEvent instanceof Timeout) {
-            stateMachine.setCurrent(new Ciphers());
-        } else if (machineEvent instanceof AuthenticationCapabilitiesReceived) {
-            stateMachine.setCurrent(new Authcap());
-        } else {
-            stateMachine.doExternalAction(new ErrorAction(
-                    new IllegalArgumentException("Invalid transition")));
-        }
-    }
+	@Override
+	public void doTransition(
+			StateMachine stateMachine,
+			StateMachineEvent machineEvent) {
+		if (machineEvent instanceof Timeout) {
+			stateMachine.setCurrent(new Ciphers());
+		} else if (machineEvent instanceof AuthenticationCapabilitiesReceived) {
+			stateMachine.setCurrent(new Authcap());
+		} else {
+			stateMachine
+					.doExternalAction(
+							new ErrorAction(
+									new IllegalArgumentException("Invalid transition")));
+		}
+	}
 
-    @Override
-    public void doAction(StateMachine stateMachine, RmcpMessage message) {
-        if (ProtocolDecoder.decodeAuthenticationType(message) == AuthenticationType.RMCPPlus) {
-            return; // this isn't IPMI v1.5 message so we ignore it
-        }
-        Protocolv15Decoder decoder = new Protocolv15Decoder();
-        IpmiMessage ipmiMessage = null;
-        try {
-            ipmiMessage = decoder.decode(message);
-            GetChannelAuthenticationCapabilities capabilities = new GetChannelAuthenticationCapabilities();
-            if (capabilities.isCommandResponse(ipmiMessage)
-                    && TypeConverter.byteToInt(((IpmiLanResponse) ipmiMessage
-                            .getPayload()).getSequenceNumber()) == tag) {
-                stateMachine.doExternalAction(new ResponseAction(capabilities
-                        .getResponseData(ipmiMessage)));
-            }
-        } catch (Exception e) {
-            stateMachine.doExternalAction(new ErrorAction(e));
-        }
-    }
+	@Override
+	public void doAction(StateMachine stateMachine, RmcpMessage message) {
+		if (ProtocolDecoder.decodeAuthenticationType(message) == AuthenticationType.RMCPPlus) {
+			return; // this isn't IPMI v1.5 message so we ignore it
+		}
+		Protocolv15Decoder decoder = new Protocolv15Decoder();
+		IpmiMessage ipmiMessage = null;
+		try {
+			ipmiMessage = decoder.decode(message);
+			GetChannelAuthenticationCapabilities capabilities = new GetChannelAuthenticationCapabilities();
+			if (capabilities.isCommandResponse(ipmiMessage)
+					&& TypeConverter
+							.byteToInt(
+									((IpmiLanResponse) ipmiMessage
+											.getPayload()).getSequenceNumber()) == tag) {
+				stateMachine
+						.doExternalAction(
+								new ResponseAction(
+										capabilities
+												.getResponseData(ipmiMessage)));
+			}
+		} catch (Exception e) {
+			stateMachine.doExternalAction(new ErrorAction(e));
+		}
+	}
 
 }

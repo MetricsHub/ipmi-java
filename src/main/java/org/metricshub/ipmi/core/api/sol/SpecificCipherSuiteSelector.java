@@ -31,15 +31,15 @@ import java.util.List;
  */
 public class SpecificCipherSuiteSelector implements CipherSuiteSelectionHandler {
 
-    private final CipherSuite cipherSuite;
+	private final CipherSuite cipherSuite;
 
-    public SpecificCipherSuiteSelector(CipherSuite cipherSuite) {
-        this.cipherSuite = cipherSuite;
-    }
+	public SpecificCipherSuiteSelector(CipherSuite cipherSuite) {
+		this.cipherSuite = cipherSuite;
+	}
 
-    @Override
-    public CipherSuite choose(List<CipherSuite> availableCipherSuites) {
-        return cipherSuite;
-    }
+	@Override
+	public CipherSuite choose(List<CipherSuite> availableCipherSuites) {
+		return cipherSuite;
+	}
 
 }

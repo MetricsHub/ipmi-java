@@ -17,8 +17,8 @@ class SensorTest {
 		CompactSensorRecord record = new CompactSensorRecord();
 		GetSensorReadingResponseData data = new GetSensorReadingResponseData();
 		String states = "power supply 1=Transition to OK";
-		assertTrue(new Sensor(record, data , states).isCompact());
-		assertFalse(new Sensor(record, data , states).isFull());
+		assertTrue(new Sensor(record, data, states).isCompact());
+		assertFalse(new Sensor(record, data, states).isFull());
 	}
 
 	@Test
@@ -26,8 +26,8 @@ class SensorTest {
 		FullSensorRecord record = new FullSensorRecord();
 		GetSensorReadingResponseData data = new GetSensorReadingResponseData();
 		String states = "power supply 1=Transition to OK";
-		assertFalse(new Sensor(record, data , states).isCompact());
-		assertTrue(new Sensor(record, data , states).isFull());
+		assertFalse(new Sensor(record, data, states).isCompact());
+		assertTrue(new Sensor(record, data, states).isFull());
 	}
 
 	@Test

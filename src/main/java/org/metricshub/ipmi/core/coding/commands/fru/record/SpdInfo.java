@@ -27,8 +27,8 @@ package org.metricshub.ipmi.core.coding.commands.fru.record;
  */
 public class SpdInfo extends FruRecord {
 
-    public SpdInfo(byte[] fruData, int offset) {
-        super();
-    }
-    // TODO: Implement
+	public SpdInfo(byte[] fruData, int offset) {
+		super();
+	}
+	// TODO: Implement
 }

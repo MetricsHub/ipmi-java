@@ -40,54 +40,57 @@ import java.util.function.Supplier;
  */
 public class CipherSuite {
 
-    public static final String NOT_YET_IMPLEMENTED_MESSAGE = "Not yet implemented.";
+	public static final String NOT_YET_IMPLEMENTED_MESSAGE = "Not yet implemented.";
 
-    private byte id;
+	private byte id;
 
-    private byte authenticationAlgorithm;
-    private byte integrityAlgorithm;
-    private byte confidentialityAlgorithm;
+	private byte authenticationAlgorithm;
+	private byte integrityAlgorithm;
+	private byte confidentialityAlgorithm;
 
-    private AuthenticationAlgorithm aa;
-    private ConfidentialityAlgorithm ca;
-    private IntegrityAlgorithm ia;
+	private AuthenticationAlgorithm aa;
+	private ConfidentialityAlgorithm ca;
+	private IntegrityAlgorithm ia;
 
-    public byte getId() {
-        return id;
-    }
+	public byte getId() {
+		return id;
+	}
 
-    public CipherSuite(byte id, byte authenticationAlgorithm,
-            byte confidentialityAlgorithm, byte integrityAlgorithm) {
-        this.id = id;
-        this.authenticationAlgorithm = (authenticationAlgorithm);
-        this.confidentialityAlgorithm = (confidentialityAlgorithm);
-        this.integrityAlgorithm = (integrityAlgorithm);
-    }
+	public CipherSuite(byte id, byte authenticationAlgorithm,
+			byte confidentialityAlgorithm, byte integrityAlgorithm) {
+		this.id = id;
+		this.authenticationAlgorithm = (authenticationAlgorithm);
+		this.confidentialityAlgorithm = (confidentialityAlgorithm);
+		this.integrityAlgorithm = (integrityAlgorithm);
+	}
 
-    /**
-     * Initializes algorithms contained in this {@link CipherSuite}.
-     *
-     * @param sik
-     *            - Session Integrity Key calculated during the opening of the
-     *            session or user password if 'one-key' logins are enabled.
-     * @throws IllegalArgumentException
-     * @throws InvalidKeyException
-     *             - when initiation of the algorithm fails
-     * @throws NoSuchAlgorithmException
-     *             - when initiation of the algorithm fails
-     * @throws NoSuchPaddingException
-     *             - when initiation of the algorithm fails
-     */
-    public void initializeAlgorithms(byte[] sik) throws InvalidKeyException, NoSuchAlgorithmException, NoSuchPaddingException {
-        getIntegrityAlgorithm().initialize(sik);
-        getConfidentialityAlgorithm().initialize(sik, getAuthenticationAlgorithm());
-    }
+	/**
+	 * Initializes algorithms contained in this {@link CipherSuite}.
+	 *
+	 * @param sik
+	 *        - Session Integrity Key calculated during the opening of the
+	 *        session or user password if 'one-key' logins are enabled.
+	 * @throws IllegalArgumentException
+	 * @throws InvalidKeyException
+	 *         - when initiation of the algorithm fails
+	 * @throws NoSuchAlgorithmException
+	 *         - when initiation of the algorithm fails
+	 * @throws NoSuchPaddingException
+	 *         - when initiation of the algorithm fails
+	 */
+	public void initializeAlgorithms(byte[] sik)
+			throws InvalidKeyException,
+			NoSuchAlgorithmException,
+			NoSuchPaddingException {
+		getIntegrityAlgorithm().initialize(sik);
+		getConfidentialityAlgorithm().initialize(sik, getAuthenticationAlgorithm());
+	}
 
 	/**
 	 * Returns instance of AuthenticationAlgorithm class.
 	 *
 	 * @throws IllegalArgumentException when authentication algorithm code is
-	 *                                  incorrect.
+	 *         incorrect.
 	 */
 	public AuthenticationAlgorithm getAuthenticationAlgorithm() {
 		if (aa != null && aa.getCode() != authenticationAlgorithm) {
@@ -133,95 +136,101 @@ public class CipherSuite {
 		}
 	}
 
-    /**
-     * Returns instance of ConfidentialityAlgorithm class.
-     *
-     * @throws IllegalArgumentException
-     *             when confidentiality algorithm code is incorrect.
-     */
-    public ConfidentialityAlgorithm getConfidentialityAlgorithm() {
-        if (ca != null && ca.getCode() != confidentialityAlgorithm) {
-            throw new IllegalArgumentException(
-                    "Invalid confidentiality algorithm code");
-        }
-        switch (confidentialityAlgorithm) {
-        case SecurityConstants.CA_NONE:
-            if (ca == null) {
-                ca = new ConfidentialityNone();
-            }
-            return ca;
-        case SecurityConstants.CA_AES_CBC128:
-            if (ca == null) {
-                ca = new ConfidentialityAesCbc128();
-            }
-            return ca;
-        case SecurityConstants.CA_XRC4_40:
-            // TODO: XRc4-40
-            throw new IllegalArgumentException("Confidentiality algorithm XRC4-40 is not yet implemented.");
-        case SecurityConstants.CA_XRC4_128:
-            // TODO: XRc4-128
-            throw new IllegalArgumentException("Confidentiality algorithm XRC4-128 is not yet implemented.");
-        default:
-            throw new IllegalArgumentException(
-                    "Invalid confidentiality algorithm.");
+	/**
+	 * Returns instance of ConfidentialityAlgorithm class.
+	 *
+	 * @throws IllegalArgumentException
+	 *         when confidentiality algorithm code is incorrect.
+	 */
+	public ConfidentialityAlgorithm getConfidentialityAlgorithm() {
+		if (ca != null && ca.getCode() != confidentialityAlgorithm) {
+			throw new IllegalArgumentException(
+					"Invalid confidentiality algorithm code");
+		}
+		switch (confidentialityAlgorithm) {
+		case SecurityConstants.CA_NONE:
+			if (ca == null) {
+				ca = new ConfidentialityNone();
+			}
+			return ca;
+		case SecurityConstants.CA_AES_CBC128:
+			if (ca == null) {
+				ca = new ConfidentialityAesCbc128();
+			}
+			return ca;
+		case SecurityConstants.CA_XRC4_40:
+			// TODO: XRc4-40
+			throw new IllegalArgumentException("Confidentiality algorithm XRC4-40 is not yet implemented.");
+		case SecurityConstants.CA_XRC4_128:
+			// TODO: XRc4-128
+			throw new IllegalArgumentException("Confidentiality algorithm XRC4-128 is not yet implemented.");
+		default:
+			throw new IllegalArgumentException(
+					"Invalid confidentiality algorithm.");
 
-        }
-    }
+		}
+	}
 
-    /**
-     * Builds Cipher Suites collection from raw data received by
-     * {@link GetChannelCipherSuites} commands. Cannot be executed in
-     * {@link GetChannelCipherSuitesResponseData} since data comes in 16-byte
-     * packets and is fragmented. Supports only one integrity and one
-     * confidentiality algorithm per suite.
-     *
-     * @param bytes
-     *            - concatenated Cipher Suite Records received by
-     *            {@link GetChannelCipherSuites} commands.
-     * @return list of Cipher Suites supported by BMC.
-     */
-    public static List<CipherSuite> getCipherSuites(byte[] bytes) {
-        ArrayList<CipherSuite> suites = new ArrayList<CipherSuite>();
+	/**
+	 * Builds Cipher Suites collection from raw data received by
+	 * {@link GetChannelCipherSuites} commands. Cannot be executed in
+	 * {@link GetChannelCipherSuitesResponseData} since data comes in 16-byte
+	 * packets and is fragmented. Supports only one integrity and one
+	 * confidentiality algorithm per suite.
+	 *
+	 * @param bytes
+	 *        - concatenated Cipher Suite Records received by
+	 *        {@link GetChannelCipherSuites} commands.
+	 * @return list of Cipher Suites supported by BMC.
+	 */
+	public static List<CipherSuite> getCipherSuites(byte[] bytes) {
+		ArrayList<CipherSuite> suites = new ArrayList<CipherSuite>();
 
-        int offset = 0;
+		int offset = 0;
 
-        while (offset < bytes.length) {
-            byte id = bytes[offset + 1];
-            if (bytes[offset] == TypeConverter.intToByte(0xC0)) {
-                offset += 2;
-            } else {
-                offset += 5;
-            }
-            byte aa = bytes[offset];
-            byte ca = -1;
-            byte ia = -1;
-            ++offset;
-            while (offset < bytes.length
-                    && bytes[offset] != TypeConverter.intToByte(0xC0)
-                    && bytes[offset] != TypeConverter.intToByte(0xC1)) {
-                if ((TypeConverter.byteToInt(bytes[offset]) & 0xC0) == 0x80) {
-                    ca = TypeConverter.intToByte(TypeConverter
-                            .byteToInt(bytes[offset]) & 0x3f);
-                } else if ((TypeConverter.byteToInt(bytes[offset]) & 0xC0) == 0x40) {
-                    ia = TypeConverter.intToByte(TypeConverter
-                            .byteToInt(bytes[offset]) & 0x3f);
-                }
-                ++offset;
-            }
-            suites.add(new CipherSuite(id, aa, ca, ia));
-        }
+		while (offset < bytes.length) {
+			byte id = bytes[offset + 1];
+			if (bytes[offset] == TypeConverter.intToByte(0xC0)) {
+				offset += 2;
+			} else {
+				offset += 5;
+			}
+			byte aa = bytes[offset];
+			byte ca = -1;
+			byte ia = -1;
+			++offset;
+			while (offset < bytes.length
+					&& bytes[offset] != TypeConverter.intToByte(0xC0)
+					&& bytes[offset] != TypeConverter.intToByte(0xC1)) {
+				if ((TypeConverter.byteToInt(bytes[offset]) & 0xC0) == 0x80) {
+					ca = TypeConverter
+							.intToByte(
+									TypeConverter
+											.byteToInt(bytes[offset])
+											& 0x3f);
+				} else if ((TypeConverter.byteToInt(bytes[offset]) & 0xC0) == 0x40) {
+					ia = TypeConverter
+							.intToByte(
+									TypeConverter
+											.byteToInt(bytes[offset])
+											& 0x3f);
+				}
+				++offset;
+			}
+			suites.add(new CipherSuite(id, aa, ca, ia));
+		}
 
-        return suites;
-    }
+		return suites;
+	}
 
-    /**
-     * @return {@link CipherSuite} with algorithms set to
-     *         {@link AuthenticationRakpNone}, {@link ConfidentialityNone} and
-     *         {@link IntegrityNone}.
-     */
-    public static CipherSuite getEmpty() {
-        return new CipherSuite((byte) 0, (byte) 0, (byte) 0, (byte) 0);
-    }
+	/**
+	 * @return {@link CipherSuite} with algorithms set to
+	 *         {@link AuthenticationRakpNone}, {@link ConfidentialityNone} and
+	 *         {@link IntegrityNone}.
+	 */
+	public static CipherSuite getEmpty() {
+		return new CipherSuite((byte) 0, (byte) 0, (byte) 0, (byte) 0);
+	}
 
 	/**
 	 * Creates an instance of AuthenticationAlgorithm.
@@ -235,7 +244,7 @@ public class CipherSuite {
 		}
 		return aa;
 	}
-	
+
 	/**
 	 * Creates an instance of IntegrityAlgorithm.
 	 *

@@ -41,65 +41,73 @@ import org.metricshub.ipmi.core.sm.events.StateMachineEvent;
 import org.metricshub.ipmi.core.sm.events.Timeout;
 
 /**
- * Waiting for RAKP Message 2. Transition to: 
+ * Waiting for RAKP Message 2. Transition to:
  * <ul>
- * <li> {@link Rakp1Complete} on {@link DefaultAck}</li>
- * <li> {@link Authcap} on {@link Timeout}</li>
+ * <li>{@link Rakp1Complete} on {@link DefaultAck}</li>
+ * <li>{@link Authcap} on {@link Timeout}</li>
  * </ul>
  */
 public class Rakp1Waiting extends State {
 
-    private Rakp1 rakp1;
+	private Rakp1 rakp1;
 
-    private int tag;
+	private int tag;
 
-    /**
-     * Initiates state.
-     *
-     * @param rakp1
-     *            - the {@link Rakp1} message that was sent earlier in the
-     *            authentification process.
-     */
-    public Rakp1Waiting(int tag, Rakp1 rakp1) {
-        this.tag = tag;
-        this.rakp1 = rakp1;
-    }
+	/**
+	 * Initiates state.
+	 *
+	 * @param rakp1
+	 *        - the {@link Rakp1} message that was sent earlier in the
+	 *        authentification process.
+	 */
+	public Rakp1Waiting(int tag, Rakp1 rakp1) {
+		this.tag = tag;
+		this.rakp1 = rakp1;
+	}
 
-    @Override
-    public void doTransition(StateMachine stateMachine,
-            StateMachineEvent machineEvent) {
-        if (machineEvent instanceof DefaultAck) {
-            stateMachine.setCurrent(new Rakp1Complete(rakp1));
-        } else if (machineEvent instanceof Timeout) {
-            stateMachine.setCurrent(new Authcap());
-        } else {
-            stateMachine.doExternalAction(new ErrorAction(
-                    new IllegalArgumentException("Invalid transition")));
-        }
+	@Override
+	public void doTransition(
+			StateMachine stateMachine,
+			StateMachineEvent machineEvent) {
+		if (machineEvent instanceof DefaultAck) {
+			stateMachine.setCurrent(new Rakp1Complete(rakp1));
+		} else if (machineEvent instanceof Timeout) {
+			stateMachine.setCurrent(new Authcap());
+		} else {
+			stateMachine
+					.doExternalAction(
+							new ErrorAction(
+									new IllegalArgumentException("Invalid transition")));
+		}
 
-    }
+	}
 
-    @Override
-    public void doAction(StateMachine stateMachine, RmcpMessage message) {
-        if (ProtocolDecoder.decodeAuthenticationType(message) != AuthenticationType.RMCPPlus) {
-            return; // this isn't IPMI v2.0 message so we ignore it
-        }
-        PlainCommandv20Decoder decoder = new PlainCommandv20Decoder(
-                CipherSuite.getEmpty());
-        if (Protocolv20Decoder.decodePayloadType(message.getData()[1]) != PayloadType.Rakp2) {
-            return;
-        }
-        IpmiMessage ipmiMessage = null;
-        try {
-            ipmiMessage = decoder.decode(message);
-            if (rakp1.isCommandResponse(ipmiMessage)
-                    && TypeConverter.byteToInt(((PlainMessage) ipmiMessage
-                            .getPayload()).getPayloadData()[0]) == tag) {
-                stateMachine.doExternalAction(new ResponseAction(rakp1
-                        .getResponseData(ipmiMessage)));
-            }
-        } catch (Exception e) {
-            stateMachine.doExternalAction(new ErrorAction(e));
-        }
-    }
+	@Override
+	public void doAction(StateMachine stateMachine, RmcpMessage message) {
+		if (ProtocolDecoder.decodeAuthenticationType(message) != AuthenticationType.RMCPPlus) {
+			return; // this isn't IPMI v2.0 message so we ignore it
+		}
+		PlainCommandv20Decoder decoder = new PlainCommandv20Decoder(
+				CipherSuite.getEmpty());
+		if (Protocolv20Decoder.decodePayloadType(message.getData()[1]) != PayloadType.Rakp2) {
+			return;
+		}
+		IpmiMessage ipmiMessage = null;
+		try {
+			ipmiMessage = decoder.decode(message);
+			if (rakp1.isCommandResponse(ipmiMessage)
+					&& TypeConverter
+							.byteToInt(
+									((PlainMessage) ipmiMessage
+											.getPayload()).getPayloadData()[0]) == tag) {
+				stateMachine
+						.doExternalAction(
+								new ResponseAction(
+										rakp1
+												.getResponseData(ipmiMessage)));
+			}
+		} catch (Exception e) {
+			stateMachine.doExternalAction(new ErrorAction(e));
+		}
+	}
 }

@@ -29,24 +29,24 @@ import org.metricshub.ipmi.core.sm.states.AuthcapWaiting;
 
 /**
  * Performs transition from {@link AuthcapWaiting} to {@link Authcap}.
- * 
+ *
  * @see StateMachine
  */
 public class AuthenticationCapabilitiesReceived extends StateMachineEvent {
-    private int sessionId;
-    private PrivilegeLevel privilegeLevel;
+	private int sessionId;
+	private PrivilegeLevel privilegeLevel;
 
-    public AuthenticationCapabilitiesReceived(int sessionId, PrivilegeLevel privilegeLevel) {
-        this.sessionId = sessionId;
-        this.privilegeLevel = privilegeLevel;
-    }
+	public AuthenticationCapabilitiesReceived(int sessionId, PrivilegeLevel privilegeLevel) {
+		this.sessionId = sessionId;
+		this.privilegeLevel = privilegeLevel;
+	}
 
-    public int getSessionId() {
-        return sessionId;
-    }
-    public PrivilegeLevel getPrivilegeLevel() {
-        return privilegeLevel;
-    }
+	public int getSessionId() {
+		return sessionId;
+	}
 
+	public PrivilegeLevel getPrivilegeLevel() {
+		return privilegeLevel;
+	}
 
 }

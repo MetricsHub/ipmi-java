@@ -23,38 +23,41 @@ package org.metricshub.ipmi.core.coding.commands.sel;
  */
 
 public enum SelRecordType {
-    OemTimestamped(SelRecordType.OEMTIMESTAMPED), System(SelRecordType.SYSTEM), OemNonTimestamped(
-            SelRecordType.OEMNONTIMESTAMPED), ;
-    /**
-     * Represents OEM timestamped record type (C0h-DFh)
-     */
-    private static final int OEMTIMESTAMPED = 192;
-    private static final int SYSTEM = 2;
-    /**
-     * Represents OEM timestamped record type (E0h-FFh)
-     */
-    private static final int OEMNONTIMESTAMPED = 224;
+	OemTimestamped(SelRecordType.OEMTIMESTAMPED),
+	System(SelRecordType.SYSTEM),
+	OemNonTimestamped(
+			SelRecordType.OEMNONTIMESTAMPED),;
 
-    private int code;
+	/**
+	 * Represents OEM timestamped record type (C0h-DFh)
+	 */
+	private static final int OEMTIMESTAMPED = 192;
+	private static final int SYSTEM = 2;
+	/**
+	 * Represents OEM timestamped record type (E0h-FFh)
+	 */
+	private static final int OEMNONTIMESTAMPED = 224;
 
-    SelRecordType(int code) {
-        this.code = code;
-    }
+	private int code;
 
-    public int getCode() {
-        return code;
-    }
+	SelRecordType(int code) {
+		this.code = code;
+	}
 
-    public static SelRecordType parseInt(int value) {
-        if (value == SYSTEM) {
-            return System;
-        }
-        if (value > OEMNONTIMESTAMPED) {
-            return OemNonTimestamped;
-        }
-        if (value > OEMTIMESTAMPED) {
-            return OemTimestamped;
-        }
-        throw new IllegalArgumentException("Invalid value: " + value);
-    }
+	public int getCode() {
+		return code;
+	}
+
+	public static SelRecordType parseInt(int value) {
+		if (value == SYSTEM) {
+			return System;
+		}
+		if (value > OEMNONTIMESTAMPED) {
+			return OemNonTimestamped;
+		}
+		if (value > OEMTIMESTAMPED) {
+			return OemTimestamped;
+		}
+		throw new IllegalArgumentException("Invalid value: " + value);
+	}
 }

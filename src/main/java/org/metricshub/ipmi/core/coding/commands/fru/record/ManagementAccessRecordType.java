@@ -26,44 +26,49 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 public enum ManagementAccessRecordType {
-    SystemManagementUrl(ManagementAccessRecordType.SYSTEMMANAGEMENTURL), SystemName(
-            ManagementAccessRecordType.SYSTEMNAME), SystemPingAddress(ManagementAccessRecordType.SYSTEMPINGADDRESS), ComponentManagementURL(
-            ManagementAccessRecordType.COMPONENTMANAGEMENTURL), Unspecified(ManagementAccessRecordType.UNSPECIFIED), ;
-    private static final int SYSTEMMANAGEMENTURL = 1;
+	SystemManagementUrl(ManagementAccessRecordType.SYSTEMMANAGEMENTURL),
+	SystemName(
+			ManagementAccessRecordType.SYSTEMNAME),
+	SystemPingAddress(ManagementAccessRecordType.SYSTEMPINGADDRESS),
+	ComponentManagementURL(
+			ManagementAccessRecordType.COMPONENTMANAGEMENTURL),
+	Unspecified(ManagementAccessRecordType.UNSPECIFIED),;
 
-    private static final int SYSTEMNAME = 2;
+	private static final int SYSTEMMANAGEMENTURL = 1;
 
-    private static final int SYSTEMPINGADDRESS = 3;
+	private static final int SYSTEMNAME = 2;
 
-    private static final int COMPONENTMANAGEMENTURL = 4;
+	private static final int SYSTEMPINGADDRESS = 3;
 
-    private static final int UNSPECIFIED = 0;
+	private static final int COMPONENTMANAGEMENTURL = 4;
 
-    private static Logger logger = LoggerFactory.getLogger(ManagementAccessRecordType.class);
+	private static final int UNSPECIFIED = 0;
 
-    private int code;
+	private static Logger logger = LoggerFactory.getLogger(ManagementAccessRecordType.class);
 
-    ManagementAccessRecordType(int code) {
-        this.code = code;
-    }
+	private int code;
 
-    public int getCode() {
-        return code;
-    }
+	ManagementAccessRecordType(int code) {
+		this.code = code;
+	}
 
-    public static ManagementAccessRecordType parseInt(int value) {
-        switch (value) {
-        case SYSTEMMANAGEMENTURL:
-            return SystemManagementUrl;
-        case SYSTEMNAME:
-            return SystemName;
-        case SYSTEMPINGADDRESS:
-            return SystemPingAddress;
-        case COMPONENTMANAGEMENTURL:
-            return ComponentManagementURL;
-        default:
-            logger.error("Invalid value: " + value);
-            return Unspecified;
-        }
-    }
+	public int getCode() {
+		return code;
+	}
+
+	public static ManagementAccessRecordType parseInt(int value) {
+		switch (value) {
+		case SYSTEMMANAGEMENTURL:
+			return SystemManagementUrl;
+		case SYSTEMNAME:
+			return SystemName;
+		case SYSTEMPINGADDRESS:
+			return SystemPingAddress;
+		case COMPONENTMANAGEMENTURL:
+			return ComponentManagementURL;
+		default:
+			logger.error("Invalid value: " + value);
+			return Unspecified;
+		}
+	}
 }

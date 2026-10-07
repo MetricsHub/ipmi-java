@@ -30,21 +30,21 @@ import org.metricshub.ipmi.core.sm.states.OpenSessionWaiting;
 
 /**
  * Performs transition from {@link Authcap} to {@link OpenSessionWaiting}.
- * 
+ *
  * @see StateMachine
  */
 public class Authorize extends Default {
 
-    private int sessionId;
+	private int sessionId;
 
-    public int getSessionId() {
-        return sessionId;
-    }
+	public int getSessionId() {
+		return sessionId;
+	}
 
-    public Authorize(CipherSuite cipherSuite, int sequenceNumber,
-            PrivilegeLevel privilegeLevel, int sessionId) {
-        super(cipherSuite, sequenceNumber, privilegeLevel);
-        this.sessionId = sessionId;
-    }
+	public Authorize(CipherSuite cipherSuite, int sequenceNumber,
+			PrivilegeLevel privilegeLevel, int sessionId) {
+		super(cipherSuite, sequenceNumber, privilegeLevel);
+		this.sessionId = sessionId;
+	}
 
 }

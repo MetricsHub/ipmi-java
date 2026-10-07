@@ -27,13 +27,12 @@ package org.metricshub.ipmi.core.common;
  */
 public final class Constants {
 
-    /**
-     * The port BMC is listening for IPMI messages on.
-     */
-    public static final int IPMI_PORT = 0x26F;
+	/**
+	 * The port BMC is listening for IPMI messages on.
+	 */
+	public static final int IPMI_PORT = 0x26F;
 
-    public static final int TIMEOUT = 500;
+	public static final int TIMEOUT = 500;
 
-    private Constants() {
-    }
+	private Constants() {}
 }

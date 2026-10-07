@@ -29,23 +29,23 @@ import org.metricshub.ipmi.core.coding.commands.ResponseData;
  */
 public class GetFruInventoryAreaInfoResponseData implements ResponseData {
 
-    private int fruInventoryAreaSize;
+	private int fruInventoryAreaSize;
 
-    private BaseUnit fruUnit;
+	private BaseUnit fruUnit;
 
-    public int getFruInventoryAreaSize() {
-        return fruInventoryAreaSize;
-    }
+	public int getFruInventoryAreaSize() {
+		return fruInventoryAreaSize;
+	}
 
-    public void setFruInventoryAreaSize(int fruInventoryAreaSize) {
-        this.fruInventoryAreaSize = fruInventoryAreaSize;
-    }
+	public void setFruInventoryAreaSize(int fruInventoryAreaSize) {
+		this.fruInventoryAreaSize = fruInventoryAreaSize;
+	}
 
-    public BaseUnit getFruUnit() {
-        return fruUnit;
-    }
+	public BaseUnit getFruUnit() {
+		return fruUnit;
+	}
 
-    public void setFruUnit(BaseUnit fruUnit) {
-        this.fruUnit = fruUnit;
-    }
+	public void setFruUnit(BaseUnit fruUnit) {
+		this.fruUnit = fruUnit;
+	}
 }

@@ -28,8 +28,8 @@ package org.metricshub.ipmi.core.coding.security;
 public class AuthenticationRakpNone extends AuthenticationAlgorithm {
 
 	/**
-     * Constructs an instance of the RAKP-None authentication algorithm.
-     */
+	 * Constructs an instance of the RAKP-None authentication algorithm.
+	 */
 	public AuthenticationRakpNone() {
 		super("");
 	}

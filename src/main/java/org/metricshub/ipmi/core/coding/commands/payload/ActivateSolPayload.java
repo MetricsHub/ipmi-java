@@ -36,46 +36,51 @@ public class ActivateSolPayload extends ActivatePayload {
 
 	/**
 	 * Instantiate a new {@link ActivateSolPayload}
-	 * @param cipherSuite     Provides cipher suite (authentication, confidentiality
-	 *                        and integrity algorithms used during the session).
+	 *
+	 * @param cipherSuite Provides cipher suite (authentication, confidentiality
+	 *        and integrity algorithms used during the session).
 	 * @param payloadInstance Paylaod instance as int
 	 */
-    public ActivateSolPayload(CipherSuite cipherSuite, int payloadInstance) {
-        super(IpmiVersion.V20, cipherSuite, AuthenticationType.RMCPPlus, payloadInstance);
-    }
+	public ActivateSolPayload(CipherSuite cipherSuite, int payloadInstance) {
+		super(IpmiVersion.V20, cipherSuite, AuthenticationType.RMCPPlus, payloadInstance);
+	}
 
-    @Override
-    public PayloadType getPayloadType() {
-        return PayloadType.Sol;
-    }
+	@Override
+	public PayloadType getPayloadType() {
+		return PayloadType.Sol;
+	}
 
-    @Override
-    protected byte[] prepareAuxilaryRequestData() {
-        byte[] result = new byte[4];
+	@Override
+	protected byte[] prepareAuxilaryRequestData() {
+		byte[] result = new byte[4];
 
-        boolean isAuthenticationEnabled = getCipherSuite().getAuthenticationAlgorithm().getCode() != SecurityConstants.AA_RAKP_NONE;
-        boolean isEncryptionEnabled = getCipherSuite().getConfidentialityAlgorithm().getCode() != SecurityConstants.CA_NONE;
+		boolean isAuthenticationEnabled = getCipherSuite()
+				.getAuthenticationAlgorithm()
+				.getCode() != SecurityConstants.AA_RAKP_NONE;
+		boolean isEncryptionEnabled = getCipherSuite().getConfidentialityAlgorithm().getCode() != SecurityConstants.CA_NONE;
 
-        if (isEncryptionEnabled) {
-            //encryption bit
-            result[0] = TypeConverter.setBitOnPosition(7, result[0]);
-        }
+		if (isEncryptionEnabled) {
+			// encryption bit
+			result[0] = TypeConverter.setBitOnPosition(7, result[0]);
+		}
 
-        if (isAuthenticationEnabled) {
-            //authentication bit
-            result[0] = TypeConverter.setBitOnPosition(6, result[0]);
-        }
+		if (isAuthenticationEnabled) {
+			// authentication bit
+			result[0] = TypeConverter.setBitOnPosition(6, result[0]);
+		}
 
-        /*The following settings determine what happens to serial alerts
-        if IPMI over Serial and SOL are sharing the same baseboard serial controller.
-        Bit 2 set and bit 3 reset mean, that serial/modem alerts are deferred while SOL active*/
-        result[0] = TypeConverter.setBitOnPosition(2, result[0]);
+		/*
+		 * The following settings determine what happens to serial alerts
+		 * if IPMI over Serial and SOL are sharing the same baseboard serial controller.
+		 * Bit 2 set and bit 3 reset mean, that serial/modem alerts are deferred while SOL active
+		 */
+		result[0] = TypeConverter.setBitOnPosition(2, result[0]);
 
-        return result;
-    }
+		return result;
+	}
 
-    @Override
-    protected ActivatePayloadResponseData createEmptyResponse() {
-        return new ActivateSolPayloadResponseData();
-    }
+	@Override
+	protected ActivatePayloadResponseData createEmptyResponse() {
+		return new ActivateSolPayloadResponseData();
+	}
 }

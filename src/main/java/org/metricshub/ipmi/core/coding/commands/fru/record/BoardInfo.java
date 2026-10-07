@@ -40,192 +40,226 @@ import java.util.Locale;
  */
 public class BoardInfo extends FruRecord {
 
-    private Date mfgDate;
+	private Date mfgDate;
 
-    private String boardManufacturer = "";
+	private String boardManufacturer = "";
 
-    private String boardProductName = "";
+	private String boardProductName = "";
 
-    private String boardSerialNumber = "";
+	private String boardSerialNumber = "";
 
-    private String boardPartNumber = "";
+	private String boardPartNumber = "";
 
-    private byte[] fruFileId = new byte[0];
+	private byte[] fruFileId = new byte[0];
 
-    private String[] customBoardInfo = new String[0];
+	private String[] customBoardInfo = new String[0];
 
-    private static Logger logger = LoggerFactory.getLogger(BoardInfo.class);
+	private static Logger logger = LoggerFactory.getLogger(BoardInfo.class);
 
-    /**
-     * Creates and populates record
-     *
-     * @param fruData
-     *            - raw data containing record
-     * @param offset
-     *            - offset to the record in the data
-     */
-    public BoardInfo(final byte[] fruData, final int offset) {
-        validateFruData(fruData[offset]);
+	/**
+	 * Creates and populates record
+	 *
+	 * @param fruData
+	 *        - raw data containing record
+	 * @param offset
+	 *        - offset to the record in the data
+	 */
+	public BoardInfo(final byte[] fruData, final int offset) {
+		validateFruData(fruData[offset]);
 
-        int languageCode = TypeConverter.byteToInt(fruData[offset + 2]);
+		int languageCode = TypeConverter.byteToInt(fruData[offset + 2]);
 
-        byte[] buffer = new byte[4];
+		byte[] buffer = new byte[4];
 
-        buffer[0] = fruData[offset + 3];
-        buffer[1] = fruData[offset + 4];
-        buffer[2] = fruData[offset + 5];
-        buffer[3] = 0;
+		buffer[0] = fruData[offset + 3];
+		buffer[1] = fruData[offset + 4];
+		buffer[2] = fruData[offset + 5];
+		buffer[3] = 0;
 
-        DateFormat df = DateFormat.getDateInstance(DateFormat.SHORT,
-                Locale.ENGLISH);
-        try {
-            setMfgDate(new Date(df.parse("01/01/96").getTime()
-                    + ((long) TypeConverter.littleEndianByteArrayToInt(buffer))
-                    * 60000l));
-        } catch (ParseException e) {
-            logger.error(e.getMessage(), e);
-        }
+		DateFormat df = DateFormat
+				.getDateInstance(
+						DateFormat.SHORT,
+						Locale.ENGLISH);
+		try {
+			setMfgDate(
+					new Date(
+							df.parse("01/01/96").getTime()
+									+ ((long) TypeConverter.littleEndianByteArrayToInt(buffer))
+											* 60000l));
+		} catch (ParseException e) {
+			logger.error(e.getMessage(), e);
+		}
 
-        int partNumber = TypeConverter.byteToInt(fruData[offset + 6]);
+		int partNumber = TypeConverter.byteToInt(fruData[offset + 6]);
 
-        ArrayList<String> customInfo = readCustomInfo(fruData, languageCode, partNumber, offset + 7);
+		ArrayList<String> customInfo = readCustomInfo(fruData, languageCode, partNumber, offset + 7);
 
-        customBoardInfo = new String[customInfo.size()];
-        customBoardInfo = customInfo.toArray(customBoardInfo);
-    }
+		customBoardInfo = new String[customInfo.size()];
+		customBoardInfo = customInfo.toArray(customBoardInfo);
+	}
 
-    private void validateFruData(byte fruDatum) {
-        if (fruDatum != 0x1) {
-            throw new IllegalArgumentException("Invalid format version");
-        }
-    }
+	private void validateFruData(byte fruDatum) {
+		if (fruDatum != 0x1) {
+			throw new IllegalArgumentException("Invalid format version");
+		}
+	}
 
-    private ArrayList<String> readCustomInfo(final byte[] fruData, final int languageCode, final int partNumber, final int offset) {
-        ArrayList<String> customInfo = new ArrayList<String>();
-        int index = 0;
+	private ArrayList<String> readCustomInfo(
+			final byte[] fruData,
+			final int languageCode,
+			final int partNumber,
+			final int offset) {
+		ArrayList<String> customInfo = new ArrayList<String>();
+		int index = 0;
 
-        int currentOffset = offset;
-        int currentPartNumber = partNumber;
+		int currentOffset = offset;
+		int currentPartNumber = partNumber;
 
-        while (currentPartNumber != 0xc1 && currentOffset < fruData.length) {
+		while (currentPartNumber != 0xc1 && currentOffset < fruData.length) {
 
-            int partType = (currentPartNumber & 0xc0) >> 6;
+			int partType = (currentPartNumber & 0xc0) >> 6;
 
-            int partDataLength = (currentPartNumber & 0x3f);
+			int partDataLength = (currentPartNumber & 0x3f);
 
-            if (partDataLengthWithinBounds(fruData, currentOffset, partDataLength)) {
+			if (partDataLengthWithinBounds(fruData, currentOffset, partDataLength)) {
 
-                byte[] partNumberData = new byte[partDataLength];
+				byte[] partNumberData = new byte[partDataLength];
 
-                System.arraycopy(fruData, currentOffset, partNumberData, 0,
-                        partDataLength);
+				System
+						.arraycopy(
+								fruData,
+								currentOffset,
+								partNumberData,
+								0,
+								partDataLength);
 
-                currentOffset += partDataLength;
+				currentOffset += partDataLength;
 
-                switch (index) {
-                case 0:
-                    setBoardManufacturer(FruRecord.decodeString(partType,
-                            partNumberData, languageCode != 0
-                                    && languageCode != 25));
-                    break;
-                case 1:
-                    setBoardProductName(FruRecord.decodeString(partType,
-                            partNumberData, languageCode != 0
-                                    && languageCode != 25));
-                    break;
-                case 2:
-                    setBoardSerialNumber(FruRecord.decodeString(partType,
-                            partNumberData, true));
-                    break;
-                case 3:
-                    setBoardPartNumber(FruRecord.decodeString(partType,
-                            partNumberData, languageCode != 0
-                                    && languageCode != 25));
-                    break;
-                case 4:
-                    setFruFileId(partNumberData);
-                    break;
-                default:
-                    if (partDataLength == 0) {
-                        currentPartNumber = TypeConverter.byteToInt(fruData[currentOffset]);
-                        ++currentOffset;
-                        continue;
-                    }
-                    customInfo.add(FruRecord.decodeString(partType,
-                            partNumberData, languageCode != 0
-                                    && languageCode != 25));
-                    break;
-                }
-            }
+				switch (index) {
+				case 0:
+					setBoardManufacturer(
+							FruRecord
+									.decodeString(
+											partType,
+											partNumberData,
+											languageCode != 0
+													&& languageCode != 25));
+					break;
+				case 1:
+					setBoardProductName(
+							FruRecord
+									.decodeString(
+											partType,
+											partNumberData,
+											languageCode != 0
+													&& languageCode != 25));
+					break;
+				case 2:
+					setBoardSerialNumber(
+							FruRecord
+									.decodeString(
+											partType,
+											partNumberData,
+											true));
+					break;
+				case 3:
+					setBoardPartNumber(
+							FruRecord
+									.decodeString(
+											partType,
+											partNumberData,
+											languageCode != 0
+													&& languageCode != 25));
+					break;
+				case 4:
+					setFruFileId(partNumberData);
+					break;
+				default:
+					if (partDataLength == 0) {
+						currentPartNumber = TypeConverter.byteToInt(fruData[currentOffset]);
+						++currentOffset;
+						continue;
+					}
+					customInfo
+							.add(
+									FruRecord
+											.decodeString(
+													partType,
+													partNumberData,
+													languageCode != 0
+															&& languageCode != 25));
+					break;
+				}
+			}
 
-            currentPartNumber = TypeConverter.byteToInt(fruData[currentOffset]);
+			currentPartNumber = TypeConverter.byteToInt(fruData[currentOffset]);
 
-            ++currentOffset;
+			++currentOffset;
 
-            ++index;
-        }
+			++index;
+		}
 
-        return customInfo;
-    }
+		return customInfo;
+	}
 
-    private boolean partDataLengthWithinBounds(byte[] fruData, int currentOfset, int partDataLength) {
-        return partDataLength > 0 && partDataLength + currentOfset < fruData.length;
-    }
+	private boolean partDataLengthWithinBounds(byte[] fruData, int currentOfset, int partDataLength) {
+		return partDataLength > 0 && partDataLength + currentOfset < fruData.length;
+	}
 
-    public Date getMfgDate() {
-        return mfgDate;
-    }
+	public Date getMfgDate() {
+		return mfgDate;
+	}
 
-    public void setMfgDate(Date mfgDate) {
-        this.mfgDate = mfgDate;
-    }
+	public void setMfgDate(Date mfgDate) {
+		this.mfgDate = mfgDate;
+	}
 
-    public String getBoardManufacturer() {
-        return boardManufacturer;
-    }
+	public String getBoardManufacturer() {
+		return boardManufacturer;
+	}
 
-    public void setBoardManufacturer(String boardManufacturer) {
-        this.boardManufacturer = boardManufacturer;
-    }
+	public void setBoardManufacturer(String boardManufacturer) {
+		this.boardManufacturer = boardManufacturer;
+	}
 
-    public String getBoardProductName() {
-        return boardProductName;
-    }
+	public String getBoardProductName() {
+		return boardProductName;
+	}
 
-    public void setBoardProductName(String boardProductName) {
-        this.boardProductName = boardProductName;
-    }
+	public void setBoardProductName(String boardProductName) {
+		this.boardProductName = boardProductName;
+	}
 
-    public String getBoardSerialNumber() {
-        return boardSerialNumber;
-    }
+	public String getBoardSerialNumber() {
+		return boardSerialNumber;
+	}
 
-    public void setBoardSerialNumber(String boardSerialNumber) {
-        this.boardSerialNumber = boardSerialNumber;
-    }
+	public void setBoardSerialNumber(String boardSerialNumber) {
+		this.boardSerialNumber = boardSerialNumber;
+	}
 
-    public String getBoardPartNumber() {
-        return boardPartNumber;
-    }
+	public String getBoardPartNumber() {
+		return boardPartNumber;
+	}
 
-    public void setBoardPartNumber(String boardPartNumber) {
-        this.boardPartNumber = boardPartNumber;
-    }
+	public void setBoardPartNumber(String boardPartNumber) {
+		this.boardPartNumber = boardPartNumber;
+	}
 
-    public byte[] getFruFileId() {
-        return fruFileId;
-    }
+	public byte[] getFruFileId() {
+		return fruFileId;
+	}
 
-    public void setFruFileId(byte[] fruFileId) {
-        this.fruFileId = fruFileId;
-    }
+	public void setFruFileId(byte[] fruFileId) {
+		this.fruFileId = fruFileId;
+	}
 
-    public String[] getCustomBoardInfo() {
-        return customBoardInfo;
-    }
+	public String[] getCustomBoardInfo() {
+		return customBoardInfo;
+	}
 
-    public void setCustomBoardInfo(String[] customBoardInfo) {
-        this.customBoardInfo = customBoardInfo;
-    }
+	public void setCustomBoardInfo(String[] customBoardInfo) {
+		this.customBoardInfo = customBoardInfo;
+	}
 
 }

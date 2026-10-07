@@ -27,7 +27,6 @@ import org.metricshub.ipmi.core.common.Constants;
 /**
  * IPMI configuration including the required credentials that need to be used to establish the
  * communication with the IPMI interface.
- *
  */
 public class IpmiClientConfiguration {
 
@@ -42,13 +41,13 @@ public class IpmiClientConfiguration {
 
 	/**
 	 * Instantiates a new {@link IpmiClientConfiguration} in order to query the IPMI host.
-	 * 
+	 *
 	 * @param hostname IP Address or host name of the remote IPMI host.
 	 * @param username Name used to establish the connection with the host via the IPMI protocol.
 	 * @param password Password used to establish the connection with the host via the IPMI protocol.
-	 * @param bmcKey   The key that should be provided if the two-key authentication is enabled, null otherwise.
+	 * @param bmcKey The key that should be provided if the two-key authentication is enabled, null otherwise.
 	 * @param skipAuth Whether the client should skip authentication
-	 * @param timeout  Timeout used for each IPMI request.
+	 * @param timeout Timeout used for each IPMI request.
 	 */
 	public IpmiClientConfiguration(String hostname, String username, char[] password,
 			byte[] bmcKey, boolean skipAuth, long timeout) {
@@ -62,14 +61,14 @@ public class IpmiClientConfiguration {
 
 	/**
 	 * Instantiates a new {@link IpmiClientConfiguration} in order to query the IPMI host.
-	 * 
+	 *
 	 * @param hostname IP Address or host name of the remote IPMI host.
 	 * @param port UDP port number of the remote IPMI host.
 	 * @param username Name used to establish the connection with the host via the IPMI protocol.
 	 * @param password Password used to establish the connection with the host via the IPMI protocol.
-	 * @param bmcKey   The key that should be provided if the two-key authentication is enabled, null otherwise.
+	 * @param bmcKey The key that should be provided if the two-key authentication is enabled, null otherwise.
 	 * @param skipAuth Whether the client should skip authentication
-	 * @param timeout  Timeout used for each IPMI request.
+	 * @param timeout Timeout used for each IPMI request.
 	 */
 	public IpmiClientConfiguration(String hostname, int port, String username, char[] password,
 			byte[] bmcKey, boolean skipAuth, long timeout) {
@@ -79,15 +78,15 @@ public class IpmiClientConfiguration {
 
 	/**
 	 * Instantiates a new {@link IpmiClientConfiguration} in order to query the IPMI host.
-	 * 
-	 * @param hostname   IP Address or host name of the remote IPMI host.
-	 * @param username   Name used to establish the connection with the host via the IPMI protocol.
-	 * @param password   Password used to establish the connection with the host via the IPMI protocol.
-	 * @param bmcKey     The key that should be provided if the two-key authentication is enabled, null otherwise.
-	 * @param skipAuth   Whether the client should skip authentication
-	 * @param timeout    Timeout used for each IPMI request.
+	 *
+	 * @param hostname IP Address or host name of the remote IPMI host.
+	 * @param username Name used to establish the connection with the host via the IPMI protocol.
+	 * @param password Password used to establish the connection with the host via the IPMI protocol.
+	 * @param bmcKey The key that should be provided if the two-key authentication is enabled, null otherwise.
+	 * @param skipAuth Whether the client should skip authentication
+	 * @param timeout Timeout used for each IPMI request.
 	 * @param pingPeriod The period in milliseconds used to send the keep alive messages.<br>
-	 *                   Set pingPeriod to 0 to turn off keep-alive messages sent to the remote host.
+	 *        Set pingPeriod to 0 to turn off keep-alive messages sent to the remote host.
 	 */
 	public IpmiClientConfiguration(String hostname, String username, char[] password,
 			byte[] bmcKey, boolean skipAuth, long timeout, long pingPeriod) {
@@ -97,7 +96,7 @@ public class IpmiClientConfiguration {
 
 	/**
 	 * Returns the IP Address or host name of the remote IPMI host.
-	 * 
+	 *
 	 * @return IP Address or host name of the remote IPMI host.
 	 */
 	public String getHostname() {
@@ -106,7 +105,7 @@ public class IpmiClientConfiguration {
 
 	/**
 	 * Sets the IP Address or host name of the remote IPMI host.
-	 * 
+	 *
 	 * @param hostname IP Address or host name of the remote IPMI host.
 	 */
 	public void setHostname(String hostname) {
@@ -115,7 +114,7 @@ public class IpmiClientConfiguration {
 
 	/**
 	 * Returns the UDP port number of the remote IPMI host.
-	 * 
+	 *
 	 * @return UDP port number of the remote IPMI host.
 	 */
 	public int getPort() {
@@ -124,7 +123,7 @@ public class IpmiClientConfiguration {
 
 	/**
 	 * Sets the UDP port number of the remote IPMI host.
-	 * 
+	 *
 	 * @param port UDP port number of the remote IPMI host.
 	 */
 	public void setPort(int port) {
@@ -134,7 +133,7 @@ public class IpmiClientConfiguration {
 	/**
 	 * Returns the name used to establish the connection with the host via the IPMI
 	 * protocol.
-	 * 
+	 *
 	 * @return Name used to establish the connection with the host via the IPMI protocol.
 	 */
 	public String getUsername() {
@@ -144,9 +143,9 @@ public class IpmiClientConfiguration {
 	/**
 	 * Sets the name used to establish the connection with the host via the IPMI
 	 * protocol.
-	 * 
+	 *
 	 * @param username Name used to establish the connection with the host via the
-	 *                 IPMI protocol.
+	 *        IPMI protocol.
 	 */
 	public void setUsername(String username) {
 		this.username = username;
@@ -155,7 +154,7 @@ public class IpmiClientConfiguration {
 	/**
 	 * Returns the password used to establish the connection with the host via the
 	 * IPMI protocol.
-	 * 
+	 *
 	 * @return Password used to establish the connection with the host via the IPMI protocol.
 	 */
 	public char[] getPassword() {
@@ -165,7 +164,7 @@ public class IpmiClientConfiguration {
 	/**
 	 * Sets the password used to establish the connection with the host via the IPMI
 	 * protocol.
-	 * 
+	 *
 	 * @param password Password used to establish the connection with the host via the IPMI protocol.
 	 */
 	public void setPassword(char[] password) {
@@ -175,7 +174,7 @@ public class IpmiClientConfiguration {
 	/**
 	 * Returns the key that should be provided if the two-key authentication is
 	 * enabled, null otherwise.
-	 * 
+	 *
 	 * @return The key that should be provided if the two-key authentication is
 	 *         enabled, null otherwise.
 	 */
@@ -186,9 +185,9 @@ public class IpmiClientConfiguration {
 	/**
 	 * Sets the key that should be provided if the two-key authentication is
 	 * enabled, null otherwise.
-	 * 
+	 *
 	 * @param bmcKey The key that should be provided if the two-key authentication
-	 *               is enabled, null otherwise.
+	 *        is enabled, null otherwise.
 	 */
 	public void setBmcKey(byte[] bmcKey) {
 		this.bmcKey = bmcKey;
@@ -196,7 +195,7 @@ public class IpmiClientConfiguration {
 
 	/**
 	 * Returns whether the client should skip authentication.
-	 * 
+	 *
 	 * @return Whether the client should skip authentication.
 	 */
 	public boolean isSkipAuth() {
@@ -205,7 +204,7 @@ public class IpmiClientConfiguration {
 
 	/**
 	 * Sets whether the client should skip authentication.
-	 * 
+	 *
 	 * @param skipAuth Whether the client should skip authentication.
 	 */
 	public void setSkipAuth(boolean skipAuth) {
@@ -214,7 +213,7 @@ public class IpmiClientConfiguration {
 
 	/**
 	 * Returns the timeout used for each IPMI request.
-	 * 
+	 *
 	 * @return The timeout used for each IPMI request.
 	 */
 	public long getTimeout() {
@@ -223,7 +222,7 @@ public class IpmiClientConfiguration {
 
 	/**
 	 * Sets the timeout used for each IPMI request.
-	 * 
+	 *
 	 * @param timeout The timeout used for each IPMI request.
 	 */
 	public void setTimeout(long timeout) {
@@ -232,7 +231,7 @@ public class IpmiClientConfiguration {
 
 	/**
 	 * Returns the period in milliseconds used to send the keep alive messages.
-	 * 
+	 *
 	 * @return The period in milliseconds used to send the keep alive messages.
 	 */
 	public long getPingPeriod() {
@@ -242,7 +241,7 @@ public class IpmiClientConfiguration {
 	/**
 	 * Sets the period in milliseconds used to send the keep alive messages.<br>
 	 * Set pingPeriod to 0 to turn off keep-alive messages sent to the remote host.
-	 * 
+	 *
 	 * @param pingPeriod The period in milliseconds used to send the keep alive messages.
 	 */
 	public void setPingPeriod(long pingPeriod) {

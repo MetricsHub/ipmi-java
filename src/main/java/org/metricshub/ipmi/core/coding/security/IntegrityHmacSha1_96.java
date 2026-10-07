@@ -27,27 +27,27 @@ package org.metricshub.ipmi.core.coding.security;
  */
 public class IntegrityHmacSha1_96 extends IntegrityAlgorithm {
 
-    public static final String ALGORITHM_NAME = "HmacSHA1";
+	public static final String ALGORITHM_NAME = "HmacSHA1";
 
-    /**
-     * Initiates HMAC-SHA1-96 integrity algorithm.
-     */
-    public IntegrityHmacSha1_96() {
-        super(ALGORITHM_NAME);
-    }
+	/**
+	 * Initiates HMAC-SHA1-96 integrity algorithm.
+	 */
+	public IntegrityHmacSha1_96() {
+		super(ALGORITHM_NAME);
+	}
 
-    @Override
-    public byte getCode() {
-        return SecurityConstants.IA_HMAC_SHA1_96;
-    }
+	@Override
+	public byte getCode() {
+		return SecurityConstants.IA_HMAC_SHA1_96;
+	}
 
-    @Override
-    public String getAlgorithmName() {
-        return ALGORITHM_NAME;
-    }
-    
+	@Override
+	public String getAlgorithmName() {
+		return ALGORITHM_NAME;
+	}
+
 	@Override
 	public int getAuthCodeLength() {
-	    return 12;
+		return 12;
 	}
 }

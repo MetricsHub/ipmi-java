@@ -34,34 +34,33 @@ import org.metricshub.ipmi.core.sm.states.State;
  * transit to {@link Authcap} {@link State} the session.
  */
 public class CloseSession extends StateMachineEvent {
-    private int sessionId;
-    private int messageSequenceNumber;
-    private int sessionSequenceNumber;
+	private int sessionId;
+	private int messageSequenceNumber;
+	private int sessionSequenceNumber;
 
-    /**
-     * Prepares {@link CloseSession}
-     *
-     * @param sessionId
-     *            - managed system session ID
-     *
-     * @param messageSequenceNumber
-     *            - generated sequence number for the message to send
-     */
-    public CloseSession(int sessionId, int messageSequenceNumber, int sessionSequenceNumber) {
-        this.messageSequenceNumber = messageSequenceNumber;
-        this.sessionSequenceNumber = sessionSequenceNumber;
-        this.sessionId = sessionId;
-    }
+	/**
+	 * Prepares {@link CloseSession}
+	 *
+	 * @param sessionId
+	 *        - managed system session ID
+	 * @param messageSequenceNumber
+	 *        - generated sequence number for the message to send
+	 */
+	public CloseSession(int sessionId, int messageSequenceNumber, int sessionSequenceNumber) {
+		this.messageSequenceNumber = messageSequenceNumber;
+		this.sessionSequenceNumber = sessionSequenceNumber;
+		this.sessionId = sessionId;
+	}
 
-    public int getSessionId() {
-        return sessionId;
-    }
+	public int getSessionId() {
+		return sessionId;
+	}
 
-    public int getMessageSequenceNumber() {
-        return messageSequenceNumber;
-    }
+	public int getMessageSequenceNumber() {
+		return messageSequenceNumber;
+	}
 
-    public int getSessionSequenceNumber() {
-        return sessionSequenceNumber;
-    }
+	public int getSessionSequenceNumber() {
+		return sessionSequenceNumber;
+	}
 }

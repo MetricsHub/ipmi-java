@@ -25,29 +25,29 @@ package org.metricshub.ipmi.core.coding.commands.payload;
 import org.metricshub.ipmi.core.common.TypeConverter;
 
 /**
- * Concrete implementation of {@link ActivatePayloadResponseData} for {@link org.metricshub.ipmi.core.coding.protocol.PayloadType#SOL}.
+ * Concrete implementation of {@link ActivatePayloadResponseData} for
+ * {@link org.metricshub.ipmi.core.coding.protocol.PayloadType#SOL}.
  */
 public class ActivateSolPayloadResponseData extends ActivatePayloadResponseData {
 
-    /**
-     * Information whether test mode is enabled or not.
-     */
-    private boolean testMode;
+	/**
+	 * Information whether test mode is enabled or not.
+	 */
+	private boolean testMode;
 
-    @Override
-    public void setAuxilaryInformationData(byte[] auxilaryInformationData) {
-        if (auxilaryInformationData == null || auxilaryInformationData.length < 1 || auxilaryInformationData.length > 4) {
-            throw new IllegalArgumentException("Auxilary information data must consists of 1 to 4 bytes");
-        }
+	@Override
+	public void setAuxilaryInformationData(byte[] auxilaryInformationData) {
+		if (auxilaryInformationData == null || auxilaryInformationData.length < 1 || auxilaryInformationData.length > 4) {
+			throw new IllegalArgumentException("Auxilary information data must consists of 1 to 4 bytes");
+		}
 
-        this.testMode = TypeConverter.isBitSetOnPosition(0, auxilaryInformationData[0]);
-    }
+		this.testMode = TypeConverter.isBitSetOnPosition(0, auxilaryInformationData[0]);
+	}
 
-    /**
-     * 
-     * @return true if the test mode is enabled otherwise false
-     */
-    public boolean isTestMode() {
-        return testMode;
-    }
+	/**
+	 * @return true if the test mode is enabled otherwise false
+	 */
+	public boolean isTestMode() {
+		return testMode;
+	}
 }

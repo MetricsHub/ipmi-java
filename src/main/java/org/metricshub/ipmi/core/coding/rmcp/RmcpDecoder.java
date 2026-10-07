@@ -29,58 +29,58 @@ import org.metricshub.ipmi.core.common.TypeConverter;
  */
 public final class RmcpDecoder {
 
-    private RmcpDecoder() {
-    }
+	private RmcpDecoder() {}
 
-    /**
-     * Decodes the RMCP packet from raw data.
-     * @param rawMessage
-     * - packet data in a byte form
-     * @return RMCPMessage
-     * @throws IllegalArgumentException
-     * - occurs when message is too short or contains invalid data
-     */
-    public static RmcpMessage decode(byte[] rawMessage) {
-        RmcpMessage message = new RmcpMessage();
+	/**
+	 * Decodes the RMCP packet from raw data.
+	 *
+	 * @param rawMessage
+	 *        - packet data in a byte form
+	 * @return RMCPMessage
+	 * @throws IllegalArgumentException
+	 *         - occurs when message is too short or contains invalid data
+	 */
+	public static RmcpMessage decode(byte[] rawMessage) {
+		RmcpMessage message = new RmcpMessage();
 
-        if (rawMessage.length < 4) {
-            throw new IllegalArgumentException("Message is corrupted");
-        }
+		if (rawMessage.length < 4) {
+			throw new IllegalArgumentException("Message is corrupted");
+		}
 
-        message.setVersion(decodeVersion(rawMessage[0]));
+		message.setVersion(decodeVersion(rawMessage[0]));
 
-        // byte 1 is reserved
+		// byte 1 is reserved
 
-        message.setSequenceNumber(decodeSequenceNumber(rawMessage[2]));
+		message.setSequenceNumber(decodeSequenceNumber(rawMessage[2]));
 
-        message.setClassOfMessage(decodeClassOfMessage(rawMessage[3]));
+		message.setClassOfMessage(decodeClassOfMessage(rawMessage[3]));
 
-        message.setData(decodeData(rawMessage));
+		message.setData(decodeData(rawMessage));
 
-        return message;
-    }
+		return message;
+	}
 
-    private static RmcpVersion decodeVersion(byte version) {
-        if (version == RmcpConstants.RMCP_V1_0) {
-            return RmcpVersion.RMCP1_0;
-        }
+	private static RmcpVersion decodeVersion(byte version) {
+		if (version == RmcpConstants.RMCP_V1_0) {
+			return RmcpVersion.RMCP1_0;
+		}
 
-        throw new IllegalArgumentException("Illegal RMCP version");
-    }
+		throw new IllegalArgumentException("Illegal RMCP version");
+	}
 
-    private static int decodeSequenceNumber(byte sequenceNumber) {
-        return TypeConverter.byteToInt(sequenceNumber);
-    }
+	private static int decodeSequenceNumber(byte sequenceNumber) {
+		return TypeConverter.byteToInt(sequenceNumber);
+	}
 
-    private static RmcpClassOfMessage decodeClassOfMessage(byte classOfMessage) {
-        return RmcpClassOfMessage.parseInt(TypeConverter.byteToInt(classOfMessage) & 0x9f); 
-        // bits 5 and 6 are reserved so we need to get rid of them
-    }
+	private static RmcpClassOfMessage decodeClassOfMessage(byte classOfMessage) {
+		return RmcpClassOfMessage.parseInt(TypeConverter.byteToInt(classOfMessage) & 0x9f);
+		// bits 5 and 6 are reserved so we need to get rid of them
+	}
 
-    private static byte[] decodeData(byte[] rawMessage) {
-        byte[] data = new byte[rawMessage.length - 4];
-        System.arraycopy(rawMessage, 4, data, 0, data.length);
-        return data;
-    }
+	private static byte[] decodeData(byte[] rawMessage) {
+		byte[] data = new byte[rawMessage.length - 4];
+		System.arraycopy(rawMessage, 4, data, 0, data.length);
+		return data;
+	}
 
 }

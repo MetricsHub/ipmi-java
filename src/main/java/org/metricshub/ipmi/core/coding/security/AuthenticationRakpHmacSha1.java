@@ -26,9 +26,9 @@ package org.metricshub.ipmi.core.coding.security;
  * RAKP-HMAC-SHA1 authentication algorithm.
  */
 public class AuthenticationRakpHmacSha1 extends AuthenticationAlgorithm {
-	
+
 	private static final String ALGORITHM_NAME = "HmacSHA1";
-	
+
 	/**
 	 * Initiates RAKP-HMAC-SHA1 authentication algorithm.
 	 */

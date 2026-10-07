@@ -29,51 +29,51 @@ import org.metricshub.ipmi.core.common.TypeConverter;
  */
 public class OemInfo extends MultiRecordInfo {
 
-    private int manufacturerId;
+	private int manufacturerId;
 
-    private byte[] oemData;
+	private byte[] oemData;
 
-    /**
-     * Creates and populates record
-     *
-     * @param fruData
-     *            - raw data containing record
-     * @param offset
-     *            - offset to the record in the data
-     * @param length
-     *            - length of the record
-     */
-    public OemInfo(byte[] fruData, int offset, int length) {
-        super();
-        // TODO: Test when server containing such records will be available
+	/**
+	 * Creates and populates record
+	 *
+	 * @param fruData
+	 *        - raw data containing record
+	 * @param offset
+	 *        - offset to the record in the data
+	 * @param length
+	 *        - length of the record
+	 */
+	public OemInfo(byte[] fruData, int offset, int length) {
+		super();
+		// TODO: Test when server containing such records will be available
 
-        byte[] buffer = new byte[4];
+		byte[] buffer = new byte[4];
 
-        System.arraycopy(fruData, offset, buffer, 0, 3);
-        buffer[3] = 0;
+		System.arraycopy(fruData, offset, buffer, 0, 3);
+		buffer[3] = 0;
 
-        manufacturerId = TypeConverter.littleEndianByteArrayToInt(buffer);
+		manufacturerId = TypeConverter.littleEndianByteArrayToInt(buffer);
 
-        oemData = new byte[length - 3];
+		oemData = new byte[length - 3];
 
-        System.arraycopy(fruData, offset+3, oemData, 0, length-3);
+		System.arraycopy(fruData, offset + 3, oemData, 0, length - 3);
 
-    }
+	}
 
-    public int getManufacturerId() {
-        return manufacturerId;
-    }
+	public int getManufacturerId() {
+		return manufacturerId;
+	}
 
-    public void setManufacturerId(int manufacturerId) {
-        this.manufacturerId = manufacturerId;
-    }
+	public void setManufacturerId(int manufacturerId) {
+		this.manufacturerId = manufacturerId;
+	}
 
-    public byte[] getOemData() {
-        return oemData;
-    }
+	public byte[] getOemData() {
+		return oemData;
+	}
 
-    public void setOemData(byte[] oemData) {
-        this.oemData = oemData;
-    }
+	public void setOemData(byte[] oemData) {
+		this.oemData = oemData;
+	}
 
 }

@@ -31,23 +31,23 @@ import org.metricshub.ipmi.core.sm.states.SessionValid;
  * Acknowledges starting the session after receiving RAKP Message 4 (
  * {@link StateMachine} transits from {@link Rakp3Complete} to
  * {@link SessionValid})
- * 
+ *
  * @see StateMachine
  */
 public class StartSession extends StateMachineEvent {
-    private CipherSuite cipherSuite;
-    private int sessionId;
+	private CipherSuite cipherSuite;
+	private int sessionId;
 
-    public StartSession(CipherSuite cipherSuite, int sessionId) {
-        this.cipherSuite = cipherSuite;
-        this.sessionId = sessionId;
-    }
+	public StartSession(CipherSuite cipherSuite, int sessionId) {
+		this.cipherSuite = cipherSuite;
+		this.sessionId = sessionId;
+	}
 
-    public CipherSuite getCipherSuite() {
-        return cipherSuite;
-    }
+	public CipherSuite getCipherSuite() {
+		return cipherSuite;
+	}
 
-    public int getSessionId() {
-        return sessionId;
-    }
+	public int getSessionId() {
+		return sessionId;
+	}
 }

@@ -23,9 +23,9 @@ package org.metricshub.ipmi.core.coding.commands;
  */
 
 public enum PrivilegeLevel {
-    Callback,
-    User,
-    Operator,
-    Administrator,
-    MaximumAvailable
+	Callback,
+	User,
+	Operator,
+	Administrator,
+	MaximumAvailable
 }

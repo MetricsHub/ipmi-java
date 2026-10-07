@@ -113,8 +113,11 @@ public class GetSensorsRunner extends AbstractIpmiRunner<List<Sensor>> {
 				// happen many times during getting all sensors, since BMC can't
 				// manage parallel sessions and invalidates old one if new one
 				// appears.
-				reservationId = ((ReserveSdrRepositoryResponseData) connector.sendMessage(handle,
-						new ReserveSdrRepository(IpmiVersion.V20, handle.getCipherSuite(), AuthenticationType.RMCPPlus))).getReservationId();
+				reservationId = ((ReserveSdrRepositoryResponseData) connector
+						.sendMessage(
+								handle,
+								new ReserveSdrRepository(IpmiVersion.V20, handle.getCipherSuite(), AuthenticationType.RMCPPlus)))
+						.getReservationId();
 			}
 
 		}
@@ -124,8 +127,8 @@ public class GetSensorsRunner extends AbstractIpmiRunner<List<Sensor>> {
 
 	/**
 	 * Build the states representation formatted as the following deviceName=state1|deviceName=state2|...
-	 * 
-	 * @param data         The sensor reading data containing the sensor parameter value and the states
+	 *
+	 * @param data The sensor reading data containing the sensor parameter value and the states
 	 * @param sensorRecord The sensor record we wish to process {@link CompactSensorRecord} or {@link FullSensorRecord}
 	 * @return String value
 	 */
@@ -147,8 +150,10 @@ public class GetSensorsRunner extends AbstractIpmiRunner<List<Sensor>> {
 					return buildOemState(data.getRaw(), deviceName);
 				}
 
-				events = data.getStatesAsserted(compactSensorRecord.getSensorType(),
-						compactSensorRecord.getEventReadingType());
+				events = data
+						.getStatesAsserted(
+								compactSensorRecord.getSensorType(),
+								compactSensorRecord.getEventReadingType());
 			} else {
 
 				FullSensorRecord fullSensorRecord = (FullSensorRecord) sensorRecord;
@@ -159,8 +164,10 @@ public class GetSensorsRunner extends AbstractIpmiRunner<List<Sensor>> {
 					return buildOemState(data.getRaw(), deviceName);
 				}
 
-				events = data.getStatesAsserted(fullSensorRecord.getSensorType(),
-						fullSensorRecord.getEventReadingType());
+				events = data
+						.getStatesAsserted(
+								fullSensorRecord.getSensorType(),
+								fullSensorRecord.getEventReadingType());
 			}
 
 			return appendReadingTypes(events, deviceName);
@@ -172,7 +179,7 @@ public class GetSensorsRunner extends AbstractIpmiRunner<List<Sensor>> {
 
 	/**
 	 * Build the state for oem event reading type (0x7f)
-	 * 
+	 *
 	 * @param raw a byte array of the raw IPMI command data
 	 * @param deviceName the name of the device
 	 * @return a string value of the state in a format of deviceName"=0x"+raw[3]+raw[2]
@@ -187,9 +194,9 @@ public class GetSensorsRunner extends AbstractIpmiRunner<List<Sensor>> {
 
 	/**
 	 * Append event reading type values
-	 * 
+	 *
 	 * @param readingTypes The list of reading type events
-	 * @param deviceName   The name of the device
+	 * @param deviceName The name of the device
 	 * @return String value formatted as deviceName=state1|deviceName=state2|...deviceName=stateN
 	 */
 	private static String appendReadingTypes(final List<ReadingType> readingTypes, final String deviceName) {
@@ -206,8 +213,8 @@ public class GetSensorsRunner extends AbstractIpmiRunner<List<Sensor>> {
 
 	/**
 	 * Create a state entry format as <em>deviceName=readingTypeDescription</em>
-	 * 
-	 * @param deviceName  The name of the device
+	 *
+	 * @param deviceName The name of the device
 	 * @param readingType The reading type event (asserted state)
 	 * @return String value or <code>null</code> if the reading type description is not found
 	 */
@@ -218,17 +225,24 @@ public class GetSensorsRunner extends AbstractIpmiRunner<List<Sensor>> {
 
 	/**
 	 * Using the given reading id run the GetSensorReading request to get reading data
-	 * 
+	 *
 	 * @param recordReadingId the reading identifier of the sensor record
 	 * @return {@link GetSensorReadingResponseData} instance
 	 * @throws Exception at sendMessage or if the error completion code is not DataNotPresent
 	 */
 	private GetSensorReadingResponseData getSensorRecordReading(final int recordReadingId) throws Exception {
 		try {
-			// If we have a reading id means the reading data (e.g. temperature) is potentially available so let's perform the re
+			// If we have a reading id means the reading data (e.g. temperature) is potentially available so let's perform the
+			// re
 			if (recordReadingId >= 0) {
-				return (GetSensorReadingResponseData) connector.sendMessage(handle,
-						new GetSensorReading(IpmiVersion.V20, handle.getCipherSuite(), AuthenticationType.RMCPPlus, recordReadingId));
+				return (GetSensorReadingResponseData) connector
+						.sendMessage(
+								handle,
+								new GetSensorReading(
+										IpmiVersion.V20,
+										handle.getCipherSuite(),
+										AuthenticationType.RMCPPlus,
+										recordReadingId));
 
 			}
 		} catch (IPMIException e) {
@@ -241,7 +255,7 @@ public class GetSensorsRunner extends AbstractIpmiRunner<List<Sensor>> {
 
 	/**
 	 * Get the reading id which is required by the BMC to answer reading commands.
-	 * 
+	 *
 	 * @param sensorRecord {@link SensorRecord} instance expected as Full or Compact.
 	 * @return The sensor number of the record otherwise -1 if cannot determine the record type.
 	 */

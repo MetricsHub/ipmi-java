@@ -32,41 +32,39 @@ import org.metricshub.ipmi.core.sm.states.State;
  * {@link SessionValid} {@link State} to send
  * {@link GetChannelAuthenticationCapabilities} to the BMC in order to keep up
  * the session.
- * 
+ *
  * @see StateMachine
  */
 public class SessionUpkeep extends StateMachineEvent {
-    private int sessionId;
-    private int messageSequenceNumber;
-    private int sessionSequenceNumber;
+	private int sessionId;
+	private int messageSequenceNumber;
+	private int sessionSequenceNumber;
 
-    /**
-     * Prepares {@link SessionUpkeep}
-     *
-     * @param sessionId
-     *            - managed system session ID
-     *
-     * @param messageSequenceNumber
-     *            - generated payload sequence number for the message to send
-     *
-     * @param sessionSequenceNumber
-     *             - generated session sequence number for the message to send.
-     */
-    public SessionUpkeep(int sessionId, int messageSequenceNumber, int sessionSequenceNumber) {
-        this.messageSequenceNumber = messageSequenceNumber;
-        this.sessionSequenceNumber = sessionSequenceNumber;
-        this.sessionId = sessionId;
-    }
+	/**
+	 * Prepares {@link SessionUpkeep}
+	 *
+	 * @param sessionId
+	 *        - managed system session ID
+	 * @param messageSequenceNumber
+	 *        - generated payload sequence number for the message to send
+	 * @param sessionSequenceNumber
+	 *        - generated session sequence number for the message to send.
+	 */
+	public SessionUpkeep(int sessionId, int messageSequenceNumber, int sessionSequenceNumber) {
+		this.messageSequenceNumber = messageSequenceNumber;
+		this.sessionSequenceNumber = sessionSequenceNumber;
+		this.sessionId = sessionId;
+	}
 
-    public int getSessionId() {
-        return sessionId;
-    }
+	public int getSessionId() {
+		return sessionId;
+	}
 
-    public int getMessageSequenceNumber() {
-        return messageSequenceNumber;
-    }
+	public int getMessageSequenceNumber() {
+		return messageSequenceNumber;
+	}
 
-    public int getSessionSequenceNumber() {
-        return sessionSequenceNumber;
-    }
+	public int getSessionSequenceNumber() {
+		return sessionSequenceNumber;
+	}
 }

@@ -55,10 +55,12 @@ public abstract class AbstractIpmiRunner<T> implements AutoCloseable, Callable<T
 	private static final int DEFAULT_LOCAL_UDP_PORT = 0;
 
 	/**
-	 * This is the value of Last Record ID (FFFFh). In order to retrieve the full set of SDR records, client must repeat reading SDR records
-	 * until MAX_REPO_RECORD_ID is returned as next record ID. For further information see section 33.12 of the IPMI specification ver. 2.0
+	 * This is the value of Last Record ID (FFFFh). In order to retrieve the full set of SDR records, client must repeat
+	 * reading SDR records
+	 * until MAX_REPO_RECORD_ID is returned as next record ID. For further information see section 33.12 of the IPMI
+	 * specification ver. 2.0
 	 */
-	protected static final int MAX_REPO_RECORD_ID =  65535; 
+	protected static final int MAX_REPO_RECORD_ID = 65535;
 
 	/**
 	 * Size of the initial GetSdr message to get record header and size
@@ -66,7 +68,8 @@ public abstract class AbstractIpmiRunner<T> implements AutoCloseable, Callable<T
 	protected static final int INITIAL_CHUNK_SIZE = 8;
 
 	/**
-	 * Chunk size depending on buffer size of the IPMI server. Bigger values will improve performance. If server is returning "Cannot return
+	 * Chunk size depending on buffer size of the IPMI server. Bigger values will improve performance. If server is
+	 * returning "Cannot return
 	 * number of requested data bytes." error during GetSdr command, CHUNK_SIZE should be decreased.
 	 */
 	protected static final int CHUNK_SIZE = 16;
@@ -77,7 +80,6 @@ public abstract class AbstractIpmiRunner<T> implements AutoCloseable, Callable<T
 	protected static final int HEADER_SIZE = 5;
 
 	protected IpmiClientConfiguration ipmiConfiguration;
-
 
 	protected IpmiConnector connector;
 	protected ConnectionHandle handle;
@@ -91,7 +93,7 @@ public abstract class AbstractIpmiRunner<T> implements AutoCloseable, Callable<T
 	/**
 	 * Create the {@link IpmiConnector} instance, perform the authentication if required then start the session. <br>
 	 * This method will instantiate the internal fields: <em></em>
-	 * 
+	 *
 	 * @throws Exception If an error occurs when starting the session
 	 */
 	protected void startSession() throws Exception {
@@ -104,30 +106,40 @@ public abstract class AbstractIpmiRunner<T> implements AutoCloseable, Callable<T
 		if (!ipmiConfiguration.isSkipAuth()) {
 			authenticate();
 		} else {
-			handle = connector.createConnection(InetAddress.getByName(ipmiConfiguration.getHostname()),
-					ipmiConfiguration.getPort(), Connection.getDefaultCipherSuite(), PrivilegeLevel.User);
+			handle = connector
+					.createConnection(
+							InetAddress.getByName(ipmiConfiguration.getHostname()),
+							ipmiConfiguration.getPort(),
+							Connection.getDefaultCipherSuite(),
+							PrivilegeLevel.User);
 		}
 
 		// Start the session, provide user name and password, and optionally the
 		// BMC key (only if the remote host has two-key authentication enabled,
 		// otherwise this parameter should be null)
-		connector.openSession(handle, ipmiConfiguration.getUsername(),
-				String.valueOf(ipmiConfiguration.getPassword()), ipmiConfiguration.getBmcKey());
+		connector
+				.openSession(
+						handle,
+						ipmiConfiguration.getUsername(),
+						String.valueOf(ipmiConfiguration.getPassword()),
+						ipmiConfiguration.getBmcKey());
 	}
 
 	/**
 	 * Authenticate IPMI
-	 * 
+	 *
 	 * @throws Exception If the authentication fails
 	 */
-	public void authenticate() throws Exception  {
+	public void authenticate() throws Exception {
 		// Create the connection and get the handle, specify IP address of the
 		// remote host. The connection is being registered in ConnectionManager,
 		// the handle will be needed to identify it among other connections
 		// (target IP address isn't enough, since we can handle multiple
 		// connections to the same host)
-		handle = connector.createConnection(InetAddress.getByName(ipmiConfiguration.getHostname()),
-				ipmiConfiguration.getPort());
+		handle = connector
+				.createConnection(
+						InetAddress.getByName(ipmiConfiguration.getHostname()),
+						ipmiConfiguration.getPort());
 
 		// Get available cipher suites list via getAvailableCipherSuites and
 		// pick one of them that will be used further in the session.
@@ -140,12 +152,12 @@ public abstract class AbstractIpmiRunner<T> implements AutoCloseable, Callable<T
 
 	/**
 	 * Get the available cipher suite. Get the last available if many cipher suites coexist.<br>
-	 * 
+	 *
 	 * @return {@link CipherSuite} instance
 	 * @throws Exception when sending message to the managed system fails or suites not found
 	 */
 	protected CipherSuite getAvailableCipherSuite() throws Exception {
-	
+
 		// Get cipher suites supported by the remote host
 		List<CipherSuite> suites = connector.getAvailableCipherSuites(handle);
 
@@ -182,9 +194,11 @@ public abstract class AbstractIpmiRunner<T> implements AutoCloseable, Callable<T
 
 	/**
 	 * Using the reservation id, get the {@link SensorRecord} instance by running a GetSdr IPMI request.<br>
-	 * When the {@link SensorRecord} cannot be fetched using one request we try a second method, see <em>getSensorViaChunks</em>
-	 * 
-	 * @param reservationId The reservation identifier that needs to be sent to the BMC so that it handles correctly the request
+	 * When the {@link SensorRecord} cannot be fetched using one request we try a second method, see
+	 * <em>getSensorViaChunks</em>
+	 *
+	 * @param reservationId The reservation identifier that needs to be sent to the BMC so that it handles correctly the
+	 *        request
 	 * @return {@link SensorRecord} instance
 	 * @throws Exception at sendMessage or if the error completion code is CannotRespond or UnspecifiedError
 	 */
@@ -193,8 +207,15 @@ public abstract class AbstractIpmiRunner<T> implements AutoCloseable, Callable<T
 			// BMC capabilities are limited - that means that sometimes the
 			// record size exceeds maximum size of the message. Since we don't
 			// know what is the size of the record, we try to get whole one first
-			GetSdrResponseData data = (GetSdrResponseData) connector.sendMessage(handle,
-					new GetSdr(IpmiVersion.V20, handle.getCipherSuite(), AuthenticationType.RMCPPlus, reservationId, nextRecId));
+			GetSdrResponseData data = (GetSdrResponseData) connector
+					.sendMessage(
+							handle,
+							new GetSdr(
+									IpmiVersion.V20,
+									handle.getCipherSuite(),
+									AuthenticationType.RMCPPlus,
+									reservationId,
+									nextRecId));
 
 			// Some BMCs answer with success but return fewer bytes than the
 			// record length declared in the header: fall back to the chunked
@@ -214,7 +235,8 @@ public abstract class AbstractIpmiRunner<T> implements AutoCloseable, Callable<T
 			// The following error codes mean that record is too large to be
 			// sent in one chunk. This means we need to split the data in
 			// smaller parts.
-			if (e.getCompletionCode() != CompletionCode.CannotRespond && e.getCompletionCode() != CompletionCode.UnspecifiedError) {
+			if (e.getCompletionCode() != CompletionCode.CannotRespond
+					&& e.getCompletionCode() != CompletionCode.UnspecifiedError) {
 				throw e;
 			}
 
@@ -226,22 +248,38 @@ public abstract class AbstractIpmiRunner<T> implements AutoCloseable, Callable<T
 	}
 
 	/**
-	 * Get SDR (sensor data record) by chunks of {@link #CHUNK_SIZE} bytes. We get the full record size from the first request, then
+	 * Get SDR (sensor data record) by chunks of {@link #CHUNK_SIZE} bytes. We get the full record size from the first
+	 * request, then
 	 * we query the IPMI interface to get the remaining parts.
-	 * 
-	 * @param reservationId The reservation identifier that needs to be sent to the BMC so that it handles correctly the request
+	 *
+	 * @param reservationId The reservation identifier that needs to be sent to the BMC so that it handles correctly the
+	 *        request
 	 * @return {@link SensorRecord} instance
 	 * @throws Exception if one of the sendMessage calls fails
 	 */
 	protected SensorRecord getSensorViaChunks(int reservationId) throws Exception {
 		// First we get the header of the record to find out its size.
-		GetSdrResponseData data = (GetSdrResponseData) connector.sendMessage(handle, new GetSdr(IpmiVersion.V20, handle.getCipherSuite(),
-				AuthenticationType.RMCPPlus, reservationId, nextRecId, 0, INITIAL_CHUNK_SIZE));
+		GetSdrResponseData data = (GetSdrResponseData) connector
+				.sendMessage(
+						handle,
+						new GetSdr(
+								IpmiVersion.V20,
+								handle.getCipherSuite(),
+								AuthenticationType.RMCPPlus,
+								reservationId,
+								nextRecId,
+								0,
+								INITIAL_CHUNK_SIZE));
 
 		byte[] header = data.getSensorRecordData();
 		if (header == null || header.length < HEADER_SIZE) {
-			LOGGER.warn("Skipping SDR record {} on {}: BMC returned {} byte(s) instead of the {}-byte header", nextRecId,
-					ipmiConfiguration.getHostname(), header == null ? 0 : header.length, HEADER_SIZE);
+			LOGGER
+					.warn(
+							"Skipping SDR record {} on {}: BMC returned {} byte(s) instead of the {}-byte header",
+							nextRecId,
+							ipmiConfiguration.getHostname(),
+							header == null ? 0 : header.length,
+							HEADER_SIZE);
 			nextRecId = data.getNextRecordId();
 			return null;
 		}
@@ -265,14 +303,27 @@ public abstract class AbstractIpmiRunner<T> implements AutoCloseable, Callable<T
 				bytesToRead = recSize - read;
 			}
 
-			GetSdrResponseData part = (GetSdrResponseData) connector.sendMessage(handle, new GetSdr(IpmiVersion.V20, handle.getCipherSuite(),
-					AuthenticationType.RMCPPlus, reservationId, nextRecId, read, bytesToRead));
+			GetSdrResponseData part = (GetSdrResponseData) connector
+					.sendMessage(
+							handle,
+							new GetSdr(
+									IpmiVersion.V20,
+									handle.getCipherSuite(),
+									AuthenticationType.RMCPPlus,
+									reservationId,
+									nextRecId,
+									read,
+									bytesToRead));
 
 			byte[] chunk = part.getSensorRecordData();
 			int got = chunk == null ? 0 : Math.min(bytesToRead, chunk.length);
 			if (got == 0) {
-				LOGGER.warn("Skipping SDR record {} on {}: BMC returned no data at offset {}", nextRecId,
-						ipmiConfiguration.getHostname(), read);
+				LOGGER
+						.warn(
+								"Skipping SDR record {} on {}: BMC returned no data at offset {}",
+								nextRecId,
+								ipmiConfiguration.getHostname(),
+								read);
 				nextRecId = data.getNextRecordId();
 				return null;
 			}
@@ -300,7 +351,12 @@ public abstract class AbstractIpmiRunner<T> implements AutoCloseable, Callable<T
 		try {
 			return SensorRecord.populateSensorRecord(recordData);
 		} catch (RuntimeException e) {
-			LOGGER.warn("Skipping undecodable SDR record before id {} on {}: {}", nextRecId, ipmiConfiguration.getHostname(), e.getMessage());
+			LOGGER
+					.warn(
+							"Skipping undecodable SDR record before id {} on {}: {}",
+							nextRecId,
+							ipmiConfiguration.getHostname(),
+							e.getMessage());
 			return null;
 		}
 	}

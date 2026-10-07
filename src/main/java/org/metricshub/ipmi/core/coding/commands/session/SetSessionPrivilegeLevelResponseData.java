@@ -25,5 +25,5 @@ package org.metricshub.ipmi.core.coding.commands.session;
 import org.metricshub.ipmi.core.coding.commands.ResponseData;
 
 public class SetSessionPrivilegeLevelResponseData implements ResponseData {
-    
+
 }

@@ -24,40 +24,40 @@ package org.metricshub.ipmi.core.coding.commands.sdr.record;
 
 public enum ModifierUnitUsage {
 
-    None(ModifierUnitUsage.NONE),
-    /**
-     * Unit = Basic Unit / Modifier Unit
-     */
-    Divide(ModifierUnitUsage.DIVIDE),
-    /**
-     * Unit = Basic Unit * Modifier Unit
-     */
-    Mulitply(ModifierUnitUsage.MULITPLY), ;
+	None(ModifierUnitUsage.NONE),
+	/**
+	 * Unit = Basic Unit / Modifier Unit
+	 */
+	Divide(ModifierUnitUsage.DIVIDE),
+	/**
+	 * Unit = Basic Unit * Modifier Unit
+	 */
+	Mulitply(ModifierUnitUsage.MULITPLY),;
 
-    private static final int NONE = 0;
-    private static final int DIVIDE = 1;
-    private static final int MULITPLY = 2;
+	private static final int NONE = 0;
+	private static final int DIVIDE = 1;
+	private static final int MULITPLY = 2;
 
-    private int code;
+	private int code;
 
-    ModifierUnitUsage(int code) {
-        this.code = code;
-    }
+	ModifierUnitUsage(int code) {
+		this.code = code;
+	}
 
-    public int getCode() {
-        return code;
-    }
+	public int getCode() {
+		return code;
+	}
 
-    public static ModifierUnitUsage parseInt(int value) {
-        switch (value) {
-        case NONE:
-            return None;
-        case DIVIDE:
-            return Divide;
-        case MULITPLY:
-            return Mulitply;
-        default:
-            throw new IllegalArgumentException("Invalid value: " + value);
-        }
-    }
+	public static ModifierUnitUsage parseInt(int value) {
+		switch (value) {
+		case NONE:
+			return None;
+		case DIVIDE:
+			return Divide;
+		case MULITPLY:
+			return Mulitply;
+		default:
+			throw new IllegalArgumentException("Invalid value: " + value);
+		}
+	}
 }

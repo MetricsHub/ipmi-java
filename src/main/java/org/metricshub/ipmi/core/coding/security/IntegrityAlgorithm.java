@@ -54,7 +54,7 @@ public abstract class IntegrityAlgorithm {
 
 	/**
 	 * Constructs an integrity algorithm with the provided MAC.
-	 * 
+	 *
 	 * @param mac the MAC instance to use
 	 */
 	private IntegrityAlgorithm(Mac mac) {
@@ -65,12 +65,12 @@ public abstract class IntegrityAlgorithm {
 	 * Initializes Integrity Algorithm
 	 *
 	 * @param sik - Session Integrity Key calculated during the opening of the
-	 *            session or user password if 'one-key' logins are enabled.
+	 *        session or user password if 'one-key' logins are enabled.
 	 */
 	public void initialize(byte[] sik) throws InvalidKeyException {
 		this.sik = sik;
 		final String algorithmName = getAlgorithmName();
-		
+
 		SecretKeySpec k1 = new SecretKeySpec(sik, algorithmName);
 
 		mac.init(k1);
@@ -88,9 +88,8 @@ public abstract class IntegrityAlgorithm {
 	 * Creates AuthCode field for message.
 	 *
 	 * @param base - data starting with the AuthType/Format field up to and
-	 *             including the field that immediately precedes the AuthCode field
+	 *        including the field that immediately precedes the AuthCode field
 	 * @return AuthCode field. Might be null if empty AuthCOde field is generated.
-	 *
 	 * @see Rakp1#calculateSik(org.metricshub.ipmi.core.coding.commands.session.Rakp1ResponseData)
 	 */
 	public byte[] generateAuthCode(final byte[] base) {
@@ -98,7 +97,7 @@ public abstract class IntegrityAlgorithm {
 		if (sik == null) {
 			throw new NullPointerException("Algorithm not initialized.");
 		}
-		
+
 		final int authCodeLength = getAuthCodeLength();
 		final byte[] result = new byte[authCodeLength];
 		byte[] updatedBase;
@@ -118,7 +117,7 @@ public abstract class IntegrityAlgorithm {
 	 * Modifies the algorithm base since with null Auth Code during encoding
 	 * Integrity Pad isn't calculated.
 	 *
-	 * @param base           - integrity algorithm base without Integrity Pad.
+	 * @param base - integrity algorithm base without Integrity Pad.
 	 * @param authCodeLength - expected length of the Auth Code field.
 	 * @return - integrity algorithm base with Integrity Pad and updated Pad Length
 	 *         field.

@@ -29,29 +29,29 @@ import org.metricshub.ipmi.core.coding.commands.ResponseData;
  */
 public class GetSelEntryResponseData implements ResponseData {
 
-    /**
-     * ID of the next record in the repository.
-     */
-    private int nextRecordId;
+	/**
+	 * ID of the next record in the repository.
+	 */
+	private int nextRecordId;
 
-    /**
-     * Sensor record data
-     */
-    private SelRecord selRecord;
+	/**
+	 * Sensor record data
+	 */
+	private SelRecord selRecord;
 
-    public void setNextRecordId(int nextRecordId) {
-        this.nextRecordId = nextRecordId;
-    }
+	public void setNextRecordId(int nextRecordId) {
+		this.nextRecordId = nextRecordId;
+	}
 
-    public int getNextRecordId() {
-        return nextRecordId;
-    }
+	public int getNextRecordId() {
+		return nextRecordId;
+	}
 
-    public void setSelRecord(SelRecord selRecord) {
-        this.selRecord = selRecord;
-    }
+	public void setSelRecord(SelRecord selRecord) {
+		this.selRecord = selRecord;
+	}
 
-    public SelRecord getSelRecord() {
-        return selRecord;
-    }
+	public SelRecord getSelRecord() {
+		return selRecord;
+	}
 }

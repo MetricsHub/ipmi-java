@@ -33,65 +33,66 @@ import java.util.Set;
  */
 public class SolResponseData implements ResponseData {
 
-    /**
-     * Sequence number of corresponding request message.
-     */
-    private final byte requestSequenceNumber;
+	/**
+	 * Sequence number of corresponding request message.
+	 */
+	private final byte requestSequenceNumber;
 
-    /**
-     * Information if corresponding message was ACKd or NACKd by remote system.
-     */
-    private final SolAckState acknowledgeState;
+	/**
+	 * Information if corresponding message was ACKd or NACKd by remote system.
+	 */
+	private final SolAckState acknowledgeState;
 
-    /**
-     * Set of statuses returned by the remote system in a response for corresponging message.
-     */
-    private final Set<SolStatus> statuses;
+	/**
+	 * Set of statuses returned by the remote system in a response for corresponging message.
+	 */
+	private final Set<SolStatus> statuses;
 
-    /**
-     * Number of characters accepted from the corresponding message.
-     */
-    private final byte acceptedCharactersNumber;
+	/**
+	 * Number of characters accepted from the corresponding message.
+	 */
+	private final byte acceptedCharactersNumber;
 
-    /**
-     * Creates new instance of {@link SolResponseData} filled with given data.
-     *
-     * @param acknowledgeState
-     *          Acknowledge status for corresponding request message
-     * @param statuses
-     *          Set of statuses
-     */
-    public SolResponseData(byte requestSequenceNumber, SolAckState acknowledgeState, Set<SolStatus> statuses, byte acceptedCharactersNumber) {
-        this.requestSequenceNumber = requestSequenceNumber;
-        this.acknowledgeState = acknowledgeState;
-        this.statuses = statuses;
-        this.acceptedCharactersNumber = acceptedCharactersNumber;
-    }
+	/**
+	 * Creates new instance of {@link SolResponseData} filled with given data.
+	 *
+	 * @param acknowledgeState
+	 *        Acknowledge status for corresponding request message
+	 * @param statuses
+	 *        Set of statuses
+	 */
+	public SolResponseData(byte requestSequenceNumber, SolAckState acknowledgeState, Set<SolStatus> statuses,
+			byte acceptedCharactersNumber) {
+		this.requestSequenceNumber = requestSequenceNumber;
+		this.acknowledgeState = acknowledgeState;
+		this.statuses = statuses;
+		this.acceptedCharactersNumber = acceptedCharactersNumber;
+	}
 
-    public byte getRequestSequenceNumber() {
-        return requestSequenceNumber;
-    }
+	public byte getRequestSequenceNumber() {
+		return requestSequenceNumber;
+	}
 
-    public SolAckState getAcknowledgeState() {
-        return acknowledgeState;
-    }
+	public SolAckState getAcknowledgeState() {
+		return acknowledgeState;
+	}
 
-    public Set<SolStatus> getStatuses() {
-        return statuses;
-    }
+	public Set<SolStatus> getStatuses() {
+		return statuses;
+	}
 
-    public byte getAcceptedCharactersNumber() {
-        return acceptedCharactersNumber;
-    }
+	public byte getAcceptedCharactersNumber() {
+		return acceptedCharactersNumber;
+	}
 
-    @Override
-    public String toString() {
-        final StringBuilder sb = new StringBuilder("SolResponseData{");
-        sb.append("requestSequenceNumber=").append(requestSequenceNumber);
-        sb.append(", acknowledgeState=").append(acknowledgeState);
-        sb.append(", statuses=").append(statuses);
-        sb.append(", acceptedCharactersNumber=").append(acceptedCharactersNumber);
-        sb.append('}');
-        return sb.toString();
-    }
+	@Override
+	public String toString() {
+		final StringBuilder sb = new StringBuilder("SolResponseData{");
+		sb.append("requestSequenceNumber=").append(requestSequenceNumber);
+		sb.append(", acknowledgeState=").append(acknowledgeState);
+		sb.append(", statuses=").append(statuses);
+		sb.append(", acceptedCharactersNumber=").append(acceptedCharactersNumber);
+		sb.append('}');
+		return sb.toString();
+	}
 }

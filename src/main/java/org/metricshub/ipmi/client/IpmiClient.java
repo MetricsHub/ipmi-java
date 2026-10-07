@@ -40,22 +40,22 @@ import org.metricshub.ipmi.core.coding.commands.chassis.GetChassisStatusResponse
  */
 public class IpmiClient {
 
-	private IpmiClient() {
-	}
+	private IpmiClient() {}
 
 	/**
 	 * Run the get Chassis status IPMI request
 	 *
 	 * @param ipmiConfiguration Wraps the IPMI device hostname and the credentials
 	 * @return {@link GetChassisStatusResponseData} instance
-	 *
 	 * @throws InterruptedException
 	 * @throws ExecutionException
 	 * @throws TimeoutException
 	 */
 	public static GetChassisStatusResponseData getChassisStatus(final IpmiClientConfiguration ipmiConfiguration)
-			throws InterruptedException, ExecutionException, TimeoutException {
-		try (GetChassisStatusRunner runner = new GetChassisStatusRunner(ipmiConfiguration)){
+			throws InterruptedException,
+			ExecutionException,
+			TimeoutException {
+		try (GetChassisStatusRunner runner = new GetChassisStatusRunner(ipmiConfiguration)) {
 			return execute(runner, ipmiConfiguration.getTimeout() * 1000);
 		}
 	}
@@ -65,13 +65,14 @@ public class IpmiClient {
 	 *
 	 * @param ipmiConfiguration Wraps the IPMI device hostname and the credentials
 	 * @return List of {@link Sensor} instances
-	 *
 	 * @throws InterruptedException
 	 * @throws ExecutionException
 	 * @throws TimeoutException
 	 */
 	public static List<Sensor> getSensors(final IpmiClientConfiguration ipmiConfiguration)
-			throws InterruptedException, ExecutionException, TimeoutException {
+			throws InterruptedException,
+			ExecutionException,
+			TimeoutException {
 		try (GetSensorsRunner runner = new GetSensorsRunner(ipmiConfiguration)) {
 			return execute(runner, ipmiConfiguration.getTimeout() * 1000);
 		}
@@ -82,13 +83,14 @@ public class IpmiClient {
 	 *
 	 * @param ipmiConfiguration Wraps the IPMI device hostname and the credentials
 	 * @return List of {@link Fru} instances
-	 *
 	 * @throws InterruptedException
 	 * @throws ExecutionException
 	 * @throws TimeoutException
 	 */
 	public static List<Fru> getFrus(final IpmiClientConfiguration ipmiConfiguration)
-			throws InterruptedException, ExecutionException, TimeoutException {
+			throws InterruptedException,
+			ExecutionException,
+			TimeoutException {
 		try (GetFrusRunner runner = new GetFrusRunner(ipmiConfiguration)) {
 			return execute(runner, ipmiConfiguration.getTimeout() * 1000);
 		}
@@ -104,7 +106,9 @@ public class IpmiClient {
 	 * @throws InterruptedException
 	 */
 	public static String getChassisStatusAsStringResult(final IpmiClientConfiguration ipmiConfiguration)
-			throws InterruptedException, ExecutionException, TimeoutException {
+			throws InterruptedException,
+			ExecutionException,
+			TimeoutException {
 		return IpmiResultConverter.convertResult(getChassisStatus(ipmiConfiguration));
 	}
 
@@ -118,7 +122,9 @@ public class IpmiClient {
 	 * @throws InterruptedException
 	 */
 	public static String getFrusAndSensorsAsStringResult(final IpmiClientConfiguration ipmiConfiguration)
-			throws InterruptedException, ExecutionException, TimeoutException {
+			throws InterruptedException,
+			ExecutionException,
+			TimeoutException {
 		return IpmiResultConverter.convertResult(getFrus(ipmiConfiguration), getSensors(ipmiConfiguration));
 	}
 }

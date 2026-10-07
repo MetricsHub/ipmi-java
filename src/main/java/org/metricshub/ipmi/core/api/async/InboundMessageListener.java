@@ -29,23 +29,24 @@ import org.metricshub.ipmi.core.coding.payload.IpmiPayload;
  */
 public interface InboundMessageListener {
 
-    /**
-     * Checks if given payload is supported by this {@link InboundMessageListener} instance.
-     * This method should be called prior to invoking {@link InboundMessageListener#notify(IpmiPayload)}.
-     *
-     * @param payload
-     *          {@link IpmiPayload} instance to check
-     * @return true if payload is supported by this object, false otherwise
-     */
-    boolean isPayloadSupported(IpmiPayload payload);
+	/**
+	 * Checks if given payload is supported by this {@link InboundMessageListener} instance.
+	 * This method should be called prior to invoking {@link InboundMessageListener#notify(IpmiPayload)}.
+	 *
+	 * @param payload
+	 *        {@link IpmiPayload} instance to check
+	 * @return true if payload is supported by this object, false otherwise
+	 */
+	boolean isPayloadSupported(IpmiPayload payload);
 
-    /**
-     * Notify listener about received inbound message.
-     * This method should be invoked only with payload for which {@link InboundMessageListener#isPayloadSupported(IpmiPayload)} returned true.
-     *
-     * @param payload
-     *          payload extracted from inbound message
-     */
-    void notify(IpmiPayload payload);
+	/**
+	 * Notify listener about received inbound message.
+	 * This method should be invoked only with payload for which
+	 * {@link InboundMessageListener#isPayloadSupported(IpmiPayload)} returned true.
+	 *
+	 * @param payload
+	 *        payload extracted from inbound message
+	 */
+	void notify(IpmiPayload payload);
 
 }

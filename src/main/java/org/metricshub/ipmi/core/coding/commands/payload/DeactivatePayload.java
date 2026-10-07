@@ -50,106 +50,114 @@ import java.security.NoSuchAlgorithmException;
  */
 public class DeactivatePayload extends IpmiCommandCoder {
 
-    private static final Logger logger = LoggerFactory.getLogger(DeactivatePayload.class);
+	private static final Logger logger = LoggerFactory.getLogger(DeactivatePayload.class);
 
-    private static final int REQUEST_DATA_LENGTH = 6;
+	private static final int REQUEST_DATA_LENGTH = 6;
 
-    /**
-     * Payload type to be deactivated by this command.
-     */
-    private final PayloadType payloadType;
+	/**
+	 * Payload type to be deactivated by this command.
+	 */
+	private final PayloadType payloadType;
 
-    /**
-     * Number of payload instance to use when activating.
-     */
-    private final int payloadInstance;
+	/**
+	 * Number of payload instance to use when activating.
+	 */
+	private final int payloadInstance;
 
-    public DeactivatePayload(CipherSuite cipherSuite, PayloadType payloadType, int payloadInstance) {
-        super(IpmiVersion.V20, cipherSuite, AuthenticationType.RMCPPlus);
-        this.payloadType = payloadType;
-        this.payloadInstance = payloadInstance;
-    }
+	public DeactivatePayload(CipherSuite cipherSuite, PayloadType payloadType, int payloadInstance) {
+		super(IpmiVersion.V20, cipherSuite, AuthenticationType.RMCPPlus);
+		this.payloadType = payloadType;
+		this.payloadInstance = payloadInstance;
+	}
 
-    @Override
-    public byte getCommandCode() {
-        return CommandCodes.DEACTIVATE_PAYLOAD;
-    }
+	@Override
+	public byte getCommandCode() {
+		return CommandCodes.DEACTIVATE_PAYLOAD;
+	}
 
-    /**
-     * Creates new instance of the {@link DeactivatePayload} command for deactivating given {@link PayloadType}.
-     *
-     * @param payloadType
-     *          payload to be deactivated.
-     */
-    public DeactivatePayload(PayloadType payloadType, int payloadInstance) {
-        this.payloadType = payloadType;
-        this.payloadInstance = payloadInstance;
-    }
+	/**
+	 * Creates new instance of the {@link DeactivatePayload} command for deactivating given {@link PayloadType}.
+	 *
+	 * @param payloadType
+	 *        payload to be deactivated.
+	 */
+	public DeactivatePayload(PayloadType payloadType, int payloadInstance) {
+		this.payloadType = payloadType;
+		this.payloadInstance = payloadInstance;
+	}
 
-    @Override
-    public NetworkFunction getNetworkFunction() {
-        return NetworkFunction.ApplicationRequest;
-    }
+	@Override
+	public NetworkFunction getNetworkFunction() {
+		return NetworkFunction.ApplicationRequest;
+	}
 
-    @Override
-    protected IpmiPayload preparePayload(int sequenceNumber) throws NoSuchAlgorithmException, InvalidKeyException {
-        //We put just 2 bytes into the 6-bytes array, as specification for this command says to leave the rest 4 bytes as zeros
-        byte[] message = MessageComposer.get(REQUEST_DATA_LENGTH)
-                .appendField(TypeConverter.intToByte(payloadType.getCode()))
-                .appendField(TypeConverter.intToByte(payloadInstance))
-                .getMessage();
+	@Override
+	protected IpmiPayload preparePayload(int sequenceNumber) throws NoSuchAlgorithmException, InvalidKeyException {
+		// We put just 2 bytes into the 6-bytes array, as specification for this command says to leave the rest 4 bytes as
+		// zeros
+		byte[] message = MessageComposer
+				.get(REQUEST_DATA_LENGTH)
+				.appendField(TypeConverter.intToByte(payloadType.getCode()))
+				.appendField(TypeConverter.intToByte(payloadInstance))
+				.getMessage();
 
-        return new IpmiLanRequest(getNetworkFunction(), getCommandCode(), message, TypeConverter.intToByte(sequenceNumber));
-    }
+		return new IpmiLanRequest(getNetworkFunction(), getCommandCode(), message, TypeConverter.intToByte(sequenceNumber));
+	}
 
-    @Override
-    public ResponseData getResponseData(IpmiMessage message) throws IPMIException, NoSuchAlgorithmException, InvalidKeyException {
-        if (!isCommandResponse(message)) {
-            throw new IllegalArgumentException("This is not a response for Deactivate Payload command");
-        }
+	@Override
+	public ResponseData getResponseData(IpmiMessage message)
+			throws IPMIException,
+			NoSuchAlgorithmException,
+			InvalidKeyException {
+		if (!isCommandResponse(message)) {
+			throw new IllegalArgumentException("This is not a response for Deactivate Payload command");
+		}
 
-        if (!(message.getPayload() instanceof IpmiLanResponse)) {
-            throw new IllegalArgumentException("Invalid response payload");
-        }
+		if (!(message.getPayload() instanceof IpmiLanResponse)) {
+			throw new IllegalArgumentException("Invalid response payload");
+		}
 
-        CompletionCode completionCode = ((IpmiLanResponse) message.getPayload()).getCompletionCode();
+		CompletionCode completionCode = ((IpmiLanResponse) message.getPayload()).getCompletionCode();
 
-        if (completionCode != CompletionCode.Ok) {
-            DeactivatePayloadCompletionCode specificCompletionCode = DeactivatePayloadCompletionCode.parseInt(completionCode.getCode());
+		if (completionCode != CompletionCode.Ok) {
+			DeactivatePayloadCompletionCode specificCompletionCode = DeactivatePayloadCompletionCode
+					.parseInt(completionCode.getCode());
 
-            if (specificCompletionCode == DeactivatePayloadCompletionCode.PAYLOAD_ALREADY_DEACTIVATED) {
-                logger.warn(specificCompletionCode.getMessage());
-            } else {
-                throw new IPMIException(((IpmiLanResponse) message.getPayload()).getCompletionCode());
-            }
-        }
+			if (specificCompletionCode == DeactivatePayloadCompletionCode.PAYLOAD_ALREADY_DEACTIVATED) {
+				logger.warn(specificCompletionCode.getMessage());
+			} else {
+				throw new IPMIException(((IpmiLanResponse) message.getPayload()).getCompletionCode());
+			}
+		}
 
-        return new DeactivatePayloadResponseData();
-    }
+		return new DeactivatePayloadResponseData();
+	}
 
-    @Override
-    public boolean equals(Object o) {
-        if (this == o) return true;
-        if (o == null || getClass() != o.getClass()) return false;
+	@Override
+	public boolean equals(Object o) {
+		if (this == o)
+			return true;
+		if (o == null || getClass() != o.getClass())
+			return false;
 
-        DeactivatePayload that = (DeactivatePayload) o;
+		DeactivatePayload that = (DeactivatePayload) o;
 
-        if (payloadInstance != that.payloadInstance) {
-            return false;
-        }
+		if (payloadInstance != that.payloadInstance) {
+			return false;
+		}
 
-        if (payloadType != that.payloadType) {
-            return false;
-        }
+		if (payloadType != that.payloadType) {
+			return false;
+		}
 
-        return getCipherSuite().equals(that.getCipherSuite());
-    }
+		return getCipherSuite().equals(that.getCipherSuite());
+	}
 
-    @Override
-    public int hashCode() {
-        int result = payloadInstance;
-        result = 31 * result + payloadType.getCode();
-        result = 31 * result + (getCipherSuite() == null ? 0 : getCipherSuite().hashCode());
-        return result;
-    }
+	@Override
+	public int hashCode() {
+		int result = payloadInstance;
+		result = 31 * result + payloadType.getCode();
+		result = 31 * result + (getCipherSuite() == null ? 0 : getCipherSuite().hashCode());
+		return result;
+	}
 }

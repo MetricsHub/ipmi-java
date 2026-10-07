@@ -1,6 +1,5 @@
 /**
  * The IPMI protocol messages, encoder and decoder.
- * 
  */
 package org.metricshub.ipmi.core.coding.protocol;
 /*-

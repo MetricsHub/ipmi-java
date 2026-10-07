@@ -27,28 +27,28 @@ package org.metricshub.ipmi.core.coding.security;
  */
 public class ConfidentialityNone extends ConfidentialityAlgorithm {
 
-    public ConfidentialityNone() {
-        super();
-    }
+	public ConfidentialityNone() {
+		super();
+	}
 
-    @Override
-    public byte getCode() {
-        return SecurityConstants.CA_NONE;
-    }
+	@Override
+	public byte getCode() {
+		return SecurityConstants.CA_NONE;
+	}
 
-    @Override
-    public byte[] encrypt(byte[] data) {
-        return data;
-    }
+	@Override
+	public byte[] encrypt(byte[] data) {
+		return data;
+	}
 
-    @Override
-    public byte[] decrypt(byte[] data) {
-        return data;
-    }
+	@Override
+	public byte[] decrypt(byte[] data) {
+		return data;
+	}
 
-    @Override
-    public int getConfidentialityOverheadSize(int payloadSize) {
-        return 0;
-    }
+	@Override
+	public int getConfidentialityOverheadSize(int payloadSize) {
+		return 0;
+	}
 
 }

@@ -26,13 +26,13 @@ package org.metricshub.ipmi.core.sm.actions;
  * Returns the Session Integrity Key calculated after receiving RAKP Message 2.
  */
 public class GetSikAction extends StateMachineAction {
-    private byte[] sik;
+	private byte[] sik;
 
-    public GetSikAction(byte[] sik) {
-        this.sik = sik;
-    }
+	public GetSikAction(byte[] sik) {
+		this.sik = sik;
+	}
 
-    public byte[] getSik() {
-        return sik;
-    }
+	public byte[] getSik() {
+		return sik;
+	}
 }

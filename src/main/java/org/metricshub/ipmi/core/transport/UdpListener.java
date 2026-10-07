@@ -26,11 +26,11 @@ package org.metricshub.ipmi.core.transport;
  * An interface for {@link UdpMessenger} listener.
  */
 public interface UdpListener {
-    /**
-     * Notifies listener of the UDP message that was received.
-     *
-     * @param message
-     *            - message received
-     */
-    void notifyMessage(UdpMessage message);
+	/**
+	 * Notifies listener of the UDP message that was received.
+	 *
+	 * @param message
+	 *        - message received
+	 */
+	void notifyMessage(UdpMessage message);
 }

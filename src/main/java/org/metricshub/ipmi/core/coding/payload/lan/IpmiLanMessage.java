@@ -29,109 +29,109 @@ import org.metricshub.ipmi.core.common.TypeConverter;
  * A wrapper class for IPMI LAN message
  */
 public abstract class IpmiLanMessage extends IpmiPayload {
-    public static final int MIN_SEQUENCE_NUMBER = 1;
-    public static final int MAX_SEQUENCE_NUMBER = 63;
+	public static final int MIN_SEQUENCE_NUMBER = 1;
+	public static final int MAX_SEQUENCE_NUMBER = 63;
 
-    private byte responderAddress;
+	private byte responderAddress;
 
-    protected byte networkFunction;
+	protected byte networkFunction;
 
-    private byte responderLogicalUnitNumber;
+	private byte responderLogicalUnitNumber;
 
-    private byte requesterAddress;
+	private byte requesterAddress;
 
-    private byte requesterLogicalUnitNumber;
-    
-    private byte sequenceNumber;
+	private byte requesterLogicalUnitNumber;
 
-    private byte command;
+	private byte sequenceNumber;
 
-    public void setResponderAddress(byte responderAddress) {
-        this.responderAddress = responderAddress;
-    }
+	private byte command;
 
-    public byte getResponderAddress() {
-        return responderAddress;
-    }
+	public void setResponderAddress(byte responderAddress) {
+		this.responderAddress = responderAddress;
+	}
 
-    public void setNetworkFunction(NetworkFunction networkFunction) {
-        this.networkFunction = TypeConverter.intToByte(networkFunction.getCode());
-    }
+	public byte getResponderAddress() {
+		return responderAddress;
+	}
 
-    public NetworkFunction getNetworkFunction() {
-        return NetworkFunction.parseInt(TypeConverter.byteToInt(networkFunction));
-    }
+	public void setNetworkFunction(NetworkFunction networkFunction) {
+		this.networkFunction = TypeConverter.intToByte(networkFunction.getCode());
+	}
 
-    public void setResponderLogicalUnitNumber(byte responderLogicalUnitNumber) {
-        this.responderLogicalUnitNumber = responderLogicalUnitNumber;
-    }
+	public NetworkFunction getNetworkFunction() {
+		return NetworkFunction.parseInt(TypeConverter.byteToInt(networkFunction));
+	}
 
-    public byte getResponderLogicalUnitNumber() {
-        return responderLogicalUnitNumber;
-    }
+	public void setResponderLogicalUnitNumber(byte responderLogicalUnitNumber) {
+		this.responderLogicalUnitNumber = responderLogicalUnitNumber;
+	}
 
-    public void setSequenceNumber(byte sequenceAddress) {
-        this.sequenceNumber = sequenceAddress;
-    }
+	public byte getResponderLogicalUnitNumber() {
+		return responderLogicalUnitNumber;
+	}
 
-    public byte getSequenceNumber() {
-        return sequenceNumber;
-    }
+	public void setSequenceNumber(byte sequenceAddress) {
+		this.sequenceNumber = sequenceAddress;
+	}
 
-    public void setRequesterAddress(byte requesterAddress) {
-        this.requesterAddress = requesterAddress;
-    }
+	public byte getSequenceNumber() {
+		return sequenceNumber;
+	}
 
-    public byte getRequesterAddress() {
-        return requesterAddress;
-    }
+	public void setRequesterAddress(byte requesterAddress) {
+		this.requesterAddress = requesterAddress;
+	}
 
-    public void setRequesterLogicalUnitNumber(byte requesterLogicalUnitNumber) {
-        this.requesterLogicalUnitNumber = requesterLogicalUnitNumber;
-    }
+	public byte getRequesterAddress() {
+		return requesterAddress;
+	}
 
-    public byte getRequesterLogicalUnitNumber() {
-        return requesterLogicalUnitNumber;
-    }
+	public void setRequesterLogicalUnitNumber(byte requesterLogicalUnitNumber) {
+		this.requesterLogicalUnitNumber = requesterLogicalUnitNumber;
+	}
 
-    public void setCommand(byte command) {
-        this.command = command;
-    }
+	public byte getRequesterLogicalUnitNumber() {
+		return requesterLogicalUnitNumber;
+	}
 
-    public byte getCommand() {
-        return command;
-    }
-    
-    /**
-     * Gets expected size of LAN message in bytes.
-     */
-    @Override
-    public abstract int getPayloadLength();
-    
-    /**
-     * Converts IpmiLanMessage to byte array. 
-     */
-    @Override
-    public abstract byte[] getPayloadData();
-        
-    protected byte getChecksum1(byte[] message) {
-        int checksum = 0;
-        for(int i = 0; i < 2; ++i) {
-            checksum = (checksum + TypeConverter.byteToInt(message[i])) % 256;
-        }
-        return (byte) -TypeConverter.intToByte(checksum);
-    }
-    
-    protected byte getChecksum2(byte[] message) {
-        int checksum = 0;
-        for(int i = 3; i < message.length-1; ++i) {
-            checksum = ((checksum + TypeConverter.byteToInt(message[i])) % 256);
-        }
-        return (byte)-TypeConverter.intToByte(checksum);
-    }
-    
-    @Override
-    public byte[] getIpmiCommandData() {
-        return getData();
-    }
+	public void setCommand(byte command) {
+		this.command = command;
+	}
+
+	public byte getCommand() {
+		return command;
+	}
+
+	/**
+	 * Gets expected size of LAN message in bytes.
+	 */
+	@Override
+	public abstract int getPayloadLength();
+
+	/**
+	 * Converts IpmiLanMessage to byte array.
+	 */
+	@Override
+	public abstract byte[] getPayloadData();
+
+	protected byte getChecksum1(byte[] message) {
+		int checksum = 0;
+		for (int i = 0; i < 2; ++i) {
+			checksum = (checksum + TypeConverter.byteToInt(message[i])) % 256;
+		}
+		return (byte) -TypeConverter.intToByte(checksum);
+	}
+
+	protected byte getChecksum2(byte[] message) {
+		int checksum = 0;
+		for (int i = 3; i < message.length - 1; ++i) {
+			checksum = ((checksum + TypeConverter.byteToInt(message[i])) % 256);
+		}
+		return (byte) -TypeConverter.intToByte(checksum);
+	}
+
+	@Override
+	public byte[] getIpmiCommandData() {
+		return getData();
+	}
 }
