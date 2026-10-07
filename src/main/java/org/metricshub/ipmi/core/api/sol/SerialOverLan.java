@@ -611,7 +611,12 @@ public class SerialOverLan implements Closeable {
 		long startTime = System.currentTimeMillis();
 
 		while (isTooFewBytesAvailable(wantedByteCount) && timeoutNotHit(timeout, startTime)) {
-			// NOP, just waiting
+			try {
+				Thread.sleep(1);
+			} catch (InterruptedException e) {
+				Thread.currentThread().interrupt();
+				return;
+			}
 		}
 	}
 

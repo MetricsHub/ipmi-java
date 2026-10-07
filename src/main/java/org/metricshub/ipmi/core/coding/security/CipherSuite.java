@@ -59,9 +59,9 @@ public class CipherSuite {
 	public CipherSuite(byte id, byte authenticationAlgorithm,
 			byte confidentialityAlgorithm, byte integrityAlgorithm) {
 		this.id = id;
-		this.authenticationAlgorithm = (authenticationAlgorithm);
-		this.confidentialityAlgorithm = (confidentialityAlgorithm);
-		this.integrityAlgorithm = (integrityAlgorithm);
+		this.authenticationAlgorithm = authenticationAlgorithm;
+		this.confidentialityAlgorithm = confidentialityAlgorithm;
+		this.integrityAlgorithm = integrityAlgorithm;
 	}
 
 	/**

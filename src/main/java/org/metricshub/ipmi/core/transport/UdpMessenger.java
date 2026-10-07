@@ -47,8 +47,6 @@ public class UdpMessenger extends Thread implements Messenger {
 
 	private boolean closing = false;
 
-	private static final String DEFAULT_ADDRESS = "0.0.0.0";
-
 	/**
 	 * Size of the message data buffer. Default
 	 * {@link UdpMessenger#DEFAULTBUFFERSIZE}.
@@ -75,7 +73,7 @@ public class UdpMessenger extends Thread implements Messenger {
 	 * @throws UnknownHostException
 	 */
 	public UdpMessenger(int port) throws SocketException, UnknownHostException {
-		this(port, InetAddress.getByName(DEFAULT_ADDRESS));
+		this(port, null); // null binds the wildcard address
 	}
 
 	/**
@@ -116,8 +114,6 @@ public class UdpMessenger extends Thread implements Messenger {
 
 	@Override
 	public void run() {
-		super.run();
-
 		boolean run = true;
 
 		while (run) {
@@ -225,9 +221,9 @@ public class UdpMessenger extends Thread implements Messenger {
 				message.getPort());
 		socket.send(packet);
 		try {
-			Thread.sleep(1);
+			sleep(1);
 		} catch (InterruptedException e) {
-			// TODO: log
+			currentThread().interrupt();
 		}
 		++sentPackets;
 	}

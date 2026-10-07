@@ -148,6 +148,27 @@
 				</executions>
 			</plugin>
 
+			<!-- pmd: fail the build on any violation of pmd.xml, so the PMD report stays clean (cpd-check awaits #115) -->
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-pmd-plugin</artifactId>
+				<version>3.28.0</version>
+				<configuration>
+					<targetJdk>${maven.compiler.release}</targetJdk>
+					<rulesets>
+						<ruleset>pmd.xml</ruleset>
+					</rulesets>
+					<printFailingErrors>true</printFailingErrors>
+				</configuration>
+				<executions>
+					<execution>
+						<goals>
+							<goal>check</goal>
+						</goals>
+					</execution>
+				</executions>
+			</plugin>
+
 			<!-- license -->
 			<plugin>
 				<groupId>org.codehaus.mojo</groupId>
@@ -162,9 +183,10 @@
 	<reporting>
 		<plugins>
 
-			<!-- pmd -->
+			<!-- pmd: same version as the build gate, so the report shows what the gate checked -->
 			<plugin>
 				<artifactId>maven-pmd-plugin</artifactId>
+				<version>3.28.0</version>
 				<configuration>
 					<linkXref>true</linkXref>
 					<sourceEncoding>${project.build.sourceEncoding}</sourceEncoding>

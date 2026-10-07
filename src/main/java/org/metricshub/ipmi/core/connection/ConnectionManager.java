@@ -142,7 +142,7 @@ public class ConnectionManager {
 					try {
 						SESSIONLESS_TAG.wait(1);
 					} catch (InterruptedException e) {
-						// TODO log
+						Thread.currentThread().interrupt();
 					}
 				}
 			}

@@ -126,8 +126,7 @@ public class GetSensorReading extends IpmiCommandCoder {
 					.setSensorState(
 							SensorState
 									.parseInt(
-											(TypeConverter
-													.byteToInt(raw[2])) & 0x3f));
+											TypeConverter.byteToInt(raw[2]) & 0x3f));
 
 			boolean[] states = null;
 

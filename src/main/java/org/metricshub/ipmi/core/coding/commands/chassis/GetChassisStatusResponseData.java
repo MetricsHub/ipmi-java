@@ -72,14 +72,14 @@ public class GetChassisStatusResponseData implements ResponseData {
 	 *         but system did not enter desired state
 	 */
 	public boolean isPowerControlFault() {
-		return ((currentPowerState & TypeConverter.intToByte(0x10)) != 0);
+		return (currentPowerState & TypeConverter.intToByte(0x10)) != 0;
 	}
 
 	/**
 	 * @return True when fault was detected in main power subsystem.
 	 */
 	public boolean isPowerFault() {
-		return ((currentPowerState & TypeConverter.intToByte(0x8)) != 0);
+		return (currentPowerState & TypeConverter.intToByte(0x8)) != 0;
 	}
 
 	/**
@@ -87,7 +87,7 @@ public class GetChassisStatusResponseData implements ResponseData {
 	 *         because a chassis panel interlock switch is active)
 	 */
 	public boolean isInterlock() {
-		return ((currentPowerState & TypeConverter.intToByte(0x4)) != 0);
+		return (currentPowerState & TypeConverter.intToByte(0x4)) != 0;
 	}
 
 	/**
@@ -95,14 +95,14 @@ public class GetChassisStatusResponseData implements ResponseData {
 	 *         condition.
 	 */
 	public boolean isPowerOverload() {
-		return ((currentPowerState & TypeConverter.intToByte(0x2)) != 0);
+		return (currentPowerState & TypeConverter.intToByte(0x2)) != 0;
 	}
 
 	/**
 	 * @return True when system power is on.
 	 */
 	public boolean isPowerOn() {
-		return ((currentPowerState & TypeConverter.intToByte(0x1)) != 0);
+		return (currentPowerState & TypeConverter.intToByte(0x1)) != 0;
 	}
 
 	public void setLastPowerEvent(byte lastPowerEvent) {
@@ -117,14 +117,14 @@ public class GetChassisStatusResponseData implements ResponseData {
 	 * @return True when last 'Power is on' state was entered via IPMI command.
 	 */
 	public boolean wasIpmiPowerOn() {
-		return ((lastPowerEvent & TypeConverter.intToByte(0x10)) != 0);
+		return (lastPowerEvent & TypeConverter.intToByte(0x10)) != 0;
 	}
 
 	/**
 	 * @return True if last power down caused by power fault.
 	 */
 	public boolean wasPowerFault() {
-		return ((lastPowerEvent & TypeConverter.intToByte(0x8)) != 0);
+		return (lastPowerEvent & TypeConverter.intToByte(0x8)) != 0;
 	}
 
 	/**
@@ -132,21 +132,21 @@ public class GetChassisStatusResponseData implements ResponseData {
 	 *         activated.
 	 */
 	public boolean wasInterlock() {
-		return ((lastPowerEvent & TypeConverter.intToByte(0x4)) != 0);
+		return (lastPowerEvent & TypeConverter.intToByte(0x4)) != 0;
 	}
 
 	/**
 	 * @return True if last power down caused by a Power overload.
 	 */
 	public boolean wasPowerOverload() {
-		return ((lastPowerEvent & TypeConverter.intToByte(0x2)) != 0);
+		return (lastPowerEvent & TypeConverter.intToByte(0x2)) != 0;
 	}
 
 	/**
 	 * @return True if AC failed.
 	 */
 	public boolean acFailed() {
-		return ((lastPowerEvent & TypeConverter.intToByte(0x1)) != 0);
+		return (lastPowerEvent & TypeConverter.intToByte(0x1)) != 0;
 
 	}
 
@@ -162,7 +162,7 @@ public class GetChassisStatusResponseData implements ResponseData {
 	 * @return True if Chassis Identify command and state info supported.
 	 */
 	public boolean isChassisIdentifyCommandSupported() {
-		return ((miscChassisState & TypeConverter.intToByte(0x40)) != 0);
+		return (miscChassisState & TypeConverter.intToByte(0x40)) != 0;
 	}
 
 	public ChassisIdentifyState getChassisIdentifyState() {
@@ -182,14 +182,14 @@ public class GetChassisStatusResponseData implements ResponseData {
 	 * @return True if cooling or fan fault was detected.
 	 */
 	public boolean coolingFaultDetected() {
-		return ((miscChassisState & TypeConverter.intToByte(0x8)) != 0);
+		return (miscChassisState & TypeConverter.intToByte(0x8)) != 0;
 	}
 
 	/**
 	 * @return True if drive fault was detected.
 	 */
 	public boolean driveFaultDetected() {
-		return ((miscChassisState & TypeConverter.intToByte(0x4)) != 0);
+		return (miscChassisState & TypeConverter.intToByte(0x4)) != 0;
 	}
 
 	/**
@@ -197,14 +197,14 @@ public class GetChassisStatusResponseData implements ResponseData {
 	 *         chassis push-buttons disabled.).
 	 */
 	public boolean isFrontPanelLockoutActive() {
-		return ((miscChassisState & TypeConverter.intToByte(0x2)) != 0);
+		return (miscChassisState & TypeConverter.intToByte(0x2)) != 0;
 	}
 
 	/**
 	 * @return True if Chassis intrusion active is active.
 	 */
 	public boolean isChassisIntrusionActive() {
-		return ((miscChassisState & TypeConverter.intToByte(0x1)) != 0);
+		return (miscChassisState & TypeConverter.intToByte(0x1)) != 0;
 	}
 
 	public void setFrontPanelButtonCapabilities(
@@ -227,7 +227,7 @@ public class GetChassisStatusResponseData implements ResponseData {
 		if (!isFrontPanelButtonCapabilitiesSet()) {
 			throw new IllegalAccessException(FRONT_PANEL_BUTTON_CAPABILITIES_NOT_SET_MESSAGE);
 		}
-		return ((frontPanelButtonCapabilities & TypeConverter.intToByte(0x80)) != 0);
+		return (frontPanelButtonCapabilities & TypeConverter.intToByte(0x80)) != 0;
 	}
 
 	/**
@@ -240,7 +240,7 @@ public class GetChassisStatusResponseData implements ResponseData {
 		if (!isFrontPanelButtonCapabilitiesSet()) {
 			throw new IllegalAccessException(FRONT_PANEL_BUTTON_CAPABILITIES_NOT_SET_MESSAGE);
 		}
-		return ((frontPanelButtonCapabilities & TypeConverter.intToByte(0x40)) != 0);
+		return (frontPanelButtonCapabilities & TypeConverter.intToByte(0x40)) != 0;
 	}
 
 	/**
@@ -252,7 +252,7 @@ public class GetChassisStatusResponseData implements ResponseData {
 		if (!isFrontPanelButtonCapabilitiesSet()) {
 			throw new IllegalAccessException(FRONT_PANEL_BUTTON_CAPABILITIES_NOT_SET_MESSAGE);
 		}
-		return ((frontPanelButtonCapabilities & TypeConverter.intToByte(0x20)) != 0);
+		return (frontPanelButtonCapabilities & TypeConverter.intToByte(0x20)) != 0;
 	}
 
 	/**
@@ -267,7 +267,7 @@ public class GetChassisStatusResponseData implements ResponseData {
 		if (!isFrontPanelButtonCapabilitiesSet()) {
 			throw new IllegalAccessException(FRONT_PANEL_BUTTON_CAPABILITIES_NOT_SET_MESSAGE);
 		}
-		return ((frontPanelButtonCapabilities & TypeConverter.intToByte(0x10)) != 0);
+		return (frontPanelButtonCapabilities & TypeConverter.intToByte(0x10)) != 0;
 	}
 
 	/**
@@ -279,7 +279,7 @@ public class GetChassisStatusResponseData implements ResponseData {
 		if (!isFrontPanelButtonCapabilitiesSet()) {
 			throw new IllegalAccessException(FRONT_PANEL_BUTTON_CAPABILITIES_NOT_SET_MESSAGE);
 		}
-		return ((frontPanelButtonCapabilities & TypeConverter.intToByte(0x8)) != 0);
+		return (frontPanelButtonCapabilities & TypeConverter.intToByte(0x8)) != 0;
 	}
 
 	/**
@@ -292,7 +292,7 @@ public class GetChassisStatusResponseData implements ResponseData {
 		if (!isFrontPanelButtonCapabilitiesSet()) {
 			throw new IllegalAccessException(FRONT_PANEL_BUTTON_CAPABILITIES_NOT_SET_MESSAGE);
 		}
-		return ((frontPanelButtonCapabilities & TypeConverter.intToByte(0x4)) != 0);
+		return (frontPanelButtonCapabilities & TypeConverter.intToByte(0x4)) != 0;
 	}
 
 	/**
@@ -304,7 +304,7 @@ public class GetChassisStatusResponseData implements ResponseData {
 		if (!isFrontPanelButtonCapabilitiesSet()) {
 			throw new IllegalAccessException(FRONT_PANEL_BUTTON_CAPABILITIES_NOT_SET_MESSAGE);
 		}
-		return ((frontPanelButtonCapabilities & TypeConverter.intToByte(0x2)) != 0);
+		return (frontPanelButtonCapabilities & TypeConverter.intToByte(0x2)) != 0;
 	}
 
 	/**
@@ -319,7 +319,7 @@ public class GetChassisStatusResponseData implements ResponseData {
 			throw new IllegalAccessException(
 					FRONT_PANEL_BUTTON_CAPABILITIES_NOT_SET_MESSAGE);
 		}
-		return ((frontPanelButtonCapabilities & TypeConverter.intToByte(0x1)) != 0);
+		return (frontPanelButtonCapabilities & TypeConverter.intToByte(0x1)) != 0;
 	}
 
 	private void setFrontPanelButtonCapabilitiesSet(
