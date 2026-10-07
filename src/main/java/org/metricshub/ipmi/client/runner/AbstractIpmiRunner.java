@@ -196,6 +196,13 @@ public abstract class AbstractIpmiRunner<T> implements AutoCloseable, Callable<T
 			GetSdrResponseData data = (GetSdrResponseData) connector.sendMessage(handle,
 					new GetSdr(IpmiVersion.V20, handle.getCipherSuite(), AuthenticationType.RMCPPlus, reservationId, nextRecId));
 
+			// Some BMCs answer with success but return fewer bytes than the
+			// record length declared in the header: fall back to the chunked
+			// read while the current record ID is still known
+			if (isTruncated(data.getSensorRecordData())) {
+				return getSensorViaChunks(reservationId);
+			}
+
 			// Advance to the next record first, so that a record we cannot
 			// decode never stalls the whole repository walk
 			nextRecId = data.getNextRecordId();
@@ -231,14 +238,22 @@ public abstract class AbstractIpmiRunner<T> implements AutoCloseable, Callable<T
 		GetSdrResponseData data = (GetSdrResponseData) connector.sendMessage(handle, new GetSdr(IpmiVersion.V20, handle.getCipherSuite(),
 				AuthenticationType.RMCPPlus, reservationId, nextRecId, 0, INITIAL_CHUNK_SIZE));
 
+		byte[] header = data.getSensorRecordData();
+		if (header == null || header.length < HEADER_SIZE) {
+			LOGGER.warn("Skipping SDR record {} on {}: BMC returned {} byte(s) instead of the {}-byte header", nextRecId,
+					ipmiConfiguration.getHostname(), header == null ? 0 : header.length, HEADER_SIZE);
+			nextRecId = data.getNextRecordId();
+			return null;
+		}
+
 		// The record size is 5th byte of the record. It does not take
 		// into account the size of the header, so we need to add it.
-		int recSize = TypeConverter.byteToInt(data.getSensorRecordData()[4]) + HEADER_SIZE;
-		int read = INITIAL_CHUNK_SIZE;
+		int recSize = TypeConverter.byteToInt(header[HEADER_SIZE - 1]) + HEADER_SIZE;
+		int read = Math.min(header.length, recSize);
 
 		byte[] bytes = new byte[recSize];
 
-		System.arraycopy(data.getSensorRecordData(), 0, bytes, 0, Math.min(recSize, data.getSensorRecordData().length));
+		System.arraycopy(header, 0, bytes, 0, read);
 
 		// We get the rest of the record in chunks (watch out for
 		// exceeding the record size, since this will result in BMC's
@@ -253,10 +268,19 @@ public abstract class AbstractIpmiRunner<T> implements AutoCloseable, Callable<T
 			GetSdrResponseData part = (GetSdrResponseData) connector.sendMessage(handle, new GetSdr(IpmiVersion.V20, handle.getCipherSuite(),
 					AuthenticationType.RMCPPlus, reservationId, nextRecId, read, bytesToRead));
 
-			// Append the new bytes
-			System.arraycopy(part.getSensorRecordData(), 0, bytes, read, bytesToRead);
+			byte[] chunk = part.getSensorRecordData();
+			int got = chunk == null ? 0 : Math.min(bytesToRead, chunk.length);
+			if (got == 0) {
+				LOGGER.warn("Skipping SDR record {} on {}: BMC returned no data at offset {}", nextRecId,
+						ipmiConfiguration.getHostname(), read);
+				nextRecId = data.getNextRecordId();
+				return null;
+			}
 
-			read += bytesToRead;
+			// Append the new bytes
+			System.arraycopy(chunk, 0, bytes, read, got);
+
+			read += got;
 		}
 
 		// Advance to the next record, then decode the gathered data
@@ -272,12 +296,26 @@ public abstract class AbstractIpmiRunner<T> implements AutoCloseable, Callable<T
 	 * @param recordData Raw bytes of the SDR record
 	 * @return {@link SensorRecord} instance or <code>null</code> if the record cannot be decoded
 	 */
-	private SensorRecord decodeRecord(byte[] recordData) {
+	SensorRecord decodeRecord(byte[] recordData) {
 		try {
 			return SensorRecord.populateSensorRecord(recordData);
 		} catch (RuntimeException e) {
 			LOGGER.warn("Skipping undecodable SDR record before id {} on {}: {}", nextRecId, ipmiConfiguration.getHostname(), e.getMessage());
 			return null;
 		}
+	}
+
+	/**
+	 * Detect a whole-record GetSdr response that is shorter than the record length declared in its own header. Some BMCs
+	 * answer such requests with a success completion code and a truncated body instead of "Cannot return number of
+	 * requested data bytes".
+	 *
+	 * @param recordData Raw bytes returned for a whole-record GetSdr request
+	 * @return <code>true</code> if the header is missing or fewer bytes than declared were returned
+	 */
+	static boolean isTruncated(byte[] recordData) {
+		return recordData == null
+				|| recordData.length < HEADER_SIZE
+				|| recordData.length < TypeConverter.byteToInt(recordData[HEADER_SIZE - 1]) + HEADER_SIZE;
 	}
 }

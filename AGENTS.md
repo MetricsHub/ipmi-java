@@ -4,7 +4,7 @@
 
 The project has not adopted the MetricsHub Eclipse formatter profile yet (see issue #118). Until it does, match the style of the file you are editing: the `org.metricshub.ipmi.client` packages use tabs, the `org.metricshub.ipmi.core` packages (forked from the Verax IPMI library) use 4 spaces. Do not reformat code you are not otherwise changing. Once `formatter-maven-plugin` is configured, simply run `mvn formatter:format` before committing.
 
-All files must include the proper LGPL-3 license header. When you add a new file, run `mvn license:update-file-header` before committing (and before building, since the build fails if a file lacks the header).
+All Java source files under `src/main/java` must include the proper LGPL-3 license header (the `license-maven-plugin` check covers `main/java/**/*.java` only; tests, Markdown and resources carry no header). When you add a new source file, run `mvn license:update-file-header` before committing (and before building, since the build fails if a source file lacks the header).
 
 All public methods must have proper Javadoc. Check the output of Maven to identify issues with Javadoc and fix these issues.
 
