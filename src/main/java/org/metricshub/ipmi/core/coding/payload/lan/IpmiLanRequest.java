@@ -97,7 +97,7 @@ public class IpmiLanRequest extends IpmiLanMessage {
 		message[0] = getResponderAddress();
 		message[1] = TypeConverter
 				.intToByte(
-						(networkFunction << 2)
+						(getNetworkFunctionCode() << 2)
 								| getResponderLogicalUnitNumber());
 		message[2] = getChecksum1(message);
 		message[3] = getRequesterAddress();

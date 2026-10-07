@@ -34,7 +34,7 @@ public abstract class IpmiLanMessage extends IpmiPayload {
 
 	private byte responderAddress;
 
-	protected byte networkFunction;
+	private byte networkFunction;
 
 	private byte responderLogicalUnitNumber;
 
@@ -60,6 +60,24 @@ public abstract class IpmiLanMessage extends IpmiPayload {
 
 	public NetworkFunction getNetworkFunction() {
 		return NetworkFunction.parseInt(TypeConverter.byteToInt(networkFunction));
+	}
+
+	/**
+	 * Sets the raw network function code (6 bits), which may not map to a known {@link NetworkFunction}.
+	 *
+	 * @param networkFunctionCode the network function code
+	 */
+	protected void setNetworkFunctionCode(byte networkFunctionCode) {
+		this.networkFunction = networkFunctionCode;
+	}
+
+	/**
+	 * Returns the raw network function code (6 bits).
+	 *
+	 * @return the network function code
+	 */
+	protected byte getNetworkFunctionCode() {
+		return networkFunction;
 	}
 
 	public void setResponderLogicalUnitNumber(byte responderLogicalUnitNumber) {

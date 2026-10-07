@@ -49,7 +49,7 @@ import org.metricshub.ipmi.core.coding.commands.sdr.record.FruDeviceLocatorRecor
 import org.metricshub.ipmi.core.coding.commands.sdr.record.FullSensorRecord;
 import org.metricshub.ipmi.core.coding.commands.sdr.record.SensorUnit;
 
-public class IpmiResultConverter {
+public final class IpmiResultConverter {
 
 	private static final double NO_READING = 255d;
 
@@ -83,7 +83,7 @@ public class IpmiResultConverter {
 	 *        </ul>
 	 * @return String value
 	 */
-	public static final String convertResult(final List<Fru> frus, final List<Sensor> sensors) {
+	public static String convertResult(final List<Fru> frus, final List<Sensor> sensors) {
 
 		// FRU id to FRU Device used when processing the sensors
 		Map<String, FruDevice> frusLookup = new HashMap<>();

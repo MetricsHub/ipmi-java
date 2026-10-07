@@ -25,7 +25,7 @@ package org.metricshub.ipmi.core.common;
 /**
  * Class used for composing byte messages aout from smaller byte subarrays.
  */
-public class MessageComposer {
+public final class MessageComposer {
 
 	private final byte[] message;
 	private int pointer = 0;

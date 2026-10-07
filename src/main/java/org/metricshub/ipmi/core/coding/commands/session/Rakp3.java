@@ -237,11 +237,11 @@ public class Rakp3 extends IpmiCommandCoder {
 	 *         KeyExchangeAuthenticationCode for RAKP Message 3
 	 */
 	private byte[] prepareKeyExchangeAuthenticationCodeBase(
-			Rakp1 rakp1,
+			Rakp1 rakp1Message,
 			Rakp1ResponseData responseData) {
 		int length = 22;
-		if (rakp1.getUsername() != null) {
-			length += rakp1.getUsername().length();
+		if (rakp1Message.getUsername() != null) {
+			length += rakp1Message.getUsername().length();
 		}
 		byte[] keac = new byte[length];
 
@@ -267,20 +267,20 @@ public class Rakp3 extends IpmiCommandCoder {
 		keac[20] = TypeConverter
 				.intToByte(
 						encodePrivilegeLevel(
-								rakp1
+								rakp1Message
 										.getRequestedMaximumPrivilegeLevel())
 								| 0x10);
 
-		if (rakp1.getUsername() != null) {
-			keac[21] = TypeConverter.intToByte(rakp1.getUsername().length());
-			if (rakp1.getUsername().length() > 0) {
+		if (rakp1Message.getUsername() != null) {
+			keac[21] = TypeConverter.intToByte(rakp1Message.getUsername().length());
+			if (rakp1Message.getUsername().length() > 0) {
 				System
 						.arraycopy(
-								rakp1.getUsername().getBytes(),
+								rakp1Message.getUsername().getBytes(),
 								0,
 								keac,
 								22,
-								rakp1.getUsername().length());
+								rakp1Message.getUsername().length());
 			}
 		} else {
 			keac[21] = 0;
@@ -371,17 +371,17 @@ public class Rakp3 extends IpmiCommandCoder {
 	 * @return byte array holding prepared base for calculating Integrity Check
 	 */
 	private byte[] prepareIntegrityCheckBase(
-			Rakp1 rakp1,
+			Rakp1 rakp1Message,
 			Rakp1ResponseData responseData) {
 		byte[] icb = new byte[36];
 
-		System.arraycopy(rakp1.getConsoleRandomNumber(), 0, icb, 0, 16);
+		System.arraycopy(rakp1Message.getConsoleRandomNumber(), 0, icb, 0, 16);
 
 		System
 				.arraycopy(
 						TypeConverter
 								.intToLittleEndianByteArray(
-										rakp1
+										rakp1Message
 												.getManagedSystemSessionId()),
 						0,
 						icb,

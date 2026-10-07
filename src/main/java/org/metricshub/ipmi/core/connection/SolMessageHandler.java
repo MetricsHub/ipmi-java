@@ -39,7 +39,7 @@ import java.io.IOException;
  */
 public class SolMessageHandler extends MessageHandler {
 
-	private static final Logger logger = LoggerFactory.getLogger(SolMessageHandler.class);
+	private static final Logger LOGGER = LoggerFactory.getLogger(SolMessageHandler.class);
 
 	public SolMessageHandler(Connection connection, int timeout) throws IOException {
 		super(connection, timeout, SolMessage.MIN_SEQUENCE_NUMBER, SolMessage.MAX_SEQUENCE_NUMBER);
@@ -66,32 +66,32 @@ public class SolMessageHandler extends MessageHandler {
 	}
 
 	private void handleIncomingAcknowledgeMessage(Ipmiv20Message message, SolInboundMessage payload) {
-		PayloadCoder coder = messageQueue.getMessageFromQueue(payload.getAckNackSequenceNumber());
+		PayloadCoder coder = getMessageQueue().getMessageFromQueue(payload.getAckNackSequenceNumber());
 		int tag = payload.getAckNackSequenceNumber();
 
-		logger.debug("Received message with tag " + tag);
+		LOGGER.debug("Received message with tag " + tag);
 
 		if (coder == null) {
-			logger.debug("No message tagged with " + tag + " in queue. Dropping orphan message.");
+			LOGGER.debug("No message tagged with " + tag + " in queue. Dropping orphan message.");
 			return;
 		}
 
 		try {
 			ResponseData responseData = coder.getResponseData(message);
-			connection.notifyResponseListeners(connection.getHandle(), tag, responseData, null);
+			getConnection().notifyResponseListeners(getConnection().getHandle(), tag, responseData, null);
 		} catch (Exception e) {
-			connection.notifyResponseListeners(connection.getHandle(), tag, null, e);
+			getConnection().notifyResponseListeners(getConnection().getHandle(), tag, null, e);
 		}
 
 		// Remove message from queue only when it was fully or partially acknowledged. Otherwise, we want to keep it in
 		// queue for further retries
 		if (payload.getStatusField().getAckState() == SolAckState.ACK || payload.getAcceptedCharacterCount() > 0) {
-			messageQueue.remove(payload.getAckNackSequenceNumber());
+			getMessageQueue().remove(payload.getAckNackSequenceNumber());
 		}
 	}
 
 	private void handleIncomingDataMessage(SolInboundMessage payload) {
-		connection.notifyRequestListeners(payload);
+		getConnection().notifyRequestListeners(payload);
 	}
 
 }

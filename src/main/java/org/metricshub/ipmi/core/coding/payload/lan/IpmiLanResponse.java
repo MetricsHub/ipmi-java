@@ -52,11 +52,12 @@ public class IpmiLanResponse extends IpmiLanMessage {
 	 */
 	public IpmiLanResponse(byte[] rawData) {
 		setRequesterAddress(rawData[0]);
-		networkFunction = TypeConverter
-				.intToByte(
-						(TypeConverter
-								.byteToInt(rawData[1])
-								& 0xfC) >> 2);
+		setNetworkFunctionCode(
+				TypeConverter
+						.intToByte(
+								(TypeConverter
+										.byteToInt(rawData[1])
+										& 0xfC) >> 2));
 		setRequesterLogicalUnitNumber(
 				TypeConverter
 						.intToByte(

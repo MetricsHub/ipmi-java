@@ -595,15 +595,15 @@ public class FullSensorRecord extends SensorRecord {
 	 *        - value to be converted
 	 * @param length
 	 *        - number of bits of value
-	 * @param sensorUnits1
+	 * @param units1
 	 *        - byte containing numeric data format
 	 * @return converted value
 	 * @throws IllegalArgumentException
 	 *         when record's numeric values are linearized in a way that is
 	 *         not supported
 	 */
-	protected double calcFormula(int value, int length, byte sensorUnits1) {
-		int dataFormat = (TypeConverter.byteToInt(sensorUnits1) & 0xc0) >> 6;
+	protected double calcFormula(int value, int length, byte units1) {
+		int dataFormat = (TypeConverter.byteToInt(units1) & 0xc0) >> 6;
 
 		int base = 0;
 

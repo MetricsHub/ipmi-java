@@ -76,17 +76,17 @@ public class MessageListener implements IpmiResponseListener {
 	 * Blocks the invoking thread until deserved message arrives (tag and handle
 	 * as specified in {@link #MessageListener(ConnectionHandle)}).
 	 *
-	 * @param tag
+	 * @param messageTag
 	 *        - tag of the expected message
 	 * @return {@link ResponseData} for message.
 	 * @throws Exception
 	 *         when message delivery fails
 	 */
-	public ResponseData waitForAnswer(int tag) throws Exception {
-		if (tag < 0 || tag > 63) {
+	public ResponseData waitForAnswer(int messageTag) throws Exception {
+		if (messageTag < 0 || messageTag > 63) {
 			throw new IllegalArgumentException("Corrupted message tag");
 		}
-		this.tag = tag;
+		this.tag = messageTag;
 		for (IpmiResponse quickResponse : quickMessages) {
 			this.notify(quickResponse);
 		}
@@ -104,12 +104,12 @@ public class MessageListener implements IpmiResponseListener {
 	}
 
 	@Override
-	public synchronized void notify(IpmiResponse response) {
-		if (response.getHandle().getHandle() == handle.getHandle()) {
+	public synchronized void notify(IpmiResponse ipmiResponse) {
+		if (ipmiResponse.getHandle().getHandle() == handle.getHandle()) {
 			if (tag == -1) {
-				quickMessages.add(response);
-			} else if (response.getTag() == tag) {
-				this.response = response;
+				quickMessages.add(ipmiResponse);
+			} else if (ipmiResponse.getTag() == tag) {
+				this.response = ipmiResponse;
 			}
 		}
 	}

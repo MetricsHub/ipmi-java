@@ -22,7 +22,10 @@ package org.metricshub.ipmi.client.model;
  * ╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱
  */
 
+// This class is a lookup table over (almost) every ReadingType constant
+// CHECKSTYLE.OFF: AvoidStarImport
 import static org.metricshub.ipmi.core.coding.commands.sdr.record.ReadingType.*;
+// CHECKSTYLE.ON: AvoidStarImport
 
 import java.util.Collections;
 import java.util.EnumMap;
@@ -33,7 +36,7 @@ import org.metricshub.ipmi.core.coding.commands.sdr.record.ReadingType;
 /**
  * {@link ReadingType} mapping to match the IPMIUtil event sensor types (states)
  */
-public class ReadingTypeDescription {
+public final class ReadingTypeDescription {
 
 	private static final String PREDICTIVE_FAILURE = "Predictive failure";
 

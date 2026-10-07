@@ -93,26 +93,26 @@ public abstract class PayloadCoder {
 	 *
 	 * @param version
 	 *        - IPMI version of the command.
-	 * @param cipherSuite
+	 * @param sessionCipherSuite
 	 *        - {@link CipherSuite} containing authentication,
 	 *        confidentiality and integrity algorithms for this session.
-	 * @param authenticationType
+	 * @param sessionAuthenticationType
 	 *        - Type of authentication used. Must be RMCPPlus for IPMI v2.0.
 	 */
 	public void setSessionParameters(
 			IpmiVersion version,
-			CipherSuite cipherSuite,
-			AuthenticationType authenticationType) {
+			CipherSuite sessionCipherSuite,
+			AuthenticationType sessionAuthenticationType) {
 
 		if (version == IpmiVersion.V20
-				&& authenticationType != AuthenticationType.RMCPPlus) {
+				&& sessionAuthenticationType != AuthenticationType.RMCPPlus) {
 			throw new IllegalArgumentException(
 					"Authentication Type must be RMCPPlus for IPMI v2.0 messages");
 		}
 
 		setIpmiVersion(version);
-		setAuthenticationType(authenticationType);
-		setCipherSuite(cipherSuite);
+		setAuthenticationType(sessionAuthenticationType);
+		setCipherSuite(sessionCipherSuite);
 	}
 
 	/**

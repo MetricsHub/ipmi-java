@@ -50,7 +50,7 @@ import java.security.NoSuchAlgorithmException;
  */
 public class DeactivatePayload extends IpmiCommandCoder {
 
-	private static final Logger logger = LoggerFactory.getLogger(DeactivatePayload.class);
+	private static final Logger LOGGER = LoggerFactory.getLogger(DeactivatePayload.class);
 
 	private static final int REQUEST_DATA_LENGTH = 6;
 
@@ -124,7 +124,7 @@ public class DeactivatePayload extends IpmiCommandCoder {
 					.parseInt(completionCode.getCode());
 
 			if (specificCompletionCode == DeactivatePayloadCompletionCode.PAYLOAD_ALREADY_DEACTIVATED) {
-				logger.warn(specificCompletionCode.getMessage());
+				LOGGER.warn(specificCompletionCode.getMessage());
 			} else {
 				throw new IPMIException(((IpmiLanResponse) message.getPayload()).getCompletionCode());
 			}
@@ -135,10 +135,12 @@ public class DeactivatePayload extends IpmiCommandCoder {
 
 	@Override
 	public boolean equals(Object o) {
-		if (this == o)
+		if (this == o) {
 			return true;
-		if (o == null || getClass() != o.getClass())
+		}
+		if (o == null || getClass() != o.getClass()) {
 			return false;
+		}
 
 		DeactivatePayload that = (DeactivatePayload) o;
 

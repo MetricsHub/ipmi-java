@@ -67,7 +67,7 @@ import java.util.Set;
  */
 public class SerialOverLan implements Closeable {
 
-	private static final Logger logger = LoggerFactory.getLogger(SerialOverLan.class);
+	private static final Logger LOGGER = LoggerFactory.getLogger(SerialOverLan.class);
 
 	private final IpmiConnector connector;
 	private final Session session;
@@ -163,11 +163,11 @@ public class SerialOverLan implements Closeable {
 	 * Given potential session object, connection data and port on which SOL should be activated,
 	 * decides what session should be finally used to SOL communication.
 	 *
-	 * @param connector
+	 * @param ipmiConnector
 	 *        {@link IpmiConnector} that will be used for communication
 	 * @param connectionHandle
 	 *        {@link ConnectionHandle} representing single connection to managed system.
-	 * @param session
+	 * @param currentSession
 	 *        Existing session that should be reused (if possible) for SOL communication.
 	 * @param solPayloadPort
 	 *        UDP port on which managed system listens for SOL communication.
@@ -178,14 +178,14 @@ public class SerialOverLan implements Closeable {
 	 *         If new session could not be established.
 	 */
 	private Session resolveSession(
-			IpmiConnector connector,
+			IpmiConnector ipmiConnector,
 			ConnectionHandle connectionHandle,
-			Session session,
+			Session currentSession,
 			int solPayloadPort)
 			throws SOLException,
 			SessionException {
 		if (solPayloadPort != connectionHandle.getRemotePort()) {
-			Session alternativeSession = connector
+			Session alternativeSession = ipmiConnector
 					.getExistingSessionForCriteria(
 							connectionHandle.getRemoteAddress(),
 							solPayloadPort,
@@ -197,7 +197,7 @@ public class SerialOverLan implements Closeable {
 
 				alternativeSession = SessionManager
 						.establishSession(
-								connector,
+								ipmiConnector,
 								connectionHandle.getRemoteAddress().getHostAddress(),
 								solPayloadPort,
 								connectionHandle.getUser(),
@@ -209,12 +209,12 @@ public class SerialOverLan implements Closeable {
 				this.isSessionInternal = false;
 			}
 
-			activatePayload(connector, alternativeSession.getConnectionHandle());
+			activatePayload(ipmiConnector, alternativeSession.getConnectionHandle());
 
 			return alternativeSession;
 		} else {
 			this.isSessionInternal = false;
-			return session;
+			return currentSession;
 		}
 	}
 
@@ -223,7 +223,7 @@ public class SerialOverLan implements Closeable {
 	 * If first activation try fails due to insufficient privileges, raises the session privileges
 	 * to maximum available and tries to activate payload once again.
 	 *
-	 * @param connector
+	 * @param ipmiConnector
 	 *        {@link IpmiConnector} that will be used for communication
 	 * @param connectionHandle
 	 *        {@link ConnectionHandle} representing single connection to managed system.
@@ -231,13 +231,13 @@ public class SerialOverLan implements Closeable {
 	 * @throws SOLException
 	 *         when any unrecoverable error occurred.
 	 */
-	private int activatePayload(IpmiConnector connector, ConnectionHandle connectionHandle) throws SOLException {
+	private int activatePayload(IpmiConnector ipmiConnector, ConnectionHandle connectionHandle) throws SOLException {
 		try {
-			this.payloadInstance = getFirstAvailablePayloadInstance(connector, connectionHandle);
+			this.payloadInstance = getFirstAvailablePayloadInstance(ipmiConnector, connectionHandle);
 
 			ActivateSolPayload activatePayload = new ActivateSolPayload(connectionHandle.getCipherSuite(), payloadInstance);
 			ActivateSolPayloadResponseData activatePayloadResponseData = getActivatePayloadResponse(
-					connector,
+					ipmiConnector,
 					connectionHandle,
 					activatePayload);
 
@@ -251,22 +251,22 @@ public class SerialOverLan implements Closeable {
 	}
 
 	private ActivateSolPayloadResponseData getActivatePayloadResponse(
-			IpmiConnector connector,
+			IpmiConnector ipmiConnector,
 			ConnectionHandle connectionHandle,
 			ActivateSolPayload activatePayload)
 			throws Exception {
 		ActivateSolPayloadResponseData activatePayloadResponseData;
 
 		try {
-			activatePayloadResponseData = (ActivateSolPayloadResponseData) connector
+			activatePayloadResponseData = (ActivateSolPayloadResponseData) ipmiConnector
 					.sendMessage(
 							connectionHandle,
 							activatePayload);
 		} catch (IPMIException e) {
 			if (e.getCompletionCode() == CompletionCode.InsufficentPrivilege) {
-				raiseSessionPrivileges(connector, connectionHandle);
+				raiseSessionPrivileges(ipmiConnector, connectionHandle);
 
-				activatePayloadResponseData = (ActivateSolPayloadResponseData) connector
+				activatePayloadResponseData = (ActivateSolPayloadResponseData) ipmiConnector
 						.sendMessage(
 								connectionHandle,
 								activatePayload);
@@ -281,7 +281,7 @@ public class SerialOverLan implements Closeable {
 	/**
 	 * Checks for available SOL payload instances and, if any, returns first available.
 	 *
-	 * @param connector
+	 * @param ipmiConnector
 	 *        {@link IpmiConnector} that will be used for communication
 	 * @param connectionHandle
 	 *        {@link ConnectionHandle} representing single connection to managed system.
@@ -289,12 +289,12 @@ public class SerialOverLan implements Closeable {
 	 * @throws Exception
 	 *         If any exception occurred during communication or if no available instances were found.
 	 */
-	private int getFirstAvailablePayloadInstance(IpmiConnector connector, ConnectionHandle connectionHandle)
+	private int getFirstAvailablePayloadInstance(IpmiConnector ipmiConnector, ConnectionHandle connectionHandle)
 			throws Exception {
 		GetPayloadActivationStatus getPayloadActivationStatus = new GetPayloadActivationStatus(
 				connectionHandle.getCipherSuite(),
 				PayloadType.Sol);
-		GetPayloadActivationStatusResponseData getActivationResponseData = (GetPayloadActivationStatusResponseData) connector
+		GetPayloadActivationStatusResponseData getActivationResponseData = (GetPayloadActivationStatusResponseData) ipmiConnector
 				.sendMessage(
 						connectionHandle,
 						getPayloadActivationStatus);
@@ -311,20 +311,20 @@ public class SerialOverLan implements Closeable {
 	 * Sends proper command to managed system in order to raise user privileges in given session to maximum available
 	 * level.
 	 *
-	 * @param connector
+	 * @param ipmiConnector
 	 *        {@link IpmiConnector} that will be used for communication
 	 * @param connectionHandle
 	 *        {@link ConnectionHandle} representing single connection to managed system.
 	 * @throws Exception
 	 *         If any exception occurred during communication.
 	 */
-	private void raiseSessionPrivileges(IpmiConnector connector, ConnectionHandle connectionHandle) throws Exception {
+	private void raiseSessionPrivileges(IpmiConnector ipmiConnector, ConnectionHandle connectionHandle) throws Exception {
 		SetSessionPrivilegeLevel setSessionPrivilegeLevel = new SetSessionPrivilegeLevel(
 				IpmiVersion.V20,
 				connectionHandle.getCipherSuite(),
 				AuthenticationType.RMCPPlus,
 				PrivilegeLevel.Administrator);
-		connector.sendMessage(connectionHandle, setSessionPrivilegeLevel);
+		ipmiConnector.sendMessage(connectionHandle, setSessionPrivilegeLevel);
 	}
 
 	/**
@@ -728,7 +728,7 @@ public class SerialOverLan implements Closeable {
 
 			return responseData;
 		} catch (Exception e) {
-			logger.error("Error while sending message", e);
+			LOGGER.error("Error while sending message", e);
 			return null;
 		}
 	}

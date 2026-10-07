@@ -80,7 +80,7 @@ public class GetFrusRunner extends AbstractIpmiRunner<List<Fru>> {
 		// Id 0 indicates first record in SDR. Next IDs can be retrieved from
 		// records - they are organized in a list and there is no BMC command to
 		// get all of them.
-		nextRecId = 0;
+		setNextRecId(0);
 
 		// Some BMCs allow getting sensor records without reservation, so we try
 		// to do it that way first
@@ -91,7 +91,7 @@ public class GetFrusRunner extends AbstractIpmiRunner<List<Fru>> {
 
 		// We get sensor data until we encounter ID = 65535 which means that
 		// this record is the last one.
-		while (nextRecId < MAX_REPO_RECORD_ID) {
+		while (getNextRecId() < MAX_REPO_RECORD_ID) {
 
 			SensorRecord sensorRecord = null;
 
@@ -117,10 +117,10 @@ public class GetFrusRunner extends AbstractIpmiRunner<List<Fru>> {
 				// happen many times during getting all sensors, since BMC can't
 				// manage parallel sessions and invalidates old one if new one
 				// appears.
-				reservationId = ((ReserveSdrRepositoryResponseData) connector
+				reservationId = ((ReserveSdrRepositoryResponseData) getConnector()
 						.sendMessage(
-								handle,
-								new ReserveSdrRepository(IpmiVersion.V20, handle.getCipherSuite(), AuthenticationType.RMCPPlus)))
+								getHandle(),
+								new ReserveSdrRepository(IpmiVersion.V20, getHandle().getCipherSuite(), AuthenticationType.RMCPPlus)))
 						.getReservationId();
 			}
 
@@ -213,10 +213,14 @@ public class GetFrusRunner extends AbstractIpmiRunner<List<Fru>> {
 		List<ReadFruDataResponseData> fruData = new ArrayList<>();
 
 		// get the FRU Inventory Area info
-		GetFruInventoryAreaInfoResponseData info = (GetFruInventoryAreaInfoResponseData) connector
+		GetFruInventoryAreaInfoResponseData info = (GetFruInventoryAreaInfoResponseData) getConnector()
 				.sendMessage(
-						handle,
-						new GetFruInventoryAreaInfo(IpmiVersion.V20, handle.getCipherSuite(), AuthenticationType.RMCPPlus, fruId));
+						getHandle(),
+						new GetFruInventoryAreaInfo(
+								IpmiVersion.V20,
+								getHandle().getCipherSuite(),
+								AuthenticationType.RMCPPlus,
+								fruId));
 
 		int size = info.getFruInventoryAreaSize();
 		BaseUnit unit = info.getFruUnit();
@@ -230,12 +234,12 @@ public class GetFrusRunner extends AbstractIpmiRunner<List<Fru>> {
 			}
 			try {
 				// get single package od FRU data
-				ReadFruDataResponseData data = (ReadFruDataResponseData) connector
+				ReadFruDataResponseData data = (ReadFruDataResponseData) getConnector()
 						.sendMessage(
-								handle,
+								getHandle(),
 								new ReadFruData(
 										IpmiVersion.V20,
-										handle.getCipherSuite(),
+										getHandle().getCipherSuite(),
 										AuthenticationType.RMCPPlus,
 										fruId,
 										unit,

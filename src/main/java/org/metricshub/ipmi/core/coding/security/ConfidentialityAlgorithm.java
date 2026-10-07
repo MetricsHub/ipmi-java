@@ -31,7 +31,6 @@ import java.security.NoSuchAlgorithmException;
  * implement constructor(byte[]).
  */
 public abstract class ConfidentialityAlgorithm {
-	protected byte[] sik;
 
 	/**
 	 * Initializes Confidentiality Algorithm
@@ -52,7 +51,7 @@ public abstract class ConfidentialityAlgorithm {
 			throws InvalidKeyException,
 			NoSuchAlgorithmException,
 			NoSuchPaddingException {
-		this.sik = sik;
+		// Nothing to keep: subclasses derive their key from sik
 	}
 
 	/**

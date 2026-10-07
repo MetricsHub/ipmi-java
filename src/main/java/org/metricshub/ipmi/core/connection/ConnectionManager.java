@@ -43,7 +43,7 @@ public class ConnectionManager {
 	private Messenger messenger;
 	private List<Connection> connections;
 
-	private static final AtomicInteger sessionlessTag = new AtomicInteger(0);
+	private static final AtomicInteger SESSIONLESS_TAG = new AtomicInteger(0);
 	private static List<Integer> reservedTags = new ArrayList<Integer>();
 
 	/**
@@ -128,28 +128,28 @@ public class ConnectionManager {
 	 * {@link ConnectionManager}. Auto-incremented.
 	 */
 	public static int generateSessionlessTag() {
-		synchronized (sessionlessTag) {
+		synchronized (SESSIONLESS_TAG) {
 			boolean wait = true;
 			while (wait) {
-				sessionlessTag.incrementAndGet();
-				sessionlessTag.set(sessionlessTag.get() % 60);
+				SESSIONLESS_TAG.incrementAndGet();
+				SESSIONLESS_TAG.set(SESSIONLESS_TAG.get() % 60);
 				synchronized (reservedTags) {
-					if (!reservedTags.contains(sessionlessTag.get())) {
+					if (!reservedTags.contains(SESSIONLESS_TAG.get())) {
 						wait = false;
 					}
 				}
 				if (wait) {
 					try {
-						sessionlessTag.wait(1);
+						SESSIONLESS_TAG.wait(1);
 					} catch (InterruptedException e) {
 						// TODO log
 					}
 				}
 			}
 			synchronized (reservedTags) {
-				reservedTags.add(sessionlessTag.get());
+				reservedTags.add(SESSIONLESS_TAG.get());
 			}
-			return sessionlessTag.get();
+			return SESSIONLESS_TAG.get();
 		}
 	}
 
@@ -209,7 +209,7 @@ public class ConnectionManager {
 	 *
 	 * @param address
 	 *        - {@link InetAddress} of the remote host
-	 * @param pingPeriod
+	 * @param connectionPingPeriod
 	 *        - frequency of the no-op commands that will be sent to keep up the session
 	 * @param skipCiphers
 	 *        - determines if the getAvailableCipherSuites and getChannelAuthenticationCapabilities phases should be
@@ -218,9 +218,10 @@ public class ConnectionManager {
 	 * @throws IOException
 	 *         - when properties file was not found
 	 */
-	public int createConnection(InetAddress address, int port, int pingPeriod, boolean skipCiphers) throws IOException {
+	public int createConnection(InetAddress address, int port, int connectionPingPeriod, boolean skipCiphers)
+			throws IOException {
 		Connection connection = new Connection(messenger, 0);
-		connection.connect(address, port, pingPeriod, skipCiphers);
+		connection.connect(address, port, connectionPingPeriod, skipCiphers);
 
 		synchronized (connections) {
 			connections.add(connection);
@@ -233,16 +234,16 @@ public class ConnectionManager {
 	 *
 	 * @param address
 	 *        - {@link InetAddress} of the remote host
-	 * @param pingPeriod
+	 * @param connectionPingPeriod
 	 *        - frequency of the no-op commands that will be sent to keep up
 	 *        the session
 	 * @return index of the connection
 	 * @throws IOException
 	 *         - when properties file was not found
 	 */
-	public int createConnection(InetAddress address, int port, int pingPeriod) throws IOException {
+	public int createConnection(InetAddress address, int port, int connectionPingPeriod) throws IOException {
 		Connection connection = new Connection(messenger, 0);
-		connection.connect(address, port, pingPeriod);
+		connection.connect(address, port, connectionPingPeriod);
 
 		synchronized (connections) {
 			connections.add(connection);

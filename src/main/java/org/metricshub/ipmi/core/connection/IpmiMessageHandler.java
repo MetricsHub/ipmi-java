@@ -38,7 +38,7 @@ import java.io.IOException;
  */
 public class IpmiMessageHandler extends MessageHandler {
 
-	private static final Logger logger = LoggerFactory.getLogger(IpmiMessageHandler.class);
+	private static final Logger LOGGER = LoggerFactory.getLogger(IpmiMessageHandler.class);
 
 	public IpmiMessageHandler(Connection connection, int timeout) throws IOException {
 		super(connection, timeout, IpmiLanMessage.MIN_SEQUENCE_NUMBER, IpmiLanMessage.MAX_SEQUENCE_NUMBER);
@@ -57,13 +57,13 @@ public class IpmiMessageHandler extends MessageHandler {
 		if (message.getPayload() instanceof IpmiLanMessage) {
 			IpmiLanMessage lanMessagePayload = (IpmiLanMessage) message.getPayload();
 
-			PayloadCoder coder = messageQueue.getMessageFromQueue(lanMessagePayload.getSequenceNumber());
+			PayloadCoder coder = getMessageQueue().getMessageFromQueue(lanMessagePayload.getSequenceNumber());
 			int tag = lanMessagePayload.getSequenceNumber();
 
-			logger.debug("Received message with tag " + tag);
+			LOGGER.debug("Received message with tag " + tag);
 
 			if (coder == null) {
-				logger
+				LOGGER
 						.debug(
 								"No message tagged with " + tag
 										+ " in queue. Dropping orphan message.");
@@ -71,16 +71,16 @@ public class IpmiMessageHandler extends MessageHandler {
 			}
 
 			if (coder.getClass() == GetChannelAuthenticationCapabilities.class) {
-				messageQueue.remove(tag);
+				getMessageQueue().remove(tag);
 			} else {
 
 				try {
 					ResponseData responseData = coder.getResponseData(message);
-					connection.notifyResponseListeners(connection.getHandle(), tag, responseData, null);
+					getConnection().notifyResponseListeners(getConnection().getHandle(), tag, responseData, null);
 				} catch (Exception e) {
-					connection.notifyResponseListeners(connection.getHandle(), tag, null, e);
+					getConnection().notifyResponseListeners(getConnection().getHandle(), tag, null, e);
 				}
-				messageQueue.remove(lanMessagePayload.getSequenceNumber());
+				getMessageQueue().remove(lanMessagePayload.getSequenceNumber());
 			}
 		}
 	}

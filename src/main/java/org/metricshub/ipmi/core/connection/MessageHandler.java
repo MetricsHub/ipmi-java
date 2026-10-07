@@ -37,11 +37,29 @@ import org.slf4j.LoggerFactory;
  */
 public abstract class MessageHandler {
 
-	private static final Logger logger = LoggerFactory.getLogger(MessageHandler.class);
+	private static final Logger LOGGER = LoggerFactory.getLogger(MessageHandler.class);
 
-	protected int lastReceivedSequenceNumber = 0;
-	protected final MessageQueue messageQueue;
-	protected final Connection connection;
+	private int lastReceivedSequenceNumber = 0;
+	private final MessageQueue messageQueue;
+	private final Connection connection;
+
+	/**
+	 * Returns the queue of messages awaiting a response.
+	 *
+	 * @return the {@link MessageQueue} of this handler
+	 */
+	protected MessageQueue getMessageQueue() {
+		return messageQueue;
+	}
+
+	/**
+	 * Returns the connection this handler serves.
+	 *
+	 * @return the {@link Connection} of this handler
+	 */
+	protected Connection getConnection() {
+		return connection;
+	}
 
 	public MessageHandler(Connection connection, int timeout, int minSequenceNumber, int maxSequenceNumber) {
 		this.messageQueue = new MessageQueue(connection, timeout, minSequenceNumber, maxSequenceNumber);
@@ -122,7 +140,7 @@ public abstract class MessageHandler {
 		int seq = message.getSessionSequenceNumber();
 
 		if (seq != 0 && (seq > lastReceivedSequenceNumber + 15 || seq < lastReceivedSequenceNumber - 16)) {
-			logger.debug("Dropping message " + seq);
+			LOGGER.debug("Dropping message " + seq);
 			return; // if the message's sequence number gets out of the sliding
 			// window range we need to drop it
 		}

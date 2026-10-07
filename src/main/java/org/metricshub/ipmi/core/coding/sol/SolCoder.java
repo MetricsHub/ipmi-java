@@ -153,11 +153,11 @@ public class SolCoder extends PayloadCoder {
 	}
 
 	@Override
-	public ResponseData getResponseData(IpmiMessage message)
+	public ResponseData getResponseData(IpmiMessage ipmiMessage)
 			throws IPMIException,
 			NoSuchAlgorithmException,
 			InvalidKeyException {
-		final SolInboundMessage payload = (SolInboundMessage) message.getPayload();
+		final SolInboundMessage payload = (SolInboundMessage) ipmiMessage.getPayload();
 		SolInboundStatusField statusField = payload.getStatusField();
 
 		return new SolResponseData(
@@ -169,23 +169,30 @@ public class SolCoder extends PayloadCoder {
 
 	@Override
 	public boolean equals(Object o) {
-		if (this == o)
+		if (this == o) {
 			return true;
-		if (o == null || getClass() != o.getClass())
+		}
+		if (o == null || getClass() != o.getClass()) {
 			return false;
+		}
 
 		SolCoder solCoder = (SolCoder) o;
 
-		if (ackNackSequenceNumber != solCoder.ackNackSequenceNumber)
+		if (ackNackSequenceNumber != solCoder.ackNackSequenceNumber) {
 			return false;
-		if (acceptedCharacters != solCoder.acceptedCharacters)
+		}
+		if (acceptedCharacters != solCoder.acceptedCharacters) {
 			return false;
-		if (acknowledgeOnly != solCoder.acknowledgeOnly)
+		}
+		if (acknowledgeOnly != solCoder.acknowledgeOnly) {
 			return false;
-		if (!Arrays.equals(message, solCoder.message))
+		}
+		if (!Arrays.equals(message, solCoder.message)) {
 			return false;
-		if (ackState != solCoder.ackState)
+		}
+		if (ackState != solCoder.ackState) {
 			return false;
+		}
 		return operations != null ? operations.equals(solCoder.operations) : solCoder.operations == null;
 	}
 

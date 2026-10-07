@@ -42,7 +42,7 @@ import org.slf4j.LoggerFactory;
  */
 public class InboundSolMessageListener implements InboundMessageListener {
 
-	private static final Logger logger = LoggerFactory.getLogger(InboundSolMessageListener.class);
+	private static final Logger LOGGER = LoggerFactory.getLogger(InboundSolMessageListener.class);
 
 	static final int BUFFER_CAPACITY = 2048;
 
@@ -126,7 +126,7 @@ public class InboundSolMessageListener implements InboundMessageListener {
 					waitingMessage = solPayload;
 				}
 			} catch (Exception e) {
-				logger.error("Could not send NACK for packet " + solPayload.getSequenceNumber(), e);
+				LOGGER.error("Could not send NACK for packet " + solPayload.getSequenceNumber(), e);
 			}
 		}
 	}
@@ -145,7 +145,7 @@ public class InboundSolMessageListener implements InboundMessageListener {
 					waitingMessage = null;
 				}
 			} catch (Exception e) {
-				logger.error("Could not send ACK for packet " + solPayload.getSequenceNumber(), e);
+				LOGGER.error("Could not send ACK for packet " + solPayload.getSequenceNumber(), e);
 			}
 		}
 	}
@@ -159,7 +159,7 @@ public class InboundSolMessageListener implements InboundMessageListener {
 					connectionHandle.getCipherSuite());
 			connector.sendOneWayMessage(connectionHandle, solResumeAck);
 		} catch (Exception e) {
-			logger.error("Could not send Resume ACK for packet " + solPayload.getSequenceNumber(), e);
+			LOGGER.error("Could not send Resume ACK for packet " + solPayload.getSequenceNumber(), e);
 		}
 	}
 

@@ -40,7 +40,7 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 public class SessionManager {
 
-	private static final Logger logger = LoggerFactory.getLogger(SessionManager.class);
+	private static final Logger LOGGER = LoggerFactory.getLogger(SessionManager.class);
 
 	private static Integer sessionId = 100;
 
@@ -90,7 +90,7 @@ public class SessionManager {
 				connector.tearDown();
 			}
 		} catch (Exception e) {
-			logger.error("Cannot close connection after exception thrown during session establishment.", e);
+			LOGGER.error("Cannot close connection after exception thrown during session establishment.", e);
 		}
 	}
 
@@ -108,12 +108,12 @@ public class SessionManager {
 	 *        handle of the connection, for which this session should be registered.
 	 * @return newly created session object or session already registered for the connection
 	 */
-	public Session registerSession(int sessionId, ConnectionHandle connectionHandle) {
+	public Session registerSession(int newSessionId, ConnectionHandle connectionHandle) {
 		if (connectionHandle.getUser() == null || connectionHandle.getRemoteAddress() == null) {
 			throw new IllegalArgumentException("Given connection handle is incomplete (lacks user or remote address)");
 		}
 
-		Session newSession = new Session(sessionId, connectionHandle);
+		Session newSession = new Session(newSessionId, connectionHandle);
 		Session currentSession = sessionsPerConnectionHandle.putIfAbsent(connectionHandle.getHandle(), newSession);
 
 		return currentSession != null ? currentSession : newSession;

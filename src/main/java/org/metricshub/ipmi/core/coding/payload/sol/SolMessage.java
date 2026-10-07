@@ -75,12 +75,12 @@ public abstract class SolMessage extends IpmiPayload {
 	/**
 	 * Trims given sequence number to max allowed value for sequence numbers, applying MAX_SEQUENCE_NUMBER mask on it.
 	 *
-	 * @param sequenceNumber
+	 * @param number
 	 *        Sequence number before trim
 	 * @return trimmed sequence number
 	 */
-	private byte trimSequenceNumber(byte sequenceNumber) {
-		return TypeConverter.intToByte(sequenceNumber & MAX_SEQUENCE_NUMBER);
+	private byte trimSequenceNumber(byte number) {
+		return TypeConverter.intToByte(number & MAX_SEQUENCE_NUMBER);
 	}
 
 	@Override

@@ -38,7 +38,7 @@ import org.metricshub.ipmi.core.coding.commands.chassis.GetChassisStatusResponse
 /**
  * This class is the entry point of the IPMI Client library
  */
-public class IpmiClient {
+public final class IpmiClient {
 
 	private IpmiClient() {}
 

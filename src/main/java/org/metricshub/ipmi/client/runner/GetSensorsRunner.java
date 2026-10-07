@@ -66,7 +66,7 @@ public class GetSensorsRunner extends AbstractIpmiRunner<List<Sensor>> {
 		// Id 0 indicates first record in SDR. Next IDs can be retrieved from
 		// records - they are organized in a list and there is no BMC command to
 		// get all of them.
-		nextRecId = 0;
+		setNextRecId(0);
 
 		// Some BMCs allow getting sensor records without reservation, so we try
 		// to do it that way first
@@ -75,7 +75,7 @@ public class GetSensorsRunner extends AbstractIpmiRunner<List<Sensor>> {
 
 		// We get sensor data until we encounter ID = 65535 which means that
 		// this record is the last one.
-		while (nextRecId < MAX_REPO_RECORD_ID) {
+		while (getNextRecId() < MAX_REPO_RECORD_ID) {
 
 			SensorRecord sensorRecord = null;
 
@@ -113,10 +113,10 @@ public class GetSensorsRunner extends AbstractIpmiRunner<List<Sensor>> {
 				// happen many times during getting all sensors, since BMC can't
 				// manage parallel sessions and invalidates old one if new one
 				// appears.
-				reservationId = ((ReserveSdrRepositoryResponseData) connector
+				reservationId = ((ReserveSdrRepositoryResponseData) getConnector()
 						.sendMessage(
-								handle,
-								new ReserveSdrRepository(IpmiVersion.V20, handle.getCipherSuite(), AuthenticationType.RMCPPlus)))
+								getHandle(),
+								new ReserveSdrRepository(IpmiVersion.V20, getHandle().getCipherSuite(), AuthenticationType.RMCPPlus)))
 						.getReservationId();
 			}
 
@@ -235,12 +235,12 @@ public class GetSensorsRunner extends AbstractIpmiRunner<List<Sensor>> {
 			// If we have a reading id means the reading data (e.g. temperature) is potentially available so let's perform the
 			// re
 			if (recordReadingId >= 0) {
-				return (GetSensorReadingResponseData) connector
+				return (GetSensorReadingResponseData) getConnector()
 						.sendMessage(
-								handle,
+								getHandle(),
 								new GetSensorReading(
 										IpmiVersion.V20,
-										handle.getCipherSuite(),
+										getHandle().getCipherSuite(),
 										AuthenticationType.RMCPPlus,
 										recordReadingId));
 

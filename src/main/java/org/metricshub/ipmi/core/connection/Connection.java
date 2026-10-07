@@ -82,7 +82,7 @@ import java.util.concurrent.atomic.AtomicInteger;
  * A connection with the specific remote host.
  */
 public class Connection extends TimerTask implements MachineObserver {
-	private static final Logger logger = LoggerFactory.getLogger(Connection.class);
+	private static final Logger LOGGER = LoggerFactory.getLogger(Connection.class);
 
 	private static final int DEFAULT_CIPHER_SUITE = 3;
 	private static final int SESSION_SEQUENCE_NUMBER_UPPER_BOUND = Integer.MAX_VALUE / 4;
@@ -327,7 +327,7 @@ public class Connection extends TimerTask implements MachineObserver {
 			try {
 				Thread.sleep(1);
 			} catch (InterruptedException e) {
-				logger.error(e.getMessage(), e);
+				LOGGER.error(e.getMessage(), e);
 			}
 			++time;
 		}
@@ -620,13 +620,13 @@ public class Connection extends TimerTask implements MachineObserver {
 	}
 
 	public void notifyResponseListeners(
-			int handle,
+			int handleId,
 			int tag,
 			ResponseData responseData,
 			Exception exception) {
 		for (ConnectionListener listener : listeners) {
 			if (listener != null) {
-				listener.processResponse(responseData, handle, tag, exception);
+				listener.processResponse(responseData, handleId, tag, exception);
 			}
 		}
 	}
@@ -647,7 +647,7 @@ public class Connection extends TimerTask implements MachineObserver {
 			lastAction = action;
 			if (action instanceof ErrorAction) {
 				ErrorAction errorAction = (ErrorAction) action;
-				logger.error(errorAction.getException().getMessage(), errorAction.getException());
+				LOGGER.error(errorAction.getException().getMessage(), errorAction.getException());
 			}
 		} else {
 			handleIncomingMessage(((MessageAction) action).getIpmiv20Message());
@@ -678,7 +678,7 @@ public class Connection extends TimerTask implements MachineObserver {
 				Thread.sleep(1000);
 
 			} catch (Exception e) {
-				logger.error(e.getMessage(), e);
+				LOGGER.error(e.getMessage(), e);
 			}
 		}
 	}

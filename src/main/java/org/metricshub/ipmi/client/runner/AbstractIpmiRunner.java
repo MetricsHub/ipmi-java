@@ -79,12 +79,40 @@ public abstract class AbstractIpmiRunner<T> implements AutoCloseable, Callable<T
 	 */
 	protected static final int HEADER_SIZE = 5;
 
-	protected IpmiClientConfiguration ipmiConfiguration;
+	private IpmiClientConfiguration ipmiConfiguration;
 
-	protected IpmiConnector connector;
-	protected ConnectionHandle handle;
+	private IpmiConnector connector;
+	private ConnectionHandle handle;
 
-	protected int nextRecId;
+	private int nextRecId;
+
+	/**
+	 * @return the {@link IpmiConnector} created by {@link #startSession()}
+	 */
+	protected IpmiConnector getConnector() {
+		return connector;
+	}
+
+	/**
+	 * @return the {@link ConnectionHandle} of the session opened by {@link #startSession()}
+	 */
+	protected ConnectionHandle getHandle() {
+		return handle;
+	}
+
+	/**
+	 * @return the ID of the next SDR record to read
+	 */
+	protected int getNextRecId() {
+		return nextRecId;
+	}
+
+	/**
+	 * @param nextRecId the ID of the next SDR record to read
+	 */
+	protected void setNextRecId(int nextRecId) {
+		this.nextRecId = nextRecId;
+	}
 
 	protected AbstractIpmiRunner(IpmiClientConfiguration ipmiConfiguration) {
 		this.ipmiConfiguration = ipmiConfiguration;

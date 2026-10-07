@@ -32,7 +32,7 @@ import java.util.concurrent.TimeoutException;
 
 import org.metricshub.ipmi.client.runner.AbstractIpmiRunner;
 
-public class Utils {
+public final class Utils {
 
 	private Utils() {}
 

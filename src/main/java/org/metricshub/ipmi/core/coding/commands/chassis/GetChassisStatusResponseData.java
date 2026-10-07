@@ -323,8 +323,8 @@ public class GetChassisStatusResponseData implements ResponseData {
 	}
 
 	private void setFrontPanelButtonCapabilitiesSet(
-			boolean isFrontPanelButtonCapabilitiesSet) {
-		this.isFrontPanelButtonCapabilitiesSet = isFrontPanelButtonCapabilitiesSet;
+			boolean frontPanelButtonCapabilitiesSet) {
+		this.isFrontPanelButtonCapabilitiesSet = frontPanelButtonCapabilitiesSet;
 	}
 
 	public boolean isFrontPanelButtonCapabilitiesSet() {

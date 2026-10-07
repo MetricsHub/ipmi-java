@@ -77,19 +77,24 @@ public class Sendv20Message extends StateMachineEvent {
 
 	@Override
 	public boolean equals(Object o) {
-		if (this == o)
+		if (this == o) {
 			return true;
-		if (o == null || getClass() != o.getClass())
+		}
+		if (o == null || getClass() != o.getClass()) {
 			return false;
+		}
 
 		Sendv20Message that = (Sendv20Message) o;
 
-		if (sessionId != that.sessionId)
+		if (sessionId != that.sessionId) {
 			return false;
-		if (messageSequenceNumber != that.messageSequenceNumber)
+		}
+		if (messageSequenceNumber != that.messageSequenceNumber) {
 			return false;
-		if (sessionSequenceNumber != that.sessionSequenceNumber)
+		}
+		if (sessionSequenceNumber != that.sessionSequenceNumber) {
 			return false;
+		}
 
 		return message != null ? message.equals(that.message) : that.message == null;
 	}

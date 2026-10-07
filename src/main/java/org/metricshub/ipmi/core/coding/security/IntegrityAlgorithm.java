@@ -42,7 +42,7 @@ public abstract class IntegrityAlgorithm {
 		Arrays.fill(CONST1, (byte) 1);
 	}
 
-	protected byte[] sik;
+	private byte[] sik;
 	private final Mac mac;
 
 	/**
@@ -64,14 +64,14 @@ public abstract class IntegrityAlgorithm {
 	/**
 	 * Initializes Integrity Algorithm
 	 *
-	 * @param sik - Session Integrity Key calculated during the opening of the
+	 * @param key - Session Integrity Key calculated during the opening of the
 	 *        session or user password if 'one-key' logins are enabled.
 	 */
-	public void initialize(byte[] sik) throws InvalidKeyException {
-		this.sik = sik;
+	public void initialize(byte[] key) throws InvalidKeyException {
+		this.sik = key;
 		final String algorithmName = getAlgorithmName();
 
-		SecretKeySpec k1 = new SecretKeySpec(sik, algorithmName);
+		SecretKeySpec k1 = new SecretKeySpec(key, algorithmName);
 
 		mac.init(k1);
 		k1 = new SecretKeySpec(mac.doFinal(CONST1), algorithmName);

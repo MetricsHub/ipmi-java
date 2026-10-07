@@ -31,7 +31,7 @@ import org.metricshub.ipmi.core.coding.commands.sdr.record.EntityId;
 /**
  * {@link EntityId} mapping to match the IPMIUtil C code.
  */
-public class DeviceDescription {
+public final class DeviceDescription {
 
 	private DeviceDescription() {}
 

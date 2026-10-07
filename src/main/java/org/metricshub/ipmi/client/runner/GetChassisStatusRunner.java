@@ -42,10 +42,10 @@ public class GetChassisStatusRunner extends AbstractIpmiRunner<GetChassisStatusR
 		super.startSession();
 
 		// Send the UDP message and read the response
-		return (GetChassisStatusResponseData) connector
+		return (GetChassisStatusResponseData) getConnector()
 				.sendMessage(
-						handle,
-						new GetChassisStatus(IpmiVersion.V20, handle.getCipherSuite(), AuthenticationType.RMCPPlus));
+						getHandle(),
+						new GetChassisStatus(IpmiVersion.V20, getHandle().getCipherSuite(), AuthenticationType.RMCPPlus));
 
 	}
 

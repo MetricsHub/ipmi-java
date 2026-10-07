@@ -85,7 +85,7 @@ public class BoardInfo extends FruRecord {
 					new Date(
 							df.parse("01/01/96").getTime()
 									+ ((long) TypeConverter.littleEndianByteArrayToInt(buffer))
-											* 60000l));
+											* 60000L));
 		} catch (ParseException e) {
 			logger.error(e.getMessage(), e);
 		}
