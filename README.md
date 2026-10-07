@@ -12,7 +12,7 @@ The IPMI Java Client is a library that communicates with the IPMI host, fetches 
 
 ## Upgrading
 
-Version 1.2.03 makes the `protected` fields of the protocol classes (`AbstractIpmiRunner`, `MessageHandler`, `IpmiLanMessage`, `ConfidentialityAlgorithm`, `IntegrityAlgorithm`) `private`. Subclasses must use the new `protected` accessors instead; see [Upgrading from 1.2.02](https://metricshub.org/ipmi-java/#upgrading-from-1-2-02) for the list. The `IpmiClient` API is unchanged.
+Version 1.2.03 makes the `protected` fields of the protocol classes (`AbstractIpmiRunner`, `MessageHandler`, `IpmiLanMessage`, `ConfidentialityAlgorithm`, `IntegrityAlgorithm`) `private`. Subclasses must use the new `protected` accessors instead; see [Upgrading from 1.2.02](https://metricshub.org/ipmi-java/#upgrading-from-1-2-02) for the list. The `IpmiClient` API is unchanged. The Full, Compact and Event-Only sensor records now share the `AbstractSensorRecord` superclass, and commands can check responses with `IpmiCommandCoder.validateResponse()`; both are described on the same page.
 
 ## Build instructions
 
