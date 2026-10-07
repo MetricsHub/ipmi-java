@@ -263,9 +263,8 @@ public class ReadFruData extends IpmiCommandCoder {
 			if (multiRecordOffset != 0) {
 				addMultirecords(list, data, multiRecordOffset);
 			}
-		} else if (false) {
-			// TODO: Recognize SPD record (returned from DIMM FRUs)
 		} else {
+			// TODO: recognize SPD records returned by DIMM FRUs (#107)
 			throw new IllegalArgumentException("Invalid format version: " + data[0]);
 		}
 

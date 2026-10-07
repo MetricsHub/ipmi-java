@@ -150,7 +150,7 @@ public class MessageQueue extends TimerTask {
 							try {
 								lastSequenceNumberLock.wait(1);
 							} catch (InterruptedException e) {
-								// TODO log
+								Thread.currentThread().interrupt();
 							}
 						}
 

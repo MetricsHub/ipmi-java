@@ -49,7 +49,7 @@ public enum SolAckState {
 	 * @return {@link SolAckState} extracted from byte
 	 */
 	public static SolAckState extractFromByte(byte value) {
-		return TypeConverter.isBitSetOnPosition(ACK_BIT_NUMBER, value) ? SolAckState.NACK : SolAckState.ACK;
+		return TypeConverter.isBitSetOnPosition(ACK_BIT_NUMBER, value) ? NACK : ACK;
 	}
 
 	/**
@@ -62,7 +62,7 @@ public enum SolAckState {
 	public byte encodeInByte(final byte value) {
 		byte updatedValue = value;
 
-		if (this == SolAckState.NACK) {
+		if (this == NACK) {
 			updatedValue = TypeConverter.setBitOnPosition(ACK_BIT_NUMBER, value);
 		}
 

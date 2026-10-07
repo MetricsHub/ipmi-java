@@ -229,7 +229,7 @@ public class FullSensorRecord extends SensorRecord {
 
 		int bExp = TypeConverter
 				.decode2sComplement(
-						(TypeConverter.byteToInt(recordData[29]) & 0xf),
+						TypeConverter.byteToInt(recordData[29]) & 0xf,
 						3);
 
 		setB(getB() * Math.pow(10, bExp));

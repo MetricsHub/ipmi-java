@@ -219,7 +219,7 @@ public abstract class AbstractIpmiRunner<T> implements AutoCloseable, Callable<T
 			try {
 				connector.closeSession(handle);
 			} catch (Exception e) {
-				// Ignore
+				LOGGER.debug("Failed to close the IPMI session", e);
 			}
 		}
 

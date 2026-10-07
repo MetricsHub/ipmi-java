@@ -130,6 +130,9 @@ public class ConnectionManager {
 	public static int generateSessionlessTag() {
 		synchronized (SESSIONLESS_TAG) {
 			boolean wait = true;
+			// wait(1) clears the interrupt flag when it throws; restore it only once a tag is found,
+			// otherwise every following wait(1) would throw immediately and the loop would hot-spin
+			boolean interrupted = false;
 			while (wait) {
 				SESSIONLESS_TAG.incrementAndGet();
 				SESSIONLESS_TAG.set(SESSIONLESS_TAG.get() % 60);
@@ -142,12 +145,15 @@ public class ConnectionManager {
 					try {
 						SESSIONLESS_TAG.wait(1);
 					} catch (InterruptedException e) {
-						// TODO log
+						interrupted = true;
 					}
 				}
 			}
 			synchronized (reservedTags) {
 				reservedTags.add(SESSIONLESS_TAG.get());
+			}
+			if (interrupted) {
+				Thread.currentThread().interrupt();
 			}
 			return SESSIONLESS_TAG.get();
 		}

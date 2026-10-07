@@ -52,7 +52,7 @@ public final class TypeConverter {
 		byte[] b = new byte[4];
 		for (int i = 0; i < 4; i++) {
 			int offset = (b.length - 1 - i) * 8;
-			b[i] = intToByte(((value >>> offset) & 0xFF));
+			b[i] = intToByte((value >>> offset) & 0xFF);
 		}
 		return b;
 	}
@@ -92,7 +92,7 @@ public final class TypeConverter {
 		byte[] b = new byte[4];
 		for (int i = 3; i >= 0; i--) {
 			int offset = i * 8;
-			b[i] = intToByte(((value >>> offset) & 0xFF));
+			b[i] = intToByte((value >>> offset) & 0xFF);
 		}
 		return b;
 	}
@@ -207,7 +207,7 @@ public final class TypeConverter {
 		byte[] tmpBytArray = new byte[4];
 		System.arraycopy(word, 0, tmpBytArray, 2, 2);
 
-		return TypeConverter.byteArrayToInt(tmpBytArray);
+		return byteArrayToInt(tmpBytArray);
 	}
 
 	/**
@@ -225,7 +225,7 @@ public final class TypeConverter {
 		byte[] tmpBytArray = new byte[4];
 		System.arraycopy(word, 0, tmpBytArray, 0, 2);
 
-		return TypeConverter.littleEndianByteArrayToInt(tmpBytArray);
+		return littleEndianByteArrayToInt(tmpBytArray);
 	}
 
 	/**
@@ -292,7 +292,8 @@ public final class TypeConverter {
 				int mask = 0x1 << i;
 				result |= mask;
 			}
-			result = -(~result);
+			// the 1's complement magnitude is ~result, so the value is -(~result), i.e. result + 1
+			result = result + 1;
 		}
 		return result;
 	}
@@ -305,18 +306,16 @@ public final class TypeConverter {
 
 		for (int i = 0; i < text.length; ++i) {
 			result[2 * i] = decodeBcdPlusChar(
-					TypeConverter
-							.intToByte((TypeConverter.byteToInt(text[i]) & 0xf0) >> 4));
+					intToByte((byteToInt(text[i]) & 0xf0) >> 4));
 			result[2 * i + 1] = decodeBcdPlusChar(
-					TypeConverter
-							.intToByte(TypeConverter.byteToInt(text[i]) & 0xf));
+					intToByte(byteToInt(text[i]) & 0xf));
 		}
 
 		return new String(result);
 	}
 
 	private static char decodeBcdPlusChar(byte ch) {
-		switch (TypeConverter.byteToInt(ch)) {
+		switch (byteToInt(ch)) {
 		case 0x0:
 			return '0';
 		case 0x1:
@@ -366,40 +365,28 @@ public final class TypeConverter {
 		for (int i = 0; i < text.length; ++i) {
 			switch (i % 3) {
 			case 0:
-				newText[index++] = TypeConverter
-						.intToByte(
-								TypeConverter
-										.byteToInt(text[i])
-										& 0x3f);
-				newText[index] = TypeConverter
-						.intToByte(
-								(TypeConverter
-										.byteToInt(text[i])
-										& 0xc0) >> 6);
+				newText[index++] = intToByte(
+						byteToInt(text[i])
+								& 0x3f);
+				newText[index] = intToByte(
+						(byteToInt(text[i])
+								& 0xc0) >> 6);
 				break;
 			case 1:
-				newText[index++] |= TypeConverter
-						.intToByte(
-								(TypeConverter
-										.byteToInt(text[i])
-										& 0xf) << 2);
-				newText[index] = TypeConverter
-						.intToByte(
-								(TypeConverter
-										.byteToInt(text[i])
-										& 0xf0) >> 4);
+				newText[index++] |= intToByte(
+						(byteToInt(text[i])
+								& 0xf) << 2);
+				newText[index] = intToByte(
+						(byteToInt(text[i])
+								& 0xf0) >> 4);
 				break;
 			case 2:
-				newText[index++] |= TypeConverter
-						.intToByte(
-								(TypeConverter
-										.byteToInt(text[i])
-										& 0x3) << 4);
-				newText[index++] = TypeConverter
-						.intToByte(
-								(TypeConverter
-										.byteToInt(text[i])
-										& 0xfc) >> 2);
+				newText[index++] |= intToByte(
+						(byteToInt(text[i])
+								& 0x3) << 4);
+				newText[index++] = intToByte(
+						(byteToInt(text[i])
+								& 0xfc) >> 2);
 				break;
 			default:
 				break;
@@ -407,10 +394,8 @@ public final class TypeConverter {
 		}
 
 		for (int i = 0; i < newText.length; ++i) {
-			newText[i] = TypeConverter
-					.intToByte(
-							TypeConverter
-									.byteToInt(newText[i]) + 0x20);
+			newText[i] = intToByte(
+					byteToInt(newText[i]) + 0x20);
 		}
 
 		return new String(newText, Charset.forName("US-ASCII"));
@@ -435,7 +420,7 @@ public final class TypeConverter {
 	 * @return
 	 */
 	public static boolean isBitSetOnPosition(int position, byte value) {
-		return ((value & SINGLE_BIT_MASKS[position]) > 0);
+		return (value & SINGLE_BIT_MASKS[position]) > 0;
 	}
 
 	public static byte setBitOnPosition(int position, byte value) {

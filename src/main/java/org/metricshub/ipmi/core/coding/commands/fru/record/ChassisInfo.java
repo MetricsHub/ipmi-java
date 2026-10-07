@@ -73,7 +73,7 @@ public class ChassisInfo extends FruRecord {
 
 			int partType = (partNumber & 0xc0) >> 6;
 
-			int partDataLength = (partNumber & 0x3f);
+			int partDataLength = partNumber & 0x3f;
 
 			if (partDataLength > 0 && partDataLength + currentOffset < fruData.length) {
 
@@ -92,19 +92,17 @@ public class ChassisInfo extends FruRecord {
 				switch (index) {
 				case 0:
 					setChassisPartNumber(
-							FruRecord
-									.decodeString(
-											partType,
-											partNumberData,
-											true));
+							decodeString(
+									partType,
+									partNumberData,
+									true));
 					break;
 				case 1:
 					setChassisSerialNumber(
-							FruRecord
-									.decodeString(
-											partType,
-											partNumberData,
-											true));
+							decodeString(
+									partType,
+									partNumberData,
+									true));
 					break;
 				default:
 					if (partDataLength == 0) {
@@ -112,11 +110,10 @@ public class ChassisInfo extends FruRecord {
 					}
 					customInfo
 							.add(
-									FruRecord
-											.decodeString(
-													partType,
-													partNumberData,
-													true));
+									decodeString(
+											partType,
+											partNumberData,
+											true));
 					break;
 				}
 			}

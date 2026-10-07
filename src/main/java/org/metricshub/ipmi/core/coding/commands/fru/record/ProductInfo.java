@@ -92,7 +92,7 @@ public class ProductInfo extends FruRecord {
 
 			int partType = (currentPartNumber & 0xc0) >> 6;
 
-			int partDataLength = (currentPartNumber & 0x3f);
+			int partDataLength = currentPartNumber & 0x3f;
 
 			if (partDataLengthWithinBounds(fruData, currentOffset, partDataLength)) {
 
@@ -111,51 +111,45 @@ public class ProductInfo extends FruRecord {
 				switch (index) {
 				case 0:
 					setManufacturerName(
-							FruRecord
-									.decodeString(
-											partType,
-											partNumberData,
-											isEnglishLanguageCode(languageCode)));
+							decodeString(
+									partType,
+									partNumberData,
+									isEnglishLanguageCode(languageCode)));
 					break;
 				case 1:
 					setProductName(
-							FruRecord
-									.decodeString(
-											partType,
-											partNumberData,
-											isEnglishLanguageCode(languageCode)));
+							decodeString(
+									partType,
+									partNumberData,
+									isEnglishLanguageCode(languageCode)));
 					break;
 				case 2:
 					setProductModelNumber(
-							FruRecord
-									.decodeString(
-											partType,
-											partNumberData,
-											isEnglishLanguageCode(languageCode)));
+							decodeString(
+									partType,
+									partNumberData,
+									isEnglishLanguageCode(languageCode)));
 					break;
 				case 3:
 					setProductVersion(
-							FruRecord
-									.decodeString(
-											partType,
-											partNumberData,
-											isEnglishLanguageCode(languageCode)));
+							decodeString(
+									partType,
+									partNumberData,
+									isEnglishLanguageCode(languageCode)));
 					break;
 				case 4:
 					setProductSerialNumber(
-							FruRecord
-									.decodeString(
-											partType,
-											partNumberData,
-											true));
+							decodeString(
+									partType,
+									partNumberData,
+									true));
 					break;
 				case 5:
 					setAssetTag(
-							FruRecord
-									.decodeString(
-											partType,
-											partNumberData,
-											isEnglishLanguageCode(languageCode)));
+							decodeString(
+									partType,
+									partNumberData,
+									isEnglishLanguageCode(languageCode)));
 					break;
 				case 6:
 					setFruFileId(partNumberData);
@@ -168,11 +162,10 @@ public class ProductInfo extends FruRecord {
 					}
 					customInfo
 							.add(
-									FruRecord
-											.decodeString(
-													partType,
-													partNumberData,
-													isEnglishLanguageCode(languageCode)));
+									decodeString(
+											partType,
+											partNumberData,
+											isEnglishLanguageCode(languageCode)));
 					break;
 				}
 			}

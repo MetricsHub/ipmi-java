@@ -388,7 +388,6 @@ public class IpmiAsyncConnector implements ConnectionListener {
 				}
 			}
 		}
-		return;
 	}
 
 	/**

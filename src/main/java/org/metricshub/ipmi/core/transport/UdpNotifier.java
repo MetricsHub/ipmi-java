@@ -42,7 +42,5 @@ public class UdpNotifier extends Thread {
 				listener.notifyMessage(message);
 			}
 		}
-
-		super.run();
 	}
 }

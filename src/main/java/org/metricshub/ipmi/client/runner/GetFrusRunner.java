@@ -47,11 +47,15 @@ import org.metricshub.ipmi.core.coding.commands.sdr.record.SensorRecord;
 import org.metricshub.ipmi.core.coding.payload.CompletionCode;
 import org.metricshub.ipmi.core.coding.payload.lan.IPMIException;
 import org.metricshub.ipmi.core.coding.protocol.AuthenticationType;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Get FRU information
  */
 public class GetFrusRunner extends AbstractIpmiRunner<List<Fru>> {
+
+	private static final Logger LOGGER = LoggerFactory.getLogger(GetFrusRunner.class);
 
 	/**
 	 * Id of the built-in, default FRU
@@ -197,7 +201,7 @@ public class GetFrusRunner extends AbstractIpmiRunner<List<Fru>> {
 			}
 
 		} catch (IPMIException e) {
-			// Nothing can be done
+			LOGGER.warn("Failed to read the FRU of sensor record {}: {}", sensorRecord.getId(), e.getMessage());
 		}
 
 	}
@@ -249,7 +253,7 @@ public class GetFrusRunner extends AbstractIpmiRunner<List<Fru>> {
 				fruData.add(data);
 
 			} catch (Exception e) {
-				// Nothing can be done
+				LOGGER.warn("Failed to read FRU {} at offset {}, the FRU data will be truncated: {}", fruId, i, e.getMessage());
 			}
 		}
 
@@ -265,7 +269,7 @@ public class GetFrusRunner extends AbstractIpmiRunner<List<Fru>> {
 					.collect(Collectors.toList());
 
 		} catch (Exception e) {
-			// Nothing can be done
+			LOGGER.warn("Failed to decode FRU {}: {}", fruId, e.getMessage());
 		}
 
 		return new ArrayList<>();

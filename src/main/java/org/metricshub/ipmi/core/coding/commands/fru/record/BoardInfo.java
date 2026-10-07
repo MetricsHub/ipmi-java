@@ -119,7 +119,7 @@ public class BoardInfo extends FruRecord {
 
 			int partType = (currentPartNumber & 0xc0) >> 6;
 
-			int partDataLength = (currentPartNumber & 0x3f);
+			int partDataLength = currentPartNumber & 0x3f;
 
 			if (partDataLengthWithinBounds(fruData, currentOffset, partDataLength)) {
 
@@ -138,38 +138,34 @@ public class BoardInfo extends FruRecord {
 				switch (index) {
 				case 0:
 					setBoardManufacturer(
-							FruRecord
-									.decodeString(
-											partType,
-											partNumberData,
-											languageCode != 0
-													&& languageCode != 25));
+							decodeString(
+									partType,
+									partNumberData,
+									languageCode != 0
+											&& languageCode != 25));
 					break;
 				case 1:
 					setBoardProductName(
-							FruRecord
-									.decodeString(
-											partType,
-											partNumberData,
-											languageCode != 0
-													&& languageCode != 25));
+							decodeString(
+									partType,
+									partNumberData,
+									languageCode != 0
+											&& languageCode != 25));
 					break;
 				case 2:
 					setBoardSerialNumber(
-							FruRecord
-									.decodeString(
-											partType,
-											partNumberData,
-											true));
+							decodeString(
+									partType,
+									partNumberData,
+									true));
 					break;
 				case 3:
 					setBoardPartNumber(
-							FruRecord
-									.decodeString(
-											partType,
-											partNumberData,
-											languageCode != 0
-													&& languageCode != 25));
+							decodeString(
+									partType,
+									partNumberData,
+									languageCode != 0
+											&& languageCode != 25));
 					break;
 				case 4:
 					setFruFileId(partNumberData);
@@ -182,12 +178,11 @@ public class BoardInfo extends FruRecord {
 					}
 					customInfo
 							.add(
-									FruRecord
-											.decodeString(
-													partType,
-													partNumberData,
-													languageCode != 0
-															&& languageCode != 25));
+									decodeString(
+											partType,
+											partNumberData,
+											languageCode != 0
+													&& languageCode != 25));
 					break;
 				}
 			}
