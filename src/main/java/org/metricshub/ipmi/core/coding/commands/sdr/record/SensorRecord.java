@@ -91,6 +91,13 @@ public abstract class SensorRecord {
             sensorRecord = new OemRecord();
             break;
         default:
+            // IPMI 2.0 Table 43-1 reserves C0h-FFh for OEM records; vendors use
+            // values above C0h (e.g. NVIDIA/GIGABYTE emit D0h). Never abort the
+            // SDR repository walk on a record type we don't model.
+            if (TypeConverter.byteToInt(recType) >= TypeConverter.byteToInt(RecordTypes.OEM_RECORD)) {
+                sensorRecord = new OemRecord();
+                break;
+            }
             throw new IllegalArgumentException("Invalid record type: "
                     + recType);
         }
