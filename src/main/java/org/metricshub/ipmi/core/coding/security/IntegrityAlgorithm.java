@@ -89,6 +89,15 @@ public abstract class IntegrityAlgorithm {
 	}
 
 	/**
+	 * Stores the Session Integrity Key without initializing the MAC, for algorithms that do not use one.
+	 *
+	 * @param sik the Session Integrity Key
+	 */
+	protected void setSik(byte[] sik) {
+		this.sik = sik;
+	}
+
+	/**
 	 * Returns the algorithm's ID.
 	 */
 	public abstract byte getCode();

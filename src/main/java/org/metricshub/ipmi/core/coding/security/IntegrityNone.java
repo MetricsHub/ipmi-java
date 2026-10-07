@@ -38,7 +38,8 @@ public class IntegrityNone extends IntegrityAlgorithm {
 
 	@Override
 	public void initialize(byte[] sik) throws InvalidKeyException {
-		// No key: generateAuthCode() is overridden and never uses it
+		// No MAC to initialize: generateAuthCode() is overridden and never uses the key
+		setSik(sik);
 	}
 
 	@Override
