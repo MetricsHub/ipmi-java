@@ -10,6 +10,10 @@ See **[Project Documentation](https://metricshub.org/ipmi-java)** and the [Javad
 
 The IPMI Java Client is a library that communicates with the IPMI host, fetches Field Replaceable Units (FRUs) and Sensors information then reports these information as a text output.
 
+## Upgrading
+
+Version 1.2.03 makes the `protected` fields of the protocol classes (`AbstractIpmiRunner`, `MessageHandler`, `IpmiLanMessage`, `ConfidentialityAlgorithm`, `IntegrityAlgorithm`) `private`. Subclasses must use the new `protected` accessors instead; see [Upgrading from 1.2.02](https://metricshub.org/ipmi-java/#upgrading-from-1-2-02) for the list. The `IpmiClient` API is unchanged.
+
 ## Build instructions
 
 This is a simple Maven project. Build with:

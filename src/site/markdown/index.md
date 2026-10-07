@@ -64,3 +64,21 @@ public class IpmiMain {
 
 ```
 
+## Upgrading from 1.2.02
+
+The `IpmiClient` API is unchanged. Classes that **extend** the library's protocol classes must replace direct access to formerly `protected` fields, which are now `private`, with the new `protected` accessors:
+
+| Class | Former field | Accessor |
+| --- | --- | --- |
+| `AbstractIpmiRunner` | `ipmiConfiguration` | `getIpmiConfiguration()` |
+| `AbstractIpmiRunner` | `connector` | `getConnector()` |
+| `AbstractIpmiRunner` | `handle` | `getHandle()` |
+| `AbstractIpmiRunner` | `nextRecId` | `getNextRecId()`, `setNextRecId(int)` |
+| `MessageHandler` | `messageQueue` | `getMessageQueue()` |
+| `MessageHandler` | `connection` | `getConnection()` |
+| `MessageHandler` | `lastReceivedSequenceNumber` | `getLastReceivedSequenceNumber()`, `setLastReceivedSequenceNumber(int)` |
+| `IpmiLanMessage` | `networkFunction` | `getNetworkFunctionCode()`, `setNetworkFunctionCode(byte)` |
+| `ConfidentialityAlgorithm` | `sik` | `getSik()` |
+| `IntegrityAlgorithm` | `sik` | `getSik()`, `setSik(byte[])` |
+
+`IpmiClient`, `IpmiResultConverter`, `Utils`, `DeviceDescription`, `ReadingTypeDescription` and `MessageComposer` are now `final` (they only had private constructors, so they could not be subclassed anyway).
