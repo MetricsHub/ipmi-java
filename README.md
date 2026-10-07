@@ -18,6 +18,22 @@ This is a simple Maven project. Build with:
 mvn verify
 ```
 
+## Code format
+
+The code is formatted with the MetricsHub Eclipse formatter profile ([metricshub-eclipse-formatter.xml](metricshub-eclipse-formatter.xml), shared with the other MetricsHub Java projects), and the build fails on unformatted code. Simply run the below command before committing:
+
+```bash
+mvn formatter:format
+```
+
+The build also fails on [Checkstyle](checkstyle.xml) violations. A justified violation can be suppressed with `// CHECKSTYLE.OFF: <RuleName>` and `// CHECKSTYLE.ON: <RuleName>` comments.
+
+To ignore the whole-tree reformat commit in `git blame`, run once:
+
+```bash
+git config blame.ignoreRevsFile .git-blame-ignore-revs
+```
+
 ## Release instructions
 
 The artifact is deployed to Sonatype's [Maven Central](https://central.sonatype.com/).
