@@ -82,3 +82,28 @@ The `IpmiClient` API is unchanged. Classes that **extend** the library's protoco
 | `IntegrityAlgorithm` | `sik` | `getSik()`, `setSik(byte[])` |
 
 `IpmiClient`, `IpmiResultConverter`, `Utils`, `DeviceDescription`, `ReadingTypeDescription` and `MessageComposer` are now `final` (they only had private constructors, so they could not be subclassed anyway).
+
+### Sensor records
+
+`FullSensorRecord`, `CompactSensorRecord` and `EventOnlyRecord` now extend the new `AbstractSensorRecord` (itself a `SensorRecord`), which holds the fields the three record types share: sensor owner and number, entity, sensor type, event/reading type, direction, name (ID string), capabilities, units and record sharing. Their getters and setters keep the same signatures, so existing code compiles unchanged, and code that handles several record types can use `AbstractSensorRecord` instead of testing each type:
+
+```java
+if (record instanceof AbstractSensorRecord) {
+	AbstractSensorRecord sensor = (AbstractSensorRecord) record;
+	System.out.println(sensor.getName() + ": " + sensor.getSensorType());
+}
+```
+
+A record type now also inherits the getters of fields it does not define, which return defaults:
+
+| Record | Field | Value |
+| --- | --- | --- |
+| `EventOnlyRecord` (no reading) | `getRateUnit()`, `getModifierUnitUsage()`, `getSensorBaseUnit()`, `getSensorModifierUnit()` | `null` |
+| `EventOnlyRecord` (no reading) | `isHysteresisReadable()`, `isThresholdsReadable()` | `false` |
+| `FullSensorRecord` (a single sensor) | `getShareCount()`, `getIdInstanceModifierOffset()` | `0` |
+| `FullSensorRecord` (a single sensor) | `getIdInstanceModifierType()` | `null` |
+| `FullSensorRecord` (a single sensor) | `isEntityInstanceIncrements()` | `false` |
+
+### Command responses
+
+Commands that extend `IpmiCommandCoder` can call the new `protected` method `validateResponse(IpmiMessage)`, which checks that a message is a successful response to the command and returns its data: it throws `IllegalArgumentException` for a response to another command or a payload that is not an IPMI LAN response, and `IPMIException` for a completion code other than `Ok`. The message of the `IllegalArgumentException` now names the command class (three commands used to name the wrong command).

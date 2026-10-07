@@ -148,13 +148,14 @@
 				</executions>
 			</plugin>
 
-			<!-- pmd: fail the build on any violation of pmd.xml, so the PMD report stays clean (cpd-check awaits #115) -->
+			<!-- pmd: fail the build on any violation of pmd.xml or any duplication of 100+ tokens (the CPD report lists 50+) -->
 			<plugin>
 				<groupId>org.apache.maven.plugins</groupId>
 				<artifactId>maven-pmd-plugin</artifactId>
 				<version>3.28.0</version>
 				<configuration>
 					<targetJdk>${maven.compiler.release}</targetJdk>
+					<minimumTokens>100</minimumTokens>
 					<rulesets>
 						<ruleset>pmd.xml</ruleset>
 					</rulesets>
@@ -164,17 +165,23 @@
 					<execution>
 						<goals>
 							<goal>check</goal>
+							<goal>cpd-check</goal>
 						</goals>
 					</execution>
 				</executions>
 			</plugin>
 
-			<!-- license -->
+			<!-- license: add headers to new files, never rewrite existing ones. The parent's canUpdateCopyright would turn
+				every "Copyright 2023 Verax Systems, MetricsHub" into "Copyright 2023 - <current year> MetricsHub", and its
+				canUpdateDescription makes every header look outdated on Windows (CRLF vs LF), which re-renders the copyright
+				line as "Copyright (C) ..." -->
 			<plugin>
 				<groupId>org.codehaus.mojo</groupId>
 				<artifactId>license-maven-plugin</artifactId>
 				<configuration>
 					<licenseName>lgpl_v3</licenseName>
+					<canUpdateCopyright>false</canUpdateCopyright>
+					<canUpdateDescription>false</canUpdateDescription>
 				</configuration>
 			</plugin>
 		</plugins>

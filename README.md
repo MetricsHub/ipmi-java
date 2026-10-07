@@ -12,7 +12,7 @@ The IPMI Java Client is a library that communicates with the IPMI host, fetches 
 
 ## Upgrading
 
-Version 1.2.03 makes the `protected` fields of the protocol classes (`AbstractIpmiRunner`, `MessageHandler`, `IpmiLanMessage`, `ConfidentialityAlgorithm`, `IntegrityAlgorithm`) `private`. Subclasses must use the new `protected` accessors instead; see [Upgrading from 1.2.02](https://metricshub.org/ipmi-java/#upgrading-from-1-2-02) for the list. The `IpmiClient` API is unchanged.
+Version 1.2.03 makes the `protected` fields of the protocol classes (`AbstractIpmiRunner`, `MessageHandler`, `IpmiLanMessage`, `ConfidentialityAlgorithm`, `IntegrityAlgorithm`) `private`. Subclasses must use the new `protected` accessors instead; see [Upgrading from 1.2.02](https://metricshub.org/ipmi-java/#upgrading-from-1-2-02) for the list. The `IpmiClient` API is unchanged. The Full, Compact and Event-Only sensor records now share the `AbstractSensorRecord` superclass, and commands can check responses with `IpmiCommandCoder.validateResponse()`; both are described on the same page.
 
 ## Build instructions
 
@@ -54,8 +54,10 @@ But it is strongly recommended to only use [GitHub Actions "Release to Maven Cen
 
 ## License
 
-License is GNU General Lesser Public License (LGPL) version 3.0. Each source file includes the LGPL-3 header (build will fail otherwise).
-To update source files with the proper header, simply execute the below command:
+License is GNU General Lesser Public License (LGPL) version 3.0. The IPMI Library for Java by Verax Systems is published under the GNU GPL v3; this fork uses it under a commercial (non-GPL) license granted by Verax Systems to Sentry Software in 2021. The source files derived from it keep Verax Systems as copyright holder.
+
+Each source file includes the LGPL-3 header (build will fail otherwise).
+To add the header to new source files, simply execute the below command (existing headers are never modified):
 
 ```bash
 mvn license:update-file-header

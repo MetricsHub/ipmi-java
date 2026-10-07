@@ -23,6 +23,7 @@ package org.metricshub.ipmi.client.model;
  */
 
 import org.metricshub.ipmi.core.coding.commands.sdr.GetSensorReadingResponseData;
+import org.metricshub.ipmi.core.coding.commands.sdr.record.AbstractSensorRecord;
 import org.metricshub.ipmi.core.coding.commands.sdr.record.CompactSensorRecord;
 import org.metricshub.ipmi.core.coding.commands.sdr.record.EntityId;
 import org.metricshub.ipmi.core.coding.commands.sdr.record.FullSensorRecord;
@@ -70,21 +71,12 @@ public class Sensor {
 	}
 
 	/**
-	 * Cast the current record to a {@link CompactSensorRecord}
+	 * Cast the current record to the {@link AbstractSensorRecord} shared by the Compact and Full sensor records
 	 *
-	 * @return {@link CompactSensorRecord} instance
+	 * @return {@link AbstractSensorRecord} instance, or <code>null</code> if the record is neither Compact nor Full
 	 */
-	private CompactSensorRecord getCompactSensorRecord() {
-		return (CompactSensorRecord) sensorRecord;
-	}
-
-	/**
-	 * Cast the current record to a {@link FullSensorRecord}
-	 *
-	 * @return {@link FullSensorRecord} instance
-	 */
-	private FullSensorRecord getFullSensorRecord() {
-		return (FullSensorRecord) sensorRecord;
+	private AbstractSensorRecord getSensorRecord() {
+		return isCompact() || isFull() ? (AbstractSensorRecord) sensorRecord : null;
 	}
 
 	/**
@@ -93,13 +85,8 @@ public class Sensor {
 	 * @return {@link EntityId} instance
 	 */
 	public EntityId getEntityId() {
-
-		if (isCompact()) {
-			return getCompactSensorRecord().getEntityId();
-		} else if (isFull()) {
-			return getFullSensorRecord().getEntityId();
-		}
-		return null;
+		final AbstractSensorRecord record = getSensorRecord();
+		return record == null ? null : record.getEntityId();
 	}
 
 	/**
@@ -108,12 +95,8 @@ public class Sensor {
 	 * @return {@link Byte} value or <code>null</code> if the type of the sensor cannot be detected.
 	 */
 	public Byte getDeviceId() {
-		if (isCompact()) {
-			return getCompactSensorRecord().getEntityInstanceNumber();
-		} else if (isFull()) {
-			return getFullSensorRecord().getEntityInstanceNumber();
-		}
-		return null;
+		final AbstractSensorRecord record = getSensorRecord();
+		return record == null ? null : record.getEntityInstanceNumber();
 	}
 
 	/**
@@ -122,12 +105,8 @@ public class Sensor {
 	 * @return {@link String} value
 	 */
 	public String getName() {
-		if (isCompact()) {
-			return getCompactSensorRecord().getName();
-		} else if (isFull()) {
-			return getFullSensorRecord().getName();
-		}
-		return null;
+		final AbstractSensorRecord record = getSensorRecord();
+		return record == null ? null : record.getName();
 	}
 
 	/**

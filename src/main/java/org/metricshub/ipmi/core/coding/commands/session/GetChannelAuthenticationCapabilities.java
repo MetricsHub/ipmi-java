@@ -27,11 +27,9 @@ import org.metricshub.ipmi.core.coding.commands.IpmiCommandCoder;
 import org.metricshub.ipmi.core.coding.commands.IpmiVersion;
 import org.metricshub.ipmi.core.coding.commands.PrivilegeLevel;
 import org.metricshub.ipmi.core.coding.commands.ResponseData;
-import org.metricshub.ipmi.core.coding.payload.CompletionCode;
 import org.metricshub.ipmi.core.coding.payload.IpmiPayload;
 import org.metricshub.ipmi.core.coding.payload.lan.IPMIException;
 import org.metricshub.ipmi.core.coding.payload.lan.IpmiLanRequest;
-import org.metricshub.ipmi.core.coding.payload.lan.IpmiLanResponse;
 import org.metricshub.ipmi.core.coding.payload.lan.NetworkFunction;
 import org.metricshub.ipmi.core.coding.protocol.AuthenticationType;
 import org.metricshub.ipmi.core.coding.protocol.IpmiMessage;
@@ -225,21 +223,9 @@ public class GetChannelAuthenticationCapabilities extends IpmiCommandCoder {
 
 	@Override
 	public ResponseData getResponseData(IpmiMessage message) throws IPMIException {
-		if (!isCommandResponse(message)) {
-			throw new IllegalArgumentException(
-					"This is not a response for Get Channel Authentication Capabilities command");
-		}
-		if (!(message.getPayload() instanceof IpmiLanResponse)) {
-			throw new IllegalArgumentException("Invalid response payload");
-		}
-		if (((IpmiLanResponse) message.getPayload()).getCompletionCode() != CompletionCode.Ok) {
-			throw new IPMIException(
-					((IpmiLanResponse) message.getPayload())
-							.getCompletionCode());
-		}
-		GetChannelAuthenticationCapabilitiesResponseData responseData = new GetChannelAuthenticationCapabilitiesResponseData();
+		byte[] raw = validateResponse(message);
 
-		byte[] raw = message.getPayload().getIpmiCommandData();
+		GetChannelAuthenticationCapabilitiesResponseData responseData = new GetChannelAuthenticationCapabilitiesResponseData();
 
 		if (raw.length != 8) {
 			throw new IllegalArgumentException("Data has invalid length");

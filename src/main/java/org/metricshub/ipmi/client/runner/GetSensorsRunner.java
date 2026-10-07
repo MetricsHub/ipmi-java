@@ -36,6 +36,7 @@ import org.metricshub.ipmi.core.coding.commands.sdr.GetSensorReading;
 import org.metricshub.ipmi.core.coding.commands.sdr.GetSensorReadingResponseData;
 import org.metricshub.ipmi.core.coding.commands.sdr.ReserveSdrRepository;
 import org.metricshub.ipmi.core.coding.commands.sdr.ReserveSdrRepositoryResponseData;
+import org.metricshub.ipmi.core.coding.commands.sdr.record.AbstractSensorRecord;
 import org.metricshub.ipmi.core.coding.commands.sdr.record.CompactSensorRecord;
 import org.metricshub.ipmi.core.coding.commands.sdr.record.FullSensorRecord;
 import org.metricshub.ipmi.core.coding.commands.sdr.record.ReadingType;
@@ -84,8 +85,11 @@ public class GetSensorsRunner extends AbstractIpmiRunner<List<Sensor>> {
 				// repository (see #getSensorData for details).
 				sensorRecord = super.getSensorData(reservationId);
 
+				// Only Full and Compact sensor records have a reading associated
+				// with them (see IPMI specification for details)
 				if (sensorRecord instanceof FullSensorRecord || sensorRecord instanceof CompactSensorRecord) {
-					int recordReadingId = getReadingId(sensorRecord);
+					int recordReadingId = TypeConverter
+							.byteToInt(((AbstractSensorRecord) sensorRecord).getSensorNumber());
 
 					// If our record has got a reading associated, we get request
 					// for it
@@ -138,37 +142,14 @@ public class GetSensorsRunner extends AbstractIpmiRunner<List<Sensor>> {
 		}
 
 		try {
-			final String deviceName;
-			final List<ReadingType> events;
-			if (sensorRecord instanceof CompactSensorRecord) {
+			final AbstractSensorRecord record = (AbstractSensorRecord) sensorRecord;
+			final String deviceName = record.getName();
 
-				CompactSensorRecord compactSensorRecord = (CompactSensorRecord) sensorRecord;
-
-				deviceName = compactSensorRecord.getName();
-
-				if (compactSensorRecord.getEventReadingType() == OEM_EVENT_READING_TYPE) {
-					return buildOemState(data.getRaw(), deviceName);
-				}
-
-				events = data
-						.getStatesAsserted(
-								compactSensorRecord.getSensorType(),
-								compactSensorRecord.getEventReadingType());
-			} else {
-
-				FullSensorRecord fullSensorRecord = (FullSensorRecord) sensorRecord;
-
-				deviceName = fullSensorRecord.getName();
-
-				if (fullSensorRecord.getEventReadingType() == OEM_EVENT_READING_TYPE) {
-					return buildOemState(data.getRaw(), deviceName);
-				}
-
-				events = data
-						.getStatesAsserted(
-								fullSensorRecord.getSensorType(),
-								fullSensorRecord.getEventReadingType());
+			if (record.getEventReadingType() == OEM_EVENT_READING_TYPE) {
+				return buildOemState(data.getRaw(), deviceName);
 			}
+
+			final List<ReadingType> events = data.getStatesAsserted(record.getSensorType(), record.getEventReadingType());
 
 			return appendReadingTypes(events, deviceName);
 
@@ -251,27 +232,5 @@ public class GetSensorsRunner extends AbstractIpmiRunner<List<Sensor>> {
 			}
 		}
 		return null;
-	}
-
-	/**
-	 * Get the reading id which is required by the BMC to answer reading commands.
-	 *
-	 * @param sensorRecord {@link SensorRecord} instance expected as Full or Compact.
-	 * @return The sensor number of the record otherwise -1 if cannot determine the record type.
-	 */
-	private int getReadingId(final SensorRecord sensorRecord) {
-		// We check if the received record is either FullSensorRecord or
-		// CompactSensorRecord, since these types have readings
-		// associated with them (see IPMI specification for details).
-		if (sensorRecord instanceof FullSensorRecord) {
-			FullSensorRecord fsr = (FullSensorRecord) sensorRecord;
-			return TypeConverter.byteToInt(fsr.getSensorNumber());
-
-		} else if (sensorRecord instanceof CompactSensorRecord) {
-			CompactSensorRecord csr = (CompactSensorRecord) sensorRecord;
-			return TypeConverter.byteToInt(csr.getSensorNumber());
-		}
-
-		return -1;
 	}
 }
