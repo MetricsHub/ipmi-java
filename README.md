@@ -54,8 +54,10 @@ But it is strongly recommended to only use [GitHub Actions "Release to Maven Cen
 
 ## License
 
-License is GNU General Lesser Public License (LGPL) version 3.0. Each source file includes the LGPL-3 header (build will fail otherwise).
-To update source files with the proper header, simply execute the below command:
+License is GNU General Lesser Public License (LGPL) version 3.0. The IPMI Library for Java by Verax Systems is published under the GNU GPL v3; this fork uses it under a commercial (non-GPL) license granted by Verax Systems to Sentry Software in 2021. The source files derived from it keep Verax Systems as copyright holder.
+
+Each source file includes the LGPL-3 header (build will fail otherwise).
+To add the header to new source files, simply execute the below command (existing headers are never modified):
 
 ```bash
 mvn license:update-file-header

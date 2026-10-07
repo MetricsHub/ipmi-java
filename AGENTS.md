@@ -6,7 +6,7 @@ The code is formatted with the MetricsHub Eclipse formatter profile (`metricshub
 
 Checkstyle (`checkstyle.xml`, byte-identical to jawk's) runs at `verify` with `failOnViolation=true`. Fix violations rather than suppressing them; when a suppression is justified, wrap the code in `// CHECKSTYLE.OFF: <RuleName>` / `// CHECKSTYLE.ON: <RuleName>` comments.
 
-All Java source files under `src/main/java` must include the proper LGPL-3 license header (the `license-maven-plugin` check covers `main/java/**/*.java` only; tests, Markdown and resources carry no header). When you add a new source file, run `mvn license:update-file-header` before committing (and before building, since the build fails if a source file lacks the header).
+All Java source files under `src/main/java` must include the proper LGPL-3 license header (the `license-maven-plugin` check covers `main/java/**/*.java` only; tests, Markdown and resources carry no header). When you add a new source file, run `mvn license:update-file-header` before committing (and before building, since the build fails if a source file lacks the header). The plugin only adds missing headers; it is configured never to rewrite existing ones, so do not edit copyright lines in bulk. The library is a fork of the Verax Systems IPMI Library for Java: files derived from Verax code (`org.metricshub.ipmi.core`) say `Copyright 2023 Verax Systems, MetricsHub`, files written by MetricsHub say `Copyright 2023 MetricsHub`. A new file gets a MetricsHub copyright line; if it contains code moved from a Verax-derived file, give it that file's copyright line.
 
 All public methods must have proper Javadoc. Check the output of Maven to identify issues with Javadoc and fix these issues.
 
