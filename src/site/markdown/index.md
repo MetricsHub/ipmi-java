@@ -1,5 +1,5 @@
 keywords: ipmi java client, ipmi 2.0, rmcp+, bmc, hardware monitoring, sensors, fru, overview
-description: A Java client for IPMI 2.0 over LAN (RMCP+): read the chassis power state, the FRU inventory and every sensor of a server's BMC, or send any IPMI command yourself.
+description: A Java client for IPMI 2.0 over LAN (RMCP+): read the chassis power state, the FRU inventory and the sensors of a server's BMC, or send any IPMI command yourself.
 
 # IPMI Java Client
 
@@ -15,9 +15,10 @@ boards) over **IPMI 2.0 over LAN (RMCP+)**, on UDP port 623. It lets a Java appl
   intrusion ([Chassis Status](chassis-status.html)),
 * read the **FRU inventory**: manufacturer, product name, part and serial numbers of the chassis,
   boards, power supplies and other Field Replaceable Units ([FRU Inventory](fru-inventory.html)),
-* read **every sensor** of the SDR repository: temperatures, voltages, fan speeds, currents,
-  power and energy readings with their thresholds, and the discrete states (presence, redundancy,
-  failure, ...) ([Sensors](sensors.html)), and
+* read the **sensors** of the BMC's SDR repository (its Full and Compact sensor records):
+  temperatures, voltages, fan speeds, currents, power and energy readings with their thresholds,
+  and the discrete states (presence, redundancy, failure, ...); [Sensors](sensors.html) lists
+  what is not read, and
 * send **any IPMI command** through the low-level connector, including the System Event Log
   and chassis control commands, and open a **Serial over LAN** console
   ([Low-Level API](low-level-api.html), [Serial over LAN](serial-over-lan.html)).

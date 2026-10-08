@@ -23,41 +23,45 @@ on top of the [low-level API](low-level-api.html).
 
 ```java
 import java.nio.charset.StandardCharsets;
+import java.util.Comparator;
 
+import org.metricshub.ipmi.core.api.sol.CipherSuiteSelectionHandler;
 import org.metricshub.ipmi.core.api.sol.SerialOverLan;
-import org.metricshub.ipmi.core.api.sol.SpecificCipherSuiteSelector;
 import org.metricshub.ipmi.core.api.sync.IpmiConnector;
-import org.metricshub.ipmi.core.connection.Connection;
+import org.metricshub.ipmi.core.coding.security.CipherSuite;
+
+// Use cipher suite 17 if the BMC offers it, else 3
+CipherSuiteSelectionHandler selector = suites -> suites
+		.stream()
+		.filter(suite -> suite.getId() == 17 || suite.getId() == 3)
+		.max(Comparator.comparingInt(CipherSuite::getId))
+		.orElseThrow(() -> new IllegalStateException("The BMC offers neither cipher suite 17 nor 3"));
 
 IpmiConnector connector = new IpmiConnector(0);
-
-try (SerialOverLan sol = new SerialOverLan(connector, "bmc.example.com", "admin", "the-password",
-		new SpecificCipherSuiteSelector(Connection.getDefaultCipherSuite()))) {
-
-	sol.writeString("\r\n", StandardCharsets.US_ASCII);  // wake the console up
-	Thread.sleep(1000);
-	System.out.print(sol.readString(StandardCharsets.US_ASCII, 4096, 2000));
+try {
+	try (SerialOverLan sol = new SerialOverLan(connector, "bmc.example.com", "admin", "the-password", selector)) {
+		sol.writeString("\r\n", StandardCharsets.US_ASCII); // wake the console up
+		Thread.sleep(1000);
+		System.out.print(sol.readString(StandardCharsets.US_ASCII, 4096, 2000));
+	}
+} finally {
+	// Also releases the connector when the console cannot be opened
+	connector.tearDown();
 }
 ```
 
 This constructor opens a dedicated session with the **Administrator** privilege, activates the
 SOL payload, and owns the session: **closing the `SerialOverLan` closes the session and tears
-down the connector** passed to it. Use a new connector for each console opened this way.
+down the connector** passed to it. Use a new connector for each console opened this way. When the
+constructor fails after the session is open (SOL disabled, no free payload instance), nothing is
+closed: hence the outer `finally`, as tearing down a connector twice is harmless.
 
 The cipher suite is chosen by a
 [`CipherSuiteSelectionHandler`](apidocs/org/metricshub/ipmi/core/api/sol/CipherSuiteSelectionHandler.html),
-which receives the suites the BMC offers and returns the one to use.
+which receives the suites the BMC offers and returns the one to use: the selector above picks 17,
+else 3, and fails if the BMC offers neither.
 [`SpecificCipherSuiteSelector`](apidocs/org/metricshub/ipmi/core/api/sol/SpecificCipherSuiteSelector.html)
-always returns the suite it was built with (suite 3 above); implement the interface to pick
-one from the list, for example suite 17 when offered:
-
-```java
-CipherSuiteSelectionHandler prefer17 = suites -> suites
-		.stream()
-		.filter(suite -> suite.getId() == 17)
-		.findFirst()
-		.orElse(Connection.getDefaultCipherSuite());
-```
+always returns the suite it was built with, whether the BMC offers it or not.
 
 | Constructor | Use |
 | --- | --- |

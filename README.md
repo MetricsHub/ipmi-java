@@ -8,7 +8,7 @@ This project is a fork of the excellent [IPMI Library for Java by Verax Systems]
 
 See **[Project Documentation](https://metricshub.org/ipmi-java)** and the [Javadoc](https://metricshub.org/ipmi-java/apidocs) for more information on how to use this library in your code.
 
-The IPMI Java Client talks to the Baseboard Management Controller (BMC) of a server over IPMI 2.0 over LAN (RMCP+): it reads the chassis status, the Field Replaceable Units (FRUs) and every sensor, as Java objects or as the text output that MetricsHub parses, and its low-level API sends any IPMI command (System Event Log, chassis control, Serial over LAN). It requires Java 8 or later.
+The IPMI Java Client talks to the Baseboard Management Controller (BMC) of a server over IPMI 2.0 over LAN (RMCP+): it reads the chassis status, the Field Replaceable Units (FRUs) and the sensors of the SDR repository, as Java objects or as the text output that MetricsHub parses, and its low-level API sends any IPMI command (System Event Log, chassis control, Serial over LAN). It requires Java 8 or later.
 
 ```java
 IpmiClientConfiguration config = new IpmiClientConfiguration("bmc.example.com", "monitor", password, null, false, 120);

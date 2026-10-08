@@ -146,19 +146,21 @@ GetSelInfoResponseData info = (GetSelInfoResponseData) connector
 		.sendMessage(handle, new GetSelInfo(IpmiVersion.V20, cipherSuite, AuthenticationType.RMCPPlus));
 System.out.println("SEL entries: " + info.getEntriesCount());
 
-int reservationId = ((ReserveSelResponseData) connector
-		.sendMessage(handle, new ReserveSel(IpmiVersion.V20, cipherSuite, AuthenticationType.RMCPPlus)))
-		.getReservationId();
+if (info.getEntriesCount() > 0) { // Get SEL Entry fails on an empty SEL
+	int reservationId = ((ReserveSelResponseData) connector
+			.sendMessage(handle, new ReserveSel(IpmiVersion.V20, cipherSuite, AuthenticationType.RMCPPlus)))
+			.getReservationId();
 
-int recordId = 0; // 0: the first entry
-while (recordId != 0xFFFF) { // 0xFFFF: no more entries
-	GetSelEntryResponseData entry = (GetSelEntryResponseData) connector
-			.sendMessage(handle, new GetSelEntry(IpmiVersion.V20, cipherSuite, AuthenticationType.RMCPPlus,
-					reservationId, recordId));
-	SelRecord record = entry.getSelRecord();
-	System.out.println(record.getTimestamp() + " " + record.getSensorType() + " " + record.getEvent() + " "
-			+ record.getEventDirection());
-	recordId = entry.getNextRecordId();
+	int recordId = 0; // 0: the first entry
+	while (recordId != 0xFFFF) { // 0xFFFF: no more entries
+		GetSelEntryResponseData entry = (GetSelEntryResponseData) connector
+				.sendMessage(handle, new GetSelEntry(IpmiVersion.V20, cipherSuite, AuthenticationType.RMCPPlus,
+						reservationId, recordId));
+		SelRecord record = entry.getSelRecord();
+		System.out.println(record.getTimestamp() + " " + record.getSensorType() + " " + record.getEvent() + " "
+				+ record.getEventDirection());
+		recordId = entry.getNextRecordId();
+	}
 }
 ```
 
@@ -168,6 +170,14 @@ Wed May 15 11:15:25 CEST 2024 EventLoggingDisabled LogAreaReset Assertion
 Wed May 15 11:16:11 CEST 2024 Voltage LimitNotExceeded Assertion
 Wed May 15 11:23:27 CEST 2024 PowerUnit PowerOffOrDown Assertion
 ```
+
+> [!WARNING]
+> `GetSelEntry` decodes every entry with the layout of a *system event record* (type `02h`).
+> OEM entries (types `C0h` to `FFh`) come back with meaningless sensor and event fields (and
+> timestamp, for the non-timestamped types `E0h` to `FFh`); an entry of type exactly `C0h` or
+> `E0h` makes `sendMessage()` throw `IllegalArgumentException` (`Invalid value: 192` or `224`),
+> which ends the walk, since the ID of the next entry is lost with it. Check
+> `record.getRecordType()` before using the decoded fields.
 
 Exposing the SEL in `IpmiClient` is tracked in
 [#103](https://github.com/metricshub/ipmi-java/issues/103).

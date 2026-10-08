@@ -1,5 +1,5 @@
 keywords: sensors, sdr, sensor data record, sensor reading, thresholds, temperature, voltage, fan, power, states, text output format, ipmiresultconverter
-description: Read every sensor of a server through its BMC — how the SDR repository is walked, the Sensor object, readings and thresholds, discrete states, and the text output format of getFrusAndSensorsAsStringResult.
+description: Read the sensors of a server through its BMC — how the SDR repository is walked, the Sensor object, readings and thresholds, discrete states, and the text output format of getFrusAndSensorsAsStringResult.
 
 # Sensors
 
@@ -8,7 +8,7 @@ description: Read every sensor of a server through its BMC — how the SDR repos
 The BMC describes its sensors in the **Sensor Data Record (SDR) repository**: one record per
 sensor, with its name, what it measures (the *entity*: a processor, a power supply, the system
 board, ...), its unit, the formula that converts its raw reading, and its thresholds. The client
-walks this repository and reads each sensor.
+walks this repository and reads the sensors that have a reading.
 
 ```java
 List<Sensor> sensors = IpmiClient.getSensors(config);

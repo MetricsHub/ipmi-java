@@ -86,8 +86,10 @@ Full, Compact and Event-Only records share
 IPMI 2.0 reserves the record types `C0h` to `FFh` for OEM use, and vendors do use them: a
 GIGABYTE BMC tested with this library returns 19 records of type `D0h`, a Lenovo IMM one of type
 `C0h`. They are all decoded as an
-[`OemRecord`](apidocs/org/metricshub/ipmi/core/coding/commands/sdr/record/OemRecord.html),
-which keeps the manufacturer ID and the whole vendor-defined payload as raw bytes.
+[`OemRecord`](apidocs/org/metricshub/ipmi/core/coding/commands/sdr/record/OemRecord.html), which
+keeps the whole vendor-defined payload as raw bytes. Only type `C0h` has a standard layout, with
+a manufacturer ID: for the types `C1h` to `FFh`, `getManufacturerId()` returns `0` (unknown), not
+the record's vendor.
 
 A record that cannot be decoded at all — a reserved type such as the deprecated BMC Message
 Channel Info record (`14h`), a record shorter than its header, an empty or truncated reply — is
