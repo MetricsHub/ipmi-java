@@ -28,8 +28,9 @@ The `IpmiClient` API is unchanged, and the client is more tolerant of real-world
   `ExecutionException` wrapping `ConnectionException: Command timed out`, about 20 s into the
   call, where 1.2.02 threw `TimeoutException` at the overall timeout;
 * the overall timeout cancels the worker for good: the interrupted session stops at its current
-  wait, closes the session and releases the port within the deadline (plus at most one second),
-  and the receiving and timer threads are daemon threads, so a program no longer needs
+  wait and closes the session and the port, normally within one second of the deadline (a worker
+  stuck in a call that cannot be interrupted, such as name resolution, does so when that call
+  returns), and the receiving and timer threads are daemon threads, so a program no longer needs
   `System.exit()` to end;
 * a failed login fails at once with its actual cause (`IllegalArgumentException: Authentication
   check failed`, `IPMIException: Unauthorized name.`), where 1.2.02 sent the credentials four

@@ -39,10 +39,16 @@ public class FakeBmc implements AutoCloseable {
 		return new FakeBmc(request -> null);
 	}
 
+	/**
+	 * @return the loopback address the fake BMC listens on
+	 */
 	public InetAddress getAddress() {
 		return socket.getLocalAddress();
 	}
 
+	/**
+	 * @return the UDP port the fake BMC listens on
+	 */
 	public int getPort() {
 		return socket.getLocalPort();
 	}

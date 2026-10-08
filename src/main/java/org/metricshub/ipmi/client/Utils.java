@@ -31,8 +31,12 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
 import org.metricshub.ipmi.client.runner.AbstractIpmiRunner;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public final class Utils {
+
+	private static final Logger LOGGER = LoggerFactory.getLogger(Utils.class);
 
 	private Utils() {}
 
@@ -97,10 +101,8 @@ public final class Utils {
 		// The worker owns the connector: it also closes it, so the cleanup is covered by the deadline and never
 		// runs on the calling thread while the worker is still using the connection
 		final Future<T> future = executorService.submit(() -> {
-			try {
-				return callable.call();
-			} finally {
-				callable.close();
+			try (AbstractIpmiRunner<T> runner = callable) {
+				return runner.call();
 			}
 		});
 
@@ -113,7 +115,11 @@ public final class Utils {
 			// Stop the worker at its current wait and give it a moment to close the session and release the port
 			future.cancel(true);
 			executorService.shutdownNow();
-			executorService.awaitTermination(CLEANUP_GRACE_MS, TimeUnit.MILLISECONDS);
+			if (!executorService.awaitTermination(CLEANUP_GRACE_MS, TimeUnit.MILLISECONDS)) {
+				// A call that cannot be interrupted (name resolution, a blocking send): the worker closes the
+				// connection and releases the port by itself when that call returns
+				LOGGER.warn("IPMI call timed out and its worker is still busy; the port is released when it returns");
+			}
 			throw e;
 		} finally {
 			executorService.shutdownNow();

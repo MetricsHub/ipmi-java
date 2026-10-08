@@ -276,6 +276,16 @@ public enum CompletionCode {
 		return code;
 	}
 
+	/**
+	 * Tells whether the BMC may answer the same request successfully a little later.
+	 *
+	 * @return true for the completion codes that only report a passing condition of the BMC (busy, out of resources,
+	 *         initializing, internal timeout), false for every other code
+	 */
+	public boolean isTransient() {
+		return this == InitializationInProgress || this == InsufficientResources || this == NodeBusy || this == Timeout;
+	}
+
 	public static CompletionCode parseInt(int value) {
 		switch (value) {
 		case OK:

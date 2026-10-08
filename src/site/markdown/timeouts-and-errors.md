@@ -21,8 +21,11 @@ the session — in a worker thread, and waits for it at most `timeout` seconds. 
 expires, the worker is interrupted and the method throws `java.util.concurrent.TimeoutException`,
 with nothing collected: there are no partial results.
 
-The interrupted worker stops at its current wait, and the library's receiving and timer threads
-are daemon threads: they never keep the JVM alive.
+The interrupted worker stops at its current wait, closes the session and releases the UDP port,
+and the method waits up to one second for that cleanup before throwing. A worker stuck in a call
+that cannot be interrupted (name resolution, for example) closes the connection when that call
+returns; a `WARN` says so. The library's receiving and timer threads are daemon threads: they
+never keep the JVM alive.
 
 ## Per-message timeout and retries
 
