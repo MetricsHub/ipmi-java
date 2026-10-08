@@ -56,6 +56,10 @@ down the connector** passed to it. Use a new connector for each console opened t
 constructor fails after the session is open (SOL disabled, no free payload instance), nothing is
 closed: hence the outer `finally`, as tearing down a connector twice is harmless.
 
+`close()` deactivates the SOL payload first. If that fails (an error, or no reply), `close()`
+throws `IOException` without logging out: the outer `finally` still releases the connector, but
+the session stays open on the BMC until the BMC expires it.
+
 The cipher suite is chosen by a
 [`CipherSuiteSelectionHandler`](apidocs/org/metricshub/ipmi/core/api/sol/CipherSuiteSelectionHandler.html),
 which receives the suites the BMC offers and returns the one to use: the selector above picks 17,

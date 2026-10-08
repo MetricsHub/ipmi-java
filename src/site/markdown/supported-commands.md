@@ -10,7 +10,9 @@ commands below. Each command is a class of
 [`org.metricshub.ipmi.core.coding.commands`](apidocs/org/metricshub/ipmi/core/coding/commands/package-summary.html),
 sent with the [low-level API](low-level-api.html#sending-commands); the last column shows which
 ones `IpmiClient` uses. A command not listed here can be added by
-[extending `IpmiCommandCoder`](low-level-api.html#writing-your-own-command).
+[extending `IpmiCommandCoder`](low-level-api.html#writing-your-own-command), with a
+[raw network function](low-level-api.html#dcmi-group-extension-and-oem-network-functions) for
+DCMI, group extension and OEM commands.
 
 ## Commands
 

@@ -73,7 +73,10 @@ System 3.3V = 3.38 Volts (upper critical: 3.56)
 `getSensorBaseUnit()` returns a
 [`SensorUnit`](apidocs/org/metricshub/ipmi/core/coding/commands/sdr/record/SensorUnit.html);
 the six thresholds (`getLowerNonCriticalThreshold()` to `getUpperNonRecoverableThreshold()`)
-are converted with the same formula, and are `0.0` when the BMC does not define them.
+are converted with the same formula. A threshold the BMC does not define, or does not make
+readable, is left at `0.0`, the same value as a threshold that really is 0; on BMCs that do not
+set the *init sensor type* bit of the record, every threshold is left at `0.0`
+([#83](https://github.com/metricshub/ipmi-java/issues/83)).
 
 > [!WARNING]
 > Known limitations of the decoding, by the IPMI 2.0 specification
@@ -176,8 +179,10 @@ Energy;$sensorId;$sensorName;$deviceUniqueId;$value
 
 * `$sensorId` is the SDR record ID, as 4 lowercase hexadecimal digits.
 * `$deviceUniqueId` is the entity of the sensor, as in the device state lines.
-* Thresholds are rounded to integers, in the same unit as `$value`, and empty when the BMC does
-  not define them.
+* Thresholds are rounded to integers, in the same unit as `$value`. A threshold is empty when
+  its decoded value is `0.0`: when the BMC does not define it or does not make it readable, but
+  also when it really is 0 (a lower fan threshold of 0 RPM, for example), and on BMCs affected by
+  [#83](https://github.com/metricshub/ipmi-java/issues/83).
 
 The chassis status has its own text form:
 [`getChassisStatusAsStringResult()`](chassis-status.html#as-text).

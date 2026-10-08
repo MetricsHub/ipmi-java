@@ -246,6 +246,48 @@ public class GetDeviceId extends IpmiCommandCoder {
 }
 ```
 
+#### DCMI, group extension and OEM network functions
+
+The [`NetworkFunction`](apidocs/org/metricshub/ipmi/core/coding/payload/lan/NetworkFunction.html)
+enum only lists the standard network functions (`00h` to `0Bh`). For a command of another
+network function — DCMI (`2Ch`), the other group extensions (`2Eh` is OEM/Group), or a vendor's
+OEM network function (`30h` to `3Fh`) — build the request with a subclass of `IpmiLanRequest`
+that sets the raw code; `getNetworkFunction()` must still return a value, which is then unused.
+Responses are matched by tag and command code, so nothing else changes. For example, Get DCMI
+Capabilities Info:
+
+```java
+/** An IPMI request with a raw network function code */
+class RawNetFnRequest extends IpmiLanRequest {
+
+	RawNetFnRequest(int networkFunction, byte commandCode, byte[] requestData, int sequenceNumber) {
+		super(NetworkFunction.ApplicationRequest, commandCode, requestData, TypeConverter.intToByte(sequenceNumber));
+		setNetworkFunctionCode(TypeConverter.intToByte(networkFunction));
+	}
+}
+
+public class GetDcmiCapabilities extends IpmiCommandCoder {
+
+	// constructor, getResponseData() as above
+
+	@Override
+	public NetworkFunction getNetworkFunction() {
+		return NetworkFunction.ApplicationRequest; // unused: see preparePayload()
+	}
+
+	@Override
+	public byte getCommandCode() {
+		return 0x01; // Get DCMI Capabilities Info
+	}
+
+	@Override
+	protected IpmiLanMessage preparePayload(int sequenceNumber) {
+		// NetFn 2Ch (DCMI); data: group extension ID DCh, parameter 1 (supported capabilities)
+		return new RawNetFnRequest(0x2C, getCommandCode(), new byte[] { (byte) 0xDC, 0x01 }, sequenceNumber);
+	}
+}
+```
+
 ## Asynchronous API
 
 [`IpmiAsyncConnector`](apidocs/org/metricshub/ipmi/core/api/async/IpmiAsyncConnector.html) has

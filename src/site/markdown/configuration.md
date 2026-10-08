@@ -54,6 +54,10 @@ chosen by the operating system for each session.
 the library converts it to a `String` internally to open the session and does not clear the
 array, so clear it yourself once you no longer need the configuration.
 
+The user name and the password are encoded with the **platform default charset**, and their
+IPMI length limits (16 and 20 bytes) are not checked: stick to ASCII credentials of at most 16
+and 20 characters ([#90](https://github.com/metricshub/ipmi-java/issues/90)).
+
 The client opens every session with the **User** privilege level, which is enough for every
 `IpmiClient` method.
 
@@ -62,6 +66,12 @@ The client opens every session with the **User** privilege level, which is enoug
 `bmcKey` is the **BMC key (Kg)** of the BMC, as raw bytes, for BMCs configured with *two-key*
 logins. Leave it `null` (the default on virtually every BMC): the session keys are then derived
 from the password. See [Preparing the BMC](preparing-the-bmc.html#bmc-key-kg).
+
+> [!WARNING]
+> The library turns the key into a `String` and back with the platform default charset, which
+> alters bytes that are not valid characters in that charset (any byte from `80h` with UTF-8):
+> the session keys are then wrong and the login fails. Only keys made of ASCII bytes (`00h` to
+> `7Fh`) work reliably ([#90](https://github.com/metricshub/ipmi-java/issues/90)).
 
 ### skipAuth
 
