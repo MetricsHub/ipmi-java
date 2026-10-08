@@ -37,6 +37,14 @@ import org.metricshub.ipmi.core.common.TypeConverter;
  * Wrapper for Get Sensor Reading response.
  */
 public class GetSensorReadingResponseData implements ResponseData {
+
+	private static final int THRESHOLD_EVENT_READING_TYPE = 1;
+
+	/**
+	 * Event offsets (Table 42-2, event/reading type 01h) of the threshold comparison bits of Table 35-15: LNC going
+	 * low, LC going low, LNR going low, UNC going high, UC going high, UNR going high.
+	 */
+	private static final int[] THRESHOLD_EVENT_OFFSETS = { 0, 2, 4, 7, 9, 11 };
 	private byte sensorReading;
 
 	/**
@@ -46,6 +54,8 @@ public class GetSensorReadingResponseData implements ResponseData {
 	 * getting an incorrect status while the first sensor update is in progress.
 	 */
 	private boolean sensorStateValid;
+
+	private boolean scanningEnabled;
 
 	/**
 	 * Contains state of the sensor if it is threshold-based.
@@ -83,6 +93,18 @@ public class GetSensorReadingResponseData implements ResponseData {
 	}
 
 	/**
+	 * @return false when the BMC reports sensor scanning as disabled (byte 2 bit 6): the reading and the states
+	 *         are then not to be used
+	 */
+	public boolean isScanningEnabled() {
+		return scanningEnabled;
+	}
+
+	public void setScanningEnabled(boolean scanningEnabled) {
+		this.scanningEnabled = scanningEnabled;
+	}
+
+	/**
 	 * Contains state of the sensor if it is threshold-based.
 	 */
 	public SensorState getSensorState() {
@@ -117,6 +139,19 @@ public class GetSensorReadingResponseData implements ResponseData {
 			SensorType sensorType,
 			int sensorEventReadingType) {
 		ArrayList<ReadingType> list = new ArrayList<ReadingType>();
+		if (statesAsserted == null) {
+			return list;
+		}
+		if (sensorEventReadingType == THRESHOLD_EVENT_READING_TYPE) {
+			// Byte 3 of a threshold sensor holds comparison bits (Table 35-15), not event offsets: bit n means
+			// "at or beyond" the threshold whose going-low (lower) or going-high (upper) event offset is below
+			for (int i = 0; i < THRESHOLD_EVENT_OFFSETS.length && i < statesAsserted.length; ++i) {
+				if (statesAsserted[i]) {
+					list.add(ReadingType.parseInt(sensorType, sensorEventReadingType, THRESHOLD_EVENT_OFFSETS[i]));
+				}
+			}
+			return list;
+		}
 		for (int i = 0; i < statesAsserted.length; ++i) {
 			if (statesAsserted[i]) {
 				list

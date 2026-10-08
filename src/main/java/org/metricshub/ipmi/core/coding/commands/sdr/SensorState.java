@@ -60,16 +60,14 @@ public enum SensorState {
 		return code;
 	}
 
+	/**
+	 * Decodes the threshold comparison status (IPMI 2.0 Table 35-15, byte 3 bits [5:0]) into the most severe
+	 * threshold crossed.
+	 *
+	 * @param value bits [5:0]: LNC, LC, LNR, UNC, UC, UNR
+	 * @return the most severe state, {@link #Ok} when no bit is set
+	 */
 	public static SensorState parseInt(int value) {
-		if ((value & BELOWLOWERNONRECOVERABLE) != 0) {
-			return BelowLowerNonRecoverable;
-		}
-		if ((value & BELOWLOWERCRITICAL) != 0) {
-			return BelowLowerCritical;
-		}
-		if ((value & ABOVEUPPERNONCRITICAL) != 0) {
-			return BelowLowerNonCritical;
-		}
 		if ((value & ABOVEUPPERNONRECOVERABLE) != 0) {
 			return AboveUpperNonRecoverable;
 		}
@@ -78,6 +76,15 @@ public enum SensorState {
 		}
 		if ((value & ABOVEUPPERNONCRITICAL) != 0) {
 			return AboveUpperNonCritical;
+		}
+		if ((value & BELOWLOWERNONRECOVERABLE) != 0) {
+			return BelowLowerNonRecoverable;
+		}
+		if ((value & BELOWLOWERCRITICAL) != 0) {
+			return BelowLowerCritical;
+		}
+		if ((value & BELOWLOWERNONCRITICAL) != 0) {
+			return BelowLowerNonCritical;
 		}
 		if (value == OK) {
 			return Ok;

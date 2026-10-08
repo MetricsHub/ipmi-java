@@ -60,8 +60,7 @@ decodes the response (IPMI 2.0, section 28.2):
 > [!NOTE]
 > `getChassisIdentifyState()` throws `IllegalAccessError` when
 > `isChassisIdentifyCommandSupported()` is `false`: check it first. `getPowerRestorePolicy()`
-> throws `IllegalArgumentException` when the BMC reports the policy as *unknown*
-> ([#87](https://github.com/metricshub/ipmi-java/issues/87)).
+> returns `Unknown` when the BMC reports the policy as such.
 
 Not every BMC fills every flag: the intrusion, drive and cooling bits in particular are optional
 in the specification, and a BMC that does not implement them reports `false`.

@@ -32,7 +32,7 @@ public enum BaseUnit {
 	private static final int BYTES = 0;
 	private static final int WORDS = 1;
 	private static final int BYTESIZE = 1;
-	private static final int WORDSIZE = 16;
+	private static final int WORDSIZE = 2;
 
 	private int code;
 

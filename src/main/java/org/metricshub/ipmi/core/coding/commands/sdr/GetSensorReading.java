@@ -106,6 +106,8 @@ public class GetSensorReading extends IpmiCommandCoder {
 		responseData
 				.setSensorStateValid((TypeConverter.byteToInt(raw[1]) & 0x20) == 0);
 
+		responseData.setScanningEnabled((TypeConverter.byteToInt(raw[1]) & 0x40) != 0);
+
 		if (raw.length >= 3) {
 			responseData
 					.setSensorState(

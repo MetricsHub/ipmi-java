@@ -38,6 +38,38 @@ The `IpmiClient` API is unchanged, and the client is more tolerant of real-world
   ([Troubleshooting](troubleshooting.html#the-login-fails)); only a handshake step that got no
   reply is sent again.
 
+The decoders follow the IPMI 2.0 and FRU specifications more closely; the visible changes are:
+
+* a Full Sensor record reports `Double.NaN` for a threshold it does not define, where 1.2.02
+  reported `0.0`; the text result now reports a threshold of `0` instead of leaving it empty;
+* the thresholds are linearized like the reading, are read whenever byte 12 of the record says
+  the sensor has thresholds (1.2.02 looked at the wrong byte), and `getAccuracy()` and
+  `getTolerance()` are decoded as the specification says; `hasAnalogReading()` tells when the
+  reading byte is not a reading;
+* a sensor whose reading the BMC flags as unavailable or not scanned is returned without reading
+  and without states (1.2.02 reported `0.0`); `GetSensorReadingResponseData.isScanningEnabled()`
+  exposes the flag;
+* the threshold status of a reading (`getSensorState()`) and the states of a threshold sensor
+  (`getStatesAsserted()`) name the threshold actually crossed (1.2.02 reported an upper
+  threshold crossing as "below lower non-critical");
+* a completion code the library does not list no longer aborts the decoding of the response:
+  the command fails with an `IPMIException` whose `getCompletionCode()` is the new
+  `CompletionCode.Unknown` and whose `getRawCode()` holds the code, and the RMCP+ status codes are
+  no longer applied to IPMI commands;
+* `FruDeviceLocatorRecord.getId()` returns the SDR record ID, as for every other record (1.2.02
+  returned the FRU device ID, which `getDeviceId()` returns);
+* SEL entries of the OEM record types are decoded with their own layout (`getManufacturerId()`,
+  `getOemData()`), the record types `C0h` and `E0h` are accepted, and a reserved record type gives
+  a `SelRecordType.Reserved` entry instead of an exception;
+* `BoardInfo.getMfgDate()` is computed in UTC and is `null` when the FRU leaves the date
+  unspecified (1.2.02 used the JVM time zone and reported 1996-01-01); FRU strings in a
+  non-English language are decoded as UTF-16LE; a word-addressed FRU is read with 2-byte words;
+* `IpmiClient.getFrus()` returns the FRUs it could read even when FRU 0 or Get FRU Inventory Area
+  Info fails, returns FRU 0 once, and stops reading a FRU at its first unreadable chunk instead of
+  shifting the following chunks into the gap;
+* reserved values of the rate unit, modifier unit usage and power restore policy decode to
+  `None` or `Unknown` instead of throwing.
+
 Code that **extends** the library's protocol classes needs the changes below. `QueueElement`
 lost its `isTimedOut()`, `makeTimedOut()` and `refreshTimestamp()` methods: a timed-out message
 now leaves the queue at once.

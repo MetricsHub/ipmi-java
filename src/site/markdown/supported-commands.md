@@ -116,5 +116,9 @@ decodes the FRU information (Platform Management FRU Information Storage Definit
 `IpmiClient.getFrus()` returns the Chassis, Board and Product areas only. FRUs in another format,
 such as the SPD data of memory modules, are not decoded
 ([#107](https://github.com/metricshub/ipmi-java/issues/107)), and are logged and left out.
-Known decoding issues of the FRU areas are listed in
-[#85](https://github.com/metricshub/ipmi-java/issues/85).
+
+The decoder checks the common header checksum and rejects a FRU whose header is corrupt. An area
+that the data read does not hold in full is skipped and logged, the others are returned. In the
+MultiRecord area, a record of a type the library does not model (such as the Extended DC Output
+and Extended DC Load records) or of an unknown format version is skipped, and the record that
+carries the end-of-list flag is decoded like the others.

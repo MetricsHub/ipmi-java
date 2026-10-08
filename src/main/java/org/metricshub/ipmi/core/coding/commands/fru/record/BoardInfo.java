@@ -24,14 +24,8 @@ package org.metricshub.ipmi.core.coding.commands.fru.record;
 
 import org.metricshub.ipmi.core.common.TypeConverter;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import java.text.DateFormat;
-import java.text.ParseException;
 import java.util.ArrayList;
 import java.util.Date;
-import java.util.Locale;
 
 /**
  * FRU record containing Board info. <br>
@@ -39,6 +33,9 @@ import java.util.Locale;
  * the board that the FRU Information Device is located on.
  */
 public class BoardInfo extends FruRecord {
+
+	/** 1996-01-01 00:00:00 UTC. */
+	private static final long MFG_DATE_EPOCH_MS = 820454400000L;
 
 	private Date mfgDate;
 
@@ -53,8 +50,6 @@ public class BoardInfo extends FruRecord {
 	private byte[] fruFileId = new byte[0];
 
 	private String[] customBoardInfo = new String[0];
-
-	private static Logger logger = LoggerFactory.getLogger(BoardInfo.class);
 
 	/**
 	 * Creates and populates record
@@ -76,19 +71,9 @@ public class BoardInfo extends FruRecord {
 		buffer[2] = fruData[offset + 5];
 		buffer[3] = 0;
 
-		DateFormat df = DateFormat
-				.getDateInstance(
-						DateFormat.SHORT,
-						Locale.ENGLISH);
-		try {
-			setMfgDate(
-					new Date(
-							df.parse("01/01/96").getTime()
-									+ ((long) TypeConverter.littleEndianByteArrayToInt(buffer))
-											* 60000L));
-		} catch (ParseException e) {
-			logger.error(e.getMessage(), e);
-		}
+		// Minutes since 1996-01-01 00:00 UTC (FRU spec section 11); 0 means unspecified
+		long minutes = TypeConverter.littleEndianByteArrayToInt(buffer);
+		setMfgDate(minutes == 0 ? null : new Date(MFG_DATE_EPOCH_MS + minutes * 60000L));
 
 		int partNumber = TypeConverter.byteToInt(fruData[offset + 6]);
 
@@ -141,16 +126,14 @@ public class BoardInfo extends FruRecord {
 							decodeString(
 									partType,
 									partNumberData,
-									languageCode != 0
-											&& languageCode != 25));
+									languageCode == 0 || languageCode == 25));
 					break;
 				case 1:
 					setBoardProductName(
 							decodeString(
 									partType,
 									partNumberData,
-									languageCode != 0
-											&& languageCode != 25));
+									languageCode == 0 || languageCode == 25));
 					break;
 				case 2:
 					setBoardSerialNumber(
@@ -164,8 +147,7 @@ public class BoardInfo extends FruRecord {
 							decodeString(
 									partType,
 									partNumberData,
-									languageCode != 0
-											&& languageCode != 25));
+									languageCode == 0 || languageCode == 25));
 					break;
 				case 4:
 					setFruFileId(partNumberData);
@@ -181,8 +163,7 @@ public class BoardInfo extends FruRecord {
 									decodeString(
 											partType,
 											partNumberData,
-											languageCode != 0
-													&& languageCode != 25));
+											languageCode == 0 || languageCode == 25));
 					break;
 				}
 			}

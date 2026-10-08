@@ -165,7 +165,9 @@ if (info.getEntriesCount() > 0) { // Get SEL Entry fails on an empty SEL
 			System.out.println(record.getTimestamp() + " " + record.getSensorType() + " " + record.getEvent() + " "
 					+ record.getEventDirection());
 		} else {
-			System.out.println("OEM entry " + record.getRecordId()); // vendor-defined content
+			// OEM entries (IPMI 2.0 sections 32.2 and 32.3): the manufacturer ID is null for the non-timestamped ones
+			System.out.println(record.getRecordType() + " entry " + record.getRecordId() + " from manufacturer "
+					+ record.getManufacturerId() + ": " + Arrays.toString(record.getOemData()));
 		}
 		recordId = entry.getNextRecordId();
 	}
@@ -175,9 +177,9 @@ if (info.getEntriesCount() > 0) { // Get SEL Entry fails on an empty SEL
 ```text
 SEL entries: 643
 Wed May 15 11:15:25 CEST 2024 EventLoggingDisabled LogAreaReset Assertion
-OEM entry 2
-OEM entry 3
-OEM entry 4
+OemTimestamped entry 2 from manufacturer 19046: [2, 1, 5, 0, 0, 0]
+OemTimestamped entry 3 from manufacturer 19046: [2, 8, 5, 0, 0, 0]
+OemTimestamped entry 4 from manufacturer 19046: [2, 2, 5, 0, 0, 0]
 Wed May 15 11:23:27 CEST 2024 PowerUnit PowerOffOrDown Assertion
 Wed May 15 11:23:34 CEST 2024 PowerUnit PowerOffOrDown Deassertion
 ```

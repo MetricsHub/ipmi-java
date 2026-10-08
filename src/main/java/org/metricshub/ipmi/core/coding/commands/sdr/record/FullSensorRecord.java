@@ -49,21 +49,24 @@ public class FullSensorRecord extends AbstractSensorRecord {
 
 	private double sensorMinmumReading;
 
-	private double upperNonRecoverableThreshold;
+	// A threshold the record does not define (Table 43-1, byte 12 bits [3:2] and the readable mask of byte 19) stays NaN
+	private double upperNonRecoverableThreshold = Double.NaN;
 
-	private double lowerNonRecoverableThreshold;
+	private double lowerNonRecoverableThreshold = Double.NaN;
 
-	private double upperCriticalThreshold;
+	private double upperCriticalThreshold = Double.NaN;
 
-	private double lowerCriticalThreshold;
+	private double lowerCriticalThreshold = Double.NaN;
 
-	private double upperNonCriticalThreshold;
+	private double upperNonCriticalThreshold = Double.NaN;
 
-	private double lowerNonCriticalThreshold;
+	private double lowerNonCriticalThreshold = Double.NaN;
 
 	private byte sensorUnits1;
 
 	private int linearization;
+
+	private static final int NO_ANALOG_READING = 3;
 
 	@Override
 	protected void populateTypeSpecficValues(
@@ -79,12 +82,8 @@ public class FullSensorRecord extends AbstractSensorRecord {
 		setM(TypeConverter.decode2sComplement(calcM, 9));
 
 		sensorUnits1 = recordData[20];
-
-		setTolerance(
-				calcFormula(
-						(TypeConverter.byteToInt(recordData[25]) & 0x3f) / 2,
-						8,
-						sensorUnits1));
+		// Needed by calcFormula(): set before the first conversion
+		linearization = TypeConverter.byteToInt(recordData[23]) & 0x7f;
 
 		int calcB = TypeConverter.byteToInt(recordData[26]);
 
@@ -96,7 +95,7 @@ public class FullSensorRecord extends AbstractSensorRecord {
 
 		calcAcc |= (TypeConverter.byteToInt(recordData[28]) & 0xf0) << 2;
 
-		int exp = TypeConverter.byteToInt(recordData[28]) & 0xc >> 2;
+		int exp = (TypeConverter.byteToInt(recordData[28]) & 0x0c) >> 2;
 
 		setAccuracy((double) calcAcc / 10000 * Math.pow(10, exp));
 
@@ -133,7 +132,8 @@ public class FullSensorRecord extends AbstractSensorRecord {
 						TypeConverter
 								.byteToInt(recordData[35])));
 
-		if ((TypeConverter.byteToInt(recordData[10]) & 0x4) != 0) {
+		// Byte 12 bits [3:2] (Table 43-1): 00b means the sensor has no thresholds
+		if ((TypeConverter.byteToInt(recordData[11]) & 0x0c) != 0) {
 			if ((TypeConverter.byteToInt(recordData[18]) & 0x20) != 0) {
 				setUpperNonRecoverableThreshold(
 						calcFormula(
@@ -175,7 +175,8 @@ public class FullSensorRecord extends AbstractSensorRecord {
 
 		populateName(recordData, 47);
 
-		linearization = TypeConverter.byteToInt(recordData[23]) & 0x7f;
+		// Tolerance in half raw counts (byte 26 bits [5:0]): +/- tolerance / 2 x |M| x 10^R (Table 43-1)
+		setTolerance((TypeConverter.byteToInt(recordData[25]) & 0x3f) / 2.0 * Math.abs(getM()) * Math.pow(10, getrExp()));
 	}
 
 	private double getM() {
@@ -316,6 +317,14 @@ public class FullSensorRecord extends AbstractSensorRecord {
 	 *        - Value to be converted. Length of 8 is assumed.
 	 * @return converted value
 	 */
+	/**
+	 * @return false when the data format of Sensor Units 1 is 11b (Table 43-1): the sensor has no analog reading and
+	 *         the reading byte must not be converted
+	 */
+	public boolean hasAnalogReading() {
+		return ((TypeConverter.byteToInt(sensorUnits1) & 0xc0) >> 6) != NO_ANALOG_READING;
+	}
+
 	public double calcFormula(int value) {
 		return calcFormula(value, 8, sensorUnits1);
 	}
@@ -369,6 +378,8 @@ public class FullSensorRecord extends AbstractSensorRecord {
 			return Math.log10(result);
 		case 3:
 			return Math.log(result) / Math.log(2);
+		case 4:
+			return Math.exp(result);
 		case 5:
 			return Math.pow(10, result);
 		case 6:
@@ -382,9 +393,11 @@ public class FullSensorRecord extends AbstractSensorRecord {
 		case 10:
 			return Math.pow(result, 0.5);
 		case 11:
-			return Math.pow(result, 0.33);
+			return Math.cbrt(result);
 		default:
-			throw new IllegalArgumentException("Unsupported linearization type");
+			// 70h-7Fh are non-linear (the linearization needs Get Sensor Reading Factors), the rest is reserved:
+			// return the linear conversion, as ipmitool does, rather than drop the sensor
+			return result;
 		}
 	}
 

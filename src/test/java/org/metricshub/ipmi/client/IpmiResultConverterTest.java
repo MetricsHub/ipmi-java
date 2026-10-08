@@ -20,7 +20,7 @@ import org.metricshub.ipmi.core.coding.commands.sdr.record.EntityId;
 import org.metricshub.ipmi.core.coding.commands.sdr.record.FruDeviceLocatorRecord;
 import org.metricshub.ipmi.core.coding.commands.sdr.record.SensorRecord;
 
-class IpmiResultConverterTest {
+public class IpmiResultConverterTest {
 
 	public static final byte[] BASE_BOARD_PRODUCT_INFO = {
 			1,
@@ -671,6 +671,8 @@ class IpmiResultConverterTest {
 		GetSensorReadingResponseData data = new GetSensorReadingResponseData();
 		// And sorry...
 		data.setSensorReading((byte) -102);
+		data.setSensorStateValid(true);
+		data.setScanningEnabled(true);
 
 		return Arrays
 				.asList(

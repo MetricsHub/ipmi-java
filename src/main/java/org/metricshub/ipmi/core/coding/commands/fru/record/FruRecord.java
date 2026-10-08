@@ -69,11 +69,11 @@ public abstract class FruRecord {
 		case 2:
 			return TypeConverter.decode6bitAscii(data);
 		case 3:
-			System.arraycopy(data, 0, data, 0, data.length);
 			if (isEnglishLanguageCode) {
 				return new String(data, Charset.forName("ISO-8859-1")).trim();
 			} else {
-				return new String(data, Charset.forName("UTF-8")).trim();
+				// Non-English type 3 strings are 2-byte Unicode, least significant byte first (FRU spec section 13)
+				return new String(data, Charset.forName("UTF-16LE")).trim();
 			}
 		default:
 			throw new IllegalArgumentException("Invalid type format");

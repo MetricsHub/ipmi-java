@@ -74,7 +74,8 @@ public enum RateUnit {
 		case D:
 			return Days;
 		default:
-			throw new IllegalArgumentException("Invalid value: " + value);
+			// Reserved values (IPMI 2.0 Table 43-1): a unit the record does not define, not a record to drop
+			return None;
 		}
 	}
 }

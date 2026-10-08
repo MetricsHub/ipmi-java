@@ -28,18 +28,46 @@ public class IPMIException extends Exception {
 
 	private static final long serialVersionUID = 1L;
 
+	private static final int OEM_CODES_START = 0x80;
+
+	private static final int GENERIC_CODES_START = 0xC0;
+
 	private final CompletionCode completionCode;
 
+	private final int rawCode;
+
 	public IPMIException(CompletionCode completionCode) {
+		this(completionCode, completionCode.getCode());
+	}
+
+	/**
+	 * @param completionCode the decoded completion code, {@link CompletionCode#Unknown} for a code the library
+	 *        does not list
+	 * @param rawCode the completion code byte as the BMC sent it
+	 */
+	public IPMIException(CompletionCode completionCode, int rawCode) {
 		this.completionCode = completionCode;
+		this.rawCode = rawCode;
 	}
 
 	public CompletionCode getCompletionCode() {
 		return completionCode;
 	}
 
+	/**
+	 * @return the completion code byte as the BMC sent it, meaningful when {@link #getCompletionCode()} is
+	 *         {@link CompletionCode#Unknown}
+	 */
+	public int getRawCode() {
+		return rawCode;
+	}
+
 	@Override
 	public String getMessage() {
+		if (completionCode == CompletionCode.Unknown && rawCode >= 0) {
+			String kind = rawCode < OEM_CODES_START ? "Command-specific" : rawCode < GENERIC_CODES_START ? "OEM" : "Reserved";
+			return String.format("%s completion code 0x%02X.", kind, rawCode);
+		}
 		return completionCode.getMessage();
 	}
 }

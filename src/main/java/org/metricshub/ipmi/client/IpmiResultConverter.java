@@ -150,8 +150,15 @@ public final class IpmiResultConverter {
 		// Get the unit
 		SensorUnit unit = fullRecord.getSensorBaseUnit();
 
-		// No Reading ? Skip.
-		if (data.getPlainSensorReading() == NO_READING || deviceType == null || unit == null || sensorName == null) {
+		// No reading? Skip: the BMC says so (reading unavailable, scanning disabled, no analog reading: IPMI 2.0
+		// Table 35-15 and Table 43-1), or the record cannot be described
+		if (data.getPlainSensorReading() == NO_READING
+				|| !data.isSensorStateValid()
+				|| !data.isScanningEnabled()
+				|| !fullRecord.hasAnalogReading()
+				|| deviceType == null
+				|| unit == null
+				|| sensorName == null) {
 			return null;
 		}
 
@@ -664,7 +671,8 @@ public final class IpmiResultConverter {
 	 * @return String value
 	 */
 	private static String getThresholdValue(final DoubleFunction<Double> conversionFunction, double threshold) {
-		return threshold != 0.0 ? String.valueOf(Math.round(conversionFunction.apply(threshold))) : Utils.EMPTY;
+		// A threshold the SDR does not define is NaN; 0 is a legitimate threshold (0 RPM, 0 degrees)
+		return Double.isNaN(threshold) ? Utils.EMPTY : String.valueOf(Math.round(conversionFunction.apply(threshold)));
 	}
 
 	/**
@@ -676,7 +684,7 @@ public final class IpmiResultConverter {
 
 		return Arrays
 				.stream(thresholds)
-				.filter(threshold -> threshold != 0.0)
+				.filter(threshold -> !Double.isNaN(threshold))
 				.mapToObj(threshold -> getThresholdValue(conversionFunction, threshold))
 				.findFirst()
 				.orElse(Utils.EMPTY);

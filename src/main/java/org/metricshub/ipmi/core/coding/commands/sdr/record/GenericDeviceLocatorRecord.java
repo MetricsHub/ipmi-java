@@ -68,9 +68,10 @@ public class GenericDeviceLocatorRecord extends SensorRecord {
 
 		setAccessLun((TypeConverter.byteToInt(recordData[7]) & 0x18) >> 3);
 
-		setBusId(TypeConverter.byteToInt(recordData[7]) & 0x3);
+		// IPMI 2.0 Table 43-10: bus ID is bits [2:0] of byte 8, address span bits [2:0] of byte 9
+		setBusId(TypeConverter.byteToInt(recordData[7]) & 0x7);
 
-		setAddressSpan(TypeConverter.byteToInt(recordData[8]) & 0x3);
+		setAddressSpan(TypeConverter.byteToInt(recordData[8]) & 0x7);
 
 		setDeviceType(DeviceType.parseInt(TypeConverter.byteToInt(recordData[10])));
 		setDeviceTypeModifier(TypeConverter.byteToInt(recordData[11]));
@@ -78,11 +79,12 @@ public class GenericDeviceLocatorRecord extends SensorRecord {
 		setEntityId(TypeConverter.byteToInt(recordData[12]));
 		setEntityInstance(TypeConverter.byteToInt(recordData[13]));
 
-		byte[] nameData = new byte[recordData.length - 17];
+		// Byte 16 is the ID string type/length, the string starts at byte 17 (Table 43-10)
+		byte[] nameData = new byte[recordData.length - 16];
 
-		System.arraycopy(recordData, 17, nameData, 0, nameData.length);
+		System.arraycopy(recordData, 16, nameData, 0, nameData.length);
 
-		setName(decodeName(recordData[16], nameData));
+		setName(decodeName(recordData[15], nameData));
 	}
 
 	public int getDeviceAccessAddress() {

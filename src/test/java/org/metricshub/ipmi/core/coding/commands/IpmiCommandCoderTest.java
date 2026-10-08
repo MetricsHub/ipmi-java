@@ -2,56 +2,33 @@ package org.metricshub.ipmi.core.coding.commands;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.metricshub.ipmi.core.coding.commands.IpmiResponses.response;
 
 import org.junit.jupiter.api.Test;
+import org.metricshub.ipmi.core.coding.commands.fru.BaseUnit;
+import org.metricshub.ipmi.core.coding.commands.fru.ReadFruData;
 import org.metricshub.ipmi.core.coding.commands.sdr.ReserveSdrRepository;
 import org.metricshub.ipmi.core.coding.commands.sdr.ReserveSdrRepositoryResponseData;
+import org.metricshub.ipmi.core.coding.commands.session.CloseSession;
+import org.metricshub.ipmi.core.coding.commands.session.GetChannelCipherSuites;
 import org.metricshub.ipmi.core.coding.payload.CompletionCode;
 import org.metricshub.ipmi.core.coding.payload.lan.IPMIException;
-import org.metricshub.ipmi.core.coding.payload.lan.IpmiLanResponse;
 import org.metricshub.ipmi.core.coding.protocol.AuthenticationType;
-import org.metricshub.ipmi.core.coding.protocol.IpmiMessage;
-import org.metricshub.ipmi.core.coding.protocol.Ipmiv15Message;
 import org.metricshub.ipmi.core.coding.security.CipherSuite;
 
 class IpmiCommandCoderTest {
+
+	private static final byte CLOSE_SESSION = 0x3c;
 
 	private static final ReserveSdrRepository COMMAND = new ReserveSdrRepository(
 			IpmiVersion.V20,
 			CipherSuite.getEmpty(),
 			AuthenticationType.RMCPPlus);
 
-	/**
-	 * Build a message wrapping an IPMI LAN response (IPMI 2.0 table 13-5) from the BMC to remote console software.
-	 */
-	private static IpmiMessage response(byte command, int completionCode, int... data) {
-		byte[] raw = new byte[8 + data.length];
-		raw[0] = (byte) 0x81; // requester address
-		raw[1] = (byte) 0x2c; // storage response network function, LUN 0
-		raw[2] = (byte) -(0x81 + 0x2c); // checksum 1
-		raw[3] = 0x20; // responder address
-		raw[4] = 0x04; // sequence number 1, LUN 0
-		raw[5] = command;
-		raw[6] = (byte) completionCode;
-		for (int i = 0; i < data.length; i++) {
-			raw[7 + i] = (byte) data[i];
-		}
-		int checksum = 0;
-		for (int i = 3; i < raw.length - 1; i++) {
-			checksum += raw[i];
-		}
-		raw[raw.length - 1] = (byte) -checksum; // checksum 2
-
-		IpmiMessage message = new Ipmiv15Message();
-		message.setPayload(new IpmiLanResponse(raw));
-		return message;
-	}
-
 	@Test
 	void successfulResponseIsDecoded() throws Exception {
 		ReserveSdrRepositoryResponseData data = (ReserveSdrRepositoryResponseData) COMMAND
 				.getResponseData(response(CommandCodes.RESERVE_SDR_REPOSITORY, 0x00, 0x34, 0x12));
-
 		assertEquals(0x1234, data.getReservationId());
 	}
 
@@ -60,8 +37,8 @@ class IpmiCommandCoderTest {
 		IPMIException e = assertThrows(
 				IPMIException.class,
 				() -> COMMAND.getResponseData(response(CommandCodes.RESERVE_SDR_REPOSITORY, 0xc5)));
-
 		assertEquals(CompletionCode.ReservationCanceled, e.getCompletionCode());
+		assertEquals(0xc5, e.getRawCode());
 	}
 
 	@Test
@@ -69,7 +46,70 @@ class IpmiCommandCoderTest {
 		IllegalArgumentException e = assertThrows(
 				IllegalArgumentException.class,
 				() -> COMMAND.getResponseData(response(CommandCodes.GET_SDR, 0x00, 0x34, 0x12)));
-
 		assertEquals("This is not a response for ReserveSdrRepository command", e.getMessage());
+	}
+
+	@Test
+	void oemAndCommandSpecificCodesAreReportedWithTheirRawValue() {
+		IPMIException oem = assertThrows(
+				IPMIException.class,
+				() -> COMMAND.getResponseData(response(CommandCodes.RESERVE_SDR_REPOSITORY, 0x8a)));
+		assertEquals(CompletionCode.Unknown, oem.getCompletionCode());
+		assertEquals(0x8a, oem.getRawCode());
+		assertEquals("OEM completion code 0x8A.", oem.getMessage());
+
+		// 0Dh is "Unauthorized name" for RAKP only: for an IPMI command it is a command-specific code
+		IPMIException specific = assertThrows(
+				IPMIException.class,
+				() -> COMMAND.getResponseData(response(CommandCodes.RESERVE_SDR_REPOSITORY, 0x0d)));
+		assertEquals(CompletionCode.Unknown, specific.getCompletionCode());
+		assertEquals("Command-specific completion code 0x0D.", specific.getMessage());
+
+		IPMIException reserved = assertThrows(
+				IPMIException.class,
+				() -> COMMAND.getResponseData(response(CommandCodes.RESERVE_SDR_REPOSITORY, 0xd9)));
+		assertEquals("Reserved completion code 0xD9.", reserved.getMessage());
+	}
+
+	@Test
+	void readFruDataKnowsItsBusyCode() {
+		ReadFruData readFruData = new ReadFruData(
+				IpmiVersion.V20,
+				CipherSuite.getEmpty(),
+				AuthenticationType.RMCPPlus,
+				0,
+				BaseUnit.Bytes,
+				0,
+				16);
+		IPMIException e = assertThrows(
+				IPMIException.class,
+				() -> readFruData.getResponseData(response(CommandCodes.READ_FRU_DATA, 0x81)));
+		assertEquals(CompletionCode.Frudevicebusy, e.getCompletionCode());
+	}
+
+	@Test
+	void closeSessionKnowsItsSessionCodes() {
+		CloseSession closeSession = new CloseSession(
+				IpmiVersion.V20,
+				CipherSuite.getEmpty(),
+				AuthenticationType.RMCPPlus,
+				0x1234);
+		IPMIException invalidId = assertThrows(
+				IPMIException.class,
+				() -> closeSession.getResponseData(response(CLOSE_SESSION, 0x87)));
+		assertEquals(CompletionCode.InvalidSessionId, invalidId.getCompletionCode());
+		IPMIException invalidHandle = assertThrows(
+				IPMIException.class,
+				() -> closeSession.getResponseData(response(CLOSE_SESSION, 0x88)));
+		assertEquals(CompletionCode.InvalidSessionHandle, invalidHandle.getCompletionCode());
+	}
+
+	@Test
+	void getChannelCipherSuitesChecksTheCompletionCode() {
+		GetChannelCipherSuites command = new GetChannelCipherSuites((byte) 0x0e, (byte) 0);
+		IPMIException e = assertThrows(
+				IPMIException.class,
+				() -> command.getResponseData(response(CommandCodes.GET_CHANNEL_CIPHER_SUITES, 0xcc)));
+		assertEquals(CompletionCode.InvalidData, e.getCompletionCode());
 	}
 }

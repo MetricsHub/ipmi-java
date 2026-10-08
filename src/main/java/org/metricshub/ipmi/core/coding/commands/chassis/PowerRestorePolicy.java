@@ -39,4 +39,8 @@ public enum PowerRestorePolicy {
 	 * Chassis always powers up after AC/mains returns
 	 */
 	PoweredUp,
+	/**
+	 * The BMC reports the policy as unknown (11b).
+	 */
+	Unknown,
 }
