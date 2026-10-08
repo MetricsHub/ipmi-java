@@ -50,16 +50,16 @@ git config blame.ignoreRevsFile .git-blame-ignore-revs
 
 ## Release instructions
 
-The artifact is deployed to Sonatype's [Maven Central](https://central.sonatype.com/).
+The artifact is published to [Maven Central](https://central.sonatype.com/) through the
+[Central Portal](https://central.sonatype.com/publishing) with the `central-publishing-maven-plugin` (server Id `central`,
+authenticated with a Portal user token). Manual deployments require these credentials in your Maven `settings.xml`.
 
-The actual repository URL is https://s01.oss.sonatype.org/, with server Id `ossrh` and requires credentials to deploy
-artifacts manually.
+It is strongly recommended to only use [GitHub Actions "Release to Maven Central"](actions/workflows/release.yml) to perform a release:
 
-But it is strongly recommended to only use [GitHub Actions "Release to Maven Central"](actions/workflows/release.yml) to perform a release:
-
-* Manually trigger the "Release" workflow
+* Manually trigger the "Release to Maven Central" workflow
 * Specify the version being released and the next version number (SNAPSHOT)
-* Release the corresponding staging repository on [Sonatype's Nexus server](https://s01.oss.sonatype.org/)
+* Publish the pending deployment on the [Central Portal](https://central.sonatype.com/publishing/deployments)
+  (the workflow uploads and validates it, but does not publish it automatically)
 * Merge the PR that has been created to prepare the next version
 
 ## License
