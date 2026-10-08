@@ -90,7 +90,7 @@ port (or always pass `0`), and call `tearDown()` when you are done with it.
 | Method | Purpose |
 | --- | --- |
 | `IpmiConnector(int port)`, `IpmiConnector(int port, InetAddress address)` | Bind the given local port (`0`: any free port), on all interfaces or on one, with the keep-alive period of [`connection.properties`](timeouts-and-errors.html#library-wide-defaults) (30 000 ms). |
-| `IpmiConnector(int port, long pingPeriod)` | The same, with a [keep-alive period](configuration.html#keep-alive) in ms (`0` or a negative value, including `-1`: none). |
+| `IpmiConnector(int port, long pingPeriod)` | The same, with a [keep-alive period](configuration.html#keep-alive) in ms (`0` or a negative value, including `-1`: none, see [#126](https://github.com/metricshub/ipmi-java/issues/126)). |
 | `createConnection(InetAddress address[, int port])` | Register a connection to a BMC (port 623 by default). |
 | `createConnection(InetAddress address, [int port,] CipherSuite cipherSuite, PrivilegeLevel level)` | The same, skipping the cipher suite and capabilities steps: call `openSession()` next. |
 | `closeSession(handle)` | Log out (Close Session). |

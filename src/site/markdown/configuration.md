@@ -115,7 +115,7 @@ inactivity during a long collection.
 `-1` is meant to use the `pingPeriod` of
 [`connection.properties`](timeouts-and-errors.html#library-wide-defaults) (30 000 ms), but the
 connector that `IpmiClient` creates overwrites that value with `-1`, which disables the
-keep-alive. Each `IpmiClient` call opens its own session and closes it when it is done, so this
+keep-alive ([#126](https://github.com/metricshub/ipmi-java/issues/126)). Each `IpmiClient` call opens its own session and closes it when it is done, so this
 only matters for calls that last longer than the BMC's session inactivity timeout (typically
 60 s), such as a long SDR walk or FRU read on a slow BMC: for those, **set `pingPeriod`
 explicitly**, for example to `30000`.
