@@ -243,6 +243,7 @@ public abstract class AbstractIpmiRunner<T> implements AutoCloseable, Callable<T
 
 		// Close connection manager and release the listener port.
 		connector.tearDown();
+		connector = null;
 	}
 
 	/**

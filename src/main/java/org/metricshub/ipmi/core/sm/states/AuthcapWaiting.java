@@ -98,6 +98,7 @@ public class AuthcapWaiting extends State {
 												.getResponseData(ipmiMessage)));
 			}
 		} catch (Exception e) {
+			stateMachine.setCurrent(new Ciphers());
 			stateMachine.doExternalAction(new ErrorAction(e));
 		}
 	}

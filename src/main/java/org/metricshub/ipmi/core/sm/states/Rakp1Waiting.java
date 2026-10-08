@@ -107,6 +107,7 @@ public class Rakp1Waiting extends State {
 												.getResponseData(ipmiMessage)));
 			}
 		} catch (Exception e) {
+			stateMachine.setCurrent(new Authcap());
 			stateMachine.doExternalAction(new ErrorAction(e));
 		}
 	}

@@ -39,6 +39,11 @@ public final class Utils {
 	public static final String EMPTY = "";
 
 	/**
+	 * How long a call that hit its deadline waits for its worker to close the session and the socket.
+	 */
+	private static final long CLEANUP_GRACE_MS = 1000;
+
+	/**
 	 * @param value The value to check
 	 * @return whether the value is null, empty or contains only blank chars
 	 */
@@ -87,8 +92,17 @@ public final class Utils {
 			ExecutionException,
 			TimeoutException {
 
-		final ExecutorService executorService = Executors.newSingleThreadExecutor();
-		final Future<T> future = executorService.submit(callable);
+		final ExecutorService executorService = Executors.newSingleThreadExecutor(Utils::newWorkerThread);
+
+		// The worker owns the connector: it also closes it, so the cleanup is covered by the deadline and never
+		// runs on the calling thread while the worker is still using the connection
+		final Future<T> future = executorService.submit(() -> {
+			try {
+				return callable.call();
+			} finally {
+				callable.close();
+			}
+		});
 
 		try {
 			return future.get(timeout, TimeUnit.MILLISECONDS);
@@ -96,10 +110,19 @@ public final class Utils {
 			Thread.currentThread().interrupt();
 			throw e;
 		} catch (TimeoutException e) {
+			// Stop the worker at its current wait and give it a moment to close the session and release the port
 			future.cancel(true);
+			executorService.shutdownNow();
+			executorService.awaitTermination(CLEANUP_GRACE_MS, TimeUnit.MILLISECONDS);
 			throw e;
 		} finally {
 			executorService.shutdownNow();
 		}
+	}
+
+	private static Thread newWorkerThread(Runnable runnable) {
+		Thread thread = new Thread(runnable, "ipmi-client");
+		thread.setDaemon(true);
+		return thread;
 	}
 }

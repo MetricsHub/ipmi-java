@@ -1,5 +1,5 @@
-keywords: troubleshooting, timeout, illegal connection state, rakp1waiting, authentication check failed, insufficient privilege, 0xd4, ipmitool, ipmiutil, debug
-description: Diagnose the usual failures of the IPMI Java Client — timeouts, authentication errors, insufficient privilege, missing sensors or FRUs, a JVM that does not exit — and compare with ipmitool and ipmiutil.
+keywords: troubleshooting, timeout, command timed out, login, authentication check failed, unauthorized name, insufficient privilege, 0xd4, ipmitool, ipmiutil, debug
+description: Diagnose the usual failures of the IPMI Java Client — timeouts, authentication errors, insufficient privilege, missing sensors or FRUs — and compare with ipmitool and ipmiutil.
 
 # Troubleshooting
 
@@ -37,14 +37,12 @@ The stack trace of the `Command timed out` shows the step that was waiting. A fa
 `getAvailableCipherSuites` means the BMC never answered the very first request: the address, the
 port or the firewall is wrong, or IPMI over LAN is disabled.
 
-## `Illegal connection state: Rakp1Waiting`
+## The login fails
 
-The `ExecutionException` wraps
-`ConnectionException: Illegal connection state: Rakp1Waiting`: the RAKP handshake (the login)
-failed, and the session could not be opened. The actual reason is logged just before, at the
-`ERROR` level ([#109](https://github.com/metricshub/ipmi-java/issues/109)):
+The RAKP handshake (the login) failed and the session could not be opened. The credentials are
+sent once; the `ExecutionException` wraps the reason:
 
-| Logged | Cause |
+| Cause | Meaning |
 | --- | --- |
 | `IllegalArgumentException: Authentication check failed` | The BMC's proof does not match the password: **wrong password** (or wrong [BMC key](configuration.html#bmc-key)). |
 | `IPMIException: Unauthorized name.` | **Unknown user**, or a user not allowed to log in over the LAN channel. |
@@ -83,12 +81,6 @@ to make it use suite 3 or 17.
 | A sensor known to `ipmitool` is not returned | Only Full and Compact sensor records of the BMC's own repository are read: sensors behind satellite controllers are not ([#84](https://github.com/metricshub/ipmi-java/issues/84)), and shared Compact records are not expanded ([#100](https://github.com/metricshub/ipmi-java/issues/100)). |
 | A sensor reads `0.0` | The BMC flags the reading as unavailable, which is not checked yet ([#110](https://github.com/metricshub/ipmi-java/issues/110)). |
 | Negative processor temperatures (`CPU1 DTS = -44.0`) | Not an error: Intel *Digital Thermal Sensor* readings are the margin below the maximum junction temperature. |
-
-## The JVM does not exit
-
-After a `TimeoutException`, some threads of the library may still run, and they are not daemon
-threads ([#79](https://github.com/metricshub/ipmi-java/issues/79)). End command-line programs and
-test harnesses with `System.exit(0)`.
 
 ## Collecting is slow
 

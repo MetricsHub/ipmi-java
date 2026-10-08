@@ -226,9 +226,8 @@ public class IpmiAsyncConnector implements ConnectionListener {
 				++tries;
 				result = connectionManager
 						.getAvailableCipherSuites(connectionHandle.getHandle());
-			} catch (InterruptedException e) {
-				throw e;
-			} catch (Exception e) {
+			} catch (ConnectionException e) {
+				// No reply: send again. Any other failure is the BMC's answer, and sending again would not change it
 				logger.warn(FAILED_TO_RECEIVE_ANSWER_CAUSE_MESSAGE, e);
 				if (tries > retries) {
 					throw e;
@@ -272,9 +271,8 @@ public class IpmiAsyncConnector implements ConnectionListener {
 								requestedPrivilegeLevel);
 				connectionHandle.setCipherSuite(cipherSuite);
 				connectionHandle.setPrivilegeLevel(requestedPrivilegeLevel);
-			} catch (InterruptedException e) {
-				throw e;
-			} catch (Exception e) {
+			} catch (ConnectionException e) {
+				// No reply: send again. Any other failure is the BMC's answer, and sending again would not change it
 				logger.warn(FAILED_TO_RECEIVE_ANSWER_CAUSE_MESSAGE, e);
 				if (tries > retries) {
 					throw e;
@@ -331,9 +329,8 @@ public class IpmiAsyncConnector implements ConnectionListener {
 				session = sessionManager.registerSession(sessionId, connectionHandle);
 
 				succeded = true;
-			} catch (InterruptedException e) {
-				throw e;
-			} catch (Exception e) {
+			} catch (ConnectionException e) {
+				// No reply: send again. Any other failure is the BMC's answer, and sending again would not change it
 				logger.warn(FAILED_TO_RECEIVE_ANSWER_CAUSE_MESSAGE, e);
 				if (tries > retries) {
 					throw e;
