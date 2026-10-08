@@ -71,7 +71,15 @@ the payload cannot be activated (SOL disabled, no free payload instance, privile
 
 ## Reading and writing
 
-Writes block until the BMC acknowledges the data, and return `false` when it is rejected:
+Writes block until the BMC acknowledges the data, and return `false` when it is rejected.
+Data longer than the BMC's SOL payload size (announced when the payload is activated) is sent in
+several packets.
+
+> [!WARNING]
+> Until [#123](https://github.com/metricshub/ipmi-java/issues/123) is fixed, a write that needs
+> **more than two packets** loses the data of its second packet, or throws
+> `IllegalArgumentException` beyond three packets. This affects `writeBytes()`, `writeString()`
+> and `writeIntArray()`: send long data in several short writes.
 
 | Method | Writes |
 | --- | --- |

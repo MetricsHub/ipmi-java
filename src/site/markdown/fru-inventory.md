@@ -30,7 +30,10 @@ but makes large FRUs slow to read: a few seconds per FRU on some BMCs
 ([#102](https://github.com/metricshub/ipmi-java/issues/102)).
 
 A FRU that cannot be read — not present, or answering with an error at some offset — is logged at
-the `WARN` level and reported truncated, or not at all; it never fails the whole call. Physical
+the `WARN` level and reported truncated, or not at all. The exception is **FRU 0**: if the BMC
+rejects Get FRU Inventory Area Info for it, `getFrus()` (and therefore
+`getFrusAndSensorsAsStringResult()`) fails with that error. As with any call, a request that gets
+no reply also fails the call ([Timeouts and Errors](timeouts-and-errors.html)). Physical
 FRU devices (EEPROMs on a private I²C bus, read with Master Write-Read) are not read.
 
 ## The `Fru` object

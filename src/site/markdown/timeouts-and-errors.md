@@ -26,7 +26,7 @@ with nothing collected: there are no partial results.
 > ([#79](https://github.com/metricshub/ipmi-java/issues/79)): a worker waiting for a reply may
 > keep waiting, and the library's receiving and timer threads are not daemon threads. The calling
 > thread gets its `TimeoutException` on time, but these threads can keep a short-lived JVM alive:
-> end command-line programs with `System.exit()`.
+> end command-line programs with `System.exit(0)`.
 
 ## Per-message timeout and retries
 
@@ -121,7 +121,8 @@ Some problems are logged at the `WARN` level and the call goes on with what it c
   reply — is skipped and the repository walk continues with the next record
   ([Supported Commands](supported-commands.html#sdr-records));
 * a **FRU** that cannot be read (for example a FRU device that is not present) is reported
-  truncated or not at all ([FRU Inventory](fru-inventory.html));
+  truncated or not at all — except the built-in FRU 0, whose inventory information must be
+  readable ([FRU Inventory](fru-inventory.html#how-the-frus-are-read));
 * a **sensor** whose reading is not available (completion code `DataNotPresent`) is returned
   without reading data.
 

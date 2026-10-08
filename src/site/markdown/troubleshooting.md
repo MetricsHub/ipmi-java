@@ -88,7 +88,7 @@ to make it use suite 3 or 17.
 
 After a `TimeoutException`, some threads of the library may still run, and they are not daemon
 threads ([#79](https://github.com/metricshub/ipmi-java/issues/79)). End command-line programs and
-test harnesses with `System.exit()`.
+test harnesses with `System.exit(0)`.
 
 ## Collecting is slow
 

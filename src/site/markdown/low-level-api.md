@@ -21,6 +21,7 @@ which `IpmiClient` itself uses:
 
 ```java
 import java.net.InetAddress;
+import java.util.Comparator;
 import java.util.List;
 
 import org.metricshub.ipmi.core.api.async.ConnectionHandle;
@@ -44,13 +45,13 @@ public class LowLevelExample {
 			// Wait at most 5 s for each reply instead of 5 min
 			connector.setTimeout(handle, 5000);
 
-			// Pick a cipher suite among those the BMC offers: 17 if available
+			// Pick a cipher suite among those the BMC offers: 17 if available, else 3
 			List<CipherSuite> suites = connector.getAvailableCipherSuites(handle);
 			CipherSuite cipherSuite = suites
 					.stream()
-					.filter(suite -> suite.getId() == 17)
-					.findFirst()
-					.orElse(suites.get(suites.size() - 1));
+					.filter(suite -> suite.getId() == 17 || suite.getId() == 3)
+					.max(Comparator.comparingInt(CipherSuite::getId))
+					.orElseThrow(() -> new IllegalStateException("The BMC offers neither cipher suite 17 nor 3"));
 
 			// Declare the cipher suite and the privilege level, then log in (RAKP handshake)
 			connector.getChannelAuthenticationCapabilities(handle, cipherSuite, PrivilegeLevel.User);
@@ -94,9 +95,10 @@ port (or always pass `0`), and call `tearDown()` when you are done with it.
 
 ### Choosing the cipher suite
 
-`getAvailableCipherSuites()` returns the suites the BMC offers, in the BMC's order. Choose one
-the library implements: **3** or **17** in practice (see the
-[table](preparing-the-bmc.html#cipher-suites)). To skip the discovery when you already know the
+`getAvailableCipherSuites()` returns the suites the BMC offers, in the BMC's order, including
+suites the library does not implement. Choose one it implements: **3** or **17** in practice (see
+the [table](preparing-the-bmc.html#cipher-suites)); a suite with an xRC4 or MD5-128 algorithm
+fails when the session is opened. To skip the discovery when you already know the
 suite, build it and pass it to `createConnection()`:
 
 ```java
