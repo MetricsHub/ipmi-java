@@ -93,8 +93,8 @@ are converted with the same formula, and are `0.0` when the BMC does not define 
 ### States
 
 Discrete sensors (presence, redundancy, power supply status, processor status, ...) report a set
-of asserted **states** instead of a value. `getStates()` returns each asserted state with a
-description, in the wording of `ipmiutil`, as `sensorName=state`, separated with `|`:
+of asserted **states** instead of a value. `getStates()` returns the asserted states that have
+a description in the wording of `ipmiutil`, as `sensorName=state`, separated with `|`:
 
 ```text
 PSU Redundancy=Fully Redundant

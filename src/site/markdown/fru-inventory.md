@@ -25,8 +25,8 @@ List<Fru> frus = IpmiClient.getFrus(config);
 3. attaches FRU 0 to the first **Compact Sensor** record of the system board entity, under the
    name `<board product name> <entity instance>`.
 
-The FRU data is read in chunks of 16 bytes, which keeps every request small enough for any BMC
-but makes large FRUs slow to read: a few seconds per FRU on some BMCs
+The FRU data is read in chunks of 16 bytes, which keeps the requests small but makes large FRUs
+slow to read: a few seconds per FRU on some BMCs
 ([#102](https://github.com/metricshub/ipmi-java/issues/102)).
 
 A FRU whose data cannot be read — not present, or answering with an error at some offset — is
