@@ -73,6 +73,13 @@ always returns the suite it was built with, whether the BMC offers it or not.
 | `SerialOverLan(connector, host, port, user, password, selector)` | New session on another port |
 | `SerialOverLan(connector, session)` | Reuse a session opened with the low-level API; closing the console leaves it, and the connector, open. If the BMC serves SOL on another UDP port, the console uses an existing session on that port, or opens one (which closing the console closes, with the connector). |
 
+> [!NOTE]
+> The constructors that open their own session take no [BMC key](configuration.html#bmc-key):
+> they cannot log in to a BMC configured with *two-key* logins. On such a BMC, open the session
+> with the low-level API, `connector.openSession(handle, user, password, bmcKey)`, and pass the
+> `Session` it returns to `SerialOverLan(connector, session)`. The session that the console
+> opens by itself on another UDP port has the same limitation.
+
 If the session's privilege is too low to activate the payload, the client raises it to
 Administrator (Set Session Privilege Level) and tries again. The constructors throw `SOLException` when
 the payload cannot be activated (SOL disabled, no free payload instance, privilege refused).

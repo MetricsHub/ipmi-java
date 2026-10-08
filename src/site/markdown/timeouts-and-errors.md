@@ -117,12 +117,13 @@ Common causes wrapped in the `ExecutionException`:
 
 Some problems are logged at the `WARN` level and the call goes on with what it could collect:
 
-* an **SDR record** that cannot be decoded — an OEM record type, a malformed record, an empty
-  reply — is skipped and the repository walk continues with the next record
-  ([Supported Commands](supported-commands.html#sdr-records));
+* an **SDR record** that cannot be decoded — a reserved record type, a record shorter than its
+  header — is skipped and the repository walk continues with the next record (a Get SDR reply
+  without any record byte fails the call instead, see
+  [Supported Commands](supported-commands.html#oem-and-unknown-records));
 * a **FRU** that cannot be read (for example a FRU device that is not present) is reported
-  truncated or not at all — except the built-in FRU 0, whose inventory information must be
-  readable ([FRU Inventory](fru-inventory.html#how-the-frus-are-read));
+  truncated or not at all — except when Get FRU Inventory Area Info fails for FRU 0, or gets no
+  reply for any FRU ([FRU Inventory](fru-inventory.html#how-the-frus-are-read));
 * a **sensor** whose reading is not available (completion code `DataNotPresent`) is returned
   without reading data.
 
