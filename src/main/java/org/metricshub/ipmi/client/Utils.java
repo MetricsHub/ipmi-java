@@ -109,20 +109,31 @@ public final class Utils {
 		try {
 			return future.get(timeout, TimeUnit.MILLISECONDS);
 		} catch (InterruptedException e) {
+			stopWorker(future, executorService);
 			Thread.currentThread().interrupt();
 			throw e;
 		} catch (TimeoutException e) {
-			// Stop the worker at its current wait and give it a moment to close the session and release the port
-			future.cancel(true);
-			executorService.shutdownNow();
-			if (!executorService.awaitTermination(CLEANUP_GRACE_MS, TimeUnit.MILLISECONDS)) {
-				// A call that cannot be interrupted (name resolution, a blocking send): the worker closes the
-				// connection and releases the port by itself when that call returns
-				LOGGER.warn("IPMI call timed out and its worker is still busy; the port is released when it returns");
-			}
+			stopWorker(future, executorService);
 			throw e;
 		} finally {
 			executorService.shutdownNow();
+		}
+	}
+
+	/**
+	 * Stops the worker at its current wait and gives it a moment to close the session and release the port.
+	 */
+	private static void stopWorker(Future<?> future, ExecutorService executorService) {
+		future.cancel(true);
+		executorService.shutdownNow();
+		try {
+			if (!executorService.awaitTermination(CLEANUP_GRACE_MS, TimeUnit.MILLISECONDS)) {
+				// A call that cannot be interrupted (name resolution, a blocking send): the worker closes the
+				// connection and releases the port by itself when that call returns
+				LOGGER.warn("The IPMI worker is still busy after the call was abandoned; the port is released when it returns");
+			}
+		} catch (InterruptedException e) {
+			Thread.currentThread().interrupt();
 		}
 	}
 
