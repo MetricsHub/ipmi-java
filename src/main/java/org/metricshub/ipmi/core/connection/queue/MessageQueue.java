@@ -41,7 +41,7 @@ import java.util.TimerTask;
 public class MessageQueue extends TimerTask {
 
 	private List<QueueElement> queue;
-	private int timeout;
+	private volatile int timeout;
 	private Timer timer;
 	private Connection connection;
 	private int lastSequenceNumber;

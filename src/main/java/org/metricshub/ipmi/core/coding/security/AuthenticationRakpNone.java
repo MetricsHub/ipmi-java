@@ -44,7 +44,7 @@ public class AuthenticationRakpNone extends AuthenticationAlgorithm {
 	 * the RAKP-None algorithm.
 	 */
 	@Override
-	public boolean checkKeyExchangeAuthenticationCode(byte[] data, byte[] key, String password) {
+	public boolean checkKeyExchangeAuthenticationCode(byte[] data, byte[] key, byte[] password) {
 		return true;
 	}
 
@@ -53,7 +53,7 @@ public class AuthenticationRakpNone extends AuthenticationAlgorithm {
 	 * using the RAKP-None algorithm.
 	 */
 	@Override
-	public byte[] getKeyExchangeAuthenticationCode(byte[] data, String password) {
+	public byte[] getKeyExchangeAuthenticationCode(byte[] data, byte[] key) {
 		return new byte[0];
 	}
 

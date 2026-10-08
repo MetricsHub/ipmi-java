@@ -50,9 +50,10 @@ chosen by the operating system for each session.
 ### Credentials
 
 `username` and `password` are the IPMI account of the BMC: see
-[Preparing the BMC](preparing-the-bmc.html#creating-the-account). The password is a `char[]`;
-the library converts it to a `String` internally to open the session and does not clear the
-array, so clear it yourself once you no longer need the configuration.
+[Preparing the BMC](preparing-the-bmc.html#creating-the-account). Both are sent to the BMC
+encoded in UTF-8, whatever the platform charset. The password is a `char[]`; the library converts
+it to a `String` internally to open the session and does not clear the array, so clear it
+yourself once you no longer need the configuration.
 
 The client opens every session with the **User** privilege level, which is enough for every
 `IpmiClient` method.

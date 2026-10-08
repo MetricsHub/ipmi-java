@@ -34,7 +34,6 @@ import java.io.IOException;
 import java.net.InetAddress;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * Manages multiple {@link Connection}s
@@ -43,7 +42,8 @@ public class ConnectionManager {
 	private Messenger messenger;
 	private List<Connection> connections;
 
-	private static final AtomicInteger SESSIONLESS_TAG = new AtomicInteger(0);
+	private static final Object SESSIONLESS_TAG_LOCK = new Object();
+	private static int sessionlessTag;
 	private static List<Integer> reservedTags = new ArrayList<Integer>();
 
 	/**
@@ -128,34 +128,33 @@ public class ConnectionManager {
 	 * {@link ConnectionManager}. Auto-incremented.
 	 */
 	public static int generateSessionlessTag() {
-		synchronized (SESSIONLESS_TAG) {
+		synchronized (SESSIONLESS_TAG_LOCK) {
 			boolean wait = true;
 			// wait(1) clears the interrupt flag when it throws; restore it only once a tag is found,
 			// otherwise every following wait(1) would throw immediately and the loop would hot-spin
 			boolean interrupted = false;
 			while (wait) {
-				SESSIONLESS_TAG.incrementAndGet();
-				SESSIONLESS_TAG.set(SESSIONLESS_TAG.get() % 60);
+				sessionlessTag = (sessionlessTag + 1) % 60;
 				synchronized (reservedTags) {
-					if (!reservedTags.contains(SESSIONLESS_TAG.get())) {
+					if (!reservedTags.contains(sessionlessTag)) {
 						wait = false;
 					}
 				}
 				if (wait) {
 					try {
-						SESSIONLESS_TAG.wait(1);
+						SESSIONLESS_TAG_LOCK.wait(1);
 					} catch (InterruptedException e) {
 						interrupted = true;
 					}
 				}
 			}
 			synchronized (reservedTags) {
-				reservedTags.add(SESSIONLESS_TAG.get());
+				reservedTags.add(sessionlessTag);
 			}
 			if (interrupted) {
 				Thread.currentThread().interrupt();
 			}
-			return SESSIONLESS_TAG.get();
+			return sessionlessTag;
 		}
 	}
 

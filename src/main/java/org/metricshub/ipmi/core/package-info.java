@@ -4,7 +4,16 @@
  *
  * @see org.metricshub.ipmi.core.api
  */
+// Applies to all the subpackages. EI_EXPOSE_REP also matches EI_EXPOSE_REP2
+@SuppressFBWarnings(value = { "CT_CONSTRUCTOR_THROW", "EI_EXPOSE_REP" }, justification = "CT_CONSTRUCTOR_THROW: "
+		+ "constructors reject invalid arguments and packets, and no class guards security-sensitive state that a "
+		+ "finalizer attack could exploit. EI_EXPOSE_REP: the protocol core shares buffers, records and "
+		+ "collaborators by reference by design; messages are built and decoded in place, and response data and "
+		+ "records are mutable holders with public setters, so a defensive copy would add allocations without "
+		+ "protecting any invariant")
 package org.metricshub.ipmi.core;
+
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 /*-
  * ╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲
  * IPMI Java Client

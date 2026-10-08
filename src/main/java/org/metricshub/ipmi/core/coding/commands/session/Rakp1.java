@@ -40,6 +40,7 @@ import org.metricshub.ipmi.core.coding.security.ConfidentialityNone;
 import org.metricshub.ipmi.core.common.Randomizer;
 import org.metricshub.ipmi.core.common.TypeConverter;
 
+import java.nio.charset.StandardCharsets;
 import java.security.InvalidKeyException;
 import java.security.NoSuchAlgorithmException;
 
@@ -108,9 +109,9 @@ public class Rakp1 extends IpmiCommandCoder {
 	}
 
 	public void setUsername(String username) {
-		if (username.length() > 16) {
+		if (username.getBytes(StandardCharsets.UTF_8).length > 16) {
 			throw new IllegalArgumentException(
-					"Username is too long. It's length cannot exceed 16");
+					"Username is too long. It's length cannot exceed 16 bytes");
 		}
 		this.username = username;
 	}
@@ -119,12 +120,26 @@ public class Rakp1 extends IpmiCommandCoder {
 		return username;
 	}
 
+	/**
+	 * @return the user name as sent to the BMC, encoded in UTF-8
+	 */
+	byte[] getUsernameBytes() {
+		return username.getBytes(StandardCharsets.UTF_8);
+	}
+
 	private void setPassword(String password) {
 		this.password = password;
 	}
 
 	public String getPassword() {
 		return password;
+	}
+
+	/**
+	 * @return the password as the key of the authentication algorithm, encoded in UTF-8 (empty when null)
+	 */
+	byte[] getPasswordBytes() {
+		return password == null ? new byte[0] : password.getBytes(StandardCharsets.UTF_8);
 	}
 
 	private void setConsoleRandomNumber(byte[] randomNumber) {
@@ -216,13 +231,8 @@ public class Rakp1 extends IpmiCommandCoder {
 
 	@Override
 	protected IpmiPayload preparePayload(int sequenceNumber) {
-		byte[] payload = null;
-
-		if (getUsername() == null) {
-			setUsername("");
-		}
-
-		payload = new byte[28 + getUsername().length()];
+		byte[] usernameBytes = getUsernameBytes();
+		byte[] payload = new byte[28 + usernameBytes.length];
 
 		// message tag
 		payload[0] = TypeConverter.intToByte(sequenceNumber);
@@ -247,18 +257,8 @@ public class Rakp1 extends IpmiCommandCoder {
 		payload[25] = 0; // reserved
 		payload[26] = 0; // reserved
 
-		payload[27] = TypeConverter.intToByte(getUsername().length()); // username
-																																		// length
-
-		if (getUsername().length() > 0) {
-			System
-					.arraycopy(
-							getUsername().getBytes(),
-							0,
-							payload,
-							28,
-							getUsername().length()); // username
-		}
+		payload[27] = TypeConverter.intToByte(usernameBytes.length); // username length
+		System.arraycopy(usernameBytes, 0, payload, 28, usernameBytes.length); // username
 
 		return new PlainMessage(payload);
 	}
@@ -349,7 +349,7 @@ public class Rakp1 extends IpmiCommandCoder {
 				.checkKeyExchangeAuthenticationCode(
 						prepareKeyExchangeAuthenticationCodeBase(data),
 						key,
-						getPassword())) {
+						getPasswordBytes())) {
 			throw new IllegalArgumentException("Authentication check failed");
 		}
 
@@ -362,11 +362,8 @@ public class Rakp1 extends IpmiCommandCoder {
 	 */
 	private byte[] prepareKeyExchangeAuthenticationCodeBase(
 			Rakp1ResponseData responseData) {
-		int length = 58;
-		if (getUsername() != null) {
-			length += getUsername().length();
-		}
-		byte[] keac = new byte[length];
+		byte[] usernameBytes = getUsernameBytes();
+		byte[] keac = new byte[58 + usernameBytes.length];
 
 		byte[] rSID = TypeConverter
 				.intToLittleEndianByteArray(
@@ -395,20 +392,8 @@ public class Rakp1 extends IpmiCommandCoder {
 		keac[56] = TypeConverter
 				.intToByte(encodePrivilegeLevel(requestedMaximumPrivilegeLevel) | 0x10);
 
-		if (getUsername() != null) {
-			keac[57] = TypeConverter.intToByte(getUsername().length());
-			if (getUsername().length() > 0) {
-				System
-						.arraycopy(
-								getUsername().getBytes(),
-								0,
-								keac,
-								58,
-								getUsername().length());
-			}
-		} else {
-			keac[57] = 0;
-		}
+		keac[57] = TypeConverter.intToByte(usernameBytes.length);
+		System.arraycopy(usernameBytes, 0, keac, 58, usernameBytes.length);
 
 		return keac;
 	}
@@ -430,7 +415,7 @@ public class Rakp1 extends IpmiCommandCoder {
 			NoSuchAlgorithmException {
 		byte[] key = null;
 		if (getBmcKey() == null || getBmcKey().length <= 0) {
-			key = getPassword().getBytes();
+			key = getPasswordBytes();
 		} else {
 			key = getBmcKey();
 		}
@@ -439,7 +424,7 @@ public class Rakp1 extends IpmiCommandCoder {
 				.getAuthenticationAlgorithm()
 				.getKeyExchangeAuthenticationCode(
 						prepareSikBase(responseData),
-						new String(key));
+						key);
 	}
 
 	/**
@@ -447,12 +432,8 @@ public class Rakp1 extends IpmiCommandCoder {
 	 *         Integrity Key
 	 */
 	private byte[] prepareSikBase(Rakp1ResponseData responseData) {
-		int length = 34;
-		if (getUsername() != null) {
-			length += getUsername().length();
-		}
-
-		byte[] sikBase = new byte[length];
+		byte[] usernameBytes = getUsernameBytes();
+		byte[] sikBase = new byte[34 + usernameBytes.length];
 
 		System.arraycopy(getConsoleRandomNumber(), 0, sikBase, 0, 16);
 
@@ -467,20 +448,8 @@ public class Rakp1 extends IpmiCommandCoder {
 		sikBase[32] = TypeConverter
 				.intToByte(encodePrivilegeLevel(requestedMaximumPrivilegeLevel) | 0x10);
 
-		if (getUsername() != null) {
-			sikBase[33] = TypeConverter.intToByte(getUsername().length());
-			if (getUsername().length() > 0) {
-				System
-						.arraycopy(
-								getUsername().getBytes(),
-								0,
-								sikBase,
-								34,
-								getUsername().length());
-			}
-		} else {
-			sikBase[33] = 0;
-		}
+		sikBase[33] = TypeConverter.intToByte(usernameBytes.length);
+		System.arraycopy(usernameBytes, 0, sikBase, 34, usernameBytes.length);
 
 		return sikBase;
 	}

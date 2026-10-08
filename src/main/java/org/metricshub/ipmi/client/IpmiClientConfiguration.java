@@ -24,10 +24,15 @@ package org.metricshub.ipmi.client;
 
 import org.metricshub.ipmi.core.common.Constants;
 
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
+
 /**
  * IPMI configuration including the required credentials that need to be used to establish the
  * communication with the IPMI interface.
  */
+// EI_EXPOSE_REP also matches EI_EXPOSE_REP2
+@SuppressFBWarnings(value = "EI_EXPOSE_REP", justification = "The password char[] and BMC key byte[] are "
+		+ "deliberately shared, not copied, so that the caller can wipe the only copy of the credentials")
 public class IpmiClientConfiguration {
 
 	private String hostname;

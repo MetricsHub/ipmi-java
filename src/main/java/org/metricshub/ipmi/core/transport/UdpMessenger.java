@@ -45,13 +45,13 @@ public class UdpMessenger extends Thread implements Messenger {
 
 	private List<UdpListener> listeners;
 
-	private boolean closing = false;
+	private volatile boolean closing = false;
 
 	/**
 	 * Size of the message data buffer. Default
 	 * {@link UdpMessenger#DEFAULTBUFFERSIZE}.
 	 */
-	private int bufferSize;
+	private volatile int bufferSize;
 
 	private static final int DEFAULTBUFFERSIZE = 512;
 
@@ -89,7 +89,6 @@ public class UdpMessenger extends Thread implements Messenger {
 	 *         bind to the specified local port.
 	 */
 	public UdpMessenger(int port, InetAddress address) throws SocketException {
-		sentPackets = 0;
 		this.port = port;
 		listeners = new ArrayList<UdpListener>();
 		bufferSize = DEFAULTBUFFERSIZE;
@@ -117,7 +116,8 @@ public class UdpMessenger extends Thread implements Messenger {
 		boolean run = true;
 
 		while (run) {
-			DatagramPacket response = new DatagramPacket(new byte[512], 512);
+			int size = bufferSize;
+			DatagramPacket response = new DatagramPacket(new byte[size], size);
 
 			try {
 				socket.receive(response);
@@ -195,16 +195,6 @@ public class UdpMessenger extends Thread implements Messenger {
 		}
 	}
 
-	private static int sentPackets = 0;
-
-	/**
-	 * Returns number of packets sent since last creation of the instance of
-	 * {@link UdpMessenger}. For debug/testing purposes only.
-	 */
-	public static int getSentPackets() {
-		return sentPackets;
-	}
-
 	/**
 	 * Sends {@link UdpMessage}.
 	 *
@@ -225,6 +215,5 @@ public class UdpMessenger extends Thread implements Messenger {
 		} catch (InterruptedException e) {
 			currentThread().interrupt();
 		}
-		++sentPackets;
 	}
 }

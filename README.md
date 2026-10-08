@@ -42,6 +42,8 @@ mvn formatter:format
 
 The build also fails on [Checkstyle](checkstyle.xml) violations. A justified violation can be suppressed with `// CHECKSTYLE.OFF: <RuleName>` and `// CHECKSTYLE.ON: <RuleName>` comments.
 
+The build fails on any SpotBugs bug as well. An intentional one is suppressed with `@SuppressFBWarnings` and a `justification`.
+
 To ignore the whole-tree reformat commit in `git blame`, run once:
 
 ```bash

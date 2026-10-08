@@ -192,6 +192,8 @@ public abstract class ProtocolDecoder implements IpmiDecoder {
 	 *        - {@link ConfidentialityAlgorithm} required to decrypt
 	 *        payload.
 	 * @return Payload decoded into {@link IpmiLanResponse}.
+	 * @throws IllegalArgumentException
+	 *         when the payload is empty
 	 */
 	protected IpmiPayload decodePayload(
 			byte[] rawData,
@@ -199,14 +201,14 @@ public abstract class ProtocolDecoder implements IpmiDecoder {
 			int length,
 			ConfidentialityAlgorithm confidentialityAlgorithm,
 			PayloadType payloadType) {
-		byte[] payload = null;
-		if (length > 0) {
-			payload = new byte[length];
-
-			System.arraycopy(rawData, offset, payload, 0, length);
-
-			payload = confidentialityAlgorithm.decrypt(payload);
+		if (length <= 0) {
+			throw new IllegalArgumentException("Empty payload");
 		}
+		byte[] payload = new byte[length];
+
+		System.arraycopy(rawData, offset, payload, 0, length);
+
+		payload = confidentialityAlgorithm.decrypt(payload);
 
 		if (payloadType == PayloadType.Sol) {
 			return new SolInboundMessage(payload);

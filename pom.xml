@@ -92,6 +92,13 @@
 	</dependencyManagement>
 
 	<dependencies>
+		<!-- @SuppressFBWarnings for the justified SpotBugs suppressions; compile-time only (provided scope) -->
+		<dependency>
+			<groupId>com.github.spotbugs</groupId>
+			<artifactId>spotbugs-annotations</artifactId>
+			<version>4.10.4</version>
+			<scope>provided</scope>
+		</dependency>
 		<dependency>
 			<groupId>org.slf4j</groupId>
 			<artifactId>slf4j-api</artifactId>
@@ -177,6 +184,22 @@
 				</executions>
 			</plugin>
 
+			<!-- spotbugs: fail the build on any SpotBugs finding; same version as the site report below. The 4.9.3.0
+				inherited from oss-parent cannot read the class files of JDK 21+ -->
+			<plugin>
+				<groupId>com.github.spotbugs</groupId>
+				<artifactId>spotbugs-maven-plugin</artifactId>
+				<version>4.10.4.1</version>
+				<executions>
+					<execution>
+						<phase>verify</phase>
+						<goals>
+							<goal>check</goal>
+						</goals>
+					</execution>
+				</executions>
+			</plugin>
+
 			<!-- license: add headers to new files, never rewrite existing ones. The parent's canUpdateCopyright would turn
 				every "Copyright 2023 Verax Systems, MetricsHub" into "Copyright 2023 - <current year> MetricsHub", and its
 				canUpdateDescription makes every header look outdated on Windows (CRLF vs LF), which re-renders the copyright
@@ -219,7 +242,7 @@
 				<version>3.6.0</version>
 			</plugin>
 
-			<!-- spotbugs: the 4.9.3.0 inherited from oss-parent cannot read the class files of JDK 21+ -->
+			<!-- spotbugs: same version as the build gate, so the report shows what the gate checked -->
 			<plugin>
 				<groupId>com.github.spotbugs</groupId>
 				<artifactId>spotbugs-maven-plugin</artifactId>

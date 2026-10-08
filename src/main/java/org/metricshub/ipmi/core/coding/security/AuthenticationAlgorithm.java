@@ -76,12 +76,12 @@ public abstract class AuthenticationAlgorithm {
 	 * @param data - The base for authentication algorithm. Depends on RAKP
 	 *        Message.
 	 * @param key - the Key Exchange Authentication Code to check.
-	 * @param password - password of the user establishing a session
+	 * @param password - password of the user establishing a session, as bytes
 	 * @return True if authentication check was successful, false otherwise.
 	 * @throws NoSuchAlgorithmException when initiation of the algorithm fails
 	 * @throws InvalidKeyException when creating of the algorithm key fails
 	 */
-	public boolean checkKeyExchangeAuthenticationCode(byte[] data, byte[] key, String password)
+	public boolean checkKeyExchangeAuthenticationCode(byte[] data, byte[] key, byte[] password)
 			throws NoSuchAlgorithmException,
 			InvalidKeyException {
 		byte[] check = getKeyExchangeAuthenticationCode(data, password);
@@ -93,15 +93,14 @@ public abstract class AuthenticationAlgorithm {
 	 *
 	 * @param data - The base for authentication algorithm. Depends on RAKP
 	 *        Message.
-	 * @param password - password of the user establishing a session
+	 * @param key - the password of the user establishing a session, or the BMC key (Kg), as bytes
+	 * @return the Key Exchange Authentication Code
 	 * @throws NoSuchAlgorithmException when initiation of the algorithm fails
 	 * @throws InvalidKeyException when creating of the algorithm key fails
 	 */
-	public byte[] getKeyExchangeAuthenticationCode(byte[] data, String password)
+	public byte[] getKeyExchangeAuthenticationCode(byte[] data, byte[] key)
 			throws NoSuchAlgorithmException,
 			InvalidKeyException {
-
-		final byte[] key = password.getBytes();
 
 		SecretKeySpec sKey = new SecretKeySpec(key, getAlgorithmName());
 		mac.init(sKey);

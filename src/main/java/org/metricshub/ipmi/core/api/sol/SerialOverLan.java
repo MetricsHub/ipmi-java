@@ -413,7 +413,7 @@ public class SerialOverLan implements Closeable {
 	 * @return true if whole string was successfully sent and acknowledged by remote server, false otherwise.
 	 */
 	public boolean writeString(String string) {
-		return writeBytes(string.getBytes());
+		return writeString(string, Charset.defaultCharset());
 	}
 
 	/**
@@ -541,7 +541,7 @@ public class SerialOverLan implements Closeable {
 	 * @return all bytes that could be read as {@link String}, but no more than given byteCount.
 	 */
 	public String readString(int byteCount) {
-		return new String(readBytes(byteCount));
+		return readString(Charset.defaultCharset(), byteCount);
 	}
 
 	/**
