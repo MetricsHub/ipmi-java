@@ -12,7 +12,7 @@ time. Two timeouts apply:
 | Timeout | Set with | Default | Scope |
 | --- | --- | --- | --- |
 | [Overall timeout](#overall-timeout) | `IpmiClientConfiguration.timeout` (seconds) | none, required | One `IpmiClient` call, from the first packet to the closed session |
-| [Per-message timeout](#per-message-timeout-and-retries) | `IpmiConnector.setTimeout(handle, ms)`, or the `timeout` of [`connection.properties`](#library-wide-defaults) | 300 000 ms | Each request, including each step of the session handshake |
+| [Per-message timeout](#per-message-timeout-and-retries) | `IpmiConnector.setTimeout(handle, ms)`, or the `timeout` of [`connection.properties`](#library-wide-defaults) | 5 000 ms, capped by the overall timeout | Each request, including each step of the session handshake |
 
 ## Overall timeout
 
@@ -21,12 +21,8 @@ the session — in a worker thread, and waits for it at most `timeout` seconds. 
 expires, the worker is interrupted and the method throws `java.util.concurrent.TimeoutException`,
 with nothing collected: there are no partial results.
 
-> [!WARNING]
-> Interrupting the worker does not always stop it
-> ([#79](https://github.com/metricshub/ipmi-java/issues/79)): a worker waiting for a reply may
-> keep waiting, and the library's receiving and timer threads are not daemon threads. The calling
-> thread gets its `TimeoutException` on time, but these threads can keep a short-lived JVM alive:
-> end command-line programs with `System.exit(0)`.
+The interrupted worker stops at its current wait, and the library's receiving and timer threads
+are daemon threads: they never keep the JVM alive.
 
 ## Per-message timeout and retries
 
@@ -41,27 +37,18 @@ Below the overall timeout, each message has its own timeout and is retried:
 BMC replies with a *transient* completion code — node busy, out of resources, initialization in
 progress, timeout — are retried the same way. Any other error completion code fails at once.
 
-> [!IMPORTANT]
-> The per-message timeout is **5 minutes** by default, longer than any reasonable overall
-> timeout, and `IpmiClientConfiguration` does not expose it
-> ([#77](https://github.com/metricshub/ipmi-java/issues/77),
-> [#101](https://github.com/metricshub/ipmi-java/issues/101)). With the defaults, **a single lost
-> reply makes the whole call wait for the overall timeout** and throw `TimeoutException`.
+The per-message timeout is **5 s** by default, and `IpmiClient` caps it by the overall timeout.
+With the defaults, a lost reply costs the per-message timeout plus the pause, then the request
+is sent again; a BMC that never answers fails after 4 tries, about 20 s (plus the pauses) into
+the call.
 
-To recover from lost replies within the overall timeout, lower the per-message timeout to a few
-seconds:
+`IpmiClientConfiguration` does not expose the per-message timeout
+([#101](https://github.com/metricshub/ipmi-java/issues/101)). To change it:
 
 * with the [low-level API](low-level-api.html#timeouts), call `setTimeout(handle, ms)` on the
   connector right after `createConnection()`;
 * with `IpmiClient`, change the [library-wide default](#library-wide-defaults) before the first
   call.
-
-Two known defects limit what the retries achieve: a retried in-session message does not wait
-for the reply to the resent request
-([#78](https://github.com/metricshub/ipmi-java/issues/78)), and each handshake step waits longer
-than its timeout because it counts its 1 ms sleeps rather than the elapsed time
-([#79](https://github.com/metricshub/ipmi-java/issues/79)). A short per-message timeout still
-turns a lost reply into a retry (or a fast failure) instead of a stall.
 
 ## Library-wide defaults
 
@@ -70,7 +57,7 @@ The defaults come from two properties files packaged in the jar, read through th
 
 | Property | Default | Meaning | Read |
 | --- | --- | --- | --- |
-| `timeout` | `300000` | Per-message timeout, in ms | When each connection is created |
+| `timeout` | `5000` | Per-message timeout, in ms | When each connection is created |
 | `retries` | `3` | How many times a failed message is sent again | When each `IpmiConnector` is created |
 | `idleTime` | `4000` | Upper bound of the random pause before a retry, in ms | When each `IpmiConnector` is created |
 | `pingPeriod` | `30000` | Keep-alive period, in ms, when the configuration's `pingPeriod` is `-1` | When each `IpmiConnector` is created |
@@ -82,7 +69,7 @@ values then apply to every connection created afterwards, in the whole JVM.
 import org.metricshub.ipmi.core.common.PropertiesManager;
 
 PropertiesManager properties = PropertiesManager.getInstance();
-properties.setProperty("timeout", "5000"); // per-message timeout: 5 s instead of 5 min
+properties.setProperty("timeout", "2000"); // per-message timeout: 2 s instead of 5 s
 properties.setProperty("retries", "3");
 ```
 
@@ -96,7 +83,7 @@ The `IpmiClient` methods declare three checked exceptions:
 
 | Exception | When |
 | --- | --- |
-| `TimeoutException` | The [overall timeout](#overall-timeout) expired. Also the usual symptom of a wrong host, a closed UDP port, IPMI over LAN disabled, or a lost reply with the default per-message timeout. |
+| `TimeoutException` | The [overall timeout](#overall-timeout) expired: a large SDR repository or many FRUs on a slow BMC, or an overall timeout shorter than the handshake tries (about 20 s). |
 | `ExecutionException` | The exchange failed. `getCause()` holds the actual exception (see below). |
 | `InterruptedException` | The calling thread was interrupted while waiting. |
 
@@ -105,7 +92,7 @@ Common causes wrapped in the `ExecutionException`:
 | Cause | Meaning |
 | --- | --- |
 | `ConnectionException: Illegal connection state: Rakp1Waiting` | The RAKP handshake failed: wrong user name or password, account not allowed over LAN or at the User level. The `ERROR` log shows the actual reason (`Authentication check failed`, ...), see [#109](https://github.com/metricshub/ipmi-java/issues/109). |
-| `ConnectionException: Command timed out` / `Message timed out` | No reply after all the tries of a message (with a [shortened](#per-message-timeout-and-retries) per-message timeout). |
+| `ConnectionException: Command timed out` / `Message timed out` | No reply after all the [tries](#per-message-timeout-and-retries) of a message: `Command timed out` during the session handshake, the usual symptom of a wrong host, a closed UDP port or IPMI over LAN disabled; `Message timed out` in the session. |
 | `IPMIException` | The BMC answered with an error completion code. `getCompletionCode()` returns it, for example `InsufficientPrivilege` (`0xD4`). |
 | `IllegalArgumentException: ... is not yet implemented.` | The chosen cipher suite uses an algorithm the client does not implement (xRC4, MD5-128). See [cipher suites](preparing-the-bmc.html#cipher-suites). |
 | `Exception: Cannot get the available cipher suites.` | The BMC returned an empty cipher suite list. |

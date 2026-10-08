@@ -52,7 +52,8 @@ public class IpmiClientConfiguration {
 	 * @param password Password used to establish the connection with the host via the IPMI protocol.
 	 * @param bmcKey The key that should be provided if the two-key authentication is enabled, null otherwise.
 	 * @param skipAuth Whether the client should skip authentication
-	 * @param timeout Timeout used for each IPMI request.
+	 * @param timeout Overall deadline of each {@code IpmiClient} call, in seconds. It also caps the timeout of each
+	 *        message.
 	 */
 	public IpmiClientConfiguration(String hostname, String username, char[] password,
 			byte[] bmcKey, boolean skipAuth, long timeout) {
@@ -73,7 +74,8 @@ public class IpmiClientConfiguration {
 	 * @param password Password used to establish the connection with the host via the IPMI protocol.
 	 * @param bmcKey The key that should be provided if the two-key authentication is enabled, null otherwise.
 	 * @param skipAuth Whether the client should skip authentication
-	 * @param timeout Timeout used for each IPMI request.
+	 * @param timeout Overall deadline of each {@code IpmiClient} call, in seconds. It also caps the timeout of each
+	 *        message.
 	 */
 	public IpmiClientConfiguration(String hostname, int port, String username, char[] password,
 			byte[] bmcKey, boolean skipAuth, long timeout) {
@@ -89,7 +91,8 @@ public class IpmiClientConfiguration {
 	 * @param password Password used to establish the connection with the host via the IPMI protocol.
 	 * @param bmcKey The key that should be provided if the two-key authentication is enabled, null otherwise.
 	 * @param skipAuth Whether the client should skip authentication
-	 * @param timeout Timeout used for each IPMI request.
+	 * @param timeout Overall deadline of each {@code IpmiClient} call, in seconds. It also caps the timeout of each
+	 *        message.
 	 * @param pingPeriod The period in milliseconds used to send the keep alive messages.<br>
 	 *        Set pingPeriod to 0 to turn off keep-alive messages sent to the remote host.
 	 */
@@ -217,18 +220,18 @@ public class IpmiClientConfiguration {
 	}
 
 	/**
-	 * Returns the timeout used for each IPMI request.
+	 * Returns the overall deadline of each {@code IpmiClient} call, in seconds.
 	 *
-	 * @return The timeout used for each IPMI request.
+	 * @return The overall deadline of each {@code IpmiClient} call, in seconds.
 	 */
 	public long getTimeout() {
 		return timeout;
 	}
 
 	/**
-	 * Sets the timeout used for each IPMI request.
+	 * Sets the overall deadline of each {@code IpmiClient} call, in seconds. It also caps the timeout of each message.
 	 *
-	 * @param timeout The timeout used for each IPMI request.
+	 * @param timeout The overall deadline of each {@code IpmiClient} call, in seconds.
 	 */
 	public void setTimeout(long timeout) {
 		this.timeout = timeout;

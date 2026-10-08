@@ -86,24 +86,25 @@ public class MessageListener implements IpmiResponseListener {
 		if (messageTag < 0 || messageTag > 63) {
 			throw new IllegalArgumentException("Corrupted message tag");
 		}
+		IpmiResponse answer;
 		synchronized (this) {
+			// Forget the outcome of the previous try: a retry must wait for the reply of the resent message
+			response = null;
 			this.tag = messageTag;
 			for (IpmiResponse quickResponse : quickMessages) {
 				this.notify(quickResponse);
 			}
-		}
-
-		while (response == null) {
-			Thread.sleep(1);
-		}
-		if (response instanceof IpmiResponseData) {
-			synchronized (this) {
-				this.tag = -1;
-				quickMessages.clear();
+			while (response == null) {
+				wait();
 			}
-			return ((IpmiResponseData) response).getResponseData();
-		} else /* response instanceof IpmiError */ {
-			throw ((IpmiError) response).getException();
+			answer = response;
+			this.tag = -1;
+			quickMessages.clear();
+		}
+		if (answer instanceof IpmiResponseData) {
+			return ((IpmiResponseData) answer).getResponseData();
+		} else /* answer instanceof IpmiError */ {
+			throw ((IpmiError) answer).getException();
 		}
 	}
 
@@ -114,6 +115,7 @@ public class MessageListener implements IpmiResponseListener {
 				quickMessages.add(ipmiResponse);
 			} else if (ipmiResponse.getTag() == tag) {
 				this.response = ipmiResponse;
+				notifyAll();
 			}
 		}
 	}

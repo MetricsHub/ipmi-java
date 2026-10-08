@@ -425,7 +425,7 @@ public class IpmiConnector {
 				}
 
 				messageSent = true;
-			} catch (IllegalArgumentException e) {
+			} catch (IllegalArgumentException | InterruptedException e) {
 				throw e;
 			} catch (IPMIException e) {
 				handleErrorResponse(tries, e);
@@ -494,6 +494,17 @@ public class IpmiConnector {
 	 */
 	public void setTimeout(ConnectionHandle handle, int timeout) {
 		asyncConnector.setTimeout(handle, timeout);
+	}
+
+	/**
+	 * Returns the timeout of a single message on the connection with the given handle.
+	 *
+	 * @param handle
+	 *        - {@link ConnectionHandle} associated with the remote host.
+	 * @return the timeout in ms after which a message without a reply is reported as timed out
+	 */
+	public int getTimeout(ConnectionHandle handle) {
+		return asyncConnector.getTimeout(handle);
 	}
 
 	/**

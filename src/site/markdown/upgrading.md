@@ -19,9 +19,21 @@ The `IpmiClient` API is unchanged, and the client is more tolerant of real-world
   [BMC key](configuration.html#bmc-key) is used as raw bytes: a key with bytes `80h` or above no
   longer gets corrupted into a wrong session key;
 * the user name is limited to 16 bytes once encoded, as the IPMI specification requires, instead of
-  16 characters.
+  16 characters;
+* a lost UDP reply is recovered in seconds instead of stalling the call: the per-message timeout
+  is 5 s by default (it was 5 minutes) and capped by the overall timeout, a retried message waits
+  for the reply of the resent request, and the handshake steps wait for the elapsed time rather
+  than a number of sleeps ([Timeouts and Errors](timeouts-and-errors.html));
+* a BMC that never answers now fails the session handshake with
+  `ExecutionException` wrapping `ConnectionException: Command timed out`, about 20 s into the
+  call, where 1.2.02 threw `TimeoutException` at the overall timeout;
+* the overall timeout cancels the worker for good: the interrupted session stops at its current
+  wait, and the receiving and timer threads are daemon threads, so a program no longer needs
+  `System.exit()` to end.
 
-Code that **extends** the library's protocol classes needs the changes below.
+Code that **extends** the library's protocol classes needs the changes below. `QueueElement`
+lost its `isTimedOut()`, `makeTimedOut()` and `refreshTimestamp()` methods: a timed-out message
+now leaves the queue at once.
 
 ### Protected fields
 

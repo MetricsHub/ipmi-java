@@ -34,7 +34,6 @@ public class QueueElement {
 	 */
 	@Deprecated
 	private int retries;
-	private boolean timedOut;
 
 	private PayloadCoder request;
 	private ResponseData response;
@@ -45,7 +44,6 @@ public class QueueElement {
 		this.request = request;
 		timestamp = new Date();
 		retries = 0;
-		this.timedOut = false;
 	}
 
 	public int getId() {
@@ -90,17 +88,5 @@ public class QueueElement {
 
 	public Date getTimestamp() {
 		return timestamp;
-	}
-
-	public void refreshTimestamp() {
-		timestamp = new Date();
-	}
-
-	public boolean isTimedOut() {
-		return timedOut;
-	}
-
-	public void makeTimedOut() {
-		this.timedOut = true;
 	}
 }

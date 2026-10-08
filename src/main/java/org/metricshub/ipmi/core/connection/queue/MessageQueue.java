@@ -79,7 +79,7 @@ public class MessageQueue extends TimerTask {
 		this.connection = connection;
 		queue = new ArrayList<QueueElement>();
 		setTimeout(timeout);
-		timer = new Timer();
+		timer = new Timer(true);
 		timer.schedule(this, cleaningFrequency, cleaningFrequency);
 	}
 
@@ -117,7 +117,7 @@ public class MessageQueue extends TimerTask {
 	 * @return true if tag was reserved successfully, false otherwise
 	 */
 	private synchronized boolean reserveTag(int tag) {
-		if (isReserved(tag)) {
+		if (!isReserved(tag)) {
 			reservedTags.add(tag);
 			return true;
 		}
@@ -349,23 +349,29 @@ public class MessageQueue extends TimerTask {
 		return now.getTime() - oldestQueueElement.getTimestamp().getTime() > (long) timeout;
 	}
 
+	/**
+	 * Removes the oldest message from the queue; when it timed out (rather than being answered), the response
+	 * listeners are told so, which lets the sender retry it with a fresh tag.
+	 */
 	private void processObsoleteMessage(QueueElement message, boolean done) {
 		int tag = message.getId();
-		boolean previouslyTimedOut = message.isTimedOut();
 
-		if (previouslyTimedOut || done) {
-			queue.remove(0);
-			logger.info("Removing message after timeout, tag: " + tag);
-			releaseTag(tag);
-		} else {
-			message.makeTimedOut();
-			message.refreshTimestamp();
-			connection
-					.notifyResponseListeners(
-							connection.getHandle(),
-							tag,
-							null,
-							new ConnectionException("Message timed out"));
+		queue.remove(0);
+		releaseTag(tag);
+
+		if (!done) {
+			logger.debug("Message timed out, tag: {}", tag);
+			try {
+				connection
+						.notifyResponseListeners(
+								connection.getHandle(),
+								tag,
+								null,
+								new ConnectionException("Message timed out"));
+			} catch (RuntimeException e) {
+				// A failing listener must not kill the timer thread that expires the other messages
+				logger.warn("Response listener failed while handling the timeout of tag {}", tag, e);
+			}
 		}
 	}
 

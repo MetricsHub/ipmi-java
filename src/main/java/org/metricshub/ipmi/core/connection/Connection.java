@@ -76,6 +76,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Timer;
 import java.util.TimerTask;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
@@ -96,6 +97,7 @@ public class Connection extends TimerTask implements MachineObserver {
 	 */
 	private volatile int timeout = -1;
 	private volatile StateMachineAction lastAction;
+	private final Object responseLock = new Object();
 	private volatile int sessionId;
 	private volatile int managedSystemSessionId;
 	private volatile byte[] sik;
@@ -208,7 +210,7 @@ public class Connection extends TimerTask implements MachineObserver {
 		// If the pingPeriod greater than 0, start the timer otherwise don't start it
 		// means that the connection won't be kept alive by sending no-op messages
 		if (pingPeriod > 0) {
-			timer = new Timer();
+			timer = new Timer(true);
 			timer.schedule(this, pingPeriod, pingPeriod);
 		}
 
@@ -321,15 +323,21 @@ public class Connection extends TimerTask implements MachineObserver {
 	}
 
 	private void waitForResponse() throws Exception {
-		int time = 0;
+		long deadline = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(timeout);
 
-		while (time < timeout && lastAction == null) {
+		synchronized (responseLock) {
 			try {
-				Thread.sleep(1);
+				long remaining = deadline - System.nanoTime();
+				while (lastAction == null && remaining > 0) {
+					TimeUnit.NANOSECONDS.timedWait(responseLock, remaining);
+					remaining = deadline - System.nanoTime();
+				}
 			} catch (InterruptedException e) {
-				LOGGER.error(e.getMessage(), e);
+				// The caller gave up on us (Future.cancel): leave the state machine in a state that allows a retry
+				stateMachine.doTransition(new Timeout());
+				Thread.currentThread().interrupt();
+				throw e;
 			}
-			++time;
 		}
 
 		if (lastAction == null) {
@@ -644,7 +652,10 @@ public class Connection extends TimerTask implements MachineObserver {
 		if (action instanceof GetSikAction) {
 			sik = ((GetSikAction) action).getSik();
 		} else if (!(action instanceof MessageAction)) {
-			lastAction = action;
+			synchronized (responseLock) {
+				lastAction = action;
+				responseLock.notifyAll();
+			}
 			if (action instanceof ErrorAction) {
 				ErrorAction errorAction = (ErrorAction) action;
 				LOGGER.error(errorAction.getException().getMessage(), errorAction.getException());

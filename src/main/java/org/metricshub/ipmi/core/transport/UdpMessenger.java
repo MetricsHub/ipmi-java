@@ -94,6 +94,7 @@ public class UdpMessenger extends Thread implements Messenger {
 		bufferSize = DEFAULTBUFFERSIZE;
 		socket = new DatagramSocket(this.port, address);
 		socket.setSoTimeout(0);
+		setDaemon(true);
 		this.start();
 	}
 

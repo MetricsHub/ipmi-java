@@ -16,11 +16,12 @@ description: Diagnose the usual failures of the IPMI Java Client — timeouts, a
 3. **Start with `getChassisStatus()`**: it is a single command, so it tests the network, the
    credentials and the cipher suite in a few hundred milliseconds.
 
-## `TimeoutException`, nothing collected
+## `Command timed out` or `TimeoutException`, nothing collected
 
-The BMC did not answer in time. With the default settings, this is the symptom of every network
-or configuration problem, because the 5-minute per-message timeout is longer than the overall
-timeout ([Timeouts and Errors](timeouts-and-errors.html)).
+The BMC did not answer in time. A BMC that never answers fails the session handshake after its
+4 tries of 5 s: the `ExecutionException` wraps `ConnectionException: Command timed out`. A
+`TimeoutException` means the whole call outlived the overall timeout
+([Timeouts and Errors](timeouts-and-errors.html)).
 
 | Cause | Check |
 | --- | --- |
@@ -28,12 +29,11 @@ timeout ([Timeouts and Errors](timeouts-and-errors.html)).
 | IPMI over LAN disabled on the BMC | [Enabling IPMI over LAN](preparing-the-bmc.html#enabling-ipmi-over-lan) |
 | UDP port 623 filtered | [Firewall](preparing-the-bmc.html#firewall) |
 | An IPMI 1.5-only BMC | Such BMCs never answer the RMCP+ Open Session request ([#91](https://github.com/metricshub/ipmi-java/issues/91)). |
-| A lost UDP reply | Run the call again. With a [shorter per-message timeout](timeouts-and-errors.html#library-wide-defaults), lost replies are retried instead. |
+| A lost UDP reply | Retried after the [per-message timeout](timeouts-and-errors.html#per-message-timeout-and-retries); the call only fails when 4 tries in a row get no reply. |
 | Several sessions to the same BMC at the same time | BMCs drop replies under concurrent sessions: query each BMC [from one thread at a time](configuration.html#thread-safety). |
 | A large SDR repository or many FRUs on a slow BMC | Raise the [timeout](configuration.html#timeout): 120 s is a safe value. |
 
-When the timeout expires, the interrupted session logs an `ERROR` with an `InterruptedException`
-(`sleep interrupted`): its stack trace shows the step that was waiting. A wait in
+The stack trace of the `Command timed out` shows the step that was waiting. A failure in
 `getAvailableCipherSuites` means the BMC never answered the very first request: the address, the
 port or the firewall is wrong, or IPMI over LAN is disabled.
 
