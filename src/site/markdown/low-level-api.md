@@ -157,8 +157,12 @@ if (info.getEntriesCount() > 0) { // Get SEL Entry fails on an empty SEL
 				.sendMessage(handle, new GetSelEntry(IpmiVersion.V20, cipherSuite, AuthenticationType.RMCPPlus,
 						reservationId, recordId));
 		SelRecord record = entry.getSelRecord();
-		System.out.println(record.getTimestamp() + " " + record.getSensorType() + " " + record.getEvent() + " "
-				+ record.getEventDirection());
+		if (record.getRecordType() == SelRecordType.System) {
+			System.out.println(record.getTimestamp() + " " + record.getSensorType() + " " + record.getEvent() + " "
+					+ record.getEventDirection());
+		} else {
+			System.out.println("OEM entry " + record.getRecordId()); // fields not decoded, see #125
+		}
 		recordId = entry.getNextRecordId();
 	}
 }
@@ -167,17 +171,21 @@ if (info.getEntriesCount() > 0) { // Get SEL Entry fails on an empty SEL
 ```text
 SEL entries: 643
 Wed May 15 11:15:25 CEST 2024 EventLoggingDisabled LogAreaReset Assertion
-Wed May 15 11:16:11 CEST 2024 Voltage LimitNotExceeded Assertion
+OEM entry 2
+OEM entry 3
+OEM entry 4
 Wed May 15 11:23:27 CEST 2024 PowerUnit PowerOffOrDown Assertion
+Wed May 15 11:23:34 CEST 2024 PowerUnit PowerOffOrDown Deassertion
 ```
 
 > [!WARNING]
-> `GetSelEntry` decodes every entry with the layout of a *system event record* (type `02h`).
-> OEM entries (types `C0h` to `FFh`) come back with meaningless sensor and event fields (and
-> timestamp, for the non-timestamped types `E0h` to `FFh`); an entry of type exactly `C0h` or
-> `E0h` makes `sendMessage()` throw `IllegalArgumentException` (`Invalid value: 192` or `224`),
-> which ends the walk, since the ID of the next entry is lost with it. Check
-> `record.getRecordType()` before using the decoded fields.
+> `GetSelEntry` decodes every entry with the layout of a *system event record* (type `02h`),
+> including the OEM entries (types `C0h` to `FFh`) that vendors log in large numbers (more than
+> half of the entries on a Lenovo IMM): their sensor and event fields are meaningless (and their
+> timestamp too, for the non-timestamped types `E0h` to `FFh`), so check `getRecordType()` first,
+> as above. An entry of type exactly `C0h` or `E0h` makes `sendMessage()` throw
+> `IllegalArgumentException` (`Invalid value: 192` or `224`), which ends the walk, since the ID of
+> the next entry is lost with it. See [#125](https://github.com/metricshub/ipmi-java/issues/125).
 
 Exposing the SEL in `IpmiClient` is tracked in
 [#103](https://github.com/metricshub/ipmi-java/issues/103).
