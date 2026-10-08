@@ -51,7 +51,7 @@ subclassed anyway).
 | --- | --- |
 | `AuthenticationAlgorithm` | `getKeyExchangeAuthenticationCode(byte[] data, byte[] key)` and `checkKeyExchangeAuthenticationCode(byte[] data, byte[] key, byte[] password)` take the key and the password as bytes instead of a `String` |
 | `IntegrityAlgorithm`, `ConfidentialityAesCbc128` | The `protected` constants `CONST1` and `CONST2` are now `private` |
-| `UdpMessenger` | `getSentPackets()`, a debug counter, is removed; `setBufferSize(int)` now sets the size of the receive buffer, which was always 512 bytes |
+| `UdpMessenger` | `getSentPackets()`, a debug counter, is removed |
 | `ProtocolDecoder` | `decodePayload(...)` throws `IllegalArgumentException` on an empty payload instead of a `NullPointerException` |
 
 ### Sensor records

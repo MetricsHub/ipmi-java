@@ -116,8 +116,7 @@ public class UdpMessenger extends Thread implements Messenger {
 		boolean run = true;
 
 		while (run) {
-			int size = bufferSize;
-			DatagramPacket response = new DatagramPacket(new byte[size], size);
+			DatagramPacket response = new DatagramPacket(new byte[512], 512);
 
 			try {
 				socket.receive(response);
