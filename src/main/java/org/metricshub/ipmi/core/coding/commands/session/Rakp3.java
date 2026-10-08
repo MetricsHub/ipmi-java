@@ -210,7 +210,7 @@ public class Rakp3 extends IpmiCommandCoder {
 						prepareKeyExchangeAuthenticationCodeBase(
 								rakp1,
 								rakp1ResponseData),
-						rakp1.getPassword());
+						rakp1.getPasswordBytes());
 
 		byte[] result = null;
 
@@ -239,11 +239,8 @@ public class Rakp3 extends IpmiCommandCoder {
 	private byte[] prepareKeyExchangeAuthenticationCodeBase(
 			Rakp1 rakp1Message,
 			Rakp1ResponseData responseData) {
-		int length = 22;
-		if (rakp1Message.getUsername() != null) {
-			length += rakp1Message.getUsername().length();
-		}
-		byte[] keac = new byte[length];
+		byte[] username = rakp1Message.getUsernameBytes();
+		byte[] keac = new byte[22 + username.length];
 
 		System
 				.arraycopy(
@@ -271,20 +268,8 @@ public class Rakp3 extends IpmiCommandCoder {
 										.getRequestedMaximumPrivilegeLevel())
 								| 0x10);
 
-		if (rakp1Message.getUsername() != null) {
-			keac[21] = TypeConverter.intToByte(rakp1Message.getUsername().length());
-			if (rakp1Message.getUsername().length() > 0) {
-				System
-						.arraycopy(
-								rakp1Message.getUsername().getBytes(),
-								0,
-								keac,
-								22,
-								rakp1Message.getUsername().length());
-			}
-		} else {
-			keac[21] = 0;
-		}
+		keac[21] = TypeConverter.intToByte(username.length);
+		System.arraycopy(username, 0, keac, 22, username.length);
 
 		return keac;
 	}

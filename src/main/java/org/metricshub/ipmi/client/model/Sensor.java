@@ -22,6 +22,8 @@ package org.metricshub.ipmi.client.model;
  * ╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱
  */
 
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
+
 import org.metricshub.ipmi.core.coding.commands.sdr.GetSensorReadingResponseData;
 import org.metricshub.ipmi.core.coding.commands.sdr.record.AbstractSensorRecord;
 import org.metricshub.ipmi.core.coding.commands.sdr.record.CompactSensorRecord;
@@ -42,6 +44,9 @@ import org.metricshub.ipmi.core.coding.commands.sdr.record.SensorRecord;
  * <em>$sensorName=$state|$sensorName=$state|...|$sensorName=$state</em></li>
  * </ul>
  */
+// EI_EXPOSE_REP also matches EI_EXPOSE_REP2
+@SuppressFBWarnings(value = "EI_EXPOSE_REP", justification = "Result holder: hands out the decoded record and "
+		+ "reading, which are mutable holders themselves, by reference")
 public class Sensor {
 
 	private SensorRecord sensorRecord;

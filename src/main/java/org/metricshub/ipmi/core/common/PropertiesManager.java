@@ -22,7 +22,10 @@ package org.metricshub.ipmi.core.common;
  * ╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱
  */
 
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
+
 import java.io.IOException;
+import java.io.InputStream;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Properties;
@@ -45,6 +48,7 @@ public final class PropertiesManager {
 		loadProperties("/vxipmi.properties");
 	}
 
+	@SuppressFBWarnings(value = "MS_EXPOSE_REP", justification = "Singleton: handing out the shared instance is the point")
 	public static PropertiesManager getInstance() {
 		if (instance == null) {
 			instance = new PropertiesManager();
@@ -53,9 +57,9 @@ public final class PropertiesManager {
 	}
 
 	private void loadProperties(String name) {
-		try {
+		try (InputStream stream = getClass().getResourceAsStream(name)) {
 			Properties props = new Properties();
-			props.load(getClass().getResourceAsStream(name));
+			props.load(stream);
 
 			for (Object key : props.keySet()) {
 				this.properties.put(key.toString(), props.getProperty(key.toString()));

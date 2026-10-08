@@ -46,7 +46,7 @@ public class MessageListener implements IpmiResponseListener {
 
 	private int tag;
 
-	private IpmiResponse response;
+	private volatile IpmiResponse response;
 
 	/**
 	 * Messages that have proper connection handle but arrived before tag was
@@ -86,17 +86,21 @@ public class MessageListener implements IpmiResponseListener {
 		if (messageTag < 0 || messageTag > 63) {
 			throw new IllegalArgumentException("Corrupted message tag");
 		}
-		this.tag = messageTag;
-		for (IpmiResponse quickResponse : quickMessages) {
-			this.notify(quickResponse);
+		synchronized (this) {
+			this.tag = messageTag;
+			for (IpmiResponse quickResponse : quickMessages) {
+				this.notify(quickResponse);
+			}
 		}
 
 		while (response == null) {
 			Thread.sleep(1);
 		}
 		if (response instanceof IpmiResponseData) {
-			this.tag = -1;
-			quickMessages.clear();
+			synchronized (this) {
+				this.tag = -1;
+				quickMessages.clear();
+			}
 			return ((IpmiResponseData) response).getResponseData();
 		} else /* response instanceof IpmiError */ {
 			throw ((IpmiError) response).getException();

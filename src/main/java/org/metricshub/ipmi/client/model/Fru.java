@@ -24,6 +24,8 @@ package org.metricshub.ipmi.client.model;
 
 import java.util.List;
 
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
+
 import org.metricshub.ipmi.core.coding.commands.fru.record.BoardInfo;
 import org.metricshub.ipmi.core.coding.commands.fru.record.ChassisInfo;
 import org.metricshub.ipmi.core.coding.commands.fru.record.FruRecord;
@@ -37,6 +39,9 @@ import org.metricshub.ipmi.core.coding.commands.sdr.record.FruDeviceLocatorRecor
  * <li>The FRU records containing {@link BoardInfo}, {@link ChassisInfo} and/or {@link ProductInfo}.</li>
  * </ul>
  */
+// EI_EXPOSE_REP also matches EI_EXPOSE_REP2
+@SuppressFBWarnings(value = "EI_EXPOSE_REP", justification = "Result holder: hands out the decoded records, "
+		+ "which are mutable holders themselves, by reference")
 public class Fru {
 
 	private FruDeviceLocatorRecord fruLocator;

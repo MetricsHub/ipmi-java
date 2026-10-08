@@ -39,7 +39,7 @@ import org.metricshub.ipmi.core.common.TypeConverter;
  */
 public class ConfidentialityAesCbc128 extends ConfidentialityAlgorithm {
 
-	protected static final byte[] CONST2 = new byte[20];
+	private static final byte[] CONST2 = new byte[20];
 	static {
 		Arrays.fill(CONST2, (byte) 2);
 	}

@@ -37,7 +37,7 @@ import javax.crypto.spec.SecretKeySpec;
  */
 public abstract class IntegrityAlgorithm {
 
-	protected static final byte[] CONST1 = new byte[20];
+	private static final byte[] CONST1 = new byte[20];
 	static {
 		Arrays.fill(CONST1, (byte) 1);
 	}

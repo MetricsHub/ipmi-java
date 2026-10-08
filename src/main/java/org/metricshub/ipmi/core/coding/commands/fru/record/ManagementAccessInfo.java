@@ -24,6 +24,8 @@ package org.metricshub.ipmi.core.coding.commands.fru.record;
 
 import org.metricshub.ipmi.core.common.TypeConverter;
 
+import java.nio.charset.StandardCharsets;
+
 /**
  * Management Access Information record from FRU Multi Record Area
  */
@@ -56,7 +58,7 @@ public class ManagementAccessInfo extends MultiRecordInfo {
 
 		System.arraycopy(fruData, offset + 1, buffer, 0, length - 1);
 
-		accessInfo = new String(buffer);
+		accessInfo = new String(buffer, StandardCharsets.ISO_8859_1);
 	}
 
 	public ManagementAccessRecordType getRecordType() {

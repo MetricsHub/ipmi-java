@@ -105,9 +105,6 @@ public class ChassisInfo extends FruRecord {
 									true));
 					break;
 				default:
-					if (partDataLength == 0) {
-						continue;
-					}
 					customInfo
 							.add(
 									decodeString(

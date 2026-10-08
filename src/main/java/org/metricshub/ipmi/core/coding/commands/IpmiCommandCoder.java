@@ -24,7 +24,6 @@ package org.metricshub.ipmi.core.coding.commands;
 
 import org.metricshub.ipmi.core.coding.PayloadCoder;
 import org.metricshub.ipmi.core.coding.payload.CompletionCode;
-import org.metricshub.ipmi.core.coding.payload.IpmiPayload;
 import org.metricshub.ipmi.core.coding.payload.PlainMessage;
 import org.metricshub.ipmi.core.coding.payload.lan.IPMIException;
 import org.metricshub.ipmi.core.coding.payload.lan.IpmiLanResponse;
@@ -66,15 +65,10 @@ public abstract class IpmiCommandCoder extends PayloadCoder {
 	 *         class, false otherwise.
 	 */
 	public boolean isCommandResponse(IpmiMessage message) {
-		if (message.getPayload() instanceof IpmiPayload) {
-			if (message.getPayload() instanceof IpmiLanResponse) {
-				return ((IpmiLanResponse) message.getPayload()).getCommand() == getCommandCode();
-			} else {
-				return message.getPayload() instanceof PlainMessage;
-			}
-		} else {
-			return false;
+		if (message.getPayload() instanceof IpmiLanResponse) {
+			return ((IpmiLanResponse) message.getPayload()).getCommand() == getCommandCode();
 		}
+		return message.getPayload() instanceof PlainMessage;
 	}
 
 	/**

@@ -20,7 +20,7 @@ The BMC must have IPMI over LAN enabled and an account with the User privilege: 
 
 ## Upgrading
 
-Version 1.2.03 makes the `protected` fields of the protocol classes (`AbstractIpmiRunner`, `MessageHandler`, `IpmiLanMessage`, `ConfidentialityAlgorithm`, `IntegrityAlgorithm`) `private`. Subclasses must use the new `protected` accessors instead; see [Upgrading from 1.2.02](https://metricshub.org/ipmi-java/upgrading.html#upgrading-from-1-2-02) for the list. The `IpmiClient` API is unchanged. The Full, Compact and Event-Only sensor records now share the `AbstractSensorRecord` superclass, and commands can check responses with `IpmiCommandCoder.validateResponse()`; both are described on the same page.
+Version 1.2.03 makes the `protected` fields of the protocol classes (`AbstractIpmiRunner`, `MessageHandler`, `IpmiLanMessage`, `ConfidentialityAlgorithm`, `IntegrityAlgorithm`) `private`. Subclasses must use the new `protected` accessors instead; see [Upgrading from 1.2.02](https://metricshub.org/ipmi-java/upgrading.html#upgrading-from-1-2-02) for the list. The `IpmiClient` API is unchanged. The Full, Compact and Event-Only sensor records now share the `AbstractSensorRecord` superclass, and commands can check responses with `IpmiCommandCoder.validateResponse()`; both are described on the same page. The user name and password are now encoded in UTF-8 whatever the platform charset, and the BMC key is used as raw bytes; as a result, `AuthenticationAlgorithm.getKeyExchangeAuthenticationCode()` and `checkKeyExchangeAuthenticationCode()` take the key and password as `byte[]` instead of `String`. `UdpMessenger.getSentPackets()` is removed, and the `CONST1`/`CONST2` constants of `IntegrityAlgorithm` and `ConfidentialityAesCbc128` are now `private`.
 
 ## Build instructions
 
@@ -41,6 +41,8 @@ mvn formatter:format
 ```
 
 The build also fails on [Checkstyle](checkstyle.xml) violations. A justified violation can be suppressed with `// CHECKSTYLE.OFF: <RuleName>` and `// CHECKSTYLE.ON: <RuleName>` comments.
+
+The build fails on any SpotBugs bug as well. An intentional one is suppressed with `@SuppressFBWarnings` and a `justification`.
 
 To ignore the whole-tree reformat commit in `git blame`, run once:
 

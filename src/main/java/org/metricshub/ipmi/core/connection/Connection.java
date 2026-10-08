@@ -94,11 +94,11 @@ public class Connection extends TimerTask implements MachineObserver {
 	/**
 	 * Time in ms after which a message times out.
 	 */
-	private int timeout = -1;
-	private StateMachineAction lastAction;
-	private int sessionId;
-	private int managedSystemSessionId;
-	private byte[] sik;
+	private volatile int timeout = -1;
+	private volatile StateMachineAction lastAction;
+	private volatile int sessionId;
+	private volatile int managedSystemSessionId;
+	private volatile byte[] sik;
 
 	private int handle;
 
