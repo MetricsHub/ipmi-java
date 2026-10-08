@@ -1,35 +1,77 @@
-<?xml version="1.0" encoding="ISO-8859-1"?>
-<project name="${project.name}">
+<?xml version="1.0" encoding="UTF-8"?>
+<site name="IPMI Java Client" xmlns="http://maven.apache.org/SITE/2.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://maven.apache.org/SITE/2.0.0 https://maven.apache.org/xsd/site-2.0.0.xsd">
 
 	<skin>
 		<groupId>org.sentrysoftware.maven</groupId>
 		<artifactId>sentry-maven-skin</artifactId>
-		<version>6.4.01</version>
+		<version>8.0.01</version>
 	</skin>
 
 	<custom>
 		<noDefaultLinks>true</noDefaultLinks>
-		<keywords>verax, vxipmi, ipmi</keywords>
+		<keywords>ipmi, bmc, rmcp+, sensors, fru, sdr, chassis, serial over lan, java, hardware monitoring</keywords>
+		<social>
+			<custom>
+				<title>IPMI Java Client on GitHub</title>
+				<href>https://github.com/metricshub/ipmi-java</href>
+				<icon>fa-brands fa-github</icon>
+			</custom>
+		</social>
+		<additionalLinks>
+			<link>
+				<name>Issue Tracker</name>
+				<href>https://github.com/metricshub/ipmi-java/issues</href>
+			</link>
+			<link>
+				<name>Licenses</name>
+				<href>licenses.html</href>
+			</link>
+			<link>
+				<name>Releases</name>
+				<href>https://github.com/metricshub/ipmi-java/releases</href>
+			</link>
+		</additionalLinks>
 	</custom>
 
-	<bannerLeft>
-		<src>images/metricshub-logo.png</src>
-		<href>https://metricshub.org</href>
+	<bannerLeft href="https://metricshub.org">
+		<image src="images/metricshub-logo-only.png" alt="MetricsHub" />
 	</bannerLeft>
 
 	<body>
-	
+
 		<links>
-			<item name="Fork on GitHub" href="${project.scm.url}" />
+			<item name="GitHub" href="https://github.com/metricshub/ipmi-java" />
+			<item name="Releases" href="https://github.com/metricshub/ipmi-java/releases/latest" />
+			<item name="Issue Tracker" href="https://github.com/metricshub/ipmi-java/issues" />
 			<item name="MetricsHub&reg;" href="https://metricshub.com" />
 		</links>
 
-		<menu name="User Documentation">
-			<item name="Getting Started" href="index.html" />
-			<item name="Javadoc" href="apidocs/index.html" />
+		<menu name="Getting Started">
+			<item name="Overview" href="index.html" />
+			<item name="Installation" href="installation.html" />
+			<item name="Preparing the BMC" href="preparing-the-bmc.html" />
+		</menu>
+
+		<menu name="Usage">
+			<item name="Chassis Status" href="chassis-status.html" />
+			<item name="FRU Inventory" href="fru-inventory.html" />
+			<item name="Sensors" href="sensors.html" />
+			<item name="Configuration" href="configuration.html" />
+			<item name="Timeouts and Errors" href="timeouts-and-errors.html" />
+			<item name="Low-Level API" href="low-level-api.html" />
+			<item name="Serial over LAN" href="serial-over-lan.html" />
+		</menu>
+
+		<menu name="Reference">
+			<item name="Supported Commands" href="supported-commands.html" />
+			<item name="Troubleshooting" href="troubleshooting.html" />
+			<item name="Upgrading" href="upgrading.html" />
+			<item name="Migrating from Verax" href="migrating-from-verax.html" />
+			<item name="Javadoc (API)" href="apidocs/index.html" />
 		</menu>
 
 		<menu ref="reports" />
 	</body>
 
-</project>
+</site>

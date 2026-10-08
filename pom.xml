@@ -4,7 +4,7 @@
 	<parent>
 		<groupId>org.metricshub</groupId>
 		<artifactId>oss-parent</artifactId>
-		<version>4</version>
+		<version>5</version>
 	</parent>
 
 	<artifactId>ipmi-java</artifactId>
@@ -68,8 +68,14 @@
 		<!-- Java 8 -->
 		<maven.compiler.release>8</maven.compiler.release>
 
+		<!-- Encoding of the generated site reports. oss-parent only sets the source encoding;
+		     spotbugs-maven-plugin 4.10.4 fails with "charsetName" while rendering its report
+		     during `mvn verify site` when this is missing. -->
+		<project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
+
 		<!-- Reproducible Build -->
 		<!-- See https://maven.apache.org/guides/mini/guide-reproducible-builds.html -->
+		<!-- Also drives the Maven site copyright year and "Documentation as of" date; bumped at release. -->
 		<project.build.outputTimestamp>2025-11-20T18:41:44Z</project.build.outputTimestamp>
 	</properties>
 
@@ -184,11 +190,52 @@
 					<canUpdateDescription>false</canUpdateDescription>
 				</configuration>
 			</plugin>
+
+			<!-- site: the maven-site-plugin 3.12.1 inherited from oss-parent mixes Velocity 1.7 with the Velocity 2.x tools
+				of maven-skin-tools and randomly fails with an AbstractMethodError (ToolContext vs Context). Sentry Maven Skin 8
+				needs maven-site-plugin 3.21.0+ (Doxia 2.0) and its companion maven-skin-tools -->
+			<plugin>
+				<artifactId>maven-site-plugin</artifactId>
+				<version>4.0.0-M16</version>
+				<dependencies>
+					<dependency>
+						<groupId>org.sentrysoftware.maven</groupId>
+						<artifactId>maven-skin-tools</artifactId>
+						<version>1.8.01</version>
+					</dependency>
+				</dependencies>
+			</plugin>
 		</plugins>
 	</build>
 
 	<reporting>
 		<plugins>
+
+			<!-- project-info-reports, jxr, checkstyle and javadoc (published at apidocs/) are inherited from oss-parent -->
+
+			<!-- surefire report: renders the unit-test results from target/surefire-reports -->
+			<plugin>
+				<artifactId>maven-surefire-report-plugin</artifactId>
+				<version>3.6.0</version>
+			</plugin>
+
+			<!-- spotbugs: the 4.9.3.0 inherited from oss-parent cannot read the class files of JDK 21+ -->
+			<plugin>
+				<groupId>com.github.spotbugs</groupId>
+				<artifactId>spotbugs-maven-plugin</artifactId>
+				<version>4.10.4.1</version>
+			</plugin>
+
+			<!-- changelog: the inherited maven-changelog-plugin 3.0.0-M1 predates Doxia 2.0; disable it with an empty
+				report set -->
+			<plugin>
+				<artifactId>maven-changelog-plugin</artifactId>
+				<reportSets>
+					<reportSet>
+						<reports />
+					</reportSet>
+				</reportSets>
+			</plugin>
 
 			<!-- pmd: same version as the build gate, so the report shows what the gate checked -->
 			<plugin>

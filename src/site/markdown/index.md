@@ -1,109 +1,130 @@
+keywords: ipmi java client, ipmi 2.0, rmcp+, bmc, hardware monitoring, sensors, fru, overview
+description: A Java client for IPMI 2.0 over LAN (RMCP+): read the chassis power state, the FRU inventory and the sensors of a server's BMC, or send any IPMI command yourself.
+
 # IPMI Java Client
 
-The IPMI Java Client is a library that communicates with the IPMI host, fetches Field Replaceable Units (FRUs) and Sensors information then reports these information as a text output.
+<!-- MACRO{toc|fromDepth=2|toDepth=3|id=toc} -->
 
-## How to run the IPMI Client inside Java
+## Overview
 
-Add IPMI in the list of dependencies in your [Maven **pom.xml**](https://maven.apache.org/pom.html):
+The **IPMI Java Client** talks to the **Baseboard Management Controller (BMC)** of a server
+(Dell iDRAC, HPE iLO, Lenovo XClarity Controller, OpenBMC, and the BMC firmwares of most other
+boards) over **IPMI 2.0 over LAN (RMCP+)**, on UDP port 623. It lets a Java application:
+
+* read the **chassis status**: power on or off, last power event, power restore policy, faults,
+  intrusion ([Chassis Status](chassis-status.html)),
+* read the **FRU inventory**: manufacturer, product name, part and serial numbers of the chassis,
+  boards, power supplies and other Field Replaceable Units ([FRU Inventory](fru-inventory.html)),
+* read the **sensors** of the BMC's SDR repository (its Full and Compact sensor records):
+  temperatures, voltages, fan speeds, currents, power and energy readings with their thresholds,
+  and the discrete states (presence, redundancy, failure, ...); [Sensors](sensors.html) lists
+  what is not read, and
+* send **any IPMI command** through the low-level connector, including the System Event Log
+  and chassis control commands, and open a **Serial over LAN** console
+  ([Low-Level API](low-level-api.html), [Serial over LAN](serial-over-lan.html)).
+
+The library is the IPMI engine of [MetricsHub](https://metricshub.com) hardware monitoring: its
+high-level [`IpmiClient`](apidocs/org/metricshub/ipmi/client/IpmiClient.html) returns the
+inventory and the sensors either as Java objects or as the semicolon-separated text that the
+MetricsHub connectors parse ([text output format](sensors.html#text-output-format)).
+
+It is a fork of the [IPMI Library for Java by Verax Systems](https://en.wikipedia.org/wiki/Verax_IPMI),
+with the RAKP-HMAC-SHA256 and RAKP-HMAC-MD5 authentication algorithms added, tolerance for the OEM
+records that vendors put in their SDR repository, and many fixes. Moving from the Verax library is
+mostly a package rename ([Migrating from Verax](migrating-from-verax.html)).
+
+## Add the dependency
+
+The library requires **Java 8** or later and is published on
+[Maven Central](https://central.sonatype.com/artifact/${project.groupId}/${project.artifactId}):
 
 ```xml
-<dependencies>
-	<dependency>
-		<groupId>${project.groupId}</groupId>
-		<artifactId>${project.artifactId}</artifactId>
-		<version>${project.version}</version>
-	</dependency>
-</dependencies>
+<dependency>
+  <groupId>${project.groupId}</groupId>
+  <artifactId>${project.artifactId}</artifactId>
+  <version>${project.version}</version>
+</dependency>
 ```
 
-Invoke the IPMI Client:
+See [Installation](installation.html) for Gradle, the dependencies and logging.
+
+## Quick start
+
+> [!NOTE]
+> **On the BMC**, IPMI over LAN must be enabled, UDP port 623 reachable, and the account must be
+> allowed to log in over LAN with at least the **User** privilege. Several vendors ship with IPMI
+> over LAN disabled. See [Preparing the BMC](preparing-the-bmc.html).
+
+Everything starts with an
+[`IpmiClientConfiguration`](apidocs/org/metricshub/ipmi/client/IpmiClientConfiguration.html) and
+the static methods of [`IpmiClient`](apidocs/org/metricshub/ipmi/client/IpmiClient.html):
 
 ```java
-
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.TimeoutException;
 import org.metricshub.ipmi.client.IpmiClient;
 import org.metricshub.ipmi.client.IpmiClientConfiguration;
 
-public class IpmiMain {
-	public static void main(String[] args) throws InterruptedException, ExecutionException, TimeoutException {
+public class Example {
 
-		final String hostname = "my-host";
-		final String username = "my-username";
-		final char[] password = new char[] { 'p', 'a', 's', 's' };
-		final boolean noAuth = false;
-		final byte[] bmcKey = null;
-		final long timeout = 120;
-		// Set pingPeriod to 0 to turn off keep-alive messages sent to the remote host.
-		final long pingPeriod = 30000;
+	public static void main(String[] args) throws Exception {
+		IpmiClientConfiguration config = new IpmiClientConfiguration(
+				"bmc.example.com",            // host name or IP address of the BMC
+				"monitor",                    // user name
+				"the-password".toCharArray(), // password
+				null,                         // BMC key (Kg), only with two-key authentication
+				false,                        // skipAuth: discover the cipher suites first
+				120);                         // overall timeout of each call, in seconds
 
-		// Instantiates a new IPMI client configuration using the credentials above
-		final IpmiClientConfiguration ipmiClientConfiguration = new IpmiClientConfiguration(
-			hostname,
-			username,
-			password,
-			bmcKey,
-			noAuth,
-			timeout,
-			pingPeriod
-		);
+		// "System power state is up"
+		System.out.println(IpmiClient.getChassisStatusAsStringResult(config));
 
-		// Get the Chassis' status
-		final String chassisStatusResult = IpmiClient.getChassisStatusAsStringResult(ipmiClientConfiguration);
-
-		System.out.println("Chassis status:");
-		System.out.println(chassisStatusResult);
-
-		// Get FRUs and Sensors
-		final String sensorsResult = IpmiClient.getFrusAndSensorsAsStringResult(ipmiClientConfiguration);
-
-		System.out.println("Sensors:");
-		System.out.println(sensorsResult);
+		// One line per FRU, per device with states, and per sensor reading
+		System.out.println(IpmiClient.getFrusAndSensorsAsStringResult(config));
 	}
 }
-
 ```
 
-## Upgrading from 1.2.02
+Which prints (from a Lenovo server, serial numbers masked):
 
-The `IpmiClient` API is unchanged. Classes that **extend** the library's protocol classes must replace direct access to formerly `protected` fields, which are now `private`, with the new `protected` accessors:
+```text
+System power state is up
+FRU;LENOVO;RD350;S4M00000 - 00000000000001
+FRU;LITEON;PS-2451-6L-LF;0000
+Power Unit;3;Power Unit 3;;;;PSU Redundancy=Fully Redundant
+Power Supply;1;Power Supply 1;;;;PSU1 Present=Presence detected
+Temperature;0008;Ambient Temp;Air Inlet 1;17.0;37;39
+PowerConsumption;000d;System Power;Power Unit 2;92.0
+Fan;0014;Fan 1;Fan Device 1;6600.0;1600;
+Voltage;0022;System 3.3V;System Board 1;3380.0;3040;3560
+```
 
-| Class | Former field | Accessor |
-| --- | --- | --- |
-| `AbstractIpmiRunner` | `ipmiConfiguration` | `getIpmiConfiguration()` |
-| `AbstractIpmiRunner` | `connector` | `getConnector()` |
-| `AbstractIpmiRunner` | `handle` | `getHandle()` |
-| `AbstractIpmiRunner` | `nextRecId` | `getNextRecId()`, `setNextRecId(int)` |
-| `MessageHandler` | `messageQueue` | `getMessageQueue()` |
-| `MessageHandler` | `connection` | `getConnection()` |
-| `MessageHandler` | `lastReceivedSequenceNumber` | `getLastReceivedSequenceNumber()`, `setLastReceivedSequenceNumber(int)` |
-| `IpmiLanMessage` | `networkFunction` | `getNetworkFunctionCode()`, `setNetworkFunctionCode(byte)` |
-| `ConfidentialityAlgorithm` | `sik` | `getSik()` |
-| `IntegrityAlgorithm` | `sik` | `getSik()`, `setSik(byte[])` |
-
-`IpmiClient`, `IpmiResultConverter`, `Utils`, `DeviceDescription`, `ReadingTypeDescription` and `MessageComposer` are now `final` (they only had private constructors, so they could not be subclassed anyway).
-
-### Sensor records
-
-`FullSensorRecord`, `CompactSensorRecord` and `EventOnlyRecord` now extend the new `AbstractSensorRecord` (itself a `SensorRecord`), which holds the fields the three record types share: sensor owner and number, entity, sensor type, event/reading type, direction, name (ID string), capabilities, units and record sharing. Their getters and setters keep the same signatures, so existing code compiles unchanged, and code that handles several record types can use `AbstractSensorRecord` instead of testing each type:
+The same data is available as Java objects:
 
 ```java
-if (record instanceof AbstractSensorRecord) {
-	AbstractSensorRecord sensor = (AbstractSensorRecord) record;
-	System.out.println(sensor.getName() + ": " + sensor.getSensorType());
-}
+GetChassisStatusResponseData status = IpmiClient.getChassisStatus(config);
+List<Fru> frus = IpmiClient.getFrus(config);
+List<Sensor> sensors = IpmiClient.getSensors(config);
 ```
 
-A record type now also inherits the getters of fields it does not define, which return defaults:
+Each call opens its own RMCP+ session, sends its commands, closes the session and releases its
+UDP port; nothing has to be closed by the caller. Each call throws `TimeoutException` when it does
+not complete within the configured timeout, and `ExecutionException` wrapping the cause when the
+session cannot be opened or a command fails ([Timeouts and Errors](timeouts-and-errors.html)).
 
-| Record | Field | Value |
-| --- | --- | --- |
-| `EventOnlyRecord` (no reading) | `getRateUnit()`, `getModifierUnitUsage()`, `getSensorBaseUnit()`, `getSensorModifierUnit()` | `null` |
-| `EventOnlyRecord` (no reading) | `isHysteresisReadable()`, `isThresholdsReadable()` | `false` |
-| `FullSensorRecord` (a single sensor) | `getShareCount()`, `getIdInstanceModifierOffset()` | `0` |
-| `FullSensorRecord` (a single sensor) | `getIdInstanceModifierType()` | `null` |
-| `FullSensorRecord` (a single sensor) | `isEntityInstanceIncrements()` | `false` |
+## Where to go next
 
-### Command responses
-
-Commands that extend `IpmiCommandCoder` can call the new `protected` method `validateResponse(IpmiMessage)`, which checks that a message is a successful response to the command and returns its data: it throws `IllegalArgumentException` for a response to another command or a payload that is not an IPMI LAN response, and `IPMIException` for a completion code other than `Ok`. The message of the `IllegalArgumentException` now names the command class (three commands used to name the wrong command).
+* [Installation](installation.html) — coordinates, supported JDKs, dependencies and logging
+* [Preparing the BMC](preparing-the-bmc.html) — enabling IPMI over LAN, the account, privilege
+  level and cipher suites, the firewall
+* [Chassis Status](chassis-status.html) — power state and chassis flags
+* [FRU Inventory](fru-inventory.html) — how FRUs are read and which fields are reported
+* [Sensors](sensors.html) — readings, thresholds, states, and the text output format
+* [Configuration](configuration.html) — every option of `IpmiClientConfiguration`
+* [Timeouts and Errors](timeouts-and-errors.html) — overall and per-message timeouts, retries,
+  exceptions and logging
+* [Low-Level API](low-level-api.html) — `IpmiConnector`: sessions, cipher suites, any IPMI command
+* [Serial over LAN](serial-over-lan.html) — a console on the server's serial port
+* [Supported Commands](supported-commands.html) — commands, cipher suites, SDR and FRU records
+* [Troubleshooting](troubleshooting.html) — common failures and how to diagnose them with
+  `ipmitool` or `ipmiutil`
+* [Upgrading](upgrading.html) — changes between versions
+* [Migrating from Verax](migrating-from-verax.html) — moving from the Verax IPMI Library for Java

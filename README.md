@@ -8,11 +8,19 @@ This project is a fork of the excellent [IPMI Library for Java by Verax Systems]
 
 See **[Project Documentation](https://metricshub.org/ipmi-java)** and the [Javadoc](https://metricshub.org/ipmi-java/apidocs) for more information on how to use this library in your code.
 
-The IPMI Java Client is a library that communicates with the IPMI host, fetches Field Replaceable Units (FRUs) and Sensors information then reports these information as a text output.
+The IPMI Java Client talks to the Baseboard Management Controller (BMC) of a server over IPMI 2.0 over LAN (RMCP+): it reads the chassis status, the Field Replaceable Units (FRUs) and the sensors of the SDR repository, as Java objects or as the text output that MetricsHub parses, and its low-level API sends any IPMI command (System Event Log, chassis control, Serial over LAN). It requires Java 8 or later.
+
+```java
+IpmiClientConfiguration config = new IpmiClientConfiguration("bmc.example.com", "monitor", password, null, false, 120);
+System.out.println(IpmiClient.getChassisStatusAsStringResult(config));
+System.out.println(IpmiClient.getFrusAndSensorsAsStringResult(config));
+```
+
+The BMC must have IPMI over LAN enabled and an account with the User privilege: see [Preparing the BMC](https://metricshub.org/ipmi-java/preparing-the-bmc.html).
 
 ## Upgrading
 
-Version 1.2.03 makes the `protected` fields of the protocol classes (`AbstractIpmiRunner`, `MessageHandler`, `IpmiLanMessage`, `ConfidentialityAlgorithm`, `IntegrityAlgorithm`) `private`. Subclasses must use the new `protected` accessors instead; see [Upgrading from 1.2.02](https://metricshub.org/ipmi-java/#upgrading-from-1-2-02) for the list. The `IpmiClient` API is unchanged. The Full, Compact and Event-Only sensor records now share the `AbstractSensorRecord` superclass, and commands can check responses with `IpmiCommandCoder.validateResponse()`; both are described on the same page.
+Version 1.2.03 makes the `protected` fields of the protocol classes (`AbstractIpmiRunner`, `MessageHandler`, `IpmiLanMessage`, `ConfidentialityAlgorithm`, `IntegrityAlgorithm`) `private`. Subclasses must use the new `protected` accessors instead; see [Upgrading from 1.2.02](https://metricshub.org/ipmi-java/upgrading.html#upgrading-from-1-2-02) for the list. The `IpmiClient` API is unchanged. The Full, Compact and Event-Only sensor records now share the `AbstractSensorRecord` superclass, and commands can check responses with `IpmiCommandCoder.validateResponse()`; both are described on the same page.
 
 ## Build instructions
 
@@ -21,6 +29,8 @@ This is a simple Maven project. Build with:
 ```bash
 mvn verify
 ```
+
+`mvn verify site` also builds the documentation in `target/site` (sources in [src/site](src/site)).
 
 ## Code format
 
