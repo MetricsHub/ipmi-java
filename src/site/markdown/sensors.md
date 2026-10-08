@@ -29,10 +29,13 @@ OEM records are part of the walk but are not returned. A record the library cann
 logged and skipped; the walk goes on
 ([Supported Commands](supported-commands.html#sdr-records)).
 
-The walk reads only the sensors of the **BMC's** SDR repository, through the BMC itself: sensors
-owned by satellite controllers that the BMC does not bridge, and the Device SDRs of other
-controllers, are not read ([#84](https://github.com/metricshub/ipmi-java/issues/84),
-[#105](https://github.com/metricshub/ipmi-java/issues/105)).
+The walk reads only the sensors of the **BMC's** SDR repository, and always asks the BMC itself
+(LUN 0) for the reading: the Device SDRs of other controllers are not read
+([#105](https://github.com/metricshub/ipmi-java/issues/105)), and a record owned by a satellite
+controller or another LUN is read by its sensor number alone. Sensor numbers are only unique
+per owner and LUN, so such a record can get the reading of an unrelated BMC sensor that has the
+same number, or no reading at all ([#84](https://github.com/metricshub/ipmi-java/issues/84); by
+the specification, not seen on the BMCs tested).
 
 ## The `Sensor` object
 
@@ -112,7 +115,8 @@ The raw states are available as
 `getData().getStatesAsserted(record.getSensorType(), record.getEventReadingType())`, a list of
 [`ReadingType`](apidocs/org/metricshub/ipmi/core/coding/commands/sdr/record/ReadingType.html).
 For OEM sensors (event/reading type `0x7F`), whose states the specification does not define,
-the state is the raw reading: `sensorName=0xHHLL`.
+the state is the raw reading: `sensorName=0xHHLL`. A BMC that returns only the first state byte
+(the second one is optional) gives such a sensor no state at all.
 
 ## Text output format
 
@@ -162,7 +166,10 @@ Sensors that report `Device Absent` are left out.
 ### Reading lines
 
 One line per Full Sensor record with a reading, for the units below; sensors in other units are
-not reported, and neither are sensors with no reading (raw value `0xFF`).
+not reported, and neither are sensors with no reading (raw value `0xFF`). A Full Sensor record
+whose data format says it has *no analog reading* is not left out: its line carries a value
+computed from a byte that the BMC does not define as a reading (by the specification, not seen
+on the BMCs tested).
 
 ```text
 Temperature;$sensorId;$sensorName;$deviceUniqueId;$value;$threshold1;$threshold2

@@ -25,7 +25,8 @@ List<Fru> frus = IpmiClient.getFrus(config);
 3. attaches FRU 0 to the first **Compact Sensor** record of the system board entity, under the
    name `<board product name> <entity instance>`. This needs a **Board Info** area in FRU 0
    (it gives the name) and such a Compact Sensor record: otherwise FRU 0 is returned only if a
-   FRU Device Locator record of the repository points to it.
+   FRU Device Locator record of the repository points to it. When both exist, FRU 0 is
+   returned **twice**, once for each.
 
 The FRU data is read in chunks of 16 bytes, which keeps every request small enough for any BMC
 but makes large FRUs slow to read: a few seconds per FRU on some BMCs
@@ -35,8 +36,11 @@ offsets and sizes, and come out garbled or missing: this is wrong by the specifi
 not seen on the BMCs tested ([#85](https://github.com/metricshub/ipmi-java/issues/85)).
 
 A FRU whose data cannot be read — not present, or answering with an error or not at all at some
-offset — is logged at the `WARN` level and reported truncated, or not at all. Get FRU Inventory
-Area Info, which starts the read of each FRU, is less forgiving:
+offset — is logged at the `WARN` level and reported truncated, or not at all. A chunk that fails
+in the middle of a FRU is simply left out: the following chunks move up into its place, so the
+fields after the gap can be decoded wrong (a plausible but incorrect serial number, for example)
+rather than missing. Get FRU Inventory Area Info, which starts the read of each FRU, is less
+forgiving:
 
 * for **FRU 0**, any failure (an error completion code or no reply) fails `getFrus()`, and
   therefore `getFrusAndSensorsAsStringResult()`;
