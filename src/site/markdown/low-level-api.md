@@ -56,13 +56,15 @@ public class LowLevelExample {
 			// Declare the cipher suite and the privilege level, then log in (RAKP handshake)
 			connector.getChannelAuthenticationCapabilities(handle, cipherSuite, PrivilegeLevel.User);
 			connector.openSession(handle, "monitor", "the-password", null);
-
-			// Send any command, and cast the response to the matching ResponseData class
-			GetChassisStatusResponseData status = (GetChassisStatusResponseData) connector
-					.sendMessage(handle, new GetChassisStatus(IpmiVersion.V20, cipherSuite, AuthenticationType.RMCPPlus));
-			System.out.println("Power is " + (status.isPowerOn() ? "on" : "off"));
-
-			connector.closeSession(handle);
+			try {
+				// Send any command, and cast the response to the matching ResponseData class
+				GetChassisStatusResponseData status = (GetChassisStatusResponseData) connector
+						.sendMessage(handle, new GetChassisStatus(IpmiVersion.V20, cipherSuite, AuthenticationType.RMCPPlus));
+				System.out.println("Power is " + (status.isPowerOn() ? "on" : "off"));
+			} finally {
+				// Log out, even when a command failed: BMCs only have a few session slots
+				connector.closeSession(handle);
+			}
 		} finally {
 			// Close every connection and release the local UDP port
 			connector.tearDown();
@@ -74,7 +76,9 @@ public class LowLevelExample {
 The four steps before the first command are mandatory and must come in this order:
 `createConnection()`, `getAvailableCipherSuites()`, `getChannelAuthenticationCapabilities()`,
 `openSession()`. Calling them out of order fails with
-`ConnectionException: Illegal connection state: ...`.
+`ConnectionException: Illegal connection state: ...`. Close the session in a `finally` block:
+`tearDown()` only releases the local resources and does not log out, so a session left open
+holds one of the BMC's few session slots until the BMC expires it.
 
 ## Connections and connectors
 

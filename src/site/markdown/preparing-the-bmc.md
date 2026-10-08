@@ -124,11 +124,16 @@ then derived from this key instead of the user's password. When it is set, pass 
 
 | From | To | Protocol / port |
 | --- | --- | --- |
-| The machine running the client (any local port) | The BMC | **UDP 623** (RMCP / RMCP+) |
-| The BMC (port 623) | The machine running the client (the same local port) | UDP replies |
+| The machine running the client (any local port) | The BMC | **UDP 623** (RMCP / RMCP+), or the port set with [`setPort()`](configuration.html#host-and-port) |
+| The BMC (the same port) | The machine running the client (the same local port) | UDP replies |
 
 A stateful firewall needs the outbound rule only. Each session binds its own ephemeral local UDP
-port, so a stateless firewall must accept UDP replies from port 623 on the whole ephemeral range.
+port, so a stateless firewall must accept UDP replies from the BMC's port on the whole ephemeral
+range.
+
+[Serial over LAN](serial-over-lan.html) may use another UDP port: the BMC returns the port of the
+SOL payload when it is activated, usually the same one, and the console then opens a second
+session on that port. Allow it too if your BMC announces a different one.
 
 ## Checking access with `ipmitool` or `ipmiutil`
 

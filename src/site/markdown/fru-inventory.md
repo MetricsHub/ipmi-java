@@ -23,7 +23,9 @@ List<Fru> frus = IpmiClient.getFrus(config);
 2. walks the **SDR repository** and, for each **FRU Device Locator** record of a *logical* FRU
    device (one accessed with the FRU commands of the BMC), reads that FRU the same way;
 3. attaches FRU 0 to the first **Compact Sensor** record of the system board entity, under the
-   name `<board product name> <entity instance>`.
+   name `<board product name> <entity instance>`. This needs a **Board Info** area in FRU 0
+   (it gives the name) and such a Compact Sensor record: otherwise FRU 0 is returned only if a
+   FRU Device Locator record of the repository points to it.
 
 The FRU data is read in chunks of 16 bytes, which keeps every request small enough for any BMC
 but makes large FRUs slow to read: a few seconds per FRU on some BMCs
@@ -54,7 +56,9 @@ Each [`Fru`](apidocs/org/metricshub/ipmi/client/model/Fru.html) holds:
 
 The MultiRecord area (power supply, DC output, management access records) is decoded by the
 library but not returned by `getFrus()`; read it with the [low-level API](low-level-api.html) and
-`ReadFruData.decodeFruData()` if you need it.
+`ReadFruData.decodeFruData()` if you need it. Note that the decoder drops the last record of the
+area, which is often the only one, such as the Power Supply Information record of a power supply
+([#85](https://github.com/metricshub/ipmi-java/issues/85)).
 
 ```java
 for (Fru fru : IpmiClient.getFrus(config)) {

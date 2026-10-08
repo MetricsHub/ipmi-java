@@ -91,11 +91,15 @@ keeps the whole vendor-defined payload as raw bytes. Only type `C0h` has a stand
 a manufacturer ID: for the types `C1h` to `FFh`, `getManufacturerId()` returns `0` (unknown), not
 the record's vendor.
 
-A record that cannot be decoded at all — a reserved type such as the deprecated BMC Message
-Channel Info record (`14h`), a record shorter than its header, an empty or truncated reply — is
-**skipped**: the client logs it at the `WARN` level and goes on with the next record, so one
-unexpected record never costs the whole sensor list. When a BMC answers a whole-record Get SDR
-with fewer bytes than the record declares, the client reads the record again in chunks.
+A record that cannot be decoded — a reserved type such as the deprecated BMC Message Channel
+Info record (`14h`), a record shorter than its header — is **skipped**: the client logs it at
+the `WARN` level and goes on with the next record, so one unexpected record does not cost the
+whole sensor list. When a BMC answers a whole-record Get SDR with fewer bytes than the record
+declares, the client reads the record again in chunks.
+
+A Get SDR reply that carries the next record ID but **no record byte at all** is not handled:
+the Get SDR decoder rejects it (`IllegalArgumentException: Invalid response payload length`),
+which ends the walk and fails `getSensors()` or `getFrus()`.
 
 ## FRU records
 
