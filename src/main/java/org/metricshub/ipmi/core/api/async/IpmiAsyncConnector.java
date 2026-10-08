@@ -30,6 +30,7 @@ import org.metricshub.ipmi.core.coding.commands.PrivilegeLevel;
 import org.metricshub.ipmi.core.coding.commands.ResponseData;
 import org.metricshub.ipmi.core.coding.commands.session.GetChannelAuthenticationCapabilitiesResponseData;
 import org.metricshub.ipmi.core.coding.payload.IpmiPayload;
+import org.metricshub.ipmi.core.coding.payload.lan.IPMIException;
 import org.metricshub.ipmi.core.coding.protocol.PayloadType;
 import org.metricshub.ipmi.core.coding.security.CipherSuite;
 import org.metricshub.ipmi.core.common.PropertiesManager;
@@ -226,13 +227,11 @@ public class IpmiAsyncConnector implements ConnectionListener {
 				++tries;
 				result = connectionManager
 						.getAvailableCipherSuites(connectionHandle.getHandle());
-			} catch (InterruptedException e) {
-				throw e;
 			} catch (Exception e) {
-				logger.warn(FAILED_TO_RECEIVE_ANSWER_CAUSE_MESSAGE, e);
-				if (tries > retries) {
+				if (tries > retries || !isRetriable(e)) {
 					throw e;
 				}
+				logger.warn(FAILED_TO_RECEIVE_ANSWER_CAUSE_MESSAGE, e);
 			}
 		}
 		return result;
@@ -272,13 +271,11 @@ public class IpmiAsyncConnector implements ConnectionListener {
 								requestedPrivilegeLevel);
 				connectionHandle.setCipherSuite(cipherSuite);
 				connectionHandle.setPrivilegeLevel(requestedPrivilegeLevel);
-			} catch (InterruptedException e) {
-				throw e;
 			} catch (Exception e) {
-				logger.warn(FAILED_TO_RECEIVE_ANSWER_CAUSE_MESSAGE, e);
-				if (tries > retries) {
+				if (tries > retries || !isRetriable(e)) {
 					throw e;
 				}
+				logger.warn(FAILED_TO_RECEIVE_ANSWER_CAUSE_MESSAGE, e);
 			}
 		}
 		return result;
@@ -331,13 +328,11 @@ public class IpmiAsyncConnector implements ConnectionListener {
 				session = sessionManager.registerSession(sessionId, connectionHandle);
 
 				succeded = true;
-			} catch (InterruptedException e) {
-				throw e;
 			} catch (Exception e) {
-				logger.warn(FAILED_TO_RECEIVE_ANSWER_CAUSE_MESSAGE, e);
-				if (tries > retries) {
+				if (tries > retries || !isRetriable(e)) {
 					throw e;
 				}
+				logger.warn(FAILED_TO_RECEIVE_ANSWER_CAUSE_MESSAGE, e);
 			}
 		}
 
@@ -600,6 +595,16 @@ public class IpmiAsyncConnector implements ConnectionListener {
 	 */
 	public int getTimeout(ConnectionHandle handle) {
 		return connectionManager.getConnection(handle.getHandle()).getTimeout();
+	}
+
+	/**
+	 * Tells whether a failed handshake step is worth sending again: when no reply came, or when the BMC answered
+	 * with a transient completion code. Any other answer (wrong credentials, unknown user, refused cipher suite...)
+	 * would be the same the next time, and resending the credentials trips account lockouts.
+	 */
+	private static boolean isRetriable(Exception e) {
+		return e instanceof ConnectionException
+				|| (e instanceof IPMIException && ((IPMIException) e).getCompletionCode().isTransient());
 	}
 
 }

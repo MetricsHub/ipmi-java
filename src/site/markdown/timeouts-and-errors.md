@@ -21,8 +21,11 @@ the session — in a worker thread, and waits for it at most `timeout` seconds. 
 expires, the worker is interrupted and the method throws `java.util.concurrent.TimeoutException`,
 with nothing collected: there are no partial results.
 
-The interrupted worker stops at its current wait, and the library's receiving and timer threads
-are daemon threads: they never keep the JVM alive.
+The interrupted worker stops at its current wait, closes the session and releases the UDP port,
+and the method waits up to one second for that cleanup before throwing. A worker stuck in a call
+that cannot be interrupted (name resolution, for example) closes the connection when that call
+returns; a `WARN` says so. The library's receiving and timer threads are daemon threads: they
+never keep the JVM alive.
 
 ## Per-message timeout and retries
 
@@ -91,7 +94,8 @@ Common causes wrapped in the `ExecutionException`:
 
 | Cause | Meaning |
 | --- | --- |
-| `ConnectionException: Illegal connection state: Rakp1Waiting` | The RAKP handshake failed: wrong user name or password, account not allowed over LAN or at the User level. The `ERROR` log shows the actual reason (`Authentication check failed`, ...), see [#109](https://github.com/metricshub/ipmi-java/issues/109). |
+| `IllegalArgumentException: Authentication check failed` | The RAKP handshake failed: the BMC's proof does not match the password or the [BMC key](configuration.html#bmc-key). The credentials are sent once. |
+| `IPMIException: Unauthorized name.`, `Invalid role.`, ... | The BMC refused the session: unknown user, user not allowed over the LAN channel or at the User level, cipher suite refused ([Troubleshooting](troubleshooting.html#the-login-fails)). |
 | `ConnectionException: Command timed out` / `Message timed out` | No reply after all the [tries](#per-message-timeout-and-retries) of a message: `Command timed out` during the session handshake, the usual symptom of a wrong host, a closed UDP port or IPMI over LAN disabled; `Message timed out` in the session. |
 | `IPMIException` | The BMC answered with an error completion code. `getCompletionCode()` returns it, for example `InsufficientPrivilege` (`0xD4`). |
 | `IllegalArgumentException: ... is not yet implemented.` | The chosen cipher suite uses an algorithm the client does not implement (xRC4, MD5-128). See [cipher suites](preparing-the-bmc.html#cipher-suites). |

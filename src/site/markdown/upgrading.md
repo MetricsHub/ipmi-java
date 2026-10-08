@@ -28,8 +28,15 @@ The `IpmiClient` API is unchanged, and the client is more tolerant of real-world
   `ExecutionException` wrapping `ConnectionException: Command timed out`, about 20 s into the
   call, where 1.2.02 threw `TimeoutException` at the overall timeout;
 * the overall timeout cancels the worker for good: the interrupted session stops at its current
-  wait, and the receiving and timer threads are daemon threads, so a program no longer needs
-  `System.exit()` to end.
+  wait and closes the session and the port, normally within one second of the deadline (a worker
+  stuck in a call that cannot be interrupted, such as name resolution, does so when that call
+  returns), and the receiving and timer threads are daemon threads, so a program no longer needs
+  `System.exit()` to end;
+* a failed login fails at once with its actual cause (`IllegalArgumentException: Authentication
+  check failed`, `IPMIException: Unauthorized name.`), where 1.2.02 sent the credentials four
+  times and threw `ConnectionException: Illegal connection state: Rakp1Waiting`
+  ([Troubleshooting](troubleshooting.html#the-login-fails)); only a handshake step that got no
+  reply is sent again.
 
 Code that **extends** the library's protocol classes needs the changes below. `QueueElement`
 lost its `isTimedOut()`, `makeTimedOut()` and `refreshTimestamp()` methods: a timed-out message

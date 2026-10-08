@@ -55,9 +55,7 @@ public final class IpmiClient {
 			throws InterruptedException,
 			ExecutionException,
 			TimeoutException {
-		try (GetChassisStatusRunner runner = new GetChassisStatusRunner(ipmiConfiguration)) {
-			return execute(runner, ipmiConfiguration.getTimeout() * 1000);
-		}
+		return execute(new GetChassisStatusRunner(ipmiConfiguration), ipmiConfiguration.getTimeout() * 1000);
 	}
 
 	/**
@@ -73,9 +71,7 @@ public final class IpmiClient {
 			throws InterruptedException,
 			ExecutionException,
 			TimeoutException {
-		try (GetSensorsRunner runner = new GetSensorsRunner(ipmiConfiguration)) {
-			return execute(runner, ipmiConfiguration.getTimeout() * 1000);
-		}
+		return execute(new GetSensorsRunner(ipmiConfiguration), ipmiConfiguration.getTimeout() * 1000);
 	}
 
 	/**
@@ -91,9 +87,7 @@ public final class IpmiClient {
 			throws InterruptedException,
 			ExecutionException,
 			TimeoutException {
-		try (GetFrusRunner runner = new GetFrusRunner(ipmiConfiguration)) {
-			return execute(runner, ipmiConfiguration.getTimeout() * 1000);
-		}
+		return execute(new GetFrusRunner(ipmiConfiguration), ipmiConfiguration.getTimeout() * 1000);
 	}
 
 	/**

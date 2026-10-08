@@ -31,12 +31,21 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
 import org.metricshub.ipmi.client.runner.AbstractIpmiRunner;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public final class Utils {
+
+	private static final Logger LOGGER = LoggerFactory.getLogger(Utils.class);
 
 	private Utils() {}
 
 	public static final String EMPTY = "";
+
+	/**
+	 * How long a call that hit its deadline waits for its worker to close the session and the socket.
+	 */
+	private static final long CLEANUP_GRACE_MS = 1000;
 
 	/**
 	 * @param value The value to check
@@ -87,19 +96,50 @@ public final class Utils {
 			ExecutionException,
 			TimeoutException {
 
-		final ExecutorService executorService = Executors.newSingleThreadExecutor();
-		final Future<T> future = executorService.submit(callable);
+		final ExecutorService executorService = Executors.newSingleThreadExecutor(Utils::newWorkerThread);
+
+		// The worker owns the connector: it also closes it, so the cleanup is covered by the deadline and never
+		// runs on the calling thread while the worker is still using the connection
+		final Future<T> future = executorService.submit(() -> {
+			try (AbstractIpmiRunner<T> runner = callable) {
+				return runner.call();
+			}
+		});
 
 		try {
 			return future.get(timeout, TimeUnit.MILLISECONDS);
 		} catch (InterruptedException e) {
+			stopWorker(future, executorService);
 			Thread.currentThread().interrupt();
 			throw e;
 		} catch (TimeoutException e) {
-			future.cancel(true);
+			stopWorker(future, executorService);
 			throw e;
 		} finally {
 			executorService.shutdownNow();
 		}
+	}
+
+	/**
+	 * Stops the worker at its current wait and gives it a moment to close the session and release the port.
+	 */
+	private static void stopWorker(Future<?> future, ExecutorService executorService) {
+		future.cancel(true);
+		executorService.shutdownNow();
+		try {
+			if (!executorService.awaitTermination(CLEANUP_GRACE_MS, TimeUnit.MILLISECONDS)) {
+				// A call that cannot be interrupted (name resolution, a blocking send): the worker closes the
+				// connection and releases the port by itself when that call returns
+				LOGGER.warn("The IPMI worker is still busy after the call was abandoned; the port is released when it returns");
+			}
+		} catch (InterruptedException e) {
+			Thread.currentThread().interrupt();
+		}
+	}
+
+	private static Thread newWorkerThread(Runnable runnable) {
+		Thread thread = new Thread(runnable, "ipmi-client");
+		thread.setDaemon(true);
+		return thread;
 	}
 }

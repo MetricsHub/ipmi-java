@@ -29,7 +29,6 @@ import org.metricshub.ipmi.core.coding.PayloadCoder;
 import org.metricshub.ipmi.core.coding.commands.PrivilegeLevel;
 import org.metricshub.ipmi.core.coding.commands.ResponseData;
 import org.metricshub.ipmi.core.coding.commands.session.GetChannelAuthenticationCapabilitiesResponseData;
-import org.metricshub.ipmi.core.coding.payload.CompletionCode;
 import org.metricshub.ipmi.core.coding.payload.lan.IPMIException;
 import org.metricshub.ipmi.core.coding.protocol.PayloadType;
 import org.metricshub.ipmi.core.coding.security.CipherSuite;
@@ -449,11 +448,7 @@ public class IpmiConnector {
 	}
 
 	private void handleErrorResponse(int tries, IPMIException e) throws Exception {
-		if (e.getCompletionCode() == CompletionCode.InitializationInProgress
-				|| e.getCompletionCode() == CompletionCode.InsufficientResources
-				|| e.getCompletionCode() == CompletionCode.NodeBusy
-				|| e.getCompletionCode() == CompletionCode.Timeout) {
-
+		if (e.getCompletionCode().isTransient()) {
 			handleRetriesWhenException(tries, e);
 		} else {
 			throw e;

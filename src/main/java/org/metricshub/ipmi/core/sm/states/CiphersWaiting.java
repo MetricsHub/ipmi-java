@@ -91,6 +91,7 @@ public class CiphersWaiting extends State {
 												0));
 				++index;
 			} catch (Exception e) {
+				stateMachine.setCurrent(new Uninitialized());
 				stateMachine.doExternalAction(new ErrorAction(e));
 			}
 		} else if (machineEvent instanceof DefaultAck) {
@@ -135,6 +136,7 @@ public class CiphersWaiting extends State {
 												.getResponseData(ipmiMessage)));
 			}
 		} catch (Exception e) {
+			stateMachine.setCurrent(new Uninitialized());
 			stateMachine.doExternalAction(new ErrorAction(e));
 		}
 	}
