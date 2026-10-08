@@ -42,8 +42,8 @@ public class LowLevelExample {
 			// Register a connection to the BMC, on UDP port 623
 			ConnectionHandle handle = connector.createConnection(InetAddress.getByName("bmc.example.com"));
 
-			// Wait at most 5 s for each reply instead of 5 min
-			connector.setTimeout(handle, 5000);
+			// Wait at most 2 s for each reply instead of the default 5 s
+			connector.setTimeout(handle, 2000);
 
 			// Pick a cipher suite among those the BMC offers: 17 if available, else 3
 			List<CipherSuite> suites = connector.getAvailableCipherSuites(handle);

@@ -147,6 +147,7 @@ public abstract class AbstractIpmiRunner<T> implements AutoCloseable, Callable<T
 							ipmiConfiguration.getPort(),
 							Connection.getDefaultCipherSuite(),
 							PrivilegeLevel.User);
+			capMessageTimeout();
 		}
 
 		// Start the session, provide user name and password, and optionally the
@@ -175,6 +176,7 @@ public abstract class AbstractIpmiRunner<T> implements AutoCloseable, Callable<T
 				.createConnection(
 						InetAddress.getByName(ipmiConfiguration.getHostname()),
 						ipmiConfiguration.getPort());
+		capMessageTimeout();
 
 		// Get available cipher suites list via getAvailableCipherSuites and
 		// pick one of them that will be used further in the session.
@@ -212,8 +214,24 @@ public abstract class AbstractIpmiRunner<T> implements AutoCloseable, Callable<T
 		return suites.get(0);
 	}
 
+	/**
+	 * Caps the timeout of each message by the overall deadline of the call, so that a lost reply is retried
+	 * within that deadline rather than reported after it.
+	 */
+	private void capMessageTimeout() {
+		long deadlineMs = ipmiConfiguration.getTimeout() * 1000;
+		if (deadlineMs > 0 && deadlineMs < connector.getTimeout(handle)) {
+			connector.setTimeout(handle, (int) deadlineMs);
+		}
+	}
+
 	@Override
 	public void close() {
+		// startSession() may have failed before the connector or the handle existed
+		if (connector == null) {
+			return;
+		}
+
 		if (handle != null) {
 			// Close the session
 			try {

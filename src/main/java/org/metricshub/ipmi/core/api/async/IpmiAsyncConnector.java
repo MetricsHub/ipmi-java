@@ -45,6 +45,7 @@ import java.io.IOException;
 import java.net.InetAddress;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -225,6 +226,8 @@ public class IpmiAsyncConnector implements ConnectionListener {
 				++tries;
 				result = connectionManager
 						.getAvailableCipherSuites(connectionHandle.getHandle());
+			} catch (InterruptedException e) {
+				throw e;
 			} catch (Exception e) {
 				logger.warn(FAILED_TO_RECEIVE_ANSWER_CAUSE_MESSAGE, e);
 				if (tries > retries) {
@@ -269,6 +272,8 @@ public class IpmiAsyncConnector implements ConnectionListener {
 								requestedPrivilegeLevel);
 				connectionHandle.setCipherSuite(cipherSuite);
 				connectionHandle.setPrivilegeLevel(requestedPrivilegeLevel);
+			} catch (InterruptedException e) {
+				throw e;
 			} catch (Exception e) {
 				logger.warn(FAILED_TO_RECEIVE_ANSWER_CAUSE_MESSAGE, e);
 				if (tries > retries) {
@@ -326,6 +331,8 @@ public class IpmiAsyncConnector implements ConnectionListener {
 				session = sessionManager.registerSession(sessionId, connectionHandle);
 
 				succeded = true;
+			} catch (InterruptedException e) {
+				throw e;
 			} catch (Exception e) {
 				logger.warn(FAILED_TO_RECEIVE_ANSWER_CAUSE_MESSAGE, e);
 				if (tries > retries) {
@@ -416,26 +423,26 @@ public class IpmiAsyncConnector implements ConnectionListener {
 			throws Exception {
 		int tries = 0;
 		int tag = -1;
+		Connection connection = connectionManager.getConnection(connectionHandle.getHandle());
 		while (tries <= retries && tag < 0) {
 			try {
 				++tries;
+				// tag < 0 means that the MessageQueue is full: wait for a slot, at most one message timeout
+				long deadline = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(connection.getTimeout());
 				while (tag < 0) {
-					tag = connectionManager
-							.getConnection(
-									connectionHandle.getHandle())
-							.sendMessage(
-									request,
-									isOneWay);
+					tag = connection.sendMessage(request, isOneWay);
 					if (tag < 0) {
-						Thread.sleep(10); // tag < 0 means that MessageQueue is
-															// full so we need to wait and retry
+						if (System.nanoTime() >= deadline) {
+							throw new ConnectionException("Message queue is full");
+						}
+						Thread.sleep(10);
 					}
 				}
 				logger
 						.debug(
 								"Sending message with tag " + tag + ", try "
 										+ tries);
-			} catch (IllegalArgumentException e) {
+			} catch (IllegalArgumentException | InterruptedException e) {
 				throw e;
 			} catch (Exception e) {
 				logger.warn("Failed to send message, cause:", e);
@@ -583,6 +590,16 @@ public class IpmiAsyncConnector implements ConnectionListener {
 	 */
 	public void setTimeout(ConnectionHandle handle, int timeout) {
 		connectionManager.getConnection(handle.getHandle()).setTimeout(timeout);
+	}
+
+	/**
+	 * Returns the timeout of a single message on the given connection.
+	 *
+	 * @param handle {@link ConnectionHandle} of the connection
+	 * @return the timeout in milliseconds after which a message without a reply is reported as timed out
+	 */
+	public int getTimeout(ConnectionHandle handle) {
+		return connectionManager.getConnection(handle.getHandle()).getTimeout();
 	}
 
 }

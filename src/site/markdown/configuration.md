@@ -88,8 +88,8 @@ take tens of seconds on a slow BMC: 120 s is a safe value.
 `getFrusAndSensorsAsStringResult()` makes two calls (FRUs, then sensors), each with this
 deadline, so it can take up to twice the timeout.
 
-The timeout of each **message** is a different setting, 5 minutes by default; see
-[Timeouts and Errors](timeouts-and-errors.html).
+The timeout of each **message** is a different setting, 5 s by default and never longer than
+this deadline; see [Timeouts and Errors](timeouts-and-errors.html).
 
 ### Keep-alive
 
