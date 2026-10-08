@@ -81,7 +81,7 @@ to make it use suite 3 or 17.
 | `WARN Failed to read FRU <id> at offset <n> ... Requested Sensor, data, or record not present` | The FRU is declared in the SDR repository but not present, for example an empty power supply bay. Usually harmless. |
 | `WARN Failed to decode FRU <id>` | The FRU data is not in the IPMI FRU format (for example the SPD data of a memory module, [#107](https://github.com/metricshub/ipmi-java/issues/107)). |
 | A sensor known to `ipmitool` is not returned | Only Full and Compact sensor records of the BMC's own repository are read: sensors behind satellite controllers are not ([#84](https://github.com/metricshub/ipmi-java/issues/84)), and shared Compact records are not expanded ([#100](https://github.com/metricshub/ipmi-java/issues/100)). |
-| A sensor reads `0.0`, or a value that makes no sense | The BMC may flag the reading as unavailable (or the sensor's scanning as disabled), which the library ignores: the value is whatever raw byte the BMC returned. `getData().isSensorStateValid()` is `false` for an unavailable reading; the text output does not check it ([#110](https://github.com/metricshub/ipmi-java/issues/110)). |
+| A sensor reads `0.0` | The BMC flags the reading as unavailable, which is not checked yet ([#110](https://github.com/metricshub/ipmi-java/issues/110)). |
 | Negative processor temperatures (`CPU1 DTS = -44.0`) | Not an error: Intel *Digital Thermal Sensor* readings are the margin below the maximum junction temperature. |
 
 ## The JVM does not exit

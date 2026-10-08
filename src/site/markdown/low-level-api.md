@@ -90,7 +90,7 @@ port (or always pass `0`), and call `tearDown()` when you are done with it.
 | Method | Purpose |
 | --- | --- |
 | `IpmiConnector(int port)`, `IpmiConnector(int port, InetAddress address)` | Bind the given local port (`0`: any free port), on all interfaces or on one, with the keep-alive period of [`connection.properties`](timeouts-and-errors.html#library-wide-defaults) (30 000 ms). |
-| `IpmiConnector(int port, long pingPeriod)` | The same, with a [keep-alive period](configuration.html#keep-alive) in ms (`0` or a negative value, including `-1`: none, see [#126](https://github.com/metricshub/ipmi-java/issues/126)). |
+| `IpmiConnector(int port, long pingPeriod)` | The same, with a [keep-alive period](configuration.html#keep-alive) in ms (`0`: none). |
 | `createConnection(InetAddress address[, int port])` | Register a connection to a BMC (port 623 by default). |
 | `createConnection(InetAddress address, [int port,] CipherSuite cipherSuite, PrivilegeLevel level)` | The same, skipping the cipher suite and capabilities steps: call `openSession()` next. |
 | `closeSession(handle)` | Log out (Close Session). |
@@ -165,7 +165,7 @@ if (info.getEntriesCount() > 0) { // Get SEL Entry fails on an empty SEL
 			System.out.println(record.getTimestamp() + " " + record.getSensorType() + " " + record.getEvent() + " "
 					+ record.getEventDirection());
 		} else {
-			System.out.println("OEM entry " + record.getRecordId()); // fields not decoded, see #125
+			System.out.println("OEM entry " + record.getRecordId()); // vendor-defined content
 		}
 		recordId = entry.getNextRecordId();
 	}
@@ -181,15 +181,6 @@ OEM entry 4
 Wed May 15 11:23:27 CEST 2024 PowerUnit PowerOffOrDown Assertion
 Wed May 15 11:23:34 CEST 2024 PowerUnit PowerOffOrDown Deassertion
 ```
-
-> [!WARNING]
-> `GetSelEntry` decodes every entry with the layout of a *system event record* (type `02h`),
-> including the OEM entries (types `C0h` to `FFh`) that vendors log in large numbers (more than
-> half of the entries on a Lenovo IMM): their sensor and event fields are meaningless (and their
-> timestamp too, for the non-timestamped types `E0h` to `FFh`), so check `getRecordType()` first,
-> as above. An entry of type exactly `C0h` or `E0h` makes `sendMessage()` throw
-> `IllegalArgumentException` (`Invalid value: 192` or `224`), which ends the walk, since the ID of
-> the next entry is lost with it. See [#125](https://github.com/metricshub/ipmi-java/issues/125).
 
 Exposing the SEL in `IpmiClient` is tracked in
 [#103](https://github.com/metricshub/ipmi-java/issues/103).
@@ -242,48 +233,6 @@ public class GetDeviceId extends IpmiCommandCoder {
 	public ResponseData getResponseData(IpmiMessage message) throws IPMIException {
 		byte[] data = validateResponse(message); // throws IPMIException on an error completion code
 		return new GetDeviceIdResponseData(data); // your own ResponseData implementation
-	}
-}
-```
-
-#### DCMI, group extension and OEM network functions
-
-The [`NetworkFunction`](apidocs/org/metricshub/ipmi/core/coding/payload/lan/NetworkFunction.html)
-enum only lists the standard network functions (`00h` to `0Bh`). For a command of another
-network function — DCMI (`2Ch`), the other group extensions (`2Eh` is OEM/Group), or a vendor's
-OEM network function (`30h` to `3Fh`) — build the request with a subclass of `IpmiLanRequest`
-that sets the raw code; `getNetworkFunction()` must still return a value, which is then unused.
-Responses are matched by tag and command code, so nothing else changes. For example, Get DCMI
-Capabilities Info:
-
-```java
-/** An IPMI request with a raw network function code */
-class RawNetFnRequest extends IpmiLanRequest {
-
-	RawNetFnRequest(int networkFunction, byte commandCode, byte[] requestData, int sequenceNumber) {
-		super(NetworkFunction.ApplicationRequest, commandCode, requestData, TypeConverter.intToByte(sequenceNumber));
-		setNetworkFunctionCode(TypeConverter.intToByte(networkFunction));
-	}
-}
-
-public class GetDcmiCapabilities extends IpmiCommandCoder {
-
-	// constructor, getResponseData() as above
-
-	@Override
-	public NetworkFunction getNetworkFunction() {
-		return NetworkFunction.ApplicationRequest; // unused: see preparePayload()
-	}
-
-	@Override
-	public byte getCommandCode() {
-		return 0x01; // Get DCMI Capabilities Info
-	}
-
-	@Override
-	protected IpmiLanMessage preparePayload(int sequenceNumber) {
-		// NetFn 2Ch (DCMI); data: group extension ID DCh, parameter 1 (supported capabilities)
-		return new RawNetFnRequest(0x2C, getCommandCode(), new byte[] { (byte) 0xDC, 0x01 }, sequenceNumber);
 	}
 }
 ```

@@ -10,9 +10,7 @@ commands below. Each command is a class of
 [`org.metricshub.ipmi.core.coding.commands`](apidocs/org/metricshub/ipmi/core/coding/commands/package-summary.html),
 sent with the [low-level API](low-level-api.html#sending-commands); the last column shows which
 ones `IpmiClient` uses. A command not listed here can be added by
-[extending `IpmiCommandCoder`](low-level-api.html#writing-your-own-command), with a
-[raw network function](low-level-api.html#dcmi-group-extension-and-oem-network-functions) for
-DCMI, group extension and OEM commands.
+[extending `IpmiCommandCoder`](low-level-api.html#writing-your-own-command).
 
 ## Commands
 
@@ -98,10 +96,6 @@ Info record (`14h`), a record shorter than its header — is **skipped**: the cl
 the `WARN` level and goes on with the next record, so one unexpected record does not cost the
 whole sensor list. When a BMC answers a whole-record Get SDR with fewer bytes than the record
 declares, the client reads the record again in chunks.
-
-A Get SDR reply that carries the next record ID but **no record byte at all** is not handled:
-the Get SDR decoder rejects it (`IllegalArgumentException: Invalid response payload length`),
-which ends the walk and fails `getSensors()` or `getFrus()`.
 
 ## FRU records
 

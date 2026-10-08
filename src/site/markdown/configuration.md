@@ -36,7 +36,7 @@ one constructor can be combined with those of another.
 | `bmcKey` | `null` | [BMC key](#bmc-key) |
 | `skipAuth` | required | [skipAuth](#skipauth) |
 | `timeout` | required, in **seconds** | [Timeout](#timeout) |
-| `pingPeriod` | `-1`: no keep-alive | [Keep-alive](#keep-alive) |
+| `pingPeriod` | `-1`: 30 000 ms | [Keep-alive](#keep-alive) |
 
 ### Host and port
 
@@ -54,10 +54,6 @@ chosen by the operating system for each session.
 the library converts it to a `String` internally to open the session and does not clear the
 array, so clear it yourself once you no longer need the configuration.
 
-The user name and the password are encoded with the **platform default charset**, and their
-IPMI length limits (16 and 20 bytes) are not checked: stick to ASCII credentials of at most 16
-and 20 characters ([#90](https://github.com/metricshub/ipmi-java/issues/90)).
-
 The client opens every session with the **User** privilege level, which is enough for every
 `IpmiClient` method.
 
@@ -66,12 +62,6 @@ The client opens every session with the **User** privilege level, which is enoug
 `bmcKey` is the **BMC key (Kg)** of the BMC, as raw bytes, for BMCs configured with *two-key*
 logins. Leave it `null` (the default on virtually every BMC): the session keys are then derived
 from the password. See [Preparing the BMC](preparing-the-bmc.html#bmc-key-kg).
-
-> [!WARNING]
-> The library turns the key into a `String` and back with the platform default charset, which
-> alters bytes that are not valid characters in that charset (any byte from `80h` with UTF-8):
-> the session keys are then wrong and the login fails. Only keys made of ASCII bytes (`00h` to
-> `7Fh`) work reliably ([#90](https://github.com/metricshub/ipmi-java/issues/90)).
 
 ### skipAuth
 
@@ -108,17 +98,13 @@ inactivity during a long collection.
 
 | `pingPeriod` | Behavior |
 | --- | --- |
+| `-1` (default) | The `pingPeriod` of [`connection.properties`](timeouts-and-errors.html#library-wide-defaults): 30 000 ms |
 | `> 0` | One keep-alive message every `pingPeriod` ms |
-| `-1` (default) | **No keep-alive messages** (see below) |
 | `0` (or any other negative value) | No keep-alive messages |
 
-`-1` is meant to use the `pingPeriod` of
-[`connection.properties`](timeouts-and-errors.html#library-wide-defaults) (30 000 ms), but the
-connector that `IpmiClient` creates overwrites that value with `-1`, which disables the
-keep-alive ([#126](https://github.com/metricshub/ipmi-java/issues/126)). Each `IpmiClient` call opens its own session and closes it when it is done, so this
+Each `IpmiClient` call opens its own session and closes it when it is done, so the keep-alive
 only matters for calls that last longer than the BMC's session inactivity timeout (typically
-60 s), such as a long SDR walk or FRU read on a slow BMC: for those, **set `pingPeriod`
-explicitly**, for example to `30000`.
+60 s). Disable it (`0`) to keep the traffic to the strict minimum.
 
 ## Thread safety
 

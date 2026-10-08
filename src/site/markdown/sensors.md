@@ -29,13 +29,10 @@ OEM records are part of the walk but are not returned. A record the library cann
 logged and skipped; the walk goes on
 ([Supported Commands](supported-commands.html#sdr-records)).
 
-The walk reads only the sensors of the **BMC's** SDR repository, and always asks the BMC itself
-(LUN 0) for the reading: the Device SDRs of other controllers are not read
-([#105](https://github.com/metricshub/ipmi-java/issues/105)), and a record owned by a satellite
-controller or another LUN is read by its sensor number alone. Sensor numbers are only unique
-per owner and LUN, so such a record can get the reading of an unrelated BMC sensor that has the
-same number, or no reading at all ([#84](https://github.com/metricshub/ipmi-java/issues/84); by
-the specification, not seen on the BMCs tested).
+The walk reads only the sensors of the **BMC's** SDR repository, through the BMC itself: sensors
+owned by satellite controllers that the BMC does not bridge, and the Device SDRs of other
+controllers, are not read ([#84](https://github.com/metricshub/ipmi-java/issues/84),
+[#105](https://github.com/metricshub/ipmi-java/issues/105)).
 
 ## The `Sensor` object
 
@@ -77,20 +74,14 @@ System 3.3V = 3.38 Volts (upper critical: 3.56)
 `getSensorBaseUnit()` returns a
 [`SensorUnit`](apidocs/org/metricshub/ipmi/core/coding/commands/sdr/record/SensorUnit.html);
 the six thresholds (`getLowerNonCriticalThreshold()` to `getUpperNonRecoverableThreshold()`)
-are converted with the same formula. A threshold the BMC does not define, or does not make
-readable, is left at `0.0`, the same value as a threshold that really is 0; on BMCs that do not
-set the *init sensor type* bit of the record, every threshold is left at `0.0`
-([#83](https://github.com/metricshub/ipmi-java/issues/83)).
+are converted with the same formula, and are `0.0` when the BMC does not define them.
 
 > [!WARNING]
 > Known limitations of the decoding, by the IPMI 2.0 specification
 > (not all of them reproduced on real hardware):
 >
-> * the *reading unavailable* and *scanning disabled* flags of Get Sensor Reading are ignored
->   by `getSensorReading()` and by the text output: such a sensor is reported with whatever raw
->   value the BMC returns, converted (`0.0` for the three unavailable sensors of the GIGABYTE BMC
->   tested, but any value is possible). `getData().isSensorStateValid()` is `false` when the
->   reading is unavailable, so check it as above; the scanning flag is not exposed
+> * a sensor whose reading is flagged *unavailable* or whose scanning is disabled is still
+>   reported with a reading: check `getData().isSensorStateValid()` as above
 >   ([#110](https://github.com/metricshub/ipmi-java/issues/110));
 > * the non-linear conversions and the readability of each threshold are not fully handled
 >   ([#83](https://github.com/metricshub/ipmi-java/issues/83));
@@ -115,8 +106,7 @@ The raw states are available as
 `getData().getStatesAsserted(record.getSensorType(), record.getEventReadingType())`, a list of
 [`ReadingType`](apidocs/org/metricshub/ipmi/core/coding/commands/sdr/record/ReadingType.html).
 For OEM sensors (event/reading type `0x7F`), whose states the specification does not define,
-the state is the raw reading: `sensorName=0xHHLL`. A BMC that returns only the first state byte
-(the second one is optional) gives such a sensor no state at all.
+the state is the raw reading: `sensorName=0xHHLL`.
 
 ## Text output format
 
@@ -166,10 +156,7 @@ Sensors that report `Device Absent` are left out.
 ### Reading lines
 
 One line per Full Sensor record with a reading, for the units below; sensors in other units are
-not reported, and neither are sensors with no reading (raw value `0xFF`). A Full Sensor record
-whose data format says it has *no analog reading* is not left out: its line carries a value
-computed from a byte that the BMC does not define as a reading (by the specification, not seen
-on the BMCs tested).
+not reported, and neither are sensors with no reading (raw value `0xFF`).
 
 ```text
 Temperature;$sensorId;$sensorName;$deviceUniqueId;$value;$threshold1;$threshold2
@@ -191,12 +178,8 @@ Energy;$sensorId;$sensorName;$deviceUniqueId;$value
 
 * `$sensorId` is the SDR record ID, as 4 lowercase hexadecimal digits.
 * `$deviceUniqueId` is the entity of the sensor, as in the device state lines.
-* Sensors whose reading the BMC flags as unavailable are **not** left out: their line carries
-  whatever value the BMC returned ([#110](https://github.com/metricshub/ipmi-java/issues/110)).
-* Thresholds are rounded to integers, in the same unit as `$value`. A threshold is empty when
-  its decoded value is `0.0`: when the BMC does not define it or does not make it readable, but
-  also when it really is 0 (a lower fan threshold of 0 RPM, for example), and on BMCs affected by
-  [#83](https://github.com/metricshub/ipmi-java/issues/83).
+* Thresholds are rounded to integers, in the same unit as `$value`, and empty when the BMC does
+  not define them.
 
 The chassis status has its own text form:
 [`getChassisStatusAsStringResult()`](chassis-status.html#as-text).

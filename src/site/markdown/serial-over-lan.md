@@ -52,13 +52,7 @@ try {
 
 This constructor opens a dedicated session with the **Administrator** privilege, activates the
 SOL payload, and owns the session: **closing the `SerialOverLan` closes the session and tears
-down the connector** passed to it. Use a new connector for each console opened this way. When the
-constructor fails after the session is open (SOL disabled, no free payload instance), nothing is
-closed: hence the outer `finally`, as tearing down a connector twice is harmless.
-
-`close()` deactivates the SOL payload first. If that fails (an error, or no reply), `close()`
-throws `IOException` without logging out: the outer `finally` still releases the connector, but
-the session stays open on the BMC until the BMC expires it.
+down the connector** passed to it. Use a new connector for each console opened this way.
 
 The cipher suite is chosen by a
 [`CipherSuiteSelectionHandler`](apidocs/org/metricshub/ipmi/core/api/sol/CipherSuiteSelectionHandler.html),
@@ -73,18 +67,6 @@ always returns the suite it was built with, whether the BMC offers it or not.
 | `SerialOverLan(connector, host, port, user, password, selector)` | New session on another port |
 | `SerialOverLan(connector, session)` | Reuse a session opened with the low-level API; closing the console leaves it, and the connector, open. If the BMC serves SOL on another UDP port, the console uses an existing session on that port, or opens one (which closing the console closes, with the connector). |
 
-> [!NOTE]
-> The constructors that open their own session take no [BMC key](configuration.html#bmc-key):
-> they cannot log in to a BMC configured with *two-key* logins. On such a BMC, open the session
-> with the low-level API, `connector.openSession(handle, user, password, bmcKey)`, and pass the
-> `Session` it returns to `SerialOverLan(connector, session)`. The session that the console
-> opens by itself on another UDP port has the same limitation.
-
-When the BMC serves SOL on another UDP port, a console opened with the host and password
-constructors holds **two** sessions: the one it opened first, and the one on the SOL port.
-`close()` only closes the second one, so the first stays open on the BMC until the BMC expires
-it. On such a BMC, opening and closing consoles in a loop can use up its session slots.
-
 If the session's privilege is too low to activate the payload, the client raises it to
 Administrator (Set Session Privilege Level) and tries again. The constructors throw `SOLException` when
 the payload cannot be activated (SOL disabled, no free payload instance, privilege refused).
@@ -94,12 +76,6 @@ the payload cannot be activated (SOL disabled, no free payload instance, privile
 Writes block until the BMC acknowledges the data, and return `false` when it is rejected.
 Data longer than the BMC's SOL payload size (announced when the payload is activated) is sent in
 several packets.
-
-> [!WARNING]
-> Until [#123](https://github.com/metricshub/ipmi-java/issues/123) is fixed, a write that needs
-> **more than two packets** loses the data of its second packet, or throws
-> `IllegalArgumentException` beyond three packets. This affects `writeBytes()`, `writeString()`
-> and `writeIntArray()`: send long data in several short writes.
 
 | Method | Writes |
 | --- | --- |

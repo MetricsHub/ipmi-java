@@ -73,7 +73,7 @@ The defaults come from two properties files packaged in the jar, read through th
 | `timeout` | `300000` | Per-message timeout, in ms | When each connection is created |
 | `retries` | `3` | How many times a failed message is sent again | When each `IpmiConnector` is created |
 | `idleTime` | `4000` | Upper bound of the random pause before a retry, in ms | When each `IpmiConnector` is created |
-| `pingPeriod` | `30000` | Keep-alive period, in ms, of the connectors created with `IpmiConnector(int)` or `IpmiConnector(int, InetAddress)`; not applied to `IpmiClient` ([Keep-alive](configuration.html#keep-alive), [#126](https://github.com/metricshub/ipmi-java/issues/126)) | When each `IpmiConnector` is created |
+| `pingPeriod` | `30000` | Keep-alive period, in ms, when the configuration's `pingPeriod` is `-1` | When each `IpmiConnector` is created |
 
 Override them at application startup, from a single thread, before the first IPMI call: the
 values then apply to every connection created afterwards, in the whole JVM.
@@ -118,12 +118,10 @@ Common causes wrapped in the `ExecutionException`:
 Some problems are logged at the `WARN` level and the call goes on with what it could collect:
 
 * an **SDR record** that cannot be decoded — a reserved record type, a record shorter than its
-  header — is skipped and the repository walk continues with the next record (a Get SDR reply
-  without any record byte fails the call instead, see
-  [Supported Commands](supported-commands.html#oem-and-unknown-records));
+  header — is skipped and the repository walk continues with the next record
+  ([Supported Commands](supported-commands.html#oem-and-unknown-records));
 * a **FRU** that cannot be read (for example a FRU device that is not present) is reported
-  truncated or not at all — except when Get FRU Inventory Area Info fails for FRU 0, or gets no
-  reply for any FRU ([FRU Inventory](fru-inventory.html#how-the-frus-are-read));
+  truncated or not at all ([FRU Inventory](fru-inventory.html#how-the-frus-are-read));
 * a **sensor** whose reading is not available (completion code `DataNotPresent`) is returned
   without reading data.
 

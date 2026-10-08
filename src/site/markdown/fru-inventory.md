@@ -23,32 +23,15 @@ List<Fru> frus = IpmiClient.getFrus(config);
 2. walks the **SDR repository** and, for each **FRU Device Locator** record of a *logical* FRU
    device (one accessed with the FRU commands of the BMC), reads that FRU the same way;
 3. attaches FRU 0 to the first **Compact Sensor** record of the system board entity, under the
-   name `<board product name> <entity instance>`. This needs a **Board Info** area in FRU 0
-   (it gives the name) and such a Compact Sensor record: otherwise FRU 0 is returned only if a
-   FRU Device Locator record of the repository points to it. When both exist, FRU 0 is
-   returned **twice**, once for each.
+   name `<board product name> <entity instance>`.
 
 The FRU data is read in chunks of 16 bytes, which keeps every request small enough for any BMC
 but makes large FRUs slow to read: a few seconds per FRU on some BMCs
-([#102](https://github.com/metricshub/ipmi-java/issues/102)). FRUs that the BMC addresses in
-**words** rather than bytes (as reported by Get FRU Inventory Area Info) are read at the wrong
-offsets and sizes, and come out garbled or missing: this is wrong by the specification, though
-not seen on the BMCs tested ([#85](https://github.com/metricshub/ipmi-java/issues/85)).
+([#102](https://github.com/metricshub/ipmi-java/issues/102)).
 
-A FRU whose data cannot be read — not present, or answering with an error or not at all at some
-offset — is logged at the `WARN` level and reported truncated, or not at all. A chunk that fails
-in the middle of a FRU is simply left out: the following chunks move up into its place, so the
-fields after the gap can be decoded wrong (a plausible but incorrect serial number, for example)
-rather than missing. Get FRU Inventory Area Info, which starts the read of each FRU, is less
-forgiving:
-
-* for **FRU 0**, any failure (an error completion code or no reply) fails `getFrus()`, and
-  therefore `getFrusAndSensorsAsStringResult()`;
-* for the other FRUs, an error completion code is logged and the FRU skipped, but no reply fails
-  the call, as does a Get SDR without a reply during the repository walk
-  ([Timeouts and Errors](timeouts-and-errors.html)).
-
-Physical FRU devices (EEPROMs on a private I²C bus, read with Master Write-Read) are not read.
+A FRU whose data cannot be read — not present, or answering with an error at some offset — is
+logged at the `WARN` level and reported truncated, or not at all. Physical FRU devices (EEPROMs on
+a private I²C bus, read with Master Write-Read) are not read.
 
 ## The `Fru` object
 
@@ -68,9 +51,7 @@ Each [`Fru`](apidocs/org/metricshub/ipmi/client/model/Fru.html) holds:
 
 The MultiRecord area (power supply, DC output, management access records) is decoded by the
 library but not returned by `getFrus()`; read it with the [low-level API](low-level-api.html) and
-`ReadFruData.decodeFruData()` if you need it. Note that the decoder drops the last record of the
-area, which is often the only one, such as the Power Supply Information record of a power supply
-([#85](https://github.com/metricshub/ipmi-java/issues/85)).
+`ReadFruData.decodeFruData()` if you need it.
 
 ```java
 for (Fru fru : IpmiClient.getFrus(config)) {
