@@ -54,7 +54,8 @@ linear formula (`M`, `B` and the exponents of IPMI 2.0, section 36.3):
 
 ```java
 for (Sensor sensor : IpmiClient.getSensors(config)) {
-	if (sensor.isFull() && sensor.getData() != null) {
+	// isSensorStateValid() is false when the BMC flags the reading as unavailable
+	if (sensor.isFull() && sensor.getData() != null && sensor.getData().isSensorStateValid()) {
 		FullSensorRecord record = (FullSensorRecord) sensor.getRecord();
 		double value = sensor.getData().getSensorReading(record);
 		System.out.println(sensor.getName() + " = " + value + " " + record.getSensorBaseUnit()
@@ -82,8 +83,12 @@ set the *init sensor type* bit of the record, every threshold is left at `0.0`
 > Known limitations of the decoding, by the IPMI 2.0 specification
 > (not all of them reproduced on real hardware):
 >
-> * a sensor whose reading is flagged *unavailable* or whose scanning is disabled is reported
->   with a reading of `0.0` ([#110](https://github.com/metricshub/ipmi-java/issues/110));
+> * the *reading unavailable* and *scanning disabled* flags of Get Sensor Reading are ignored
+>   by `getSensorReading()` and by the text output: such a sensor is reported with whatever raw
+>   value the BMC returns, converted (`0.0` for the three unavailable sensors of the GIGABYTE BMC
+>   tested, but any value is possible). `getData().isSensorStateValid()` is `false` when the
+>   reading is unavailable, so check it as above; the scanning flag is not exposed
+>   ([#110](https://github.com/metricshub/ipmi-java/issues/110));
 > * the non-linear conversions and the readability of each threshold are not fully handled
 >   ([#83](https://github.com/metricshub/ipmi-java/issues/83));
 > * the threshold status bits of the reading are mis-mapped
@@ -179,6 +184,8 @@ Energy;$sensorId;$sensorName;$deviceUniqueId;$value
 
 * `$sensorId` is the SDR record ID, as 4 lowercase hexadecimal digits.
 * `$deviceUniqueId` is the entity of the sensor, as in the device state lines.
+* Sensors whose reading the BMC flags as unavailable are **not** left out: their line carries
+  whatever value the BMC returned ([#110](https://github.com/metricshub/ipmi-java/issues/110)).
 * Thresholds are rounded to integers, in the same unit as `$value`. A threshold is empty when
   its decoded value is `0.0`: when the BMC does not define it or does not make it readable, but
   also when it really is 0 (a lower fan threshold of 0 RPM, for example), and on BMCs affected by
