@@ -36,7 +36,7 @@ one constructor can be combined with those of another.
 | `bmcKey` | `null` | [BMC key](#bmc-key) |
 | `skipAuth` | required | [skipAuth](#skipauth) |
 | `timeout` | required, in **seconds** | [Timeout](#timeout) |
-| `pingPeriod` | `-1`: 30 000 ms | [Keep-alive](#keep-alive) |
+| `pingPeriod` | `-1`: no keep-alive | [Keep-alive](#keep-alive) |
 
 ### Host and port
 
@@ -108,13 +108,17 @@ inactivity during a long collection.
 
 | `pingPeriod` | Behavior |
 | --- | --- |
-| `-1` (default) | The `pingPeriod` of [`connection.properties`](timeouts-and-errors.html#library-wide-defaults): 30 000 ms |
 | `> 0` | One keep-alive message every `pingPeriod` ms |
+| `-1` (default) | **No keep-alive messages** (see below) |
 | `0` (or any other negative value) | No keep-alive messages |
 
-Each `IpmiClient` call opens its own session and closes it when it is done, so the keep-alive
+`-1` is meant to use the `pingPeriod` of
+[`connection.properties`](timeouts-and-errors.html#library-wide-defaults) (30 000 ms), but the
+connector that `IpmiClient` creates overwrites that value with `-1`, which disables the
+keep-alive. Each `IpmiClient` call opens its own session and closes it when it is done, so this
 only matters for calls that last longer than the BMC's session inactivity timeout (typically
-60 s). Disable it (`0`) to keep the traffic to the strict minimum.
+60 s), such as a long SDR walk or FRU read on a slow BMC: for those, **set `pingPeriod`
+explicitly**, for example to `30000`.
 
 ## Thread safety
 

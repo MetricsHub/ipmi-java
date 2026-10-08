@@ -89,8 +89,8 @@ port (or always pass `0`), and call `tearDown()` when you are done with it.
 
 | Method | Purpose |
 | --- | --- |
-| `IpmiConnector(int port)`, `IpmiConnector(int port, InetAddress address)` | Bind the given local port (`0`: any free port), on all interfaces or on one. |
-| `IpmiConnector(int port, long pingPeriod)` | The same, with a [keep-alive period](configuration.html#keep-alive) in ms (`0`: none). |
+| `IpmiConnector(int port)`, `IpmiConnector(int port, InetAddress address)` | Bind the given local port (`0`: any free port), on all interfaces or on one, with the keep-alive period of [`connection.properties`](timeouts-and-errors.html#library-wide-defaults) (30 000 ms). |
+| `IpmiConnector(int port, long pingPeriod)` | The same, with a [keep-alive period](configuration.html#keep-alive) in ms (`0` or a negative value, including `-1`: none). |
 | `createConnection(InetAddress address[, int port])` | Register a connection to a BMC (port 623 by default). |
 | `createConnection(InetAddress address, [int port,] CipherSuite cipherSuite, PrivilegeLevel level)` | The same, skipping the cipher suite and capabilities steps: call `openSession()` next. |
 | `closeSession(handle)` | Log out (Close Session). |
@@ -151,9 +151,9 @@ GetSelInfoResponseData info = (GetSelInfoResponseData) connector
 System.out.println("SEL entries: " + info.getEntriesCount());
 
 if (info.getEntriesCount() > 0) { // Get SEL Entry fails on an empty SEL
-	int reservationId = ((ReserveSelResponseData) connector
-			.sendMessage(handle, new ReserveSel(IpmiVersion.V20, cipherSuite, AuthenticationType.RMCPPlus)))
-			.getReservationId();
+	// GetSelEntry reads whole entries, which need no reservation (IPMI 2.0, section 31.5):
+	// 0 works on every BMC, including those that do not implement Reserve SEL
+	int reservationId = 0;
 
 	int recordId = 0; // 0: the first entry
 	while (recordId != 0xFFFF) { // 0xFFFF: no more entries

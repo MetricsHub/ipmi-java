@@ -80,6 +80,11 @@ always returns the suite it was built with, whether the BMC offers it or not.
 > `Session` it returns to `SerialOverLan(connector, session)`. The session that the console
 > opens by itself on another UDP port has the same limitation.
 
+When the BMC serves SOL on another UDP port, a console opened with the host and password
+constructors holds **two** sessions: the one it opened first, and the one on the SOL port.
+`close()` only closes the second one, so the first stays open on the BMC until the BMC expires
+it. On such a BMC, opening and closing consoles in a loop can use up its session slots.
+
 If the session's privilege is too low to activate the payload, the client raises it to
 Administrator (Set Session Privilege Level) and tries again. The constructors throw `SOLException` when
 the payload cannot be activated (SOL disabled, no free payload instance, privilege refused).

@@ -73,7 +73,7 @@ The defaults come from two properties files packaged in the jar, read through th
 | `timeout` | `300000` | Per-message timeout, in ms | When each connection is created |
 | `retries` | `3` | How many times a failed message is sent again | When each `IpmiConnector` is created |
 | `idleTime` | `4000` | Upper bound of the random pause before a retry, in ms | When each `IpmiConnector` is created |
-| `pingPeriod` | `30000` | Keep-alive period, in ms, when the configuration's `pingPeriod` is `-1` | When each `IpmiConnector` is created |
+| `pingPeriod` | `30000` | Keep-alive period, in ms, of the connectors created with `IpmiConnector(int)` or `IpmiConnector(int, InetAddress)`; not applied to `IpmiClient` (see [Keep-alive](configuration.html#keep-alive)) | When each `IpmiConnector` is created |
 
 Override them at application startup, from a single thread, before the first IPMI call: the
 values then apply to every connection created afterwards, in the whole JVM.
