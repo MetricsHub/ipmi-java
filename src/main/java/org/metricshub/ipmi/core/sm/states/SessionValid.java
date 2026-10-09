@@ -43,6 +43,8 @@ import org.metricshub.ipmi.core.sm.events.Sendv20Message;
 import org.metricshub.ipmi.core.sm.events.SessionUpkeep;
 import org.metricshub.ipmi.core.sm.events.StateMachineEvent;
 import org.metricshub.ipmi.core.sm.events.Timeout;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * {@link State} in which the session is valid and sending IPMI commands to the
@@ -58,6 +60,8 @@ import org.metricshub.ipmi.core.sm.events.Timeout;
  * </ul>
  */
 public class SessionValid extends State {
+
+	private static final Logger LOGGER = LoggerFactory.getLogger(SessionValid.class);
 
 	private CipherSuite cipherSuite;
 
@@ -173,7 +177,9 @@ public class SessionValid extends State {
 				stateMachine.doExternalAction(new MessageAction(message20));
 			}
 		} catch (Exception e) {
-			stateMachine.doExternalAction(new ErrorAction(e));
+			// A message that fails the integrity check or cannot be decoded is discarded (IPMI 2.0 section 6.12.4):
+			// the request it may have answered is sent again when it times out
+			LOGGER.warn("Dropped a message of session {}: {}", sessionId, e.getMessage());
 		}
 	}
 

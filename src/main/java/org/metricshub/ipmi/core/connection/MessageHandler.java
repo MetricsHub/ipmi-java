@@ -39,7 +39,21 @@ public abstract class MessageHandler {
 
 	private static final Logger LOGGER = LoggerFactory.getLogger(MessageHandler.class);
 
-	private int lastReceivedSequenceNumber = 0;
+	/**
+	 * How far below the highest session sequence number received a message may be (IPMI 2.0 section 6.12.14).
+	 */
+	private static final int SEQUENCE_WINDOW = 16;
+
+	/**
+	 * The highest session sequence number received so far.
+	 */
+	private int highestReceivedSequenceNumber;
+
+	/**
+	 * Bit i is set when {@code highestReceivedSequenceNumber - i} was received.
+	 */
+	private int receivedSequenceNumbers = 1;
+
 	private final MessageQueue messageQueue;
 	private final Connection connection;
 
@@ -59,24 +73,6 @@ public abstract class MessageHandler {
 	 */
 	protected Connection getConnection() {
 		return connection;
-	}
-
-	/**
-	 * Returns the highest sequence number received so far (sliding window state).
-	 *
-	 * @return the last received sequence number
-	 */
-	protected int getLastReceivedSequenceNumber() {
-		return lastReceivedSequenceNumber;
-	}
-
-	/**
-	 * Sets the highest sequence number received so far (sliding window state).
-	 *
-	 * @param lastReceivedSequenceNumber the last received sequence number
-	 */
-	protected void setLastReceivedSequenceNumber(int lastReceivedSequenceNumber) {
-		this.lastReceivedSequenceNumber = lastReceivedSequenceNumber;
 	}
 
 	public MessageHandler(Connection connection, int timeout, int minSequenceNumber, int maxSequenceNumber) {
@@ -162,26 +158,55 @@ public abstract class MessageHandler {
 	}
 
 	/**
-	 * Checks if received message is inside "sliding window range", and if it is,
-	 * further processes the message in a cimplementation-specific way.
+	 * Checks if received message is inside "sliding window range" and was not received yet, and if so,
+	 * further processes the message in a implementation-specific way.
 	 *
-	 * @param message
+	 * @param message the message received from the BMC
 	 */
 	public void handleIncomingMessage(Ipmiv20Message message) {
 
 		int seq = message.getSessionSequenceNumber();
 
-		if (seq != 0 && (seq > lastReceivedSequenceNumber + 15 || seq < lastReceivedSequenceNumber - 16)) {
-			LOGGER.debug("Dropping message " + seq);
-			return; // if the message's sequence number gets out of the sliding
-			// window range we need to drop it
-		}
-
-		if (seq != 0) {
-			lastReceivedSequenceNumber = (seq > lastReceivedSequenceNumber ? seq : lastReceivedSequenceNumber);
+		if (seq != 0 && !acceptSequenceNumber(seq)) {
+			LOGGER.debug("Dropping message {}", seq);
+			return;
 		}
 
 		handleIncomingMessageInternal(message);
+	}
+
+	/**
+	 * Sliding window over the session sequence numbers received (IPMI 2.0 sections 6.12.13 and 6.12.14): drops a
+	 * message received already (a replay or a duplicate) or more than {@link #SEQUENCE_WINDOW} below the highest number
+	 * received. A number above it is always accepted: the message was authenticated before reaching this point, when
+	 * the session has integrity, so its number cannot be forged, and a gap left by lost messages or by the messages of
+	 * the other payload type (IPMI and SOL share the numbers) must not lock the session out.
+	 *
+	 * @param seq the session sequence number of a message received
+	 * @return whether the message is accepted
+	 */
+	private synchronized boolean acceptSequenceNumber(int seq) {
+		// The difference wraps around like the 32-bit sequence numbers
+		int ahead = seq - highestReceivedSequenceNumber;
+		if (ahead > 0) {
+			receivedSequenceNumbers = ahead < Integer.SIZE ? (receivedSequenceNumbers << ahead) | 1 : 1;
+			highestReceivedSequenceNumber = seq;
+			return true;
+		}
+		if (ahead < -SEQUENCE_WINDOW || (receivedSequenceNumbers & (1 << -ahead)) != 0) {
+			return false;
+		}
+		receivedSequenceNumbers |= 1 << -ahead;
+		return true;
+	}
+
+	/**
+	 * Forgets the session sequence numbers received: the BMC numbers the messages of each new session from 1 again
+	 * (IPMI 2.0 section 6.12.13).
+	 */
+	synchronized void resetSequenceWindow() {
+		highestReceivedSequenceNumber = 0;
+		receivedSequenceNumbers = 1;
 	}
 
 	public void setTimeout(int timeout) {

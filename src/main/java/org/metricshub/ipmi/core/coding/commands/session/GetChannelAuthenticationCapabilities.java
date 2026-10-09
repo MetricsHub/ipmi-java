@@ -233,7 +233,9 @@ public class GetChannelAuthenticationCapabilities extends IpmiCommandCoder {
 
 		responseData.setChannelNumber(raw[0]);
 
-		responseData.setIpmiv20Support((raw[1] & 0x80) != 0);
+		// Byte 3 bit 7 only says that byte 5 holds the extended capabilities, whose bit 1 is the IPMI v2.0 support
+		// (IPMI 2.0 table 22-15; raw[0] is byte 2, the channel number)
+		responseData.setIpmiv20Support((raw[1] & 0x80) != 0 && (raw[3] & 0x02) != 0);
 
 		responseData
 				.setAuthenticationTypes(new ArrayList<AuthenticationType>());

@@ -22,27 +22,29 @@ package org.metricshub.ipmi.core.coding.protocol.decoder;
  * ╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱
  */
 
-import org.metricshub.ipmi.core.coding.protocol.AuthenticationType;
 import org.metricshub.ipmi.core.coding.protocol.IpmiMessage;
 import org.metricshub.ipmi.core.coding.protocol.Ipmiv20Message;
 import org.metricshub.ipmi.core.coding.protocol.PayloadType;
 import org.metricshub.ipmi.core.coding.rmcp.RmcpMessage;
 import org.metricshub.ipmi.core.coding.security.CipherSuite;
 import org.metricshub.ipmi.core.coding.security.ConfidentialityNone;
+import org.metricshub.ipmi.core.coding.security.SecurityConstants;
 import org.metricshub.ipmi.core.common.TypeConverter;
 
 import java.security.InvalidKeyException;
+import java.security.MessageDigest;
 import java.util.Arrays;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * Decodes IPMI v2.0 session header and retrieves encrypted payload.
  */
 public class Protocolv20Decoder extends ProtocolDecoder {
 
-	private static Logger logger = LoggerFactory.getLogger(Protocolv20Decoder.class);
+	/**
+	 * Length of the session header without the OEM fields: AuthType/Format, Payload Type, Session ID, Session
+	 * Sequence Number and Payload Length.
+	 */
+	private static final int HEADER_LENGTH = 12;
 
 	private CipherSuite cipherSuite;
 
@@ -78,6 +80,8 @@ public class Protocolv20Decoder extends ProtocolDecoder {
 
 		byte[] raw = rmcpMessage.getData();
 
+		checkLength(raw, HEADER_LENGTH);
+
 		message.setAuthenticationType(decodeAuthenticationType(raw[0]));
 
 		message.setPayloadEncrypted(decodeEncryption(raw[1]));
@@ -89,6 +93,8 @@ public class Protocolv20Decoder extends ProtocolDecoder {
 		int offset = 2;
 
 		if (message.getPayloadType() == PayloadType.Oem) {
+			checkLength(raw, HEADER_LENGTH + 6);
+
 			message.setOemIANA(decodeOEMIANA(raw));
 			offset += 4;
 
@@ -108,6 +114,21 @@ public class Protocolv20Decoder extends ProtocolDecoder {
 
 		int payloadLength = decodePayloadLength(raw, offset);
 		offset += 2;
+
+		checkLength(raw, offset + payloadLength);
+
+		// A packet of a session with integrity protection must carry a valid AuthCode, or it is discarded (IPMI 2.0
+		// section 13.28.4). The AuthCode covers the encrypted payload: it is checked before decrypting it.
+		if (message.getSessionID() != 0 && cipherSuite.getIntegrityAlgorithm().getCode() != SecurityConstants.IA_NONE) {
+			if (!message.isPayloadAuthenticated()) {
+				throw new IllegalArgumentException("Unauthenticated message in a session with integrity protection");
+			}
+			int authCodeOffset = skipIntegrityPAD(raw, offset + payloadLength);
+			if (!validateAuthCode(raw, authCodeOffset)) {
+				throw new IllegalArgumentException("Integrity check failed");
+			}
+			message.setAuthCode(decodeAuthCode(raw, authCodeOffset));
+		}
 
 		if (message.isPayloadEncrypted()) {
 			message
@@ -129,21 +150,20 @@ public class Protocolv20Decoder extends ProtocolDecoder {
 									message.getPayloadType()));
 		}
 
-		offset += payloadLength;
-
-		if (message.getAuthenticationType() != AuthenticationType.None
-				&& !(message.getAuthenticationType() == AuthenticationType.RMCPPlus
-						&& !message
-								.isPayloadAuthenticated())
-				&& message.getSessionID() != 0) {
-			offset = skipIntegrityPAD(raw, offset);
-			message.setAuthCode(decodeAuthCode(raw, offset));
-			if (!validateAuthCode(raw, offset)) {
-				logger.warn("Integrity check failed");
-			}
-		}
-
 		return message;
+	}
+
+	/**
+	 * Checks that the message holds at least the given number of bytes.
+	 *
+	 * @param rawMessage the message data
+	 * @param length the minimum length
+	 * @throws IllegalArgumentException when the message is shorter
+	 */
+	private static void checkLength(byte[] rawMessage, int length) {
+		if (rawMessage.length < length) {
+			throw new IllegalArgumentException("Message is truncated: " + rawMessage.length + " bytes, expected " + length);
+		}
 	}
 
 	/**
@@ -185,7 +205,7 @@ public class Protocolv20Decoder extends ProtocolDecoder {
 	private int decodeOEMIANA(byte[] rawMessage) {
 		byte[] oemIANA = new byte[4];
 
-		System.arraycopy(rawMessage, 3, oemIANA, 0, 3);
+		System.arraycopy(rawMessage, 2, oemIANA, 0, 3);
 		oemIANA[3] = 0;
 
 		return TypeConverter.littleEndianByteArrayToInt(oemIANA);
@@ -227,23 +247,22 @@ public class Protocolv20Decoder extends ProtocolDecoder {
 	 * @param offset
 	 *        - Offset to integrity pad.
 	 * @return Offset to Auth Code
-	 * @throws IndexOutOfBoundsException
+	 * @throws IllegalArgumentException
 	 *         when message is corrupted and pad length does not appear
 	 *         after integrity pad or length is incorrect.
 	 */
 	private int skipIntegrityPAD(final byte[] rawMessage, final int offset) {
+		// Integrity PAD: 0 to 3 FFh bytes, then the Pad Length and the Next Header (07h)
 		int skip = 0;
-		while (TypeConverter.byteToInt(rawMessage[offset + skip]) == 0xff) {
+		while (skip < 3
+				&& offset + skip < rawMessage.length
+				&& TypeConverter.byteToInt(rawMessage[offset + skip]) == 0xff) {
 			++skip;
-		}
-		int length = TypeConverter.byteToInt(rawMessage[offset + skip]);
-		if (length != skip) {
-			throw new IndexOutOfBoundsException("Message is corrupted.");
 		}
 
 		int currentOffset = offset + skip + 2; // skip pad length and next header fields
-		if (currentOffset >= rawMessage.length) {
-			throw new IndexOutOfBoundsException("Message is corrupted.");
+		if (currentOffset >= rawMessage.length || TypeConverter.byteToInt(rawMessage[offset + skip]) != skip) {
+			throw new IllegalArgumentException("Message is corrupted.");
 		}
 		return currentOffset;
 	}
@@ -256,9 +275,6 @@ public class Protocolv20Decoder extends ProtocolDecoder {
 	 * @param offset
 	 *        - Offset to auth code.
 	 * @return Auth Code
-	 * @throws IndexOutOfBoundsException
-	 *         when message is corrupted and pad length does not appear
-	 *         after integrity pad or length is incorrect.
 	 */
 	private byte[] decodeAuthCode(byte[] rawMessage, int offset) {
 		byte[] authCode = new byte[rawMessage.length - offset];
@@ -278,23 +294,10 @@ public class Protocolv20Decoder extends ProtocolDecoder {
 	 *         - when initiation of the integrity algorithm fails
 	 */
 	private boolean validateAuthCode(byte[] rawMessage, int offset) {
-		byte[] base = new byte[offset];
-
-		System.arraycopy(rawMessage, 0, base, 0, offset);
-
-		byte[] authCode = null;
-
-		if (rawMessage.length > offset) {
-			authCode = new byte[rawMessage.length - offset];
-			System.arraycopy(rawMessage, offset, authCode, 0, authCode.length);
-		}
-
-		return Arrays
-				.equals(
-						authCode,
-						cipherSuite
-								.getIntegrityAlgorithm()
-								.generateAuthCode(base));
+		return MessageDigest
+				.isEqual(
+						decodeAuthCode(rawMessage, offset),
+						cipherSuite.getIntegrityAlgorithm().generateAuthCode(Arrays.copyOf(rawMessage, offset)));
 	}
 
 	/**

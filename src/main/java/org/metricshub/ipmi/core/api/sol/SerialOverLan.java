@@ -201,7 +201,7 @@ public class SerialOverLan implements Closeable {
 								connectionHandle.getRemoteAddress().getHostAddress(),
 								solPayloadPort,
 								connectionHandle.getUser(),
-								connectionHandle.getPassword(),
+								connectionHandle.getPasswordBytes(),
 								cipherSuiteSelector);
 				this.isSessionInternal = true;
 

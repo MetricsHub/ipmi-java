@@ -129,7 +129,7 @@ class ConnectionManagerTest {
 			assertThrows(
 					IllegalStateException.class,
 					() -> manager.getChannelAuthenticationCapabilities(handle, null, null));
-			assertThrows(IllegalStateException.class, () -> manager.startSession(handle, null, null, "", "", null));
+			assertThrows(IllegalStateException.class, () -> manager.startSession(handle, null, null, "", new byte[0], null));
 			assertThrows(IllegalStateException.class, () -> manager.registerListener(handle, null));
 			assertThrows(IllegalStateException.class, () -> manager.getConnection(handle));
 		} finally {

@@ -23,8 +23,8 @@ package org.metricshub.ipmi.core.coding.security;
  */
 
 import java.security.InvalidKeyException;
+import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
-import java.util.Arrays;
 
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
@@ -85,7 +85,7 @@ public abstract class AuthenticationAlgorithm {
 			throws NoSuchAlgorithmException,
 			InvalidKeyException {
 		byte[] check = getKeyExchangeAuthenticationCode(data, password);
-		return Arrays.equals(check, key);
+		return MessageDigest.isEqual(check, key);
 	}
 
 	/**
@@ -132,7 +132,7 @@ public abstract class AuthenticationAlgorithm {
 
 		System.arraycopy(mac.doFinal(data), 0, result, 0, integrityCheckLength);
 
-		return Arrays.equals(result, reference);
+		return MessageDigest.isEqual(result, reference);
 	}
 
 	/**

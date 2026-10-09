@@ -28,7 +28,9 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 
+import org.metricshub.ipmi.core.coding.rmcp.RmcpClassOfMessage;
 import org.metricshub.ipmi.core.coding.rmcp.RmcpDecoder;
+import org.metricshub.ipmi.core.coding.rmcp.RmcpMessage;
 import org.metricshub.ipmi.core.common.Constants;
 import org.metricshub.ipmi.core.sm.actions.MessageAction;
 import org.metricshub.ipmi.core.sm.actions.StateMachineAction;
@@ -39,12 +41,16 @@ import org.metricshub.ipmi.core.sm.states.Uninitialized;
 import org.metricshub.ipmi.core.transport.Messenger;
 import org.metricshub.ipmi.core.transport.UdpListener;
 import org.metricshub.ipmi.core.transport.UdpMessage;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * State machine for connecting and acquiring session with the remote host via
  * IPMI v.2.0.
  */
 public class StateMachine implements UdpListener {
+
+	private static final Logger LOGGER = LoggerFactory.getLogger(StateMachine.class);
 
 	private final List<MachineObserver> observers = new CopyOnWriteArrayList<MachineObserver>();
 
@@ -214,7 +220,16 @@ public class StateMachine implements UdpListener {
 		}
 		List<StateMachineAction> actions;
 		synchronized (this) {
-			current.doAction(this, RmcpDecoder.decode(message.getMessage()));
+			try {
+				RmcpMessage rmcpMessage = RmcpDecoder.decode(message.getMessage());
+				if (rmcpMessage.getClassOfMessage() == RmcpClassOfMessage.Ipmi) {
+					current.doAction(this, rmcpMessage);
+				}
+			} catch (RuntimeException e) {
+				// A datagram too short or malformed for the states to decode: drop it, as the BMC could not have sent
+				// it, rather than let the exception skip the other listeners of the messenger
+				LOGGER.warn("Dropped a malformed message", e);
+			}
 			actions = drainPendingActions();
 		}
 		dispatch(actions);

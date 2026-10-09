@@ -25,7 +25,6 @@ package org.metricshub.ipmi.core.coding.commands.session;
 import org.metricshub.ipmi.core.coding.commands.IpmiCommandCoder;
 import org.metricshub.ipmi.core.coding.commands.IpmiVersion;
 import org.metricshub.ipmi.core.coding.commands.ResponseData;
-import org.metricshub.ipmi.core.coding.payload.CompletionCode;
 import org.metricshub.ipmi.core.coding.payload.IpmiPayload;
 import org.metricshub.ipmi.core.coding.payload.PlainMessage;
 import org.metricshub.ipmi.core.coding.payload.lan.IPMIException;
@@ -294,7 +293,7 @@ public class Rakp3 extends IpmiCommandCoder {
 			throw new IllegalArgumentException("This is not RAKP 4 message!");
 		}
 
-		byte[] payload = message.getPayload().getPayloadData();
+		byte[] payload = validateSessionSetupResponse(message);
 
 		Rakp3ResponseData data = new Rakp3ResponseData();
 
@@ -302,15 +301,11 @@ public class Rakp3 extends IpmiCommandCoder {
 
 		data.setStatusCode(payload[1]);
 
-		if (payload[1] != 0) {
-			throw new IPMIException(
-					CompletionCode
-							.parseInt(
-									TypeConverter
-											.byteToInt(payload[1])));
-		}
+		int integrityCheckLength = getCipherSuite()
+				.getAuthenticationAlgorithm()
+				.getIntegrityCheckBaseLength();
 
-		if (payload.length < 8) {
+		if (payload.length < 8 + integrityCheckLength) {
 			throw new IllegalArgumentException("Invalid payload length");
 		}
 
@@ -323,22 +318,8 @@ public class Rakp3 extends IpmiCommandCoder {
 						TypeConverter
 								.littleEndianByteArrayToInt(buffer));
 
-		byte[] integrityCheck = null;
-
-		if (payload.length > 8) {
-			integrityCheck = new byte[getCipherSuite()
-					.getAuthenticationAlgorithm()
-					.getIntegrityCheckBaseLength()];
-			System
-					.arraycopy(
-							payload,
-							8,
-							integrityCheck,
-							0,
-							getCipherSuite()
-									.getAuthenticationAlgorithm()
-									.getIntegrityCheckBaseLength());
-		}
+		byte[] integrityCheck = new byte[integrityCheckLength];
+		System.arraycopy(payload, 8, integrityCheck, 0, integrityCheckLength);
 
 		if (!getCipherSuite()
 				.getAuthenticationAlgorithm()

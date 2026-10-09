@@ -104,7 +104,7 @@ public class IpmiLanRequest extends IpmiLanMessage {
 		message[4] = TypeConverter
 				.intToByte(
 						((getSequenceNumber() & 0x3f) << 2)
-								| getResponderLogicalUnitNumber());
+								| getRequesterLogicalUnitNumber()); // rqSeq/rqLUN (IPMI 2.0 figure 13-4)
 		message[5] = getCommand();
 
 		if (getData() != null) {

@@ -22,14 +22,15 @@ package org.metricshub.ipmi.core.common;
  * ╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱
  */
 
-import java.util.Date;
-import java.util.Random;
+import java.security.SecureRandom;
 
 /**
- * Utility class for generating random numbers.
+ * Utility class for generating the random numbers of the RMCP+ session setup (the console random number of RAKP
+ * Message 1, the first console session ID), with a {@link SecureRandom}: a predictable console random number
+ * weakens the session keys.
  */
 public final class Randomizer {
-	private static Random rand = new Random(new Date().getTime());
+	private static final SecureRandom RANDOM = new SecureRandom();
 
 	private Randomizer() {}
 
@@ -37,6 +38,18 @@ public final class Randomizer {
 	 * @return Generated random {@link Integer}
 	 */
 	public static int getInt() {
-		return rand.nextInt();
+		return RANDOM.nextInt();
+	}
+
+	/**
+	 * Generates random bytes.
+	 *
+	 * @param length the number of bytes
+	 * @return a new array of {@code length} random bytes
+	 */
+	public static byte[] getBytes(int length) {
+		byte[] bytes = new byte[length];
+		RANDOM.nextBytes(bytes);
+		return bytes;
 	}
 }

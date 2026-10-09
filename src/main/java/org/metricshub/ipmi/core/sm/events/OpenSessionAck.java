@@ -38,7 +38,7 @@ public class OpenSessionAck extends Default {
 
 	private int managedSystemSessionId;
 	private String username;
-	private String password;
+	private byte[] password;
 	private byte[] bmcKey;
 
 	/**
@@ -60,7 +60,7 @@ public class OpenSessionAck extends Default {
 	 *        wishes to assume for this session. It's length cannot exceed
 	 *        16.
 	 * @param password
-	 *        - password matching username
+	 *        - password matching username, as sent to the BMC
 	 * @param bmcKey
 	 *        - BMC specific key. Should be null if Get Channel
 	 *        Authentication Capabilities Response indicated that Kg is
@@ -70,7 +70,7 @@ public class OpenSessionAck extends Default {
 	 */
 	public OpenSessionAck(CipherSuite cipherSuite,
 			PrivilegeLevel privilegeLevel, int sequenceNumber,
-			int managedSystemSessionId, String username, String password,
+			int managedSystemSessionId, String username, byte[] password,
 			byte[] bmcKey) {
 		super(cipherSuite, sequenceNumber, privilegeLevel);
 		this.managedSystemSessionId = managedSystemSessionId;
@@ -87,7 +87,7 @@ public class OpenSessionAck extends Default {
 		return username;
 	}
 
-	public String getPassword() {
+	public byte[] getPassword() {
 		return password;
 	}
 

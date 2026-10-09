@@ -180,6 +180,37 @@ public abstract class ProtocolDecoder implements IpmiDecoder {
 	protected abstract int decodePayloadLength(byte[] rawData, int offset);
 
 	/**
+	 * Copies the payload out of the message and decrypts it.
+	 *
+	 * @param rawData
+	 *        - Byte array holding whole message data.
+	 * @param offset
+	 *        - Offset to payload.
+	 * @param length
+	 *        - Length of the payload.
+	 * @param confidentialityAlgorithm
+	 *        - {@link ConfidentialityAlgorithm} required to decrypt
+	 *        payload.
+	 * @return the decrypted payload
+	 * @throws IllegalArgumentException
+	 *         when the payload is empty or cannot be decrypted
+	 */
+	protected static byte[] decryptPayload(
+			byte[] rawData,
+			int offset,
+			int length,
+			ConfidentialityAlgorithm confidentialityAlgorithm) {
+		if (length <= 0) {
+			throw new IllegalArgumentException("Empty payload");
+		}
+		byte[] payload = new byte[length];
+
+		System.arraycopy(rawData, offset, payload, 0, length);
+
+		return confidentialityAlgorithm.decrypt(payload);
+	}
+
+	/**
 	 * Decodes payload.
 	 *
 	 * @param rawData
@@ -201,14 +232,7 @@ public abstract class ProtocolDecoder implements IpmiDecoder {
 			int length,
 			ConfidentialityAlgorithm confidentialityAlgorithm,
 			PayloadType payloadType) {
-		if (length <= 0) {
-			throw new IllegalArgumentException("Empty payload");
-		}
-		byte[] payload = new byte[length];
-
-		System.arraycopy(rawData, offset, payload, 0, length);
-
-		payload = confidentialityAlgorithm.decrypt(payload);
+		byte[] payload = decryptPayload(rawData, offset, length, confidentialityAlgorithm);
 
 		if (payloadType == PayloadType.Sol) {
 			return new SolInboundMessage(payload);

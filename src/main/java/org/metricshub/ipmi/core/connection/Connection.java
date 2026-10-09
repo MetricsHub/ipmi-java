@@ -31,6 +31,7 @@ import org.metricshub.ipmi.core.coding.commands.ResponseData;
 import org.metricshub.ipmi.core.coding.commands.session.GetChannelAuthenticationCapabilitiesResponseData;
 import org.metricshub.ipmi.core.coding.commands.session.GetChannelCipherSuitesResponseData;
 import org.metricshub.ipmi.core.coding.commands.session.OpenSessionResponseData;
+import org.metricshub.ipmi.core.coding.commands.session.Rakp1;
 import org.metricshub.ipmi.core.coding.commands.session.Rakp1ResponseData;
 import org.metricshub.ipmi.core.coding.commands.session.Rakp3ResponseData;
 import org.metricshub.ipmi.core.coding.payload.IpmiPayload;
@@ -469,13 +470,22 @@ public class Connection extends TimerTask implements MachineObserver {
 			CipherSuite cipherSuite,
 			PrivilegeLevel privilegeLevel,
 			String username,
-			String password,
+			byte[] password,
 			byte[] bmcKey)
 			throws Exception {
 		if (stateMachine.getCurrent().getClass() != Authcap.class) {
 			throw new ConnectionException(
 					ILLEGAL_CONNECTION_STATE_MESSAGE
 							+ stateMachine.getCurrent().getClass().getSimpleName());
+		}
+
+		Rakp1.checkCredentials(username, password, bmcKey);
+
+		// The session sequence numbers of a new session start from 1 again, in both directions (IPMI 2.0 section
+		// 6.12.13)
+		currentSessionSequenceNumber.set(0);
+		for (MessageHandler handler : messageHandlers.values()) {
+			handler.resetSequenceWindow();
 		}
 
 		lastAction = null;
@@ -501,8 +511,23 @@ public class Connection extends TimerTask implements MachineObserver {
 					"Response data not matching OpenSession response data");
 		}
 
-		managedSystemSessionId = ((OpenSessionResponseData) action
-				.getIpmiResponseData()).getManagedSystemSessionId();
+		OpenSessionResponseData openSessionResponseData = (OpenSessionResponseData) action.getIpmiResponseData();
+
+		// IPMI 2.0 section 13.18: the reply must be for this session, with a valid managed system session ID and the
+		// requested algorithms (sections 13.21 and 13.23 for the RAKP messages)
+		checkHandshakeReply(
+				"Open Session Response",
+				openSessionResponseData.getRemoteConsoleSessionId() == sessionId
+						&& openSessionResponseData.getManagedSystemSessionId() != 0
+						&& openSessionResponseData.getAuthenticationAlgorithm() == cipherSuite
+								.getAuthenticationAlgorithm()
+								.getCode()
+						&& openSessionResponseData.getIntegrityAlgorithm() == cipherSuite.getIntegrityAlgorithm().getCode()
+						&& openSessionResponseData.getConfidentialityAlgorithm() == cipherSuite
+								.getConfidentialityAlgorithm()
+								.getCode());
+
+		managedSystemSessionId = openSessionResponseData.getManagedSystemSessionId();
 
 		stateMachine.doTransition(new DefaultAck());
 
@@ -537,6 +562,8 @@ public class Connection extends TimerTask implements MachineObserver {
 		Rakp1ResponseData rakp1ResponseData = (Rakp1ResponseData) action
 				.getIpmiResponseData();
 
+		checkHandshakeReply("RAKP Message 2", rakp1ResponseData.getRemoteConsoleSessionId() == sessionId);
+
 		stateMachine.doTransition(new DefaultAck());
 
 		// RAKP 3
@@ -567,10 +594,30 @@ public class Connection extends TimerTask implements MachineObserver {
 					"Response data not matching RAKP Message 4");
 		}
 
+		checkHandshakeReply(
+				"RAKP Message 4",
+				((Rakp3ResponseData) action.getIpmiResponseData()).getConsoleSessionId() == sessionId);
+
 		stateMachine.doTransition(new DefaultAck());
 		stateMachine.doTransition(new StartSession(cipherSuite, sessionId));
 
 		return sessionId;
+	}
+
+	/**
+	 * Fails the session handshake, back to the state before the Open Session Request, when a reply does not match
+	 * the request (another session ID, other algorithms). Like a failed authentication check, this is not retried:
+	 * the BMC would answer the same.
+	 *
+	 * @param reply the name of the reply
+	 * @param matches whether the reply matches the request
+	 * @throws IllegalArgumentException when it does not
+	 */
+	private void checkHandshakeReply(String reply, boolean matches) {
+		if (!matches) {
+			stateMachine.doTransition(new Timeout());
+			throw new IllegalArgumentException(reply + " does not match the request");
+		}
 	}
 
 	/**

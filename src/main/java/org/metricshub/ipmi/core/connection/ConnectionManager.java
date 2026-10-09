@@ -414,7 +414,7 @@ public class ConnectionManager {
 			CipherSuite cipherSuite,
 			PrivilegeLevel privilegeLevel,
 			String username,
-			String password,
+			byte[] password,
 			byte[] bmcKey)
 			throws Exception {
 		int sessionId;
