@@ -674,9 +674,19 @@ public class Connection extends TimerTask implements MachineObserver {
 	}
 
 	/**
-	 * {@link TimerTask} runner - periodically sends a no-op message to keep the session up. The message is sent
-	 * one-way: its reply is not awaited, so it is neither queued nor retried, and a reply to the same command sent by
-	 * the application is delivered to the application.
+	 * The keep-alive request: queued like any request, so that its tag stays reserved until its reply arrives or it
+	 * times out, and recognized by {@link IpmiMessageHandler}, which discards its reply.
+	 */
+	static final class KeepAlive extends GetChannelAuthenticationCapabilities {
+		KeepAlive(CipherSuite cipherSuite) {
+			super(IpmiVersion.V20, IpmiVersion.V20, cipherSuite, PrivilegeLevel.Callback, TypeConverter.intToByte(0xe));
+		}
+	}
+
+	/**
+	 * {@link TimerTask} runner - periodically sends a no-op message to keep the session up. The message is a
+	 * {@link KeepAlive}: its reply is discarded, while a reply to the same command sent by the application is
+	 * delivered to the application. When the message queue is full, the keep-alive of this period is skipped.
 	 */
 	@Override
 	public void run() {
@@ -685,14 +695,7 @@ public class Connection extends TimerTask implements MachineObserver {
 			return;
 		}
 		try {
-			sendMessage(
-					new GetChannelAuthenticationCapabilities(
-							IpmiVersion.V20,
-							IpmiVersion.V20,
-							((SessionValid) current).getCipherSuite(),
-							PrivilegeLevel.Callback,
-							TypeConverter.intToByte(0xe)),
-					true);
+			sendMessage(new KeepAlive(((SessionValid) current).getCipherSuite()), false);
 		} catch (Exception e) {
 			LOGGER.error("Keep-alive failed: " + e.getMessage(), e);
 		}
