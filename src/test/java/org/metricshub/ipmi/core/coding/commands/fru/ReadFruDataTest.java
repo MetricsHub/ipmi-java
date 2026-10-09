@@ -178,14 +178,16 @@ class ReadFruDataTest {
 	}
 
 	@Test
-	void multirecordWithAnInvalidRecordChecksumIsSkipped() {
+	void multirecordWithAnInvalidRecordChecksumIsStillDecoded() {
 		byte[] image = image();
-		// the data of the last multirecord (the power supply record) starts 5 bytes after its header, 24 bytes long
-		image[image.length - 24] ^= 0x01;
+		// the data of the last multirecord (the power supply record) starts 5 bytes after its header, 24 bytes long:
+		// a Dell iDRAC 8 writes a record checksum off by one on genuine power supply records
+		image[image.length - 24 - 5 + 3] ^= 0x01;
 
 		List<FruRecord> records = decode(image);
 
-		assertEquals(2, records.size(), "board and product; the corrupt power supply record is skipped");
+		assertEquals(3, records.size(), "board, product and the power supply record, checksum or not");
+		assertEquals(750, assertInstanceOf(PowerSupplyInfo.class, records.get(2)).getCapacity());
 	}
 
 	@Test

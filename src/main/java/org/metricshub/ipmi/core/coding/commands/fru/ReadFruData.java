@@ -331,15 +331,15 @@ public class ReadFruData extends IpmiCommandCoder {
 				LOGGER.warn("The multirecord at offset {} is truncated: the rest of the multirecord area is skipped", offset);
 				return;
 			}
-			// The record checksum (header byte 4) is a zero checksum of the record data (section 16.2.6)
+			// The record checksum (header byte 4) is a zero checksum of the record data (section 16.2.6). Real
+			// firmware gets it wrong on genuine records (a Dell iDRAC 8 writes it off by one on its power supply
+			// records), so a mismatch is logged, not fatal: the length-delimited record is decoded anyway
 			if (((data[offset + 3] + sum(data, offset + MULTIRECORD_HEADER_SIZE, length)) & 0xff) != 0) {
 				LOGGER
-						.warn(
-								"Skipping the multirecord of type 0x{} at offset {}: invalid record checksum",
+						.debug(
+								"The multirecord of type 0x{} at offset {} has an invalid record checksum: decoded anyway",
 								Integer.toHexString(TypeConverter.byteToInt(data[offset])),
 								offset);
-				offset += MULTIRECORD_HEADER_SIZE + length;
-				continue;
 			}
 			try {
 				list.add(MultiRecordInfo.populateMultiRecord(data, offset));
