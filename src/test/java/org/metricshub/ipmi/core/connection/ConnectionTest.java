@@ -201,6 +201,54 @@ class ConnectionTest {
 	}
 
 	@Test
+	void aReplyToAnotherCommandWithTheTagOfAQueuedRequestIsDropped() throws Exception {
+		Connection connection = connect(TIMEOUT_MS);
+		try {
+			openSession(connection);
+			AtomicInteger notifiedTag = new AtomicInteger(-1);
+			connection.registerListener(new ConnectionListener() {
+				@Override
+				public void processResponse(ResponseData responseData, int handle, int tag, Exception exception) {
+					notifiedTag.set(tag);
+				}
+
+				@Override
+				public void processRequest(IpmiPayload payload) {
+					// not expected
+				}
+			});
+			GetChannelAuthenticationCapabilities request = new GetChannelAuthenticationCapabilities(
+					IpmiVersion.V20,
+					IpmiVersion.V20,
+					CipherSuite.getEmpty(),
+					PrivilegeLevel.Callback,
+					(byte) 0xe);
+			int tag = connection.sendMessage(request, false);
+
+			// A late reply to a one-way Get Device ID (command 01h) whose sequence number was reused by the request
+			connection.notify(new MessageAction(reply(tag, (byte) 0x01)));
+			assertEquals(-1, notifiedTag.get(), "a reply to another command must not answer the queued request");
+
+			// The request is still queued: its own reply (command 38h) is delivered
+			connection.notify(new MessageAction(reply(tag, (byte) 0x38)));
+			assertEquals(tag, notifiedTag.get());
+		} finally {
+			connection.disconnect();
+		}
+	}
+
+	/** A minimal IPMI LAN response with the given tag (rqSeq, bits 7:2 of byte 4) and command. */
+	private static Ipmiv20Message reply(int tag, byte command) {
+		byte[] raw = { 0x20, 0x18, 0, (byte) 0x81, (byte) (tag << 2), command, 0, 0 };
+		raw[2] = (byte) -(raw[0] + raw[1]);
+		raw[7] = (byte) -(raw[3] + raw[4] + raw[5] + raw[6]);
+		Ipmiv20Message reply = new Ipmiv20Message(null);
+		reply.setPayloadType(PayloadType.Ipmi);
+		reply.setPayload(new IpmiLanResponse(raw));
+		return reply;
+	}
+
+	@Test
 	void aListenerMayUnregisterItselfWhileNotified() throws Exception {
 		Connection connection = connect(TIMEOUT_MS);
 		try {
