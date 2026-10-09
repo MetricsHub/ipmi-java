@@ -178,6 +178,28 @@ class ReadFruDataTest {
 	}
 
 	@Test
+	void multirecordWithAnInvalidRecordChecksumIsSkipped() {
+		byte[] image = image();
+		// the data of the last multirecord (the power supply record) starts 5 bytes after its header, 24 bytes long
+		image[image.length - 24] ^= 0x01;
+
+		List<FruRecord> records = decode(image);
+
+		assertEquals(2, records.size(), "board and product; the corrupt power supply record is skipped");
+	}
+
+	@Test
+	void multirecordWithAnInvalidHeaderChecksumEndsTheArea() {
+		byte[] image = image();
+		// header checksum of the last multirecord: byte 4 of its 5-byte header
+		image[image.length - 24 - 1] ^= 0x01;
+
+		List<FruRecord> records = decode(image);
+
+		assertEquals(2, records.size(), "board and product; the area is not read past the corrupt header");
+	}
+
+	@Test
 	void invalidHeaderChecksumIsRejected() {
 		byte[] image = image();
 		image[7] ^= 0x01;

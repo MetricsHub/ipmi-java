@@ -72,6 +72,21 @@ The decoders follow the IPMI 2.0 and FRU specifications more closely; the visibl
 * reserved values of the rate unit, modifier unit usage and power restore policy decode to
   `None` or `Unknown` instead of throwing.
 
+Code that **uses the low-level API** to read FRUs: the `offset` and `countToRead` arguments of
+the `ReadFruData` constructors are now **in bytes** whatever the access unit of the device, and
+the offset alone is sent in words when Get FRU Inventory Area Info reports a word-addressed FRU
+(1.2.02 multiplied both by a "word size" of 16, which read word-addressed FRUs 16 times too far).
+A loop that walked a FRU in units of the device now walks it in bytes, with an even offset for
+a word-addressed device:
+
+```java
+int size = info.getFruInventoryAreaSize(); // in bytes, whatever the access unit
+for (int offset = 0; offset < size; offset += 16) {
+	connector.sendMessage(handle, new ReadFruData(IpmiVersion.V20, cipherSuite, AuthenticationType.RMCPPlus,
+			fruId, info.getFruUnit(), offset, Math.min(16, size - offset)));
+}
+```
+
 Code that **extends** the library's protocol classes needs the changes below. `QueueElement`
 lost its `isTimedOut()`, `makeTimedOut()` and `refreshTimestamp()` methods: a timed-out message
 now leaves the queue at once.

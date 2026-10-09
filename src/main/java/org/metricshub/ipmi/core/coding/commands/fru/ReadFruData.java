@@ -316,12 +316,30 @@ public class ReadFruData extends IpmiCommandCoder {
 		boolean last = false;
 
 		while (!last && offset + MULTIRECORD_HEADER_SIZE <= data.length) {
+			// A corrupt header (section 16.2.5) means the length and the end-of-list flag cannot be trusted
+			if (!isChecksumValid(data, offset, MULTIRECORD_HEADER_SIZE)) {
+				LOGGER
+						.warn(
+								"The multirecord header at offset {} has an invalid checksum: the rest of the multirecord area is skipped",
+								offset);
+				return;
+			}
 			last = (TypeConverter.byteToInt(data[offset + 1]) & 0x80) != 0;
 			int length = TypeConverter.byteToInt(data[offset + 2]);
 
 			if (offset + MULTIRECORD_HEADER_SIZE + length > data.length) {
 				LOGGER.warn("The multirecord at offset {} is truncated: the rest of the multirecord area is skipped", offset);
 				return;
+			}
+			// The record checksum (header byte 4) is a zero checksum of the record data (section 16.2.6)
+			if (((data[offset + 3] + sum(data, offset + MULTIRECORD_HEADER_SIZE, length)) & 0xff) != 0) {
+				LOGGER
+						.warn(
+								"Skipping the multirecord of type 0x{} at offset {}: invalid record checksum",
+								Integer.toHexString(TypeConverter.byteToInt(data[offset])),
+								offset);
+				offset += MULTIRECORD_HEADER_SIZE + length;
+				continue;
 			}
 			try {
 				list.add(MultiRecordInfo.populateMultiRecord(data, offset));
@@ -341,11 +359,15 @@ public class ReadFruData extends IpmiCommandCoder {
 	 * @return whether the bytes of the given range add up to zero modulo 256, as every FRU header and area must
 	 */
 	private static boolean isChecksumValid(byte[] data, int offset, int length) {
+		return (sum(data, offset, length) & 0xff) == 0;
+	}
+
+	private static int sum(byte[] data, int offset, int length) {
 		int sum = 0;
 		for (int i = offset; i < offset + length; i++) {
 			sum += data[i];
 		}
-		return (sum & 0xff) == 0;
+		return sum;
 	}
 
 }
