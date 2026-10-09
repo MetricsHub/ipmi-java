@@ -8,6 +8,10 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.junit.jupiter.api.Test;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import java.net.InetAddress;
+import org.metricshub.ipmi.core.transport.SilentMessenger;
 
 class ConnectionManagerTest {
 
@@ -41,6 +45,77 @@ class ConnectionManagerTest {
 			for (int tag : tags) {
 				ConnectionManager.freeTag(tag);
 			}
+		}
+	}
+
+	@Test
+	void pingPeriodComesFromThePropertiesOnlyWhenNotGiven() throws Exception {
+		assertPingPeriod(30000, new ConnectionManager(0));
+		assertPingPeriod(30000, new ConnectionManager(0, -1));
+		assertPingPeriod(12345, new ConnectionManager(0, 12345));
+		assertPingPeriod(0, new ConnectionManager(0, 0));
+	}
+
+	private static void assertPingPeriod(long expected, ConnectionManager manager) {
+		try {
+			assertEquals(expected, manager.getPingPeriod());
+		} finally {
+			manager.close();
+		}
+	}
+
+	@Test
+	void sessionlessTagsStayReservedWhenAnotherManagerIsCreated() {
+		int reserved = ConnectionManager.generateSessionlessTag();
+		int[] others = new int[TAG_COUNT - 1];
+		try {
+			new ConnectionManager(new SilentMessenger()).close();
+			for (int i = 0; i < others.length; i++) {
+				others[i] = ConnectionManager.generateSessionlessTag();
+				assertNotEquals(reserved, others[i], "a tag reserved before the second manager was handed out again");
+			}
+		} finally {
+			ConnectionManager.freeTag(reserved);
+			for (int tag : others) {
+				ConnectionManager.freeTag(tag);
+			}
+		}
+	}
+
+	@Test
+	void everyCreateConnectionOverloadReturnsTheHandleOfTheConnection() throws Exception {
+		ConnectionManager manager = new ConnectionManager(new SilentMessenger());
+		InetAddress bmc = InetAddress.getLoopbackAddress();
+		try {
+			int[] handles = {
+					manager.createConnection(bmc, 623),
+					manager.createConnection(bmc, 623, 0),
+					manager.createConnection(bmc, 623, 0, true),
+					manager.createConnection(bmc, 623, true) };
+			for (int i = 0; i < handles.length; i++) {
+				assertEquals(i, handles[i]);
+				assertEquals(i, manager.getConnection(i).getHandle(), "the connection must carry its own handle");
+			}
+		} finally {
+			manager.close();
+		}
+	}
+
+	@Test
+	void closeConnectionReleasesTheConnectionAndKeepsTheOtherHandles() throws Exception {
+		ConnectionManager manager = new ConnectionManager(new SilentMessenger());
+		InetAddress bmc = InetAddress.getLoopbackAddress();
+		try {
+			int first = manager.createConnection(bmc, 623);
+			int second = manager.createConnection(bmc, 623);
+			manager.closeConnection(first);
+			assertThrows(IllegalStateException.class, () -> manager.getConnection(first));
+			assertEquals(second, manager.getConnection(second).getHandle());
+			assertTrue(manager.getConnection(second).isActive());
+			manager.closeConnection(first); // closing twice is harmless
+			assertEquals(2, manager.createConnection(bmc, 623), "a released handle is not reused");
+		} finally {
+			manager.close();
 		}
 	}
 }

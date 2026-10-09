@@ -24,7 +24,6 @@ package org.metricshub.ipmi.core.connection;
 
 import org.metricshub.ipmi.core.coding.PayloadCoder;
 import org.metricshub.ipmi.core.coding.commands.ResponseData;
-import org.metricshub.ipmi.core.coding.commands.session.GetChannelAuthenticationCapabilities;
 import org.metricshub.ipmi.core.coding.payload.lan.IpmiLanMessage;
 import org.metricshub.ipmi.core.coding.protocol.Ipmiv20Message;
 
@@ -70,18 +69,13 @@ public class IpmiMessageHandler extends MessageHandler {
 				return;
 			}
 
-			if (coder.getClass() == GetChannelAuthenticationCapabilities.class) {
-				getMessageQueue().remove(tag);
-			} else {
-
-				try {
-					ResponseData responseData = coder.getResponseData(message);
-					getConnection().notifyResponseListeners(getConnection().getHandle(), tag, responseData, null);
-				} catch (Exception e) {
-					getConnection().notifyResponseListeners(getConnection().getHandle(), tag, null, e);
-				}
-				getMessageQueue().remove(lanMessagePayload.getSequenceNumber());
+			try {
+				ResponseData responseData = coder.getResponseData(message);
+				getConnection().notifyResponseListeners(getConnection().getHandle(), tag, responseData, null);
+			} catch (Exception e) {
+				getConnection().notifyResponseListeners(getConnection().getHandle(), tag, null, e);
 			}
+			getMessageQueue().remove(tag);
 		}
 	}
 

@@ -94,7 +94,7 @@ port (or always pass `0`), and call `tearDown()` when you are done with it.
 | `createConnection(InetAddress address[, int port])` | Register a connection to a BMC (port 623 by default). |
 | `createConnection(InetAddress address, [int port,] CipherSuite cipherSuite, PrivilegeLevel level)` | The same, skipping the cipher suite and capabilities steps: call `openSession()` next. |
 | `closeSession(handle)` | Log out (Close Session). |
-| `closeConnection(handle)` | Forget the connection. |
+| `closeConnection(handle)` | Close and release the connection; the handle is no longer usable. |
 | `tearDown()` | Close every connection and release the local port. |
 
 ### Choosing the cipher suite

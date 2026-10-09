@@ -36,7 +36,18 @@ The `IpmiClient` API is unchanged, and the client is more tolerant of real-world
   check failed`, `IPMIException: Unauthorized name.`), where 1.2.02 sent the credentials four
   times and threw `ConnectionException: Illegal connection state: Rakp1Waiting`
   ([Troubleshooting](troubleshooting.html#the-login-fails)); only a handshake step that got no
-  reply is sent again.
+  reply is sent again;
+* the [keep-alive](configuration.html#keep-alive) is actually sent: with the default `pingPeriod`
+  (`-1`) 1.2.02 sent no keep-alive at all, so a session could expire during a long collection; the
+  keep-alive is now one message every 30 s by default, sent without waiting for its reply, and a
+  Get Channel Authentication Capabilities command sent by the application in a session gets its
+  reply (1.2.02 dropped it, as it did the keep-alive replies);
+* `IpmiConnector.closeConnection()` releases the connection: its handle then throws
+  `IllegalStateException` instead of addressing a disconnected connection, and a session that
+  fails to be established by `SerialOverLan` closes its own connection instead of tearing down the
+  whole connector;
+* the `PropertiesManager` lookups are logged at `DEBUG` instead of `INFO`, and the unused
+  `cleaningFrequency` property is gone from `connection.properties`.
 
 The decoders follow the IPMI 2.0 and FRU specifications more closely; the visible changes are:
 

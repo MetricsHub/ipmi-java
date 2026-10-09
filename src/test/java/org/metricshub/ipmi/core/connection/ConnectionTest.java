@@ -16,6 +16,22 @@ import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.Test;
 import org.metricshub.ipmi.core.api.sync.IpmiConnector;
 import org.metricshub.ipmi.core.transport.SilentMessenger;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import java.lang.reflect.Field;
+import java.util.concurrent.atomic.AtomicInteger;
+import org.metricshub.ipmi.core.coding.commands.IpmiVersion;
+import org.metricshub.ipmi.core.coding.commands.PrivilegeLevel;
+import org.metricshub.ipmi.core.coding.commands.ResponseData;
+import org.metricshub.ipmi.core.coding.commands.session.GetChannelAuthenticationCapabilities;
+import org.metricshub.ipmi.core.coding.payload.IpmiPayload;
+import org.metricshub.ipmi.core.coding.payload.lan.IpmiLanResponse;
+import org.metricshub.ipmi.core.coding.protocol.Ipmiv20Message;
+import org.metricshub.ipmi.core.coding.protocol.PayloadType;
+import org.metricshub.ipmi.core.coding.security.CipherSuite;
+import org.metricshub.ipmi.core.sm.StateMachine;
+import org.metricshub.ipmi.core.sm.actions.MessageAction;
+import org.metricshub.ipmi.core.sm.states.SessionValid;
+import org.metricshub.ipmi.core.transport.UdpMessage;
 
 class ConnectionTest {
 
@@ -101,6 +117,86 @@ class ConnectionTest {
 			}
 		} finally {
 			connector.tearDown();
+		}
+	}
+
+	/**
+	 * Puts the connection in the session-open state without a handshake (there is no BMC behind the messenger).
+	 */
+	private static void openSession(Connection connection) throws Exception {
+		Field field = Connection.class.getDeclaredField("stateMachine");
+		field.setAccessible(true);
+		((StateMachine) field.get(connection)).setCurrent(new SessionValid(CipherSuite.getEmpty(), 1));
+	}
+
+	@Test
+	void keepAliveSendsOneMessageAndReturnsAtOnce() throws Exception {
+		AtomicInteger sent = new AtomicInteger();
+		Connection connection = new Connection(new SilentMessenger() {
+			@Override
+			public void send(UdpMessage message) {
+				sent.incrementAndGet();
+			}
+		}, 0);
+		connection.connect(InetAddress.getLoopbackAddress(), 623, 0);
+		try {
+			openSession(connection);
+			long start = System.nanoTime();
+			connection.run();
+			long elapsed = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - start);
+			assertEquals(1, sent.get());
+			assertTrue(elapsed < 500, "the keep-alive must not sleep, took " + elapsed + " ms");
+
+			connection.disconnect();
+			assertFalse(connection.isSessionValid(), "a disconnected connection has no session");
+			connection.run();
+			assertEquals(1, sent.get(), "a disconnected connection sends no keep-alive");
+		} finally {
+			connection.disconnect();
+		}
+	}
+
+	@Test
+	void aGetChannelAuthenticationCapabilitiesReplyReachesTheListeners() throws Exception {
+		Connection connection = connect(TIMEOUT_MS);
+		try {
+			openSession(connection);
+			AtomicInteger notifiedTag = new AtomicInteger(-1);
+			AtomicReference<Object> outcome = new AtomicReference<>();
+			connection.registerListener(new ConnectionListener() {
+				@Override
+				public void processResponse(ResponseData responseData, int handle, int tag, Exception exception) {
+					notifiedTag.set(tag);
+					outcome.set(responseData != null ? responseData : exception);
+				}
+
+				@Override
+				public void processRequest(IpmiPayload payload) {
+					// not expected
+				}
+			});
+			GetChannelAuthenticationCapabilities request = new GetChannelAuthenticationCapabilities(
+					IpmiVersion.V20,
+					IpmiVersion.V20,
+					CipherSuite.getEmpty(),
+					PrivilegeLevel.Callback,
+					(byte) 0xe);
+			int tag = connection.sendMessage(request, false);
+			assertTrue(tag > 0, "the request must be queued");
+
+			// A minimal response carrying the tag of the request (rqSeq, bits 7:2 of byte 4)
+			byte[] raw = { 0x20, 0x18, 0, (byte) 0x81, (byte) (tag << 2), 0x38, 0, 0 };
+			raw[2] = (byte) -(raw[0] + raw[1]);
+			raw[7] = (byte) -(raw[3] + raw[4] + raw[5] + raw[6]);
+			Ipmiv20Message reply = new Ipmiv20Message(null);
+			reply.setPayloadType(PayloadType.Ipmi);
+			reply.setPayload(new IpmiLanResponse(raw));
+			connection.notify(new MessageAction(reply));
+
+			assertEquals(tag, notifiedTag.get(), "the reply must be delivered to the listeners");
+			assertNotNull(outcome.get());
+		} finally {
+			connection.disconnect();
 		}
 	}
 }

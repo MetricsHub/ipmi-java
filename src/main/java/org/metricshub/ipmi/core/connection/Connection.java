@@ -26,6 +26,7 @@ import org.metricshub.ipmi.core.coding.PayloadCoder;
 import org.metricshub.ipmi.core.coding.commands.IpmiVersion;
 import org.metricshub.ipmi.core.coding.commands.PrivilegeLevel;
 import org.metricshub.ipmi.core.coding.commands.ResponseData;
+import org.metricshub.ipmi.core.coding.commands.session.GetChannelAuthenticationCapabilities;
 import org.metricshub.ipmi.core.coding.commands.session.GetChannelAuthenticationCapabilitiesResponseData;
 import org.metricshub.ipmi.core.coding.commands.session.GetChannelCipherSuitesResponseData;
 import org.metricshub.ipmi.core.coding.commands.session.OpenSessionResponseData;
@@ -61,6 +62,7 @@ import org.metricshub.ipmi.core.sm.events.Timeout;
 import org.metricshub.ipmi.core.sm.states.Authcap;
 import org.metricshub.ipmi.core.sm.states.Ciphers;
 import org.metricshub.ipmi.core.sm.states.SessionValid;
+import org.metricshub.ipmi.core.sm.states.State;
 import org.metricshub.ipmi.core.sm.states.Uninitialized;
 import org.metricshub.ipmi.core.transport.Messenger;
 
@@ -666,31 +668,27 @@ public class Connection extends TimerTask implements MachineObserver {
 	}
 
 	/**
-	 * {@link TimerTask} runner - periodically sends no-op messages to keep the
-	 * session up
+	 * {@link TimerTask} runner - periodically sends a no-op message to keep the session up. The message is sent
+	 * one-way: its reply is not awaited, so it is neither queued nor retried, and a reply to the same command sent by
+	 * the application is delivered to the application.
 	 */
 	@Override
 	public void run() {
-		int result = -1;
-		while (!Thread.currentThread().isInterrupted()
-				&& result <= 0
-				&& stateMachine.getCurrent() instanceof SessionValid) {
-			try {
-
-				result = sendMessage(
-						new org.metricshub.ipmi.core.coding.commands.session.GetChannelAuthenticationCapabilities(
-								IpmiVersion.V20,
-								IpmiVersion.V20,
-								((SessionValid) stateMachine.getCurrent()).getCipherSuite(),
-								PrivilegeLevel.Callback,
-								TypeConverter.intToByte(0xe)),
-						false);
-
-				Thread.sleep(1000);
-
-			} catch (Exception e) {
-				LOGGER.error(e.getMessage(), e);
-			}
+		State current = stateMachine.getCurrent();
+		if (!stateMachine.isActive() || !(current instanceof SessionValid)) {
+			return;
+		}
+		try {
+			sendMessage(
+					new GetChannelAuthenticationCapabilities(
+							IpmiVersion.V20,
+							IpmiVersion.V20,
+							((SessionValid) current).getCipherSuite(),
+							PrivilegeLevel.Callback,
+							TypeConverter.intToByte(0xe)),
+					true);
+		} catch (Exception e) {
+			LOGGER.error("Keep-alive failed: " + e.getMessage(), e);
 		}
 	}
 

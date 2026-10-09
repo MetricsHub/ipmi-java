@@ -32,7 +32,5 @@ public final class Constants {
 	 */
 	public static final int IPMI_PORT = 0x26F;
 
-	public static final int TIMEOUT = 500;
-
 	private Constants() {}
 }

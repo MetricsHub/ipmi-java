@@ -54,7 +54,7 @@ public class MessageQueue extends TimerTask {
 	/**
 	 * Frequency of checking messages for timeouts in ms.
 	 */
-	private static int cleaningFrequency = 500;
+	private static final int CLEANING_FREQUENCY = 500;
 
 	/**
 	 * Size of the queue determined by IPMI sliding window algorithm
@@ -80,7 +80,7 @@ public class MessageQueue extends TimerTask {
 		queue = new ArrayList<QueueElement>();
 		setTimeout(timeout);
 		timer = new Timer(true);
-		timer.schedule(this, cleaningFrequency, cleaningFrequency);
+		timer.schedule(this, CLEANING_FREQUENCY, CLEANING_FREQUENCY);
 	}
 
 	private int incrementSequenceNumber(int currentSequenceNumber) {

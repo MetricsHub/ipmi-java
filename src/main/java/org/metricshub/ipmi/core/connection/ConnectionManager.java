@@ -44,7 +44,7 @@ public class ConnectionManager {
 
 	private static final Object SESSIONLESS_TAG_LOCK = new Object();
 	private static int sessionlessTag;
-	private static List<Integer> reservedTags = new ArrayList<Integer>();
+	private static final List<Integer> RESERVED_TAGS = new ArrayList<Integer>();
 
 	/**
 	 * Frequency of the no-op commands that will be sent to keep up the session
@@ -60,8 +60,10 @@ public class ConnectionManager {
 	 * @throws IOException If UdpMessenger encountered an error
 	 */
 	public ConnectionManager(int port, long pingPeriod) throws IOException {
-		this(port);
+		messenger = new UdpMessenger(port);
+		// Set before initialize(), which resolves -1 to the connection.properties period
 		this.pingPeriod = pingPeriod;
+		initialize();
 	}
 
 	/**
@@ -103,10 +105,18 @@ public class ConnectionManager {
 
 	private void initialize() {
 		connections = new ArrayList<Connection>();
-		reservedTags = new ArrayList<Integer>();
 		if (pingPeriod == -1) {
 			pingPeriod = Long.parseLong(PropertiesManager.getInstance().getProperty("pingPeriod"));
 		}
+	}
+
+	/**
+	 * Returns the keep-alive period of the connections created without an explicit one.
+	 *
+	 * @return the period in ms between two keep-alive messages, 0 or negative when the sessions are not kept alive
+	 */
+	public long getPingPeriod() {
+		return pingPeriod;
 	}
 
 	/**
@@ -135,8 +145,8 @@ public class ConnectionManager {
 			boolean interrupted = false;
 			while (wait) {
 				sessionlessTag = (sessionlessTag + 1) % 60;
-				synchronized (reservedTags) {
-					if (!reservedTags.contains(sessionlessTag)) {
+				synchronized (RESERVED_TAGS) {
+					if (!RESERVED_TAGS.contains(sessionlessTag)) {
 						wait = false;
 					}
 				}
@@ -148,8 +158,8 @@ public class ConnectionManager {
 					}
 				}
 			}
-			synchronized (reservedTags) {
-				reservedTags.add(sessionlessTag);
+			synchronized (RESERVED_TAGS) {
+				RESERVED_TAGS.add(sessionlessTag);
 			}
 			if (interrupted) {
 				Thread.currentThread().interrupt();
@@ -165,8 +175,8 @@ public class ConnectionManager {
 	 *        - tag to free
 	 */
 	public static void freeTag(int tag) {
-		synchronized (reservedTags) {
-			reservedTags.remove((Integer) tag);
+		synchronized (RESERVED_TAGS) {
+			RESERVED_TAGS.remove((Integer) tag);
 		}
 	}
 
@@ -177,14 +187,28 @@ public class ConnectionManager {
 	 *        - index of the connection to return
 	 */
 	public Connection getConnection(int index) {
-		return connections.get(index);
+		Connection connection;
+		synchronized (connections) {
+			connection = connections.get(index);
+		}
+		if (connection == null) {
+			throw new IllegalStateException("Connection " + index + " is closed");
+		}
+		return connection;
 	}
 
 	/**
-	 * Closes the connection with the given index.
+	 * Closes the connection with the given index and releases it; the index is not reused. Closing an already
+	 * closed connection does nothing.
 	 */
 	public void closeConnection(int index) {
-		connections.get(index).disconnect();
+		Connection connection;
+		synchronized (connections) {
+			connection = connections.set(index, null);
+		}
+		if (connection != null) {
+			connection.disconnect();
+		}
 	}
 
 	/**
@@ -200,7 +224,7 @@ public class ConnectionManager {
 			for (Connection connection : connections) {
 				if (connection != null
 						&& connection.isActive()
-						&& connection.getRemoteMachineAddress() == address
+						&& connection.getRemoteMachineAddress().equals(address)
 						&& connection.getRemoteMachinePort() == port) {
 					return connection;
 				}
@@ -225,10 +249,14 @@ public class ConnectionManager {
 	 */
 	public int createConnection(InetAddress address, int port, int connectionPingPeriod, boolean skipCiphers)
 			throws IOException {
-		Connection connection = new Connection(messenger, 0);
-		connection.connect(address, port, connectionPingPeriod, skipCiphers);
+		return connect(address, port, connectionPingPeriod, skipCiphers);
+	}
 
+	private int connect(InetAddress address, int port, long connectionPingPeriod, boolean skipCiphers)
+			throws IOException {
 		synchronized (connections) {
+			Connection connection = new Connection(messenger, connections.size());
+			connection.connect(address, port, connectionPingPeriod, skipCiphers);
 			connections.add(connection);
 			return connections.size() - 1;
 		}
@@ -247,13 +275,7 @@ public class ConnectionManager {
 	 *         - when properties file was not found
 	 */
 	public int createConnection(InetAddress address, int port, int connectionPingPeriod) throws IOException {
-		Connection connection = new Connection(messenger, 0);
-		connection.connect(address, port, connectionPingPeriod);
-
-		synchronized (connections) {
-			connections.add(connection);
-			return connections.size() - 1;
-		}
+		return connect(address, port, connectionPingPeriod, false);
 	}
 
 	/**
@@ -267,15 +289,7 @@ public class ConnectionManager {
 	 *         when properties file was not found
 	 */
 	public int createConnection(InetAddress address, int port) throws IOException {
-
-		synchronized (connections) {
-			Connection connection = new Connection(
-					messenger,
-					connections.size());
-			connection.connect(address, port, pingPeriod);
-			connections.add(connection);
-			return connections.size() - 1;
-		}
+		return connect(address, port, pingPeriod, false);
 	}
 
 	/**
@@ -291,12 +305,7 @@ public class ConnectionManager {
 	 *         when properties file was not found
 	 */
 	public int createConnection(InetAddress address, int port, boolean skipCiphers) throws IOException {
-		synchronized (connections) {
-			Connection connection = new Connection(messenger, connections.size());
-			connection.connect(address, port, pingPeriod, skipCiphers);
-			connections.add(connection);
-			return connections.size() - 1;
-		}
+		return connect(address, port, pingPeriod, skipCiphers);
 	}
 
 	/**
