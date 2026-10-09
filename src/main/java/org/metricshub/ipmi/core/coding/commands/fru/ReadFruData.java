@@ -89,9 +89,9 @@ public class ReadFruData extends IpmiCommandCoder {
 	 *        - {@link BaseUnit} indicating if the FRU device is accessed in
 	 *        {@link BaseUnit#Bytes} or {@link BaseUnit#Words}
 	 * @param offset
-	 *        - offset to read in units specified by unit
+	 *        - offset to read, in bytes (sent in words when the device is word-addressed, so it must be even then)
 	 * @param countToRead
-	 *        - size of the area to read in unit. Cannot exceed 255;
+	 *        - number of bytes to read. Cannot exceed 255;
 	 */
 	public ReadFruData(int fruId, BaseUnit unit, int offset, int countToRead) {
 		super();
@@ -105,13 +105,10 @@ public class ReadFruData extends IpmiCommandCoder {
 			throw new IllegalArgumentException("FRU ID cannot exceed 255");
 		}
 
-		this.offset = offset * unit.getSize();
-
-		size = countToRead * unit.getSize();
-
+		// Table 34-3: the offset goes on the wire in the unit of the device, the count in bytes (as ipmitool sends it)
+		this.offset = offset / unit.getSize();
+		size = countToRead;
 		this.fruId = fruId;
-		// TODO: Check if Count To Read field is encoded in words if the FRU is
-		// addressed in words (requires different server settings).
 	}
 
 	/**
@@ -132,9 +129,9 @@ public class ReadFruData extends IpmiCommandCoder {
 	 *        - {@link BaseUnit} indicating if the FRU device is accessed in
 	 *        {@link BaseUnit#Bytes} or {@link BaseUnit#Words}
 	 * @param offset
-	 *        - offset to read in units specified by unit
+	 *        - offset to read, in bytes (sent in words when the device is word-addressed, so it must be even then)
 	 * @param countToRead
-	 *        - size of the area to read in unit. Cannot exceed 255;
+	 *        - number of bytes to read. Cannot exceed 255;
 	 */
 	public ReadFruData(IpmiVersion version, CipherSuite cipherSuite,
 			AuthenticationType authenticationType, int fruId, BaseUnit unit,
@@ -150,13 +147,10 @@ public class ReadFruData extends IpmiCommandCoder {
 			throw new IllegalArgumentException("FRU ID cannot exceed 255");
 		}
 
-		this.offset = offset * unit.getSize();
-
-		size = countToRead * unit.getSize();
-
+		// Table 34-3: the offset goes on the wire in the unit of the device, the count in bytes (as ipmitool sends it)
+		this.offset = offset / unit.getSize();
+		size = countToRead;
 		this.fruId = fruId;
-		// TODO: Check if Count To Read field is encoded in words if the FRU is
-		// addressed in words (requires different server settings).
 	}
 
 	@Override

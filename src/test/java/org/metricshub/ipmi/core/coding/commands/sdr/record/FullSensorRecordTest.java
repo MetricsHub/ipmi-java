@@ -90,6 +90,7 @@ class FullSensorRecordTest {
 		FullSensorRecord record = (FullSensorRecord) SensorRecord.populateSensorRecord(NO_THRESHOLDS_NO_READING);
 
 		assertFalse(record.hasAnalogReading());
+		assertTrue(Double.isNaN(record.calcFormula(7)), "the reading byte of such a record is not a value");
 		assertTrue(Double.isNaN(record.getUpperNonRecoverableThreshold()));
 		assertTrue(Double.isNaN(record.getUpperCriticalThreshold()));
 		assertTrue(Double.isNaN(record.getUpperNonCriticalThreshold()));

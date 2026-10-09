@@ -367,9 +367,8 @@ public class FullSensorRecord extends AbstractSensorRecord {
 		case 2: // 2's complement
 			base = TypeConverter.decode2sComplement(value, length - 1);
 			break;
-		case 3: // no analog reading
-			base = value;
-			break;
+		case 3: // no analog reading: the byte is not a value to convert
+			return Double.NaN;
 		default:
 			throw new IllegalArgumentException(
 					"Invalid data format in sensorUnits1");

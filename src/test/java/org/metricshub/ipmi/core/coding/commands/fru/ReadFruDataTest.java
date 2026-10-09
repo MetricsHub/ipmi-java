@@ -192,6 +192,16 @@ class ReadFruDataTest {
 	}
 
 	@Test
+	void wordAddressedDeviceGetsItsOffsetInWordsAndItsCountInBytes() throws Exception {
+		// Table 34-3: FRU ID, offset (LS byte first) in the unit of the device, count in bytes
+		ReadFruData bytes = new ReadFruData(3, BaseUnit.Bytes, 32, 16);
+		assertArrayEquals(bytes(3, 32, 0, 16), bytes.preparePayload(1).getData());
+
+		ReadFruData words = new ReadFruData(3, BaseUnit.Words, 32, 16);
+		assertArrayEquals(bytes(3, 16, 0, 16), words.preparePayload(1).getData());
+	}
+
+	@Test
 	void baseCompatibilityMasksAreReadAtTheRecordOffset() {
 		byte[] junk = new byte[10];
 		// manufacturer ID, entity ID 7 (system board), compatibility base, code start, 3 mask bytes
