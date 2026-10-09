@@ -26,6 +26,7 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 import org.metricshub.ipmi.client.IpmiClientConfiguration;
@@ -185,20 +186,29 @@ public class GetFrusRunner extends AbstractIpmiRunner<List<Fru>> {
 	 * @return the name of the system board from its board, product or chassis area, whichever exists
 	 */
 	static String systemBoardName(final List<FruRecord> fruRecords) {
-		for (FruRecord record : fruRecords) {
-			String name = null;
-			if (record instanceof BoardInfo) {
-				name = ((BoardInfo) record).getBoardProductName();
-			} else if (record instanceof ProductInfo) {
-				name = ((ProductInfo) record).getProductName();
-			} else if (record instanceof ChassisInfo) {
-				name = ((ChassisInfo) record).getChassisPartNumber();
-			}
-			if (Utils.isNotBlank(name)) {
-				return name;
-			}
+		// In priority order, whatever the order of the areas in the FRU: board, then product, then chassis
+		String name = firstName(fruRecords, BoardInfo.class, BoardInfo::getBoardProductName);
+		if (name == null) {
+			name = firstName(fruRecords, ProductInfo.class, ProductInfo::getProductName);
 		}
-		return SYSTEM_BOARD_NAME;
+		if (name == null) {
+			name = firstName(fruRecords, ChassisInfo.class, ChassisInfo::getChassisPartNumber);
+		}
+		return name == null ? SYSTEM_BOARD_NAME : name;
+	}
+
+	private static <T extends FruRecord> String firstName(
+			final List<FruRecord> fruRecords,
+			final Class<T> type,
+			final Function<T, String> getter) {
+		return fruRecords
+				.stream()
+				.filter(type::isInstance)
+				.map(type::cast)
+				.map(getter)
+				.filter(Utils::isNotBlank)
+				.findFirst()
+				.orElse(null);
 	}
 
 	/**
