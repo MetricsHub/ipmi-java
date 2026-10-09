@@ -100,8 +100,9 @@ Common causes wrapped in the `ExecutionException`:
 | `IPMIException: Unauthorized name.`, `Invalid role.`, ... | The BMC refused the session: unknown user, user not allowed over the LAN channel or at the User level, cipher suite refused ([Troubleshooting](troubleshooting.html#the-login-fails)). |
 | `ConnectionException: Command timed out` / `Message timed out` | No reply after all the [tries](#per-message-timeout-and-retries) of a message: `Command timed out` during the session handshake, the usual symptom of a wrong host, a closed UDP port or IPMI over LAN disabled; `Message timed out` in the session. |
 | `IPMIException` | The BMC answered with an error completion code. `getCompletionCode()` returns it, for example `InsufficentPrivilege` (sic, `0xD4`). |
-| `IllegalArgumentException: ... is not yet implemented.` | The chosen cipher suite uses an algorithm the client does not implement (xRC4, MD5-128). See [cipher suites](preparing-the-bmc.html#cipher-suites). |
-| `Exception: Cannot get the available cipher suites.` | The BMC returned an empty cipher suite list. |
+| `ConnectionException: The BMC offers none of the cipher suites 17, 3, 8, 16, 2 and 7 (offered: ...)` | The BMC offers no suite with integrity that the client implements. See [how the suite is chosen](preparing-the-bmc.html#how-ipmiclient-chooses-the-suite). |
+| `IllegalArgumentException: Open Session Response does not match the request` (or `RAKP Message 2`, `RAKP Message 4`) | A handshake reply of the BMC is for another session, or confirms other algorithms than the requested ones. It is not sent again. |
+| `IllegalArgumentException: Password is too long. ...` (or `Username is too long. ...`, `BMC key is too long. ...`) | The password or the BMC key is longer than the 20 bytes a BMC stores, or the user name longer than 16 bytes: the BMC cannot have it. Nothing is sent to the BMC. |
 | `UnknownHostException` | The host name cannot be resolved. |
 
 [Troubleshooting](troubleshooting.html) maps these symptoms to their usual fixes.
@@ -116,7 +117,11 @@ Some problems are logged at the `WARN` level and the call goes on with what it c
 * a **FRU** that cannot be read (for example a FRU device that is not present) is reported
   truncated or not at all ([FRU Inventory](fru-inventory.html#how-the-frus-are-read));
 * a **sensor** whose reading is not available (completion code `DataNotPresent`, not logged) or
-  refused with another completion code is returned without reading data.
+  refused with another completion code is returned without reading data;
+* a **reply** that fails the integrity check of the session (`WARN Dropped a message of session
+  <id>: Integrity check failed`), that is not signed in a session with integrity, or that cannot be
+  decoded, is discarded as the IPMI specification requires, and the request is sent again when it
+  times out; a reply received twice (a duplicate or a replay) is discarded without a log.
 
 Values a record may carry but the library does not model (an OEM or chassis-specific entity ID, a
 reserved device or sensor type, a state the reading type does not define) are logged at the

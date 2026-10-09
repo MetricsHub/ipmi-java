@@ -80,6 +80,14 @@ The four steps before the first command are mandatory and must come in this orde
 `tearDown()` only releases the local resources and does not log out, so a session left open
 holds one of the BMC's few session slots until the BMC expires it.
 
+`openSession()` takes the password as a `String`, sent in UTF-8, or as a `byte[]`, sent as is
+(a literal `null` password needs a cast to choose between the two). The connection keeps its own
+copy of the password, to open a [Serial over LAN](serial-over-lan.html) session, so you can clear
+your array once the session is open. The BMC stores at most 20 bytes of password and of BMC key,
+and 16 of user name: a longer one fails with `IllegalArgumentException` before anything is sent.
+The handshake checks that each reply of the BMC is for this session and confirms the requested
+algorithms; otherwise it fails with `IllegalArgumentException: ... does not match the request`.
+
 ## Connections and connectors
 
 An `IpmiConnector` owns one local UDP port and the threads that send and receive on it. It can
@@ -106,10 +114,13 @@ being delivered to the listeners, and its timeout is not reported.
 
 ### Choosing the cipher suite
 
-`getAvailableCipherSuites()` returns the suites the BMC offers, in the BMC's order, including
-suites the library does not implement. Choose one it implements: **3** or **17** in practice (see
-the [table](preparing-the-bmc.html#cipher-suites)); a suite with an xRC4 or MD5-128 algorithm
-fails when the session is opened. To skip the discovery when you already know the
+`getAvailableCipherSuites()` returns the standard suites the BMC offers, in the BMC's order, with
+the algorithms of the [table](preparing-the-bmc.html#cipher-suites) (the OEM suites are left
+out), including suites the library does not implement. Choose one it implements, with integrity:
+**3** or **17** in practice; `CipherSuite.isSupported()` tells whether the library implements the
+algorithms of a suite, and a suite with an xRC4 or MD5-128 algorithm fails when the session is
+opened. Do not fall back to a suite without integrity (0, 1, 6, 15) just because the BMC lists
+nothing else: the list is not authenticated. To skip the discovery when you already know the
 suite, build it and pass it to `createConnection()`:
 
 ```java

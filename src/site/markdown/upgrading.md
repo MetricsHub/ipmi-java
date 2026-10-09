@@ -1,4 +1,4 @@
-keywords: upgrade, migration, release notes, breaking changes, protected fields, accessors, abstractsensorrecord, validateresponse, utf-8, bmc key, org.sentrysoftware
+keywords: upgrade, migration, release notes, breaking changes, protected fields, accessors, abstractsensorrecord, validateresponse, utf-8, bmc key, cipher suite, integrity, org.sentrysoftware
 description: What changes when upgrading the IPMI Java Client — from 1.2.02, from 1.2.01, and from the org.sentrysoftware:ipmi artifact of 1.2.00 and earlier.
 
 # Upgrading
@@ -68,6 +68,43 @@ The `IpmiClient` API is unchanged, and the client is more tolerant of real-world
   machine serializes transitions and received messages, the HMAC and AES objects of a cipher suite
   are used by one thread at a time, and the listener lists can be changed while they are being
   notified (a listener may unregister itself from its own callback).
+
+The RMCP+ sessions follow the security rules of the IPMI 2.0 specification:
+
+* `IpmiClient` chooses the cipher suite by its ID: the first of 17, 3, 8, 16, 2 and 7 that the BMC
+  offers ([How `IpmiClient` chooses the suite](preparing-the-bmc.html#how-ipmiclient-chooses-the-suite)),
+  where 1.2.02 took the 4th suite of the BMC's list (or the 3rd, 2nd, 1st): suite 4 (xRC4) on a
+  Lenovo XCC, which the client does not implement; a BMC that offers none of the six, only suites
+  without integrity, fails with `ConnectionException: The BMC offers none of the cipher suites
+  ...` instead of opening a session whose replies could be forged;
+* `getAvailableCipherSuites()` gives the standard suites the algorithms of the specification,
+  whatever the BMC's records say, leaves out the OEM suites (1.2.02 listed those of a Cisco IMC as
+  suites -128 and -79) and skips malformed records instead of throwing; the new
+  `CipherSuite.isSupported()` tells the suites the library implements;
+* a reply that fails the integrity check of the session is discarded, where 1.2.02 logged
+  `Integrity check failed` and accepted it, and so is a reply that is not signed in a session with
+  integrity (1.2.02 accepted a forged reply in clear text); the integrity is checked before
+  decrypting, the pad of AES-CBC-128 is checked, a reply received twice is discarded, and the
+  sequence-number window no longer locks the session out after 16 lost replies;
+* the handshake fails with `IllegalArgumentException: ... does not match the request` when a reply of
+  the BMC is for another session or confirms other algorithms than the requested ones, and the RAKP
+  Message 4 of RAKP-HMAC-MD5 (suites 6 to 8) is checked on its 16 bytes instead of 12;
+* the console random number of the handshake comes from a `SecureRandom` (1.2.02 used a
+  `java.util.Random` seeded with the time), and the console session IDs start at a random value
+  instead of 100 (they still go up by one per session), and every new session numbers its messages
+  from 1 again, where 1.2.02 dropped the replies of a session reopened on the same connection
+  after more than 17 messages;
+* a password or a BMC key longer than 20 bytes fails with `IllegalArgumentException` before
+  anything is sent (1.2.02 failed the handshake as for a wrong password), an empty password is valid, a BMC key of zeros only is
+  treated as no key, and the `char[]` password of `IpmiClientConfiguration` is no longer copied into
+  a `String`;
+* a truncated or malformed datagram is dropped instead of throwing an
+  `ArrayIndexOutOfBoundsException` in the receiving thread;
+* a request carries the LUN of the client (0) in its rqSeq/rqLUN byte, where 1.2.02 put the LUN of
+  the target there;
+* `GetChannelAuthenticationCapabilitiesResponseData.isIpmiv20Support()` reads the "IPMI v2.0
+  connections" bit of the extended capabilities, where 1.2.02 returned the bit that says the
+  extended capabilities are present.
 
 The decoders follow the IPMI 2.0 and FRU specifications more closely; the visible changes are:
 
@@ -146,7 +183,7 @@ with the new `protected` accessors:
 | `AbstractIpmiRunner` | `nextRecId` | `getNextRecId()`, `setNextRecId(int)` |
 | `MessageHandler` | `messageQueue` | `getMessageQueue()` |
 | `MessageHandler` | `connection` | `getConnection()` |
-| `MessageHandler` | `lastReceivedSequenceNumber` | `getLastReceivedSequenceNumber()`, `setLastReceivedSequenceNumber(int)` |
+| `MessageHandler` | `lastReceivedSequenceNumber` | None: the sequence-number window is private |
 | `IpmiLanMessage` | `networkFunction` | `getNetworkFunctionCode()`, `setNetworkFunctionCode(byte)` |
 | `ConfidentialityAlgorithm` | `sik` | `getSik()` |
 | `IntegrityAlgorithm` | `sik` | `getSik()`, `setSik(byte[])` |
@@ -163,6 +200,12 @@ subclassed anyway).
 | `IntegrityAlgorithm`, `ConfidentialityAesCbc128` | The `protected` constants `CONST1` and `CONST2` are now `private` |
 | `UdpMessenger` | `getSentPackets()`, a debug counter, is removed |
 | `ProtocolDecoder` | `decodePayload(...)` throws `IllegalArgumentException` on an empty payload instead of a `NullPointerException` |
+| `Protocolv20Decoder` | `decode()` throws `IllegalArgumentException` for a message that fails the integrity check, is not signed in a session with integrity, or is truncated |
+| `IpmiConnector`, `IpmiAsyncConnector` | New `openSession(ConnectionHandle, String username, byte[] password, byte[] bmcKey)`; a call with a literal `null` password now needs a cast: `(String) null` |
+| `ConnectionHandle` | The password is kept as bytes: new `getPasswordBytes()` and `setPasswordBytes(byte[])`, which keeps a copy |
+| `SessionManager` | New `establishSession(...)` overload with the password as a `byte[]` |
+| `Rakp1` | The constructor takes the password as a `byte[]` of at most 20 bytes; `getPassword()` is removed; the new `checkCredentials(String, byte[], byte[])` checks the lengths, and the user name message now reads `Username is too long. Its length cannot exceed 16 bytes` |
+| `OpenSessionAck`, `Connection.startSession()`, `ConnectionManager.startSession()` | The password is a `byte[]` |
 
 ### Sensor records
 
