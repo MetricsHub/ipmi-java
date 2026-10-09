@@ -45,6 +45,22 @@ public class IpmiMessageHandler extends MessageHandler {
 	}
 
 	/**
+	 * Tells whether the reply answers the request: the same command code, under the response network function of
+	 * the request (the request one plus one, IPMI 2.0 section 5.1). A reply whose network function the library does
+	 * not know answers nothing.
+	 */
+	private static boolean answers(IpmiCommandCoder request, IpmiLanMessage reply) {
+		if (request.getCommandCode() != reply.getCommand()) {
+			return false;
+		}
+		try {
+			return request.getNetworkFunction().getCode() + 1 == reply.getNetworkFunction().getCode();
+		} catch (IllegalArgumentException e) {
+			return false;
+		}
+	}
+
+	/**
 	 * If message is of type {@link IpmiLanMessage}, finds corresponding request message and extracts response data from
 	 * it,
 	 * using data carried in this message.
@@ -78,12 +94,11 @@ public class IpmiMessageHandler extends MessageHandler {
 
 			// A late reply to a one-way message, whose tag is not reserved, may carry the tag of a newer queued
 			// request: the reply of a request answers the command of that request, and the request stays queued
-			if (coder instanceof IpmiCommandCoder
-					&& ((IpmiCommandCoder) coder).getCommandCode() != lanMessagePayload.getCommand()) {
+			if (coder instanceof IpmiCommandCoder && !answers((IpmiCommandCoder) coder, lanMessagePayload)) {
 				LOGGER
 						.debug(
-								"Message tagged with " + tag + " answers command " + lanMessagePayload.getCommand()
-										+ ", not the queued request. Dropping stale message.");
+								"Message tagged with " + tag + " answers another command than the queued request."
+										+ " Dropping stale message.");
 				return;
 			}
 
