@@ -34,17 +34,22 @@ import java.io.IOException;
 import java.net.InetAddress;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.CopyOnWriteArrayList;
 
 /**
  * Manages multiple {@link Connection}s
  */
 public class ConnectionManager {
 	private Messenger messenger;
+	// Copy-on-write: looked up without a lock by the receiving thread, which holds a state machine lock, while
+	// connect() takes a state machine lock under the list lock
 	private List<Connection> connections;
+	private final Object connectionsLock = new Object();
+	private volatile boolean closed;
 
 	private static final Object SESSIONLESS_TAG_LOCK = new Object();
 	private static int sessionlessTag;
-	private static List<Integer> reservedTags = new ArrayList<Integer>();
+	private static final List<Integer> RESERVED_TAGS = new ArrayList<Integer>();
 
 	/**
 	 * Frequency of the no-op commands that will be sent to keep up the session
@@ -60,8 +65,10 @@ public class ConnectionManager {
 	 * @throws IOException If UdpMessenger encountered an error
 	 */
 	public ConnectionManager(int port, long pingPeriod) throws IOException {
-		this(port);
+		messenger = new UdpMessenger(port);
+		// Set before initialize(), which resolves -1 to the connection.properties period
 		this.pingPeriod = pingPeriod;
+		initialize();
 	}
 
 	/**
@@ -102,22 +109,33 @@ public class ConnectionManager {
 	}
 
 	private void initialize() {
-		connections = new ArrayList<Connection>();
-		reservedTags = new ArrayList<Integer>();
+		connections = new CopyOnWriteArrayList<Connection>();
 		if (pingPeriod == -1) {
 			pingPeriod = Long.parseLong(PropertiesManager.getInstance().getProperty("pingPeriod"));
 		}
 	}
 
 	/**
+	 * Returns the keep-alive period of the connections created without an explicit one.
+	 *
+	 * @return the period in ms between two keep-alive messages, 0 or negative when the sessions are not kept alive
+	 */
+	long getPingPeriod() {
+		return pingPeriod;
+	}
+
+	/**
 	 * Closes all open connections and disconnects {@link UdpListener}.
 	 */
 	public void close() {
-		synchronized (connections) {
-			for (Connection connection : connections) {
-				if (connection != null && connection.isActive()) {
-					connection.disconnect();
-				}
+		synchronized (connectionsLock) {
+			closed = true;
+		}
+		// Outside the lock: disconnect() unregisters from the messenger, whose receiving thread holds its own lock
+		// while it notifies the application, which may create or close connections
+		for (Connection connection : connections) {
+			if (connection != null && connection.isActive()) {
+				connection.disconnect();
 			}
 		}
 		messenger.closeConnection();
@@ -135,8 +153,8 @@ public class ConnectionManager {
 			boolean interrupted = false;
 			while (wait) {
 				sessionlessTag = (sessionlessTag + 1) % 60;
-				synchronized (reservedTags) {
-					if (!reservedTags.contains(sessionlessTag)) {
+				synchronized (RESERVED_TAGS) {
+					if (!RESERVED_TAGS.contains(sessionlessTag)) {
 						wait = false;
 					}
 				}
@@ -148,8 +166,8 @@ public class ConnectionManager {
 					}
 				}
 			}
-			synchronized (reservedTags) {
-				reservedTags.add(sessionlessTag);
+			synchronized (RESERVED_TAGS) {
+				RESERVED_TAGS.add(sessionlessTag);
 			}
 			if (interrupted) {
 				Thread.currentThread().interrupt();
@@ -165,8 +183,8 @@ public class ConnectionManager {
 	 *        - tag to free
 	 */
 	public static void freeTag(int tag) {
-		synchronized (reservedTags) {
-			reservedTags.remove((Integer) tag);
+		synchronized (RESERVED_TAGS) {
+			RESERVED_TAGS.remove((Integer) tag);
 		}
 	}
 
@@ -177,14 +195,22 @@ public class ConnectionManager {
 	 *        - index of the connection to return
 	 */
 	public Connection getConnection(int index) {
-		return connections.get(index);
+		Connection connection = connections.get(index);
+		if (connection == null) {
+			throw new IllegalStateException("Connection " + index + " is closed");
+		}
+		return connection;
 	}
 
 	/**
-	 * Closes the connection with the given index.
+	 * Closes the connection with the given index and releases it; the index is not reused. Closing an already
+	 * closed connection does nothing.
 	 */
 	public void closeConnection(int index) {
-		connections.get(index).disconnect();
+		Connection connection = connections.set(index, null);
+		if (connection != null) {
+			connection.disconnect();
+		}
 	}
 
 	/**
@@ -196,14 +222,12 @@ public class ConnectionManager {
 	 * @return First {@link Connection} to the address or null if none found
 	 */
 	public Connection getConnection(InetAddress address, int port) {
-		synchronized (connections) {
-			for (Connection connection : connections) {
-				if (connection != null
-						&& connection.isActive()
-						&& connection.getRemoteMachineAddress() == address
-						&& connection.getRemoteMachinePort() == port) {
-					return connection;
-				}
+		for (Connection connection : connections) {
+			if (connection != null
+					&& connection.isActive()
+					&& connection.getRemoteMachineAddress().equals(address)
+					&& connection.getRemoteMachinePort() == port) {
+				return connection;
 			}
 		}
 		return null;
@@ -225,13 +249,27 @@ public class ConnectionManager {
 	 */
 	public int createConnection(InetAddress address, int port, int connectionPingPeriod, boolean skipCiphers)
 			throws IOException {
-		Connection connection = new Connection(messenger, 0);
-		connection.connect(address, port, connectionPingPeriod, skipCiphers);
+		return connect(address, port, connectionPingPeriod, skipCiphers);
+	}
 
-		synchronized (connections) {
+	private int connect(InetAddress address, int port, long connectionPingPeriod, boolean skipCiphers)
+			throws IOException {
+		Connection connection;
+		synchronized (connectionsLock) {
+			if (closed) {
+				throw new IllegalStateException("The connection manager is closed");
+			}
+			connection = new Connection(messenger, connections.size());
 			connections.add(connection);
-			return connections.size() - 1;
 		}
+		// Outside the lock: connect() registers with the messenger (see close())
+		connection.connect(address, port, connectionPingPeriod, skipCiphers);
+		if (closed) {
+			// close() ran meanwhile and may have missed this connection
+			connection.disconnect();
+			throw new IllegalStateException("The connection manager is closed");
+		}
+		return connection.getHandle();
 	}
 
 	/**
@@ -247,13 +285,7 @@ public class ConnectionManager {
 	 *         - when properties file was not found
 	 */
 	public int createConnection(InetAddress address, int port, int connectionPingPeriod) throws IOException {
-		Connection connection = new Connection(messenger, 0);
-		connection.connect(address, port, connectionPingPeriod);
-
-		synchronized (connections) {
-			connections.add(connection);
-			return connections.size() - 1;
-		}
+		return connect(address, port, connectionPingPeriod, false);
 	}
 
 	/**
@@ -267,15 +299,7 @@ public class ConnectionManager {
 	 *         when properties file was not found
 	 */
 	public int createConnection(InetAddress address, int port) throws IOException {
-
-		synchronized (connections) {
-			Connection connection = new Connection(
-					messenger,
-					connections.size());
-			connection.connect(address, port, pingPeriod);
-			connections.add(connection);
-			return connections.size() - 1;
-		}
+		return connect(address, port, pingPeriod, false);
 	}
 
 	/**
@@ -291,12 +315,7 @@ public class ConnectionManager {
 	 *         when properties file was not found
 	 */
 	public int createConnection(InetAddress address, int port, boolean skipCiphers) throws IOException {
-		synchronized (connections) {
-			Connection connection = new Connection(messenger, connections.size());
-			connection.connect(address, port, pingPeriod, skipCiphers);
-			connections.add(connection);
-			return connections.size() - 1;
-		}
+		return connect(address, port, pingPeriod, skipCiphers);
 	}
 
 	/**
@@ -317,7 +336,7 @@ public class ConnectionManager {
 		int tag = generateSessionlessTag();
 		List<CipherSuite> suites;
 		try {
-			suites = connections.get(connection).getAvailableCipherSuites(tag);
+			suites = getConnection(connection).getAvailableCipherSuites(tag);
 		} catch (Exception e) {
 			freeTag(tag);
 			throw e;
@@ -352,8 +371,7 @@ public class ConnectionManager {
 		int tag = generateSessionlessTag();
 		GetChannelAuthenticationCapabilitiesResponseData responseData;
 		try {
-			responseData = connections
-					.get(connection)
+			responseData = getConnection(connection)
 					.getChannelAuthenticationCapabilities(
 							tag,
 							cipherSuite,
@@ -402,8 +420,7 @@ public class ConnectionManager {
 		int sessionId;
 		int tag = generateSessionlessTag();
 		try {
-			sessionId = connections
-					.get(connection)
+			sessionId = getConnection(connection)
 					.startSession(
 							tag,
 							cipherSuite,
@@ -429,6 +446,6 @@ public class ConnectionManager {
 	 *        - {@link ConnectionListener} to processResponse
 	 */
 	public void registerListener(int connection, ConnectionListener listener) {
-		connections.get(connection).registerListener(listener);
+		getConnection(connection).registerListener(listener);
 	}
 }

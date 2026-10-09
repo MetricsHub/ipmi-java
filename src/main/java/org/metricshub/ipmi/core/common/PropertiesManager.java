@@ -26,15 +26,16 @@ import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 
 import java.io.IOException;
 import java.io.InputStream;
-import java.util.HashMap;
 import java.util.Map;
 import java.util.Properties;
+import java.util.concurrent.ConcurrentHashMap;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 public final class PropertiesManager {
 
+	private static final Object INSTANCE_LOCK = new Object();
 	private static PropertiesManager instance;
 
 	private Map<String, String> properties;
@@ -42,7 +43,7 @@ public final class PropertiesManager {
 	private Logger logger = LoggerFactory.getLogger(PropertiesManager.class);
 
 	private PropertiesManager() {
-		properties = new HashMap<String, String>();
+		properties = new ConcurrentHashMap<String, String>();
 
 		loadProperties("/connection.properties");
 		loadProperties("/vxipmi.properties");
@@ -50,14 +51,25 @@ public final class PropertiesManager {
 
 	@SuppressFBWarnings(value = "MS_EXPOSE_REP", justification = "Singleton: handing out the shared instance is the point")
 	public static PropertiesManager getInstance() {
-		if (instance == null) {
-			instance = new PropertiesManager();
+		synchronized (INSTANCE_LOCK) {
+			if (instance == null) {
+				instance = new PropertiesManager();
+			}
+			return instance;
 		}
-		return instance;
 	}
 
-	private void loadProperties(String name) {
+	/**
+	 * Adds the properties of a classpath resource; a missing resource is logged and skipped.
+	 *
+	 * @param name the resource name, such as {@code /connection.properties}
+	 */
+	void loadProperties(String name) {
 		try (InputStream stream = getClass().getResourceAsStream(name)) {
+			if (stream == null) {
+				logger.error("Properties resource {} not found", name);
+				return;
+			}
 			Properties props = new Properties();
 			props.load(stream);
 
@@ -71,7 +83,7 @@ public final class PropertiesManager {
 	}
 
 	public String getProperty(String key) {
-		logger.info("Getting " + key + ": " + properties.get(key));
+		logger.debug("Getting {}: {}", key, properties.get(key));
 		return properties.get(key);
 	}
 

@@ -23,8 +23,8 @@ package org.metricshub.ipmi.core.connection;
  */
 
 import org.metricshub.ipmi.core.coding.PayloadCoder;
+import org.metricshub.ipmi.core.coding.commands.IpmiCommandCoder;
 import org.metricshub.ipmi.core.coding.commands.ResponseData;
-import org.metricshub.ipmi.core.coding.commands.session.GetChannelAuthenticationCapabilities;
 import org.metricshub.ipmi.core.coding.payload.lan.IpmiLanMessage;
 import org.metricshub.ipmi.core.coding.protocol.Ipmiv20Message;
 
@@ -42,6 +42,22 @@ public class IpmiMessageHandler extends MessageHandler {
 
 	public IpmiMessageHandler(Connection connection, int timeout) throws IOException {
 		super(connection, timeout, IpmiLanMessage.MIN_SEQUENCE_NUMBER, IpmiLanMessage.MAX_SEQUENCE_NUMBER);
+	}
+
+	/**
+	 * Tells whether the reply answers the request: the same command code, under the response network function of
+	 * the request (the request one plus one, IPMI 2.0 section 5.1). A reply whose network function the library does
+	 * not know answers nothing.
+	 */
+	private static boolean answers(IpmiCommandCoder request, IpmiLanMessage reply) {
+		if (request.getCommandCode() != reply.getCommand()) {
+			return false;
+		}
+		try {
+			return request.getNetworkFunction().getCode() + 1 == reply.getNetworkFunction().getCode();
+		} catch (IllegalArgumentException e) {
+			return false;
+		}
 	}
 
 	/**
@@ -70,18 +86,29 @@ public class IpmiMessageHandler extends MessageHandler {
 				return;
 			}
 
-			if (coder.getClass() == GetChannelAuthenticationCapabilities.class) {
+			if (coder instanceof Connection.KeepAlive) {
+				// Nobody waits for the reply of the keep-alive: it only frees the tag
 				getMessageQueue().remove(tag);
-			} else {
-
-				try {
-					ResponseData responseData = coder.getResponseData(message);
-					getConnection().notifyResponseListeners(getConnection().getHandle(), tag, responseData, null);
-				} catch (Exception e) {
-					getConnection().notifyResponseListeners(getConnection().getHandle(), tag, null, e);
-				}
-				getMessageQueue().remove(lanMessagePayload.getSequenceNumber());
+				return;
 			}
+
+			// A late reply to a one-way message, whose tag is not reserved, may carry the tag of a newer queued
+			// request: the reply of a request answers the command of that request, and the request stays queued
+			if (coder instanceof IpmiCommandCoder && !answers((IpmiCommandCoder) coder, lanMessagePayload)) {
+				LOGGER
+						.debug(
+								"Message tagged with " + tag + " answers another command than the queued request."
+										+ " Dropping stale message.");
+				return;
+			}
+
+			try {
+				ResponseData responseData = coder.getResponseData(message);
+				getConnection().notifyResponseListeners(getConnection().getHandle(), tag, responseData, null);
+			} catch (Exception e) {
+				getConnection().notifyResponseListeners(getConnection().getHandle(), tag, null, e);
+			}
+			getMessageQueue().remove(tag);
 		}
 	}
 

@@ -115,4 +115,39 @@ class MessageQueueTest {
 			queue.tearDown();
 		}
 	}
+
+	@Test
+	void oneWaySequenceNumbersSkipTheQueuedTags() {
+		MessageQueue queue = newQueue();
+		try {
+			int queued = queue.add(request());
+			assertTrue(queued > 0);
+			// Twice around the 63-value sequence space
+			for (int i = 0; i < 2 * IpmiLanMessage.MAX_SEQUENCE_NUMBER; i++) {
+				int sequenceNumber = queue.getSequenceNumber();
+				assertTrue(sequenceNumber != queued, "a one-way message took the tag of the queued request");
+				assertTrue(
+						sequenceNumber >= IpmiLanMessage.MIN_SEQUENCE_NUMBER
+								&& sequenceNumber <= IpmiLanMessage.MAX_SEQUENCE_NUMBER,
+						"out of range: " + sequenceNumber);
+			}
+		} finally {
+			queue.tearDown();
+		}
+	}
+
+	@Test
+	void aTimedOutKeepAliveIsNotReported() throws Exception {
+		MessageQueue queue = newQueue();
+		try {
+			connection.registerListener(recorder());
+			int keepAlive = queue.add(new Connection.KeepAlive(CipherSuite.getEmpty()));
+			int request = queue.add(request());
+			Thread.sleep(TIMER_TICK_MS);
+			assertFalse(queue.containsId(keepAlive), "the keep-alive must leave the queue");
+			assertEquals(Collections.singletonList(request + ":Message timed out"), reported);
+		} finally {
+			queue.tearDown();
+		}
+	}
 }

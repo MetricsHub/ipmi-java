@@ -83,15 +83,20 @@ public class SessionManager {
 		}
 	}
 
+	/**
+	 * Closes the session and the connection that failed to establish a session, leaving the connector and its other
+	 * connections untouched.
+	 */
 	private static void closeConnection(IpmiConnector connector, ConnectionHandle handle) {
-		try {
-			if (connector != null && handle != null) {
-				connector.closeSession(handle);
-				connector.tearDown();
-			}
-		} catch (Exception e) {
-			LOGGER.error("Cannot close connection after exception thrown during session establishment.", e);
+		if (connector == null || handle == null) {
+			return;
 		}
+		try {
+			connector.closeSession(handle);
+		} catch (Exception e) {
+			LOGGER.error("Cannot close session after exception thrown during session establishment.", e);
+		}
+		connector.closeConnection(handle);
 	}
 
 	private final ConcurrentHashMap<Integer, Session> sessionsPerConnectionHandle;

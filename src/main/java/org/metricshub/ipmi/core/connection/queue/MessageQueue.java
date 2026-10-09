@@ -54,7 +54,7 @@ public class MessageQueue extends TimerTask {
 	/**
 	 * Frequency of checking messages for timeouts in ms.
 	 */
-	private static int cleaningFrequency = 500;
+	private static final int CLEANING_FREQUENCY = 500;
 
 	/**
 	 * Size of the queue determined by IPMI sliding window algorithm
@@ -80,7 +80,7 @@ public class MessageQueue extends TimerTask {
 		queue = new ArrayList<QueueElement>();
 		setTimeout(timeout);
 		timer = new Timer(true);
-		timer.schedule(this, cleaningFrequency, cleaningFrequency);
+		timer.schedule(this, CLEANING_FREQUENCY, CLEANING_FREQUENCY);
 	}
 
 	private int incrementSequenceNumber(int currentSequenceNumber) {
@@ -240,14 +240,16 @@ public class MessageQueue extends TimerTask {
 	}
 
 	/**
-	 * Returns valid session sequence number that cannot be used as a tag though
+	 * Returns the sequence number for a message that awaits no reply: it skips the tags of the queued requests, so
+	 * a reply to the one-way message can never be taken for the reply of a queued request.
 	 */
 	public int getSequenceNumber() {
 		synchronized (lastSequenceNumberLock) {
 			int sequenceNumber = incrementSequenceNumber(lastSequenceNumber);
-
+			while (isReserved(sequenceNumber)) {
+				sequenceNumber = incrementSequenceNumber(sequenceNumber);
+			}
 			lastSequenceNumber = sequenceNumber;
-
 			return sequenceNumber;
 		}
 	}
@@ -351,7 +353,8 @@ public class MessageQueue extends TimerTask {
 
 	/**
 	 * Removes the oldest message from the queue; when it timed out (rather than being answered), the response
-	 * listeners are told so, which lets the sender retry it with a fresh tag.
+	 * listeners are told so, which lets the sender retry it with a fresh tag. Nobody waits for a keep-alive: its
+	 * timeout is not reported.
 	 */
 	private void processObsoleteMessage(QueueElement message, boolean done) {
 		int tag = message.getId();
@@ -359,7 +362,7 @@ public class MessageQueue extends TimerTask {
 		queue.remove(0);
 		releaseTag(tag);
 
-		if (!done) {
+		if (!done && !(message.getRequest() instanceof Connection.KeepAlive)) {
 			logger.debug("Message timed out, tag: {}", tag);
 			try {
 				connection

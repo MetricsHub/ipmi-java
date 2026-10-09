@@ -132,13 +132,15 @@ public class StateMachine implements UdpListener {
 	}
 
 	/**
-	 * Cleans up the machine resources.
+	 * Cleans up the machine resources and leaves the current state: a stopped machine no longer reports a valid
+	 * session.
 	 *
 	 * @see #start(InetAddress, int)
 	 */
 	public void stop() {
 		messenger.unregister(this);
 		initialized = false;
+		current = new Uninitialized();
 	}
 
 	/**
