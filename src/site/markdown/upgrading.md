@@ -39,7 +39,7 @@ The `IpmiClient` API is unchanged, and the client is more tolerant of real-world
   reply is sent again;
 * the [keep-alive](configuration.html#keep-alive) is actually sent: with the default `pingPeriod`
   (`-1`) 1.2.02 sent no keep-alive at all, so a session could expire during a long collection; the
-  keep-alive is now one message every 30 s by default, sent without waiting for its reply, and a
+  keep-alive is now one message every 30 s by default, whose reply is discarded, and a
   Get Channel Authentication Capabilities command sent by the application in a session gets its
   reply (1.2.02 dropped it, as it did the keep-alive replies);
 * `IpmiConnector.closeConnection()` releases the connection: its handle then throws

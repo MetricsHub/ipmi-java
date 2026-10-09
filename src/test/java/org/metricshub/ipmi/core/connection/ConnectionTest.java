@@ -201,7 +201,7 @@ class ConnectionTest {
 	}
 
 	@Test
-	void aReplyToAnotherCommandWithTheTagOfAQueuedRequestIsDropped() throws Exception {
+	void theKeepAliveReplyIsDiscardedAndFreesItsTag() throws Exception {
 		Connection connection = connect(TIMEOUT_MS);
 		try {
 			openSession(connection);
@@ -217,6 +217,13 @@ class ConnectionTest {
 					// not expected
 				}
 			});
+			connection.run();
+			int keepAliveTag = 1; // the first tag of a new connection
+			// The keep-alive reply (command 38h) is not delivered, and its tag is free again
+			connection.notify(new MessageAction(reply(keepAliveTag, (byte) 0x38)));
+			assertEquals(-1, notifiedTag.get(), "the keep-alive reply must not reach the listeners");
+
+			// The same command sent by the application gets its reply
 			GetChannelAuthenticationCapabilities request = new GetChannelAuthenticationCapabilities(
 					IpmiVersion.V20,
 					IpmiVersion.V20,
@@ -224,12 +231,7 @@ class ConnectionTest {
 					PrivilegeLevel.Callback,
 					(byte) 0xe);
 			int tag = connection.sendMessage(request, false);
-
-			// A late reply to a one-way Get Device ID (command 01h) whose sequence number was reused by the request
-			connection.notify(new MessageAction(reply(tag, (byte) 0x01)));
-			assertEquals(-1, notifiedTag.get(), "a reply to another command must not answer the queued request");
-
-			// The request is still queued: its own reply (command 38h) is delivered
+			assertEquals(keepAliveTag + 1, tag);
 			connection.notify(new MessageAction(reply(tag, (byte) 0x38)));
 			assertEquals(tag, notifiedTag.get());
 		} finally {

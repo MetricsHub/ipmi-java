@@ -23,7 +23,6 @@ package org.metricshub.ipmi.core.connection;
  */
 
 import org.metricshub.ipmi.core.coding.PayloadCoder;
-import org.metricshub.ipmi.core.coding.commands.IpmiCommandCoder;
 import org.metricshub.ipmi.core.coding.commands.ResponseData;
 import org.metricshub.ipmi.core.coding.payload.lan.IpmiLanMessage;
 import org.metricshub.ipmi.core.coding.protocol.Ipmiv20Message;
@@ -70,14 +69,9 @@ public class IpmiMessageHandler extends MessageHandler {
 				return;
 			}
 
-			// A reply to a message whose reply was not awaited (the keep-alive) may arrive once its sequence number
-			// has been given to a queued request: the reply of a request answers the command of that request
-			if (coder instanceof IpmiCommandCoder
-					&& ((IpmiCommandCoder) coder).getCommandCode() != lanMessagePayload.getCommand()) {
-				LOGGER
-						.debug(
-								"Message tagged with " + tag + " answers command " + lanMessagePayload.getCommand()
-										+ ", not the queued request. Dropping stale message.");
+			if (coder instanceof Connection.KeepAlive) {
+				// Nobody waits for the reply of the keep-alive: it only frees the tag
+				getMessageQueue().remove(tag);
 				return;
 			}
 
