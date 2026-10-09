@@ -26,9 +26,11 @@ import java.io.IOException;
 import java.net.InetAddress;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.CopyOnWriteArrayList;
 
 import org.metricshub.ipmi.core.coding.rmcp.RmcpDecoder;
 import org.metricshub.ipmi.core.common.Constants;
+import org.metricshub.ipmi.core.sm.actions.MessageAction;
 import org.metricshub.ipmi.core.sm.actions.StateMachineAction;
 import org.metricshub.ipmi.core.sm.events.StateMachineEvent;
 import org.metricshub.ipmi.core.sm.states.SessionValid;
@@ -44,15 +46,23 @@ import org.metricshub.ipmi.core.transport.UdpMessage;
  */
 public class StateMachine implements UdpListener {
 
-	private List<MachineObserver> observers;
+	private final List<MachineObserver> observers = new CopyOnWriteArrayList<MachineObserver>();
 
-	private State current;
+	/**
+	 * In-session messages received while the lock is held, dispatched by {@link #doTransition(StateMachineEvent)}
+	 * and {@link #notifyMessage(UdpMessage)} once they release it, so that no application listener runs under the
+	 * lock. The other actions (a handshake reply, an error, the session key) are published under the lock: the
+	 * caller then sees the reply together with the state it produced, and cannot time the request out in between.
+	 */
+	private final List<StateMachineAction> pendingActions = new ArrayList<StateMachineAction>();
+
+	private volatile State current;
 
 	private Messenger messenger;
-	private InetAddress remoteMachineAddress;
-	private int remoteMachinePort;
+	private volatile InetAddress remoteMachineAddress;
+	private volatile int remoteMachinePort;
 
-	private boolean initialized;
+	private volatile boolean initialized;
 
 	public State getCurrent() {
 		return current;
@@ -72,7 +82,6 @@ public class StateMachine implements UdpListener {
 	 */
 	public StateMachine(Messenger messenger) {
 		this.messenger = messenger;
-		observers = new ArrayList<MachineObserver>();
 		initialized = false;
 	}
 
@@ -101,17 +110,39 @@ public class StateMachine implements UdpListener {
 	}
 
 	/**
-	 * Sends a notification of an action to all {@link MachineObserver}s
+	 * Sends a notification of an action to all {@link MachineObserver}s. A {@link MessageAction} emitted by a state
+	 * while the lock is held is deferred until the transition releases it; the other actions are published at once.
 	 *
 	 * @param action
 	 *        - a {@link StateMachineAction} to perform
 	 */
 	public void doExternalAction(StateMachineAction action) {
+		if (action instanceof MessageAction && Thread.holdsLock(this)) {
+			pendingActions.add(action);
+		} else {
+			notifyObservers(action);
+		}
+	}
+
+	private void notifyObservers(StateMachineAction action) {
 		for (MachineObserver observer : observers) {
 			if (observer != null) {
 				observer.notify(action);
 			}
 		}
+	}
+
+	private void dispatch(List<StateMachineAction> actions) {
+		for (StateMachineAction action : actions) {
+			notifyObservers(action);
+		}
+	}
+
+	/** Returns the actions emitted so far and clears them; called under the lock. */
+	private List<StateMachineAction> drainPendingActions() {
+		List<StateMachineAction> actions = new ArrayList<StateMachineAction>(pendingActions);
+		pendingActions.clear();
+		return actions;
 	}
 
 	/**
@@ -154,7 +185,9 @@ public class StateMachine implements UdpListener {
 
 	/**
 	 * Performs a {@link State} transition according to the event and
-	 * {@link #current} state
+	 * {@link #current} state. Transitions and received messages are serialized, so a late reply cannot interleave
+	 * with the timeout or close of the request it answers; the in-session messages are dispatched once the lock is
+	 * released.
 	 *
 	 * @param event
 	 *        - {@link StateMachineEvent} invoking the transition
@@ -163,17 +196,28 @@ public class StateMachine implements UdpListener {
 	 * @see #start(InetAddress, int)
 	 */
 	public void doTransition(StateMachineEvent event) {
-		if (!initialized) {
-			throw new NullPointerException("State machine not started");
+		List<StateMachineAction> actions;
+		synchronized (this) {
+			if (!initialized) {
+				throw new NullPointerException("State machine not started");
+			}
+			current.doTransition(this, event);
+			actions = drainPendingActions();
 		}
-		current.doTransition(this, event);
+		dispatch(actions);
 	}
 
 	@Override
 	public void notifyMessage(UdpMessage message) {
-		if (message.getAddress().equals(getRemoteMachineAddress()) && message.getPort() == getRemoteMachinePort()) {
-			current.doAction(this, RmcpDecoder.decode(message.getMessage()));
+		if (!message.getAddress().equals(getRemoteMachineAddress()) || message.getPort() != getRemoteMachinePort()) {
+			return;
 		}
+		List<StateMachineAction> actions;
+		synchronized (this) {
+			current.doAction(this, RmcpDecoder.decode(message.getMessage()));
+			actions = drainPendingActions();
+		}
+		dispatch(actions);
 	}
 
 	/**

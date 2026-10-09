@@ -44,8 +44,8 @@ import org.metricshub.ipmi.core.connection.SessionManager;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.net.InetAddress;
-import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.TimeUnit;
 
 import org.slf4j.Logger;
@@ -87,8 +87,8 @@ public class IpmiAsyncConnector implements ConnectionListener {
 	private ConnectionManager connectionManager;
 	private SessionManager sessionManager;
 	private int retries;
-	private final List<IpmiResponseListener> responseListeners;
-	private final List<InboundMessageListener> inboundMessageListeners;
+	private final List<IpmiResponseListener> responseListeners = new CopyOnWriteArrayList<IpmiResponseListener>();
+	private final List<InboundMessageListener> inboundMessageListeners = new CopyOnWriteArrayList<InboundMessageListener>();
 
 	private static Logger logger = LoggerFactory.getLogger(IpmiAsyncConnector.class);
 
@@ -104,8 +104,6 @@ public class IpmiAsyncConnector implements ConnectionListener {
 	 *         when properties file was not found
 	 */
 	public IpmiAsyncConnector(int port) throws IOException {
-		responseListeners = new ArrayList<IpmiResponseListener>();
-		inboundMessageListeners = new ArrayList<InboundMessageListener>();
 		connectionManager = new ConnectionManager(port);
 		sessionManager = new SessionManager();
 		loadProperties();
@@ -126,8 +124,6 @@ public class IpmiAsyncConnector implements ConnectionListener {
 	 *         when properties file was not found
 	 */
 	public IpmiAsyncConnector(int port, InetAddress address) throws IOException {
-		responseListeners = new ArrayList<IpmiResponseListener>();
-		inboundMessageListeners = new ArrayList<InboundMessageListener>();
 		connectionManager = new ConnectionManager(port, address);
 		sessionManager = new SessionManager();
 		loadProperties();
@@ -145,8 +141,6 @@ public class IpmiAsyncConnector implements ConnectionListener {
 	 *         error.
 	 */
 	public IpmiAsyncConnector(int port, long pingPeriod) throws IOException {
-		responseListeners = new ArrayList<>();
-		inboundMessageListeners = new ArrayList<>();
 		connectionManager = new ConnectionManager(port, pingPeriod);
 		sessionManager = new SessionManager();
 		loadProperties();
@@ -475,9 +469,7 @@ public class IpmiAsyncConnector implements ConnectionListener {
 	 *        {@link IpmiResponseListener} to processResponse
 	 */
 	public void registerListener(IpmiResponseListener listener) {
-		synchronized (responseListeners) {
-			responseListeners.add(listener);
-		}
+		responseListeners.add(listener);
 	}
 
 	/**
@@ -488,9 +480,7 @@ public class IpmiAsyncConnector implements ConnectionListener {
 	 *        - the {@link IpmiResponseListener} to unregister
 	 */
 	public void unregisterListener(IpmiResponseListener listener) {
-		synchronized (responseListeners) {
-			responseListeners.remove(listener);
-		}
+		responseListeners.remove(listener);
 	}
 
 	/**
@@ -500,9 +490,7 @@ public class IpmiAsyncConnector implements ConnectionListener {
 	 *        the {@link InboundMessageListener} to register.
 	 */
 	public void registerIncomingPayloadListener(InboundMessageListener listener) {
-		synchronized (inboundMessageListeners) {
-			inboundMessageListeners.add(listener);
-		}
+		inboundMessageListeners.add(listener);
 	}
 
 	/**
@@ -512,9 +500,7 @@ public class IpmiAsyncConnector implements ConnectionListener {
 	 *        the {@link InboundMessageListener} to unregister.
 	 */
 	public void unregisterIncomingPayloadListener(InboundMessageListener listener) {
-		synchronized (inboundMessageListeners) {
-			inboundMessageListeners.remove(listener);
-		}
+		inboundMessageListeners.remove(listener);
 	}
 
 	@Override
@@ -539,11 +525,9 @@ public class IpmiAsyncConnector implements ConnectionListener {
 					new ConnectionHandle(handle, connection.getRemoteMachineAddress(), connection.getRemoteMachinePort()));
 
 		}
-		synchronized (responseListeners) {
-			for (IpmiResponseListener listener : responseListeners) {
-				if (listener != null) {
-					listener.notify(response);
-				}
+		for (IpmiResponseListener listener : responseListeners) {
+			if (listener != null) {
+				listener.notify(response);
 			}
 		}
 	}

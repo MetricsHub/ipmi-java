@@ -78,6 +78,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Timer;
 import java.util.TimerTask;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -140,7 +141,7 @@ public class Connection extends TimerTask implements MachineObserver {
 	public Connection(Messenger messenger, int handle) {
 		stateMachine = new StateMachine(messenger);
 		this.handle = handle;
-		listeners = new ArrayList<ConnectionListener>();
+		listeners = new CopyOnWriteArrayList<ConnectionListener>();
 		timeout = Integer.parseInt(PropertiesManager.getInstance().getProperty("timeout"));
 		messageHandlers = new EnumMap<PayloadType, MessageHandler>(PayloadType.class);
 		currentSessionSequenceNumber = new AtomicInteger(0);
@@ -327,6 +328,7 @@ public class Connection extends TimerTask implements MachineObserver {
 	private void waitForResponse() throws Exception {
 		long deadline = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(timeout);
 
+		InterruptedException interrupted = null;
 		synchronized (responseLock) {
 			try {
 				long remaining = deadline - System.nanoTime();
@@ -335,16 +337,26 @@ public class Connection extends TimerTask implements MachineObserver {
 					remaining = deadline - System.nanoTime();
 				}
 			} catch (InterruptedException e) {
-				// The caller gave up on us (Future.cancel): leave the state machine in a state that allows a retry
-				stateMachine.doTransition(new Timeout());
-				Thread.currentThread().interrupt();
-				throw e;
+				interrupted = e;
 			}
+		}
+		if (interrupted != null) {
+			// The caller gave up on us (Future.cancel): leave the state machine in a state that allows a retry.
+			// Outside the response lock: the receiving thread takes it while holding the state machine lock.
+			stateMachine.doTransition(new Timeout());
+			Thread.currentThread().interrupt();
+			throw interrupted;
 		}
 
 		if (lastAction == null) {
-			stateMachine.doTransition(new Timeout());
-			throw new ConnectionException("Command timed out");
+			// The receiving thread publishes a reply under the state machine lock: once we hold it, a reply that
+			// is not there yet cannot be processed before the timeout rolls the state back
+			synchronized (stateMachine) {
+				if (lastAction == null) {
+					stateMachine.doTransition(new Timeout());
+					throw new ConnectionException("Command timed out");
+				}
+			}
 		}
 		if (!(lastAction instanceof ResponseAction || lastAction instanceof GetSikAction)) {
 			if (lastAction instanceof ErrorAction) {
