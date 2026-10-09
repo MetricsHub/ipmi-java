@@ -240,14 +240,16 @@ public class MessageQueue extends TimerTask {
 	}
 
 	/**
-	 * Returns valid session sequence number that cannot be used as a tag though
+	 * Returns the sequence number for a message that awaits no reply: it skips the tags of the queued requests, so
+	 * a reply to the one-way message can never be taken for the reply of a queued request.
 	 */
 	public int getSequenceNumber() {
 		synchronized (lastSequenceNumberLock) {
 			int sequenceNumber = incrementSequenceNumber(lastSequenceNumber);
-
+			while (isReserved(sequenceNumber)) {
+				sequenceNumber = incrementSequenceNumber(sequenceNumber);
+			}
 			lastSequenceNumber = sequenceNumber;
-
 			return sequenceNumber;
 		}
 	}

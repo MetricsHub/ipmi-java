@@ -59,12 +59,11 @@ What is logged, and at which level:
 | --- | --- |
 | `ERROR` | A value the decoders do not know (`Invalid value: ...` for an entity ID, sensor type or unit), a failed session handshake, exceptions in the receiving and keep-alive threads. |
 | `WARN` | An SDR record that cannot be decoded and is skipped, a FRU that cannot be read or decoded (the FRU is then truncated or missing), a message that failed and is resent, a packet whose integrity check failed, a response listener that threw while a timeout was reported. |
-| `INFO` | Every lookup of a [`connection.properties`](timeouts-and-errors.html#library-wide-defaults) value. |
-| `DEBUG` | Each message sent, with its tag and attempt number; each message that timed out; a session that could not be closed cleanly. |
+| `DEBUG` | Each message sent, with its tag and attempt number; each message that timed out; a session that could not be closed cleanly; every lookup of a [`connection.properties`](timeouts-and-errors.html#library-wide-defaults) value. |
 
 > [!TIP]
-> The `INFO` messages are noisy: set the `org.metricshub.ipmi` logger to `WARN` in production,
-> and to `DEBUG` when diagnosing a BMC ([Troubleshooting](troubleshooting.html)).
+> Set the `org.metricshub.ipmi` logger to `WARN` in production, and to `DEBUG` when diagnosing a
+> BMC ([Troubleshooting](troubleshooting.html)).
 
 With `slf4j-simple`, for example:
 

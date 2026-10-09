@@ -32,5 +32,13 @@ public final class Constants {
 	 */
 	public static final int IPMI_PORT = 0x26F;
 
+	/**
+	 * Unused by the library.
+	 *
+	 * @deprecated nothing reads it; it will be removed in the next major version.
+	 */
+	@Deprecated
+	public static final int TIMEOUT = 500;
+
 	private Constants() {}
 }

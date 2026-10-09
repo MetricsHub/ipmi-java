@@ -115,7 +115,7 @@ public class ConnectionManager {
 	 *
 	 * @return the period in ms between two keep-alive messages, 0 or negative when the sessions are not kept alive
 	 */
-	public long getPingPeriod() {
+	long getPingPeriod() {
 		return pingPeriod;
 	}
 
@@ -326,7 +326,7 @@ public class ConnectionManager {
 		int tag = generateSessionlessTag();
 		List<CipherSuite> suites;
 		try {
-			suites = connections.get(connection).getAvailableCipherSuites(tag);
+			suites = getConnection(connection).getAvailableCipherSuites(tag);
 		} catch (Exception e) {
 			freeTag(tag);
 			throw e;
@@ -361,8 +361,7 @@ public class ConnectionManager {
 		int tag = generateSessionlessTag();
 		GetChannelAuthenticationCapabilitiesResponseData responseData;
 		try {
-			responseData = connections
-					.get(connection)
+			responseData = getConnection(connection)
 					.getChannelAuthenticationCapabilities(
 							tag,
 							cipherSuite,
@@ -411,8 +410,7 @@ public class ConnectionManager {
 		int sessionId;
 		int tag = generateSessionlessTag();
 		try {
-			sessionId = connections
-					.get(connection)
+			sessionId = getConnection(connection)
 					.startSession(
 							tag,
 							cipherSuite,
@@ -438,6 +436,6 @@ public class ConnectionManager {
 	 *        - {@link ConnectionListener} to processResponse
 	 */
 	public void registerListener(int connection, ConnectionListener listener) {
-		connections.get(connection).registerListener(listener);
+		getConnection(connection).registerListener(listener);
 	}
 }

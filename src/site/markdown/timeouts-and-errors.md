@@ -76,9 +76,9 @@ properties.setProperty("timeout", "2000"); // per-message timeout: 2 s instead o
 properties.setProperty("retries", "3");
 ```
 
-`PropertiesManager` logs every lookup at the `INFO` level and its lazy initialization is not
-synchronized ([#98](https://github.com/metricshub/ipmi-java/issues/98)), hence "from a single
-thread, at startup".
+`PropertiesManager` logs every lookup at the `DEBUG` level. Its initialization is thread-safe and
+`setProperty()` may be called at any time, but a value changed while connections are being created
+applies to some of them and not to others, hence "from a single thread, at startup".
 
 ## Exceptions
 

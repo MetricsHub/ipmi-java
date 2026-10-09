@@ -118,4 +118,22 @@ class ConnectionManagerTest {
 			manager.close();
 		}
 	}
+
+	@Test
+	void everyOperationOnAReleasedHandleFailsTheSameWay() throws Exception {
+		ConnectionManager manager = new ConnectionManager(new SilentMessenger());
+		try {
+			int handle = manager.createConnection(InetAddress.getLoopbackAddress(), 623);
+			manager.closeConnection(handle);
+			assertThrows(IllegalStateException.class, () -> manager.getAvailableCipherSuites(handle));
+			assertThrows(
+					IllegalStateException.class,
+					() -> manager.getChannelAuthenticationCapabilities(handle, null, null));
+			assertThrows(IllegalStateException.class, () -> manager.startSession(handle, null, null, "", "", null));
+			assertThrows(IllegalStateException.class, () -> manager.registerListener(handle, null));
+			assertThrows(IllegalStateException.class, () -> manager.getConnection(handle));
+		} finally {
+			manager.close();
+		}
+	}
 }

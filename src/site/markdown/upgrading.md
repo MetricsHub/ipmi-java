@@ -46,8 +46,9 @@ The `IpmiClient` API is unchanged, and the client is more tolerant of real-world
   `IllegalStateException` instead of addressing a disconnected connection, and a session that
   fails to be established by `SerialOverLan` closes its own connection instead of tearing down the
   whole connector;
-* the `PropertiesManager` lookups are logged at `DEBUG` instead of `INFO`, and the unused
-  `cleaningFrequency` property is gone from `connection.properties`.
+* the `PropertiesManager` lookups are logged at `DEBUG` instead of `INFO`, the unused
+  `cleaningFrequency` property is gone from `connection.properties`, and `Constants.TIMEOUT`,
+  which nothing reads, is deprecated.
 
 The decoders follow the IPMI 2.0 and FRU specifications more closely; the visible changes are:
 
