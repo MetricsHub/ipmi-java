@@ -30,17 +30,34 @@ import org.metricshub.ipmi.core.common.TypeConverter;
  */
 public class IpmiLanResponse extends IpmiLanMessage {
 
+	private static final int GENERIC_CODES_START = 0xC0;
+
 	private CompletionCode completionCode;
 
+	private int rawCompletionCode;
+
+	/**
+	 * Decodes the completion code. Only 00h and the generic codes (C0h-FFh, IPMI 2.0 Table 5-2) have a meaning
+	 * common to every command; an OEM (01h-7Eh) or command-specific (80h-BEh) code is {@link CompletionCode#Unknown}
+	 * here, and the command coder may give it its own meaning.
+	 *
+	 * @param completionCode the completion code byte of the response
+	 */
 	public void setCompletionCode(byte completionCode) {
-		this.completionCode = CompletionCode
-				.parseInt(
-						TypeConverter
-								.byteToInt(completionCode));
+		rawCompletionCode = TypeConverter.byteToInt(completionCode);
+		this.completionCode = rawCompletionCode == 0 || rawCompletionCode >= GENERIC_CODES_START ?
+				CompletionCode.parseInt(rawCompletionCode) : CompletionCode.Unknown;
 	}
 
 	public CompletionCode getCompletionCode() {
 		return completionCode;
+	}
+
+	/**
+	 * @return the completion code byte as the BMC sent it
+	 */
+	public int getRawCompletionCode() {
+		return rawCompletionCode;
 	}
 
 	/**

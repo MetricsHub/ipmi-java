@@ -217,6 +217,11 @@ public enum CompletionCode {
 	 * Invalid role.
 	 */
 	InvalidRole(CompletionCode.INVALIDROLE),
+	/**
+	 * A code this enumeration does not list: OEM, command-specific or reserved. The raw value is available on the
+	 * {@link org.metricshub.ipmi.core.coding.payload.lan.IPMIException}.
+	 */
+	Unknown(CompletionCode.UNKNOWN),
 	;
 
 	private static final int OK = 0;
@@ -258,6 +263,7 @@ public enum CompletionCode {
 	private static final int COMMANDNOTSUPPORTED = 213;
 	private static final int ILLEGALPARAMETER = 214;
 	private static final int UNSPECIFIEDERROR = 255;
+	private static final int UNKNOWN = -1;
 	private static final int INVALIDPAYLOADTYPE = 3;
 	private static final int INVALIDAUTHENTICATIONALGORITHM = 4;
 	private static final int INVALIDINTEGRITYALGORITHM = 5;
@@ -381,7 +387,9 @@ public enum CompletionCode {
 		case INVALIDROLE:
 			return InvalidRole;
 		default:
-			throw new IllegalArgumentException("Invalid value: " + value);
+			// IPMI 2.0 Table 5-2 lets every command use OEM (01h-7Eh) and command-specific (80h-BEh) codes, and
+			// reserves the rest: a code this table does not list must not abort the decoding of the response
+			return Unknown;
 		}
 	}
 
@@ -479,6 +487,8 @@ public enum CompletionCode {
 			return "Inactive session ID.";
 		case INVALIDROLE:
 			return "Invalid role.";
+		case UNKNOWN:
+			return "Unknown completion code.";
 		default:
 			throw new IllegalArgumentException("Invalid value: " + code);
 		}

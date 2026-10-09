@@ -181,7 +181,7 @@ public class GetChannelCipherSuites extends IpmiCommandCoder {
 
 		GetChannelCipherSuitesResponseData data = new GetChannelCipherSuitesResponseData();
 
-		byte[] raw = message.getPayload().getIpmiCommandData();
+		byte[] raw = validateResponse(message);
 
 		data.setChannelNumber(raw[0]);
 

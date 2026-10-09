@@ -26,7 +26,11 @@ public enum SelRecordType {
 	OemTimestamped(SelRecordType.OEMTIMESTAMPED),
 	System(SelRecordType.SYSTEM),
 	OemNonTimestamped(
-			SelRecordType.OEMNONTIMESTAMPED),;
+			SelRecordType.OEMNONTIMESTAMPED),
+	/**
+	 * A reserved record type (03h-BFh, IPMI 2.0 section 32): only the record ID of such an entry is meaningful.
+	 */
+	Reserved(SelRecordType.RESERVED),;
 
 	/**
 	 * Represents OEM timestamped record type (C0h-DFh)
@@ -37,6 +41,7 @@ public enum SelRecordType {
 	 * Represents OEM timestamped record type (E0h-FFh)
 	 */
 	private static final int OEMNONTIMESTAMPED = 224;
+	private static final int RESERVED = -1;
 
 	private int code;
 
@@ -52,12 +57,12 @@ public enum SelRecordType {
 		if (value == SYSTEM) {
 			return System;
 		}
-		if (value > OEMNONTIMESTAMPED) {
+		if (value >= OEMNONTIMESTAMPED) {
 			return OemNonTimestamped;
 		}
-		if (value > OEMTIMESTAMPED) {
+		if (value >= OEMTIMESTAMPED) {
 			return OemTimestamped;
 		}
-		throw new IllegalArgumentException("Invalid value: " + value);
+		return Reserved;
 	}
 }

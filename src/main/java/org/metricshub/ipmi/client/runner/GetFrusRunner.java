@@ -23,10 +23,14 @@ package org.metricshub.ipmi.client.runner;
  */
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 import org.metricshub.ipmi.client.IpmiClientConfiguration;
+import org.metricshub.ipmi.client.Utils;
 import org.metricshub.ipmi.client.model.Fru;
 import org.metricshub.ipmi.core.coding.commands.IpmiVersion;
 import org.metricshub.ipmi.core.coding.commands.fru.BaseUnit;
@@ -69,7 +73,11 @@ public class GetFrusRunner extends AbstractIpmiRunner<List<Fru>> {
 	 */
 	private static final int FRU_READ_PACKET_SIZE = 16;
 
-	private boolean systemBoardFruUpdated = false;
+	/** Name of the system board FRU when none of its areas names it. */
+	private static final String SYSTEM_BOARD_NAME = "System Board";
+
+	/** Device IDs of the FRUs already returned: a FRU is returned once. */
+	private final Set<Integer> returnedFruIds = new HashSet<>();
 
 	public GetFrusRunner(IpmiClientConfiguration ipmiConfiguration) {
 		super(ipmiConfiguration);
@@ -91,12 +99,13 @@ public class GetFrusRunner extends AbstractIpmiRunner<List<Fru>> {
 		int reservationId = 0;
 		int lastReservationId = -1;
 
-		List<FruRecord> systemBoardFruRecords = getFruRecords(DEFAULT_FRU_ID);
+		// FRU 0 describes the system board on most BMCs; not all of them expose it, and the SDR walk must not
+		// depend on it
+		List<FruRecord> systemBoardFruRecords = readFruRecords(DEFAULT_FRU_ID);
 
 		// We get sensor data until we encounter ID = 65535 which means that
 		// this record is the last one.
 		while (getNextRecId() < MAX_REPO_RECORD_ID) {
-
 			SensorRecord sensorRecord = null;
 
 			try {
@@ -107,18 +116,16 @@ public class GetFrusRunner extends AbstractIpmiRunner<List<Fru>> {
 				processFruRecord(result, sensorRecord, systemBoardFruRecords);
 
 			} catch (IPMIException e) {
-
 				// If getting sensor data failed, we check if it already failed
 				// with this reservation ID, so that we avoid the infinite loop.
 				if (lastReservationId == reservationId || e.getCompletionCode() != CompletionCode.ReservationCanceled) {
 					throw e;
 				}
-
 				lastReservationId = reservationId;
 
 				// If the cause of the failure was canceling of the
 				// reservation, we get new reservationId and retry. This can
-				// happen many times during getting all sensors, since BMC can't
+				// happen many times during getting all sensors, since the BMC cannot
 				// manage parallel sessions and invalidates old one if new one
 				// appears.
 				reservationId = ((ReserveSdrRepositoryResponseData) getConnector()
@@ -127,92 +134,98 @@ public class GetFrusRunner extends AbstractIpmiRunner<List<Fru>> {
 								new ReserveSdrRepository(IpmiVersion.V20, getHandle().getCipherSuite(), AuthenticationType.RMCPPlus)))
 						.getReservationId();
 			}
-
 		}
 
 		return result;
 	}
 
 	/**
-	 * Process the given sensor record and create the system board FRU record. The new {@link Fru} is added to th FRU list
-	 * <code>result</code>
-	 *
-	 * @param result List of {@link Fru} instance to append
-	 * @param sensorRecord The sensor record to process
-	 * @param systemBoardFruRecords The system board Fru records
-	 * @throws Exception
+	 * Adds to the result the FRU a FRU Device Locator record points at, or FRU 0 attached to the system board when a
+	 * System Board sensor record is met before any locator for it. A FRU is returned once.
 	 */
 	private void processFruRecord(
 			final List<Fru> result,
 			final SensorRecord sensorRecord,
 			final List<FruRecord> systemBoardFruRecords)
-			throws Exception {
-		try {
-			// Process the FRU record
-			Fru fru = null;
-			if (sensorRecord instanceof FruDeviceLocatorRecord) {
-				FruDeviceLocatorRecord fruLocator = (FruDeviceLocatorRecord) sensorRecord;
+			throws InterruptedException {
 
-				if (fruLocator.isLogical()) {
-					List<FruRecord> fruRecords = getFruRecords(fruLocator.getDeviceId());
+		if (sensorRecord instanceof FruDeviceLocatorRecord) {
+			FruDeviceLocatorRecord fruLocator = (FruDeviceLocatorRecord) sensorRecord;
+			int deviceId = fruLocator.getDeviceId();
 
-					if (!fruRecords.isEmpty()) {
-						fru = new Fru(fruLocator, fruRecords);
-					}
+			if (fruLocator.isLogical() && !returnedFruIds.contains(deviceId)) {
+				List<FruRecord> fruRecords = deviceId == DEFAULT_FRU_ID ? systemBoardFruRecords : readFruRecords(deviceId);
+				if (!fruRecords.isEmpty()) {
+					result.add(new Fru(fruLocator, fruRecords));
+					returnedFruIds.add(deviceId);
 				}
-			} else
-				if (!systemBoardFruRecords.isEmpty()
-						&& !systemBoardFruUpdated
-						&& sensorRecord instanceof CompactSensorRecord
-						&& ((CompactSensorRecord) sensorRecord).getEntityId().equals(EntityId.SystemBoard)) {
-
-							// Since we can only access the SystemBoard components,
-							// we need to build the FruDeviceLocatorRecord for SystemBoard instance.
-
-							// OK this can be one of the SystemBoard sensors
-							CompactSensorRecord compactSensorRecord = (CompactSensorRecord) sensorRecord;
-
-							BoardInfo boardInfo = systemBoardFruRecords
-									.stream()
-									.filter(BoardInfo.class::isInstance)
-									.map(BoardInfo.class::cast)
-									.findFirst()
-									.orElse(null);
-
-							if (boardInfo != null) {
-
-								// Create the Fru locator
-								FruDeviceLocatorRecord locator = new FruDeviceLocatorRecord();
-								locator.setFruEntityId(EntityId.SystemBoard.getCode());
-								locator.setFruEntityInstance(compactSensorRecord.getEntityInstanceNumber());
-								locator.setName(boardInfo.getBoardProductName() + " " + compactSensorRecord.getEntityInstanceNumber());
-
-								fru = new Fru(locator, systemBoardFruRecords);
-
-								// OK, now we are good!
-								systemBoardFruUpdated = true;
-
-							}
-						}
-
-			// Add the Fru instance
-			if (fru != null) {
-				result.add(fru);
 			}
+		} else
+			if (!systemBoardFruRecords.isEmpty()
+					&& !returnedFruIds.contains(DEFAULT_FRU_ID)
+					&& sensorRecord instanceof CompactSensorRecord
+					&& EntityId.SystemBoard.equals(((CompactSensorRecord) sensorRecord).getEntityId())) {
+						// No locator pointed at FRU 0 so far: build one for the system board, named after whichever area
+						// describes it
+						CompactSensorRecord compactSensorRecord = (CompactSensorRecord) sensorRecord;
 
-		} catch (IPMIException e) {
-			LOGGER.warn("Failed to read the FRU of sensor record {}: {}", sensorRecord.getId(), e.getMessage());
-		}
+						FruDeviceLocatorRecord locator = new FruDeviceLocatorRecord();
+						locator.setDeviceId(DEFAULT_FRU_ID);
+						locator.setLogical(true);
+						locator.setFruEntityId(EntityId.SystemBoard.getCode());
+						locator.setFruEntityInstance(compactSensorRecord.getEntityInstanceNumber());
+						locator
+								.setName(systemBoardName(systemBoardFruRecords) + " " + compactSensorRecord.getEntityInstanceNumber());
 
+						result.add(new Fru(locator, systemBoardFruRecords));
+						returnedFruIds.add(DEFAULT_FRU_ID);
+					}
 	}
 
 	/**
-	 * Get the FRU records for the given FRU identifier <code>fruId</code>
-	 *
-	 * @param fruId The unique identifier of the FRU
-	 * @return new List of {@link FruRecord} instances
-	 * @throws Exception
+	 * @return the name of the system board from its board, product or chassis area, whichever exists
 	 */
+	static String systemBoardName(final List<FruRecord> fruRecords) {
+		// In priority order, whatever the order of the areas in the FRU: board, then product, then chassis
+		String name = firstName(fruRecords, BoardInfo.class, BoardInfo::getBoardProductName);
+		if (name == null) {
+			name = firstName(fruRecords, ProductInfo.class, ProductInfo::getProductName);
+		}
+		if (name == null) {
+			name = firstName(fruRecords, ChassisInfo.class, ChassisInfo::getChassisPartNumber);
+		}
+		return name == null ? SYSTEM_BOARD_NAME : name;
+	}
+
+	private static <T extends FruRecord> String firstName(
+			final List<FruRecord> fruRecords,
+			final Class<T> type,
+			final Function<T, String> getter) {
+		return fruRecords
+				.stream()
+				.filter(type::isInstance)
+				.map(type::cast)
+				.map(getter)
+				.filter(Utils::isNotBlank)
+				.findFirst()
+				.orElse(null);
+	}
+
+	/**
+	 * Reads a FRU; a FRU that cannot be read (absent, not answering, undecodable) is logged and reported empty, so
+	 * that the other FRUs are still returned.
+	 */
+	private List<FruRecord> readFruRecords(int fruId) throws InterruptedException {
+		try {
+			return getFruRecords(fruId);
+		} catch (InterruptedException e) {
+			throw e;
+		} catch (Exception e) {
+			LOGGER.warn("Failed to read FRU {}: {}", fruId, e.getMessage());
+			return new ArrayList<>();
+		}
+	}
+
 	private List<FruRecord> getFruRecords(int fruId) throws Exception {
 		List<ReadFruDataResponseData> fruData = new ArrayList<>();
 
@@ -249,29 +262,29 @@ public class GetFrusRunner extends AbstractIpmiRunner<List<Fru>> {
 										unit,
 										i,
 										fruReadPacketSize));
-
 				fruData.add(data);
-
+			} catch (InterruptedException e) {
+				throw e;
 			} catch (Exception e) {
-				LOGGER.warn("Failed to read FRU {} at offset {}, the FRU data will be truncated: {}", fruId, i, e.getMessage());
+				// Stop here: the chunks after a gap would shift into its place and decode into wrong fields
+				LOGGER
+						.warn("Failed to read FRU {} at offset {}, the FRU data is truncated there: {}", fruId, i, e.getMessage());
+				break;
 			}
 		}
 
-		try {
-			// after collecting all the data, we can combine and parse it
-			return ReadFruData
-					.decodeFruData(fruData)
-					.stream()
-					.filter(
-							fruRecord -> fruRecord instanceof BoardInfo
-									|| fruRecord instanceof ChassisInfo
-									|| fruRecord instanceof ProductInfo)
-					.collect(Collectors.toList());
-
-		} catch (Exception e) {
-			LOGGER.warn("Failed to decode FRU {}: {}", fruId, e.getMessage());
+		if (fruData.isEmpty()) {
+			return new ArrayList<>();
 		}
 
-		return new ArrayList<>();
+		// after collecting all the data, we can combine and parse it
+		return ReadFruData
+				.decodeFruData(fruData)
+				.stream()
+				.filter(
+						fruRecord -> fruRecord instanceof BoardInfo
+								|| fruRecord instanceof ChassisInfo
+								|| fruRecord instanceof ProductInfo)
+				.collect(Collectors.toList());
 	}
 }

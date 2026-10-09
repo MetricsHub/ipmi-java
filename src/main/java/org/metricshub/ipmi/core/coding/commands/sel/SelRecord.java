@@ -29,6 +29,8 @@ import org.metricshub.ipmi.core.coding.commands.sdr.record.ReadingType;
 import org.metricshub.ipmi.core.coding.commands.sdr.record.SensorType;
 import org.metricshub.ipmi.core.common.TypeConverter;
 
+import java.util.Arrays;
+
 public class SelRecord {
 
 	private int recordId;
@@ -57,6 +59,10 @@ public class SelRecord {
 	 */
 	private byte reading;
 
+	private Integer manufacturerId;
+
+	private byte[] oemData;
+
 	public static SelRecord populateSelRecord(byte[] data) {
 		SelRecord record = new SelRecord();
 
@@ -70,6 +76,39 @@ public class SelRecord {
 		record.setRecordId(TypeConverter.littleEndianByteArrayToInt(buffer));
 
 		record.setRecordType(SelRecordType.parseInt(TypeConverter.byteToInt(data[2])));
+
+		switch (record.getRecordType()) {
+		case System:
+			populateSystemEvent(record, data);
+			break;
+		case OemTimestamped:
+			// IPMI 2.0 section 32.2: timestamp, 3-byte manufacturer ID, 6 OEM-defined bytes
+			System.arraycopy(data, 3, buffer, 0, 4);
+			record.setTimestamp(TypeConverter.decodeDate(TypeConverter.littleEndianByteArrayToInt(buffer)));
+			buffer[0] = data[7];
+			buffer[1] = data[8];
+			buffer[2] = data[9];
+			buffer[3] = 0;
+			record.setManufacturerId(TypeConverter.littleEndianByteArrayToInt(buffer));
+			record.setOemData(Arrays.copyOfRange(data, 10, 16));
+			break;
+		case OemNonTimestamped:
+			// IPMI 2.0 section 32.3: 13 OEM-defined bytes
+			record.setOemData(Arrays.copyOfRange(data, 3, 16));
+			break;
+		default:
+			// Reserved: nothing but the record ID is defined
+			break;
+		}
+
+		return record;
+	}
+
+	/**
+	 * Decodes the body of a system event record (IPMI 2.0 section 32.1).
+	 */
+	private static void populateSystemEvent(SelRecord record, byte[] data) {
+		byte[] buffer = new byte[4];
 
 		System.arraycopy(data, 3, buffer, 0, 4);
 
@@ -88,8 +127,36 @@ public class SelRecord {
 		record.setEvent(ReadingType.parseInt(record.getSensorType(), eventType, eventOffset));
 
 		record.setReading(data[14]);
+	}
 
-		return record;
+	/**
+	 * @return the manufacturer ID (IANA enterprise number) of an OEM timestamped record, null for the other record
+	 *         types
+	 */
+	public Integer getManufacturerId() {
+		return manufacturerId;
+	}
+
+	/**
+	 * @param manufacturerId the manufacturer ID of an OEM timestamped record, null for the other record types
+	 */
+	public void setManufacturerId(Integer manufacturerId) {
+		this.manufacturerId = manufacturerId;
+	}
+
+	/**
+	 * @return the OEM-defined bytes of an OEM record (6 for a timestamped one, 13 otherwise), null for the other
+	 *         record types
+	 */
+	public byte[] getOemData() {
+		return oemData;
+	}
+
+	/**
+	 * @param oemData the OEM-defined bytes of an OEM record, null for the other record types
+	 */
+	public void setOemData(byte[] oemData) {
+		this.oemData = oemData;
 	}
 
 	public void setRecordId(int recordId) {

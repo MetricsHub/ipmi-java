@@ -154,7 +154,8 @@ public class GetSdr extends IpmiCommandCoder {
 			InvalidKeyException {
 		byte[] raw = validateResponse(message);
 
-		if (raw == null || raw.length < 3) {
+		// Two bytes (the next record ID) and no record data is a valid, if unhelpful, answer: the walk must go on
+		if (raw == null || raw.length < 2) {
 			throw new IllegalArgumentException(
 					"Invalid response payload length");
 		}

@@ -180,7 +180,7 @@ public class ProductInfo extends FruRecord {
 	}
 
 	private boolean isEnglishLanguageCode(int languageCode) {
-		return languageCode != 0 && languageCode != 25;
+		return languageCode == 0 || languageCode == 25;
 	}
 
 	private boolean partDataLengthWithinBounds(byte[] fruData, int currentOffset, int partDataLength) {

@@ -98,8 +98,9 @@ public class PowerSupplyInfo extends MultiRecordInfo {
 
 		// TODO: Test when server containing such records will be available
 
-		capacity = TypeConverter.byteToInt(fruData[offset]) & 0xf;
-		capacity |= TypeConverter.byteToInt(fruData[offset + 1]) << 4;
+		// 12-bit capacity, least significant byte first (FRU spec section 18.1)
+		capacity = TypeConverter.byteToInt(fruData[offset]);
+		capacity |= (TypeConverter.byteToInt(fruData[offset + 1]) & 0x0f) << 8;
 
 		peakVa = TypeConverter.byteToInt(fruData[offset + 2]);
 		peakVa |= TypeConverter.byteToInt(fruData[offset + 3]) << 8;

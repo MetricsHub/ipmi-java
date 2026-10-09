@@ -67,7 +67,7 @@ public class BaseCompatibilityInfo extends MultiRecordInfo {
 		compatibilityBase = TypeConverter.byteToInt(fruData[offset + 4]);
 		codeStart = TypeConverter.byteToInt(fruData[offset + 5]) & 0x7f;
 		codeRangeMasks = new byte[length - 6];
-		System.arraycopy(fruData, 6, codeRangeMasks, 0, length - 6);
+		System.arraycopy(fruData, offset + 6, codeRangeMasks, 0, length - 6);
 	}
 
 	public int getManufacturerId() {

@@ -63,7 +63,8 @@ public class GetChassisStatusResponseData implements ResponseData {
 		case 2:
 			return PowerRestorePolicy.PoweredUp;
 		default:
-			throw new IllegalArgumentException("Invalid Power Restore Policy");
+			// 11b is "unknown" in IPMI 2.0 Table 28-3
+			return PowerRestorePolicy.Unknown;
 		}
 	}
 

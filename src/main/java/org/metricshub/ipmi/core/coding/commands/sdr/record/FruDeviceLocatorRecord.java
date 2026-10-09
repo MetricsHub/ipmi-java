@@ -71,15 +71,9 @@ public class FruDeviceLocatorRecord extends SensorRecord {
 		}
 
 		setDeviceId(deviceIdFromRecord);
-		int id = TypeConverter.byteToInt(recordData[6]);
 
-		if (!isLogical()) {
-			id >>= 1;
-		}
-
-		setId(id);
-
-		setAccessLun((TypeConverter.byteToInt(recordData[7]) & 0xc) >> 2);
+		// IPMI 2.0 Table 43-7 byte 8: bit 7 logical, bits [4:3] LUN, bits [2:0] private bus ID
+		setAccessLun((TypeConverter.byteToInt(recordData[7]) & 0x18) >> 3);
 
 		setManagementChannelNumber((TypeConverter.byteToInt(recordData[8]) & 0xf0) >> 4);
 

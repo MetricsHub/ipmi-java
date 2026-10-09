@@ -54,41 +54,35 @@ linear formula (`M`, `B` and the exponents of IPMI 2.0, section 36.3):
 
 ```java
 for (Sensor sensor : IpmiClient.getSensors(config)) {
-	// isSensorStateValid() is false when the BMC flags the reading as unavailable
-	if (sensor.isFull() && sensor.getData() != null && sensor.getData().isSensorStateValid()) {
+	if (sensor.isFull() && sensor.getData() != null) {
 		FullSensorRecord record = (FullSensorRecord) sensor.getRecord();
-		double value = sensor.getData().getSensorReading(record);
-		System.out.println(sensor.getName() + " = " + value + " " + record.getSensorBaseUnit()
-				+ " (upper critical: " + record.getUpperCriticalThreshold() + ")");
+		GetSensorReadingResponseData data = sensor.getData();
+		// The BMC flags a reading it does not vouch for: unavailable, scanning disabled, or no analog reading
+		if (data.isSensorStateValid() && data.isScanningEnabled() && record.hasAnalogReading()) {
+			double value = data.getSensorReading(record);
+			System.out.println(sensor.getName() + " = " + value + " " + record.getSensorBaseUnit()
+					+ " (upper critical: " + record.getUpperCriticalThreshold() + ")");
+		}
 	}
 }
 ```
 
 ```text
 Ambient Temp = 17.0 DegreesC (upper critical: 39.0)
-System Power = 92.0 Watts (upper critical: 0.0)
-Fan 1 = 6600.0 Rpm (upper critical: 0.0)
+System Power = 92.0 Watts (upper critical: NaN)
+Fan 1 = 6600.0 Rpm (upper critical: NaN)
 System 3.3V = 3.38 Volts (upper critical: 3.56)
 ```
 
 `getSensorBaseUnit()` returns a
 [`SensorUnit`](apidocs/org/metricshub/ipmi/core/coding/commands/sdr/record/SensorUnit.html);
 the six thresholds (`getLowerNonCriticalThreshold()` to `getUpperNonRecoverableThreshold()`)
-are converted with the same formula, and are `0.0` when the BMC does not define them.
+are converted with the same formula (linearization included), and are `Double.NaN` when the
+record does not define them, so that a threshold of `0` is a threshold.
 
-> [!WARNING]
-> Known limitations of the decoding, by the IPMI 2.0 specification
-> (not all of them reproduced on real hardware):
->
-> * a sensor whose reading is flagged *unavailable* or whose scanning is disabled is still
->   reported with a reading: check `getData().isSensorStateValid()` as above
->   ([#110](https://github.com/metricshub/ipmi-java/issues/110));
-> * the non-linear conversions and the readability of each threshold are not fully handled
->   ([#83](https://github.com/metricshub/ipmi-java/issues/83));
-> * the threshold status bits of the reading are mis-mapped
->   ([#82](https://github.com/metricshub/ipmi-java/issues/82));
-> * a Compact record that describes several shared sensors is reported as a single sensor
->   ([#100](https://github.com/metricshub/ipmi-java/issues/100)).
+> [!NOTE]
+> A Compact record that describes several shared sensors is reported as a single sensor
+> ([#100](https://github.com/metricshub/ipmi-java/issues/100)).
 
 ### States
 

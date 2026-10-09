@@ -32,6 +32,7 @@ import org.metricshub.ipmi.core.coding.payload.lan.NetworkFunction;
 import org.metricshub.ipmi.core.coding.protocol.AuthenticationType;
 import org.metricshub.ipmi.core.coding.protocol.IpmiMessage;
 import org.metricshub.ipmi.core.coding.security.CipherSuite;
+import org.metricshub.ipmi.core.coding.payload.CompletionCode;
 import org.metricshub.ipmi.core.common.TypeConverter;
 
 import java.security.InvalidKeyException;
@@ -41,6 +42,10 @@ import java.security.NoSuchAlgorithmException;
  * Wrapper for Close Session request
  */
 public class CloseSession extends IpmiCommandCoder {
+
+	private static final int INVALID_SESSION_ID = 0x87;
+
+	private static final int INVALID_SESSION_HANDLE = 0x88;
 
 	private int sessionId;
 
@@ -93,10 +98,25 @@ public class CloseSession extends IpmiCommandCoder {
 	}
 
 	@Override
+	protected CompletionCode decodeCommandSpecificCompletionCode(int rawCode) {
+		// IPMI 2.0 Table 22-19
+		switch (rawCode) {
+		case INVALID_SESSION_ID:
+			return CompletionCode.InvalidSessionId;
+		case INVALID_SESSION_HANDLE:
+			return CompletionCode.InvalidSessionHandle;
+		default:
+			return CompletionCode.Unknown;
+		}
+	}
+
+	@Override
 	public ResponseData getResponseData(IpmiMessage message)
 			throws IPMIException,
 			NoSuchAlgorithmException,
 			InvalidKeyException {
+		validateResponse(message);
+
 		return new CloseSessionResponseData();
 	}
 

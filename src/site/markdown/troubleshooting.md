@@ -76,10 +76,10 @@ to make it use suite 3 or 17.
 | Symptom | Cause |
 | --- | --- |
 | `WARN Skipping SDR record ...` | A record that cannot be decoded is skipped; the other sensors are still returned. [SDR records](supported-commands.html#sdr-records) lists what is decoded. |
-| `WARN Failed to read FRU <id> at offset <n> ... Requested Sensor, data, or record not present` | The FRU is declared in the SDR repository but not present, for example an empty power supply bay. Usually harmless. |
-| `WARN Failed to decode FRU <id>` | The FRU data is not in the IPMI FRU format (for example the SPD data of a memory module, [#107](https://github.com/metricshub/ipmi-java/issues/107)). |
-| A sensor known to `ipmitool` is not returned | Only Full and Compact sensor records of the BMC's own repository are read: sensors behind satellite controllers are not ([#84](https://github.com/metricshub/ipmi-java/issues/84)), and shared Compact records are not expanded ([#100](https://github.com/metricshub/ipmi-java/issues/100)). |
-| A sensor reads `0.0` | The BMC flags the reading as unavailable, which is not checked yet ([#110](https://github.com/metricshub/ipmi-java/issues/110)). |
+| `WARN Failed to read FRU <id> at offset <n>, the FRU data is truncated there: Requested Sensor, data, or record not present` | The FRU is declared in the SDR repository but not present, for example an empty power supply bay. Usually harmless: the reading stops there and the areas read so far are decoded. |
+| `WARN Failed to read FRU <id>` | The BMC did not answer Get FRU Inventory Area Info for that FRU, or its data is not in the IPMI FRU format (for example the SPD data of a memory module, [#107](https://github.com/metricshub/ipmi-java/issues/107)). The other FRUs are still returned. |
+| `WARN The <area> info area at offset <n> is truncated: skipped` | The read stopped before the end of that area (see above): the complete areas of the FRU are still returned. |
+| A sensor known to `ipmitool` is not returned | Only Full and Compact sensor records of the BMC's own repository are read: sensors behind satellite controllers are not ([#84](https://github.com/metricshub/ipmi-java/issues/84)), and shared Compact records are not expanded ([#100](https://github.com/metricshub/ipmi-java/issues/100)). A sensor whose reading the BMC flags as unavailable or not scanned (`ipmitool` shows `na` or `disabled`) is returned without reading or states. |
 | Negative processor temperatures (`CPU1 DTS = -44.0`) | Not an error: Intel *Digital Thermal Sensor* readings are the margin below the maximum junction temperature. |
 
 ## Collecting is slow

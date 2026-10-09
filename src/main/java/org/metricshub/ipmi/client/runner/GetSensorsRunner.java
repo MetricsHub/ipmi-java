@@ -137,7 +137,8 @@ public class GetSensorsRunner extends AbstractIpmiRunner<List<Sensor>> {
 	 * @return String value
 	 */
 	static String buildStates(final GetSensorReadingResponseData data, final SensorRecord sensorRecord) {
-		if (data == null) {
+		// IPMI 2.0 Table 35-15: neither the reading nor the states are valid when the sensor is unavailable or not scanned
+		if (data == null || !data.isSensorStateValid() || !data.isScanningEnabled()) {
 			return Utils.EMPTY;
 		}
 
@@ -166,9 +167,13 @@ public class GetSensorsRunner extends AbstractIpmiRunner<List<Sensor>> {
 	 * @return a string value of the state in a format of deviceName"=0x"+raw[3]+raw[2]
 	 */
 	static String buildOemState(final byte[] raw, final String deviceName) {
-		if (raw == null || raw.length < 4) {
+		if (raw == null || raw.length < 3) {
 			throw new IllegalArgumentException(
 					String.format("Invalid IPMI raw command date for device %s.", deviceName));
+		}
+		// The second state byte (states 8-14) is optional in Get Sensor Reading (Table 35-15)
+		if (raw.length == 3) {
+			return String.format("%s=0x%02x", deviceName, raw[2]);
 		}
 		return String.format("%s=0x%02x%02x", deviceName, raw[3], raw[2]);
 	}

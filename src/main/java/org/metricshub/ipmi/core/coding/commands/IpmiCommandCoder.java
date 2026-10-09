@@ -87,10 +87,25 @@ public abstract class IpmiCommandCoder extends PayloadCoder {
 			throw new IllegalArgumentException("Invalid response payload");
 		}
 		IpmiLanResponse response = (IpmiLanResponse) message.getPayload();
-		if (response.getCompletionCode() != CompletionCode.Ok) {
-			throw new IPMIException(response.getCompletionCode());
+		CompletionCode completionCode = response.getCompletionCode();
+		if (completionCode == CompletionCode.Unknown) {
+			completionCode = decodeCommandSpecificCompletionCode(response.getRawCompletionCode());
+		}
+		if (completionCode != CompletionCode.Ok) {
+			throw new IPMIException(completionCode, response.getRawCompletionCode());
 		}
 		return response.getIpmiCommandData();
+	}
+
+	/**
+	 * Gives a meaning to an OEM or command-specific completion code (01h-7Eh and 80h-BEh, IPMI 2.0 Table 5-2) of this
+	 * command. The default knows none of them.
+	 *
+	 * @param rawCode the completion code byte of the response
+	 * @return the matching {@link CompletionCode}, or {@link CompletionCode#Unknown}
+	 */
+	protected CompletionCode decodeCommandSpecificCompletionCode(int rawCode) {
+		return CompletionCode.Unknown;
 	}
 
 	/**
