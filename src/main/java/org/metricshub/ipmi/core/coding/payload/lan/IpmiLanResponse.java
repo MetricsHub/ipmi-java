@@ -38,7 +38,7 @@ public class IpmiLanResponse extends IpmiLanMessage {
 
 	/**
 	 * Decodes the completion code. Only 00h and the generic codes (C0h-FFh, IPMI 2.0 Table 5-2) have a meaning
-	 * common to every command; a command-specific (01h-7Eh) or OEM (80h-BEh) code is {@link CompletionCode#Unknown}
+	 * common to every command; an OEM (01h-7Eh) or command-specific (80h-BEh) code is {@link CompletionCode#Unknown}
 	 * here, and the command coder may give it its own meaning.
 	 *
 	 * @param completionCode the completion code byte of the response

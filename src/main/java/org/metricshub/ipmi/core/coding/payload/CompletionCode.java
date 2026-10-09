@@ -218,7 +218,7 @@ public enum CompletionCode {
 	 */
 	InvalidRole(CompletionCode.INVALIDROLE),
 	/**
-	 * A code this enumeration does not list: command-specific, OEM or reserved. The raw value is available on the
+	 * A code this enumeration does not list: OEM, command-specific or reserved. The raw value is available on the
 	 * {@link org.metricshub.ipmi.core.coding.payload.lan.IPMIException}.
 	 */
 	Unknown(CompletionCode.UNKNOWN),
@@ -387,7 +387,7 @@ public enum CompletionCode {
 		case INVALIDROLE:
 			return InvalidRole;
 		default:
-			// IPMI 2.0 Table 5-2 lets every command use command-specific (01h-7Eh) and OEM (80h-BEh) codes, and
+			// IPMI 2.0 Table 5-2 lets every command use OEM (01h-7Eh) and command-specific (80h-BEh) codes, and
 			// reserves the rest: a code this table does not list must not abort the decoding of the response
 			return Unknown;
 		}

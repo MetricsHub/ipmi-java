@@ -68,6 +68,9 @@ public class FullSensorRecord extends AbstractSensorRecord {
 
 	private static final int NO_ANALOG_READING = 3;
 
+	/** Last linearization code (cube root, Table 43-1 byte 24) the library can apply. */
+	private static final int LAST_LINEARIZABLE = 0x0b;
+
 	@Override
 	protected void populateTypeSpecficValues(
 			byte[] recordData,
@@ -310,21 +313,26 @@ public class FullSensorRecord extends AbstractSensorRecord {
 	}
 
 	/**
+	 * Tells whether the reading byte of this sensor converts to a value: false when the data format of Sensor Units 1
+	 * is 11b (no analog reading, Table 43-1), or when the linearization is non-linear (70h-7Fh) or reserved, as the
+	 * conversion then needs the Get Sensor Reading Factors command, which the library does not implement.
+	 *
+	 * @return whether {@link #calcFormula(int)} gives a meaningful value
+	 */
+	public boolean hasAnalogReading() {
+		return ((TypeConverter.byteToInt(sensorUnits1) & 0xc0) >> 6) != NO_ANALOG_READING
+				&& linearization <= LAST_LINEARIZABLE;
+	}
+
+	/**
 	 * Converts to units-based value using the 'y=Mx+B' formula. 1's or 2's
 	 * complement signed or unsigned per flag bits in Sensor Units 1.
 	 *
 	 * @param value
 	 *        - Value to be converted. Length of 8 is assumed.
-	 * @return converted value
+	 * @return converted value, {@link Double#NaN} when the sensor has no analog reading
+	 *         ({@link #hasAnalogReading()})
 	 */
-	/**
-	 * @return false when the data format of Sensor Units 1 is 11b (Table 43-1): the sensor has no analog reading and
-	 *         the reading byte must not be converted
-	 */
-	public boolean hasAnalogReading() {
-		return ((TypeConverter.byteToInt(sensorUnits1) & 0xc0) >> 6) != NO_ANALOG_READING;
-	}
-
 	public double calcFormula(int value) {
 		return calcFormula(value, 8, sensorUnits1);
 	}
@@ -395,9 +403,9 @@ public class FullSensorRecord extends AbstractSensorRecord {
 		case 11:
 			return Math.cbrt(result);
 		default:
-			// 70h-7Fh are non-linear (the linearization needs Get Sensor Reading Factors), the rest is reserved:
-			// return the linear conversion, as ipmitool does, rather than drop the sensor
-			return result;
+			// 70h-7Fh are non-linear: the SDR factors hold at the nominal reading only and the conversion needs
+			// Get Sensor Reading Factors, which the library does not implement; the rest is reserved
+			return Double.NaN;
 		}
 	}
 

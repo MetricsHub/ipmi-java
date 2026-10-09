@@ -137,6 +137,9 @@ public class SelRecord {
 		return manufacturerId;
 	}
 
+	/**
+	 * @param manufacturerId the manufacturer ID of an OEM timestamped record, null for the other record types
+	 */
 	public void setManufacturerId(Integer manufacturerId) {
 		this.manufacturerId = manufacturerId;
 	}
@@ -149,6 +152,9 @@ public class SelRecord {
 		return oemData;
 	}
 
+	/**
+	 * @param oemData the OEM-defined bytes of an OEM record, null for the other record types
+	 */
 	public void setOemData(byte[] oemData) {
 		this.oemData = oemData;
 	}

@@ -28,7 +28,8 @@ public class IPMIException extends Exception {
 
 	private static final long serialVersionUID = 1L;
 
-	private static final int OEM_CODES_START = 0x80;
+	/** First command-specific code (IPMI 2.0 Table 5-2): 01h-7Eh are OEM, 80h-BEh command-specific. */
+	private static final int COMMAND_SPECIFIC_CODES_START = 0x80;
 
 	private static final int GENERIC_CODES_START = 0xC0;
 
@@ -50,6 +51,13 @@ public class IPMIException extends Exception {
 		this.rawCode = rawCode;
 	}
 
+	/**
+	 * @return whether the code is one Table 5-2 reserves: 7Fh, BFh, D7h-FEh
+	 */
+	private static boolean isReserved(int rawCode) {
+		return rawCode == 0x7f || rawCode == 0xbf || (rawCode >= 0xd7 && rawCode <= 0xfe);
+	}
+
 	public CompletionCode getCompletionCode() {
 		return completionCode;
 	}
@@ -65,7 +73,9 @@ public class IPMIException extends Exception {
 	@Override
 	public String getMessage() {
 		if (completionCode == CompletionCode.Unknown && rawCode >= 0) {
-			String kind = rawCode < OEM_CODES_START ? "Command-specific" : rawCode < GENERIC_CODES_START ? "OEM" : "Reserved";
+			String kind = isReserved(rawCode) ?
+					"Reserved" : rawCode < COMMAND_SPECIFIC_CODES_START ?
+							"OEM" : rawCode < GENERIC_CODES_START ? "Command-specific" : "Generic";
 			return String.format("%s completion code 0x%02X.", kind, rawCode);
 		}
 		return completionCode.getMessage();

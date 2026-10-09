@@ -50,25 +50,29 @@ class IpmiCommandCoderTest {
 	}
 
 	@Test
-	void oemAndCommandSpecificCodesAreReportedWithTheirRawValue() {
+	void oemCommandSpecificAndReservedCodesAreReportedWithTheirRawValue() {
 		IPMIException oem = assertThrows(
 				IPMIException.class,
 				() -> COMMAND.getResponseData(response(CommandCodes.RESERVE_SDR_REPOSITORY, 0x8a)));
 		assertEquals(CompletionCode.Unknown, oem.getCompletionCode());
 		assertEquals(0x8a, oem.getRawCode());
-		assertEquals("OEM completion code 0x8A.", oem.getMessage());
+		assertEquals("Command-specific completion code 0x8A.", oem.getMessage());
 
-		// 0Dh is "Unauthorized name" for RAKP only: for an IPMI command it is a command-specific code
+		// 0Dh is "Unauthorized name" for RAKP only: for an IPMI command it is an OEM (device-specific) code
 		IPMIException specific = assertThrows(
 				IPMIException.class,
 				() -> COMMAND.getResponseData(response(CommandCodes.RESERVE_SDR_REPOSITORY, 0x0d)));
 		assertEquals(CompletionCode.Unknown, specific.getCompletionCode());
-		assertEquals("Command-specific completion code 0x0D.", specific.getMessage());
+		assertEquals("OEM completion code 0x0D.", specific.getMessage());
 
 		IPMIException reserved = assertThrows(
 				IPMIException.class,
 				() -> COMMAND.getResponseData(response(CommandCodes.RESERVE_SDR_REPOSITORY, 0xd9)));
 		assertEquals("Reserved completion code 0xD9.", reserved.getMessage());
+		IPMIException boundary = assertThrows(
+				IPMIException.class,
+				() -> COMMAND.getResponseData(response(CommandCodes.RESERVE_SDR_REPOSITORY, 0xbf)));
+		assertEquals("Reserved completion code 0xBF.", boundary.getMessage());
 	}
 
 	@Test

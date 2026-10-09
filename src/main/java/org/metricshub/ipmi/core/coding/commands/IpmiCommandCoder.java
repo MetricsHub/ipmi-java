@@ -98,7 +98,7 @@ public abstract class IpmiCommandCoder extends PayloadCoder {
 	}
 
 	/**
-	 * Gives a meaning to a command-specific or OEM completion code (01h-7Eh and 80h-BEh, IPMI 2.0 Table 5-2) of this
+	 * Gives a meaning to an OEM or command-specific completion code (01h-7Eh and 80h-BEh, IPMI 2.0 Table 5-2) of this
 	 * command. The default knows none of them.
 	 *
 	 * @param rawCode the completion code byte of the response

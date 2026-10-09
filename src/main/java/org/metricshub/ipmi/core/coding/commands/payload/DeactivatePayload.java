@@ -117,16 +117,17 @@ public class DeactivatePayload extends IpmiCommandCoder {
 			throw new IllegalArgumentException("Invalid response payload");
 		}
 
-		CompletionCode completionCode = ((IpmiLanResponse) message.getPayload()).getCompletionCode();
+		IpmiLanResponse response = (IpmiLanResponse) message.getPayload();
 
-		if (completionCode != CompletionCode.Ok) {
+		if (response.getCompletionCode() != CompletionCode.Ok) {
+			// The command-specific codes (IPMI 2.0 Table 24-8) are read from the raw byte
 			DeactivatePayloadCompletionCode specificCompletionCode = DeactivatePayloadCompletionCode
-					.parseInt(completionCode.getCode());
+					.parseInt(response.getRawCompletionCode());
 
 			if (specificCompletionCode == DeactivatePayloadCompletionCode.PAYLOAD_ALREADY_DEACTIVATED) {
 				LOGGER.warn(specificCompletionCode.getMessage());
 			} else {
-				throw new IPMIException(((IpmiLanResponse) message.getPayload()).getCompletionCode());
+				throw new IPMIException(response.getCompletionCode(), response.getRawCompletionCode());
 			}
 		}
 

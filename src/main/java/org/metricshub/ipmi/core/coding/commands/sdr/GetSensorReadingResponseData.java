@@ -100,6 +100,9 @@ public class GetSensorReadingResponseData implements ResponseData {
 		return scanningEnabled;
 	}
 
+	/**
+	 * @param scanningEnabled whether the BMC reports sensor scanning as enabled (byte 2 bit 6)
+	 */
 	public void setScanningEnabled(boolean scanningEnabled) {
 		this.scanningEnabled = scanningEnabled;
 	}

@@ -45,7 +45,9 @@ The decoders follow the IPMI 2.0 and FRU specifications more closely; the visibl
 * the thresholds are linearized like the reading, are read whenever byte 12 of the record says
   the sensor has thresholds (1.2.02 looked at the wrong byte), and `getAccuracy()` and
   `getTolerance()` are decoded as the specification says; `hasAnalogReading()` tells when the
-  reading byte is not a reading;
+  reading byte is not a reading, which includes the non-linear sensors (linearization `70h`-`7Fh`),
+  whose conversion needs the Get Sensor Reading Factors command the library does not implement:
+  their reading and thresholds are `NaN` where 1.2.02 dropped the sensor;
 * a sensor whose reading the BMC flags as unavailable or not scanned is returned without reading
   and without states (1.2.02 reported `0.0`); `GetSensorReadingResponseData.isScanningEnabled()`
   exposes the flag;

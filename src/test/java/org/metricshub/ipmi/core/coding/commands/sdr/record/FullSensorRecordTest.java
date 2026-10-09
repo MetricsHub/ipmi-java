@@ -99,6 +99,18 @@ class FullSensorRecordTest {
 	}
 
 	@Test
+	void nonLinearSensorHasNoComputableReading() {
+		byte[] nonLinear = EXPONENTIAL_TEMPERATURE.clone();
+		nonLinear[23] = 0x70; // linearization: non-linear, the factors hold at the nominal reading only
+
+		FullSensorRecord record = (FullSensorRecord) SensorRecord.populateSensorRecord(nonLinear);
+
+		assertFalse(record.hasAnalogReading());
+		assertTrue(Double.isNaN(record.calcFormula(7)));
+		assertTrue(Double.isNaN(record.getUpperCriticalThreshold()));
+	}
+
+	@Test
 	void reservedUnitValuesDoNotThrow() {
 		assertEquals(RateUnit.None, RateUnit.parseInt(7));
 		assertEquals(ModifierUnitUsage.None, ModifierUnitUsage.parseInt(3));
