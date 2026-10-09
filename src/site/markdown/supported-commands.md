@@ -17,7 +17,7 @@ ones `IpmiClient` uses. A command not listed here can be added by
 | Command | Class | NetFn / Cmd | Used by `IpmiClient` |
 | --- | --- | --- | --- |
 | **Session** | | | |
-| Get Channel Authentication Capabilities | `GetChannelAuthenticationCapabilities` | App / `38h` | every call, and the keep-alive |
+| Get Channel Authentication Capabilities | `GetChannelAuthenticationCapabilities` | App / `38h` | every call |
 | Get Channel Cipher Suites | `GetChannelCipherSuites` | App / `54h` | every call (unless `skipAuth`) |
 | RMCP+ Open Session | `OpenSession` | (payload) | every call |
 | RAKP Message 1 / 3 | `Rakp1`, `Rakp3` | (payload) | every call |

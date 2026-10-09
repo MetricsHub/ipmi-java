@@ -40,6 +40,11 @@ public final class CommandCodes {
 	public static final byte GET_CHASSIS_STATUS = 0x01;
 
 	/**
+	 * An IPMI code for Get Device ID command (Application network function)
+	 */
+	public static final byte GET_DEVICE_ID = 0x01;
+
+	/**
 	 * An IPMI code for Chassis Control command
 	 */
 	public static final byte CHASSIS_CONTROL = 0x02;

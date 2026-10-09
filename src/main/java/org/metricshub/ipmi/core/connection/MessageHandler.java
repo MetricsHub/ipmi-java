@@ -95,21 +95,35 @@ public abstract class MessageHandler {
 	 *        ID of the current session.
 	 * @param isOneWay
 	 *        flag indicating, if message is one way and we shouldn't await response,
-	 *        or it isn't and needs response from remote system
-	 * @return sequence number of the sent message
+	 *        or it isn't and needs response from remote system. A one-way IPMI message is queued all the same, so that
+	 *        its tag stays reserved until its reply arrives or it times out, but its reply and its timeout are not
+	 *        reported (see {@link #takeTag(PayloadCoder, boolean)}).
+	 * @return sequence number of the sent message, or -1 when the queue is full
 	 * @throws ConnectionException when could not send message due to some problems with connection
 	 */
 	public int sendMessage(PayloadCoder payloadCoder, StateMachine stateMachine, int sessionId, boolean isOneWay)
 			throws ConnectionException {
 		validateSessionState(stateMachine);
 
-		int seq = isOneWay ? messageQueue.getSequenceNumber() : messageQueue.add(payloadCoder);
+		int seq = takeTag(payloadCoder, isOneWay);
 		if (seq > 0) {
 			stateMachine
 					.doTransition(new Sendv20Message(payloadCoder, sessionId, seq, connection.getNextSessionSequenceNumber()));
 		}
 
 		return seq;
+	}
+
+	/**
+	 * Takes the tag of a message to send by queuing it: the tag stays reserved until its reply arrives or it times
+	 * out.
+	 *
+	 * @param payloadCoder the message to send
+	 * @param isOneWay true when nobody waits for the reply
+	 * @return the tag of the message, or -1 when the queue is full
+	 */
+	protected int takeTag(PayloadCoder payloadCoder, boolean isOneWay) {
+		return messageQueue.add(payloadCoder, isOneWay);
 	}
 
 	/**
@@ -178,6 +192,12 @@ public abstract class MessageHandler {
 		messageQueue.tearDown();
 	}
 
+	/**
+	 * Returns a sequence number for a message sent outside the queue (the Close Session request, the SOL ACK-only
+	 * packets).
+	 *
+	 * @return a sequence number that no queued request holds
+	 */
 	public int getSequenceNumber() {
 		return messageQueue.getSequenceNumber();
 	}

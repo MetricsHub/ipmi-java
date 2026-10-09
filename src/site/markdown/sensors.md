@@ -44,7 +44,7 @@ Each [`Sensor`](apidocs/org/metricshub/ipmi/client/model/Sensor.html) holds:
 | `getEntityId()`, `getDeviceId()` | The entity the sensor belongs to: its type (`EntityId.Processor`, `EntityId.PowerSupply`, ...) and instance number |
 | `isFull()`, `isCompact()` | Whether the record is a Full Sensor record (an analog sensor with a conversion formula and thresholds) or a Compact one (usually a discrete sensor) |
 | `getRecord()` | The decoded record: a [`FullSensorRecord`](apidocs/org/metricshub/ipmi/core/coding/commands/sdr/record/FullSensorRecord.html) or a [`CompactSensorRecord`](apidocs/org/metricshub/ipmi/core/coding/commands/sdr/record/CompactSensorRecord.html), both [`AbstractSensorRecord`](apidocs/org/metricshub/ipmi/core/coding/commands/sdr/record/AbstractSensorRecord.html) |
-| `getData()` | The [`GetSensorReadingResponseData`](apidocs/org/metricshub/ipmi/core/coding/commands/sdr/GetSensorReadingResponseData.html), or `null` when the BMC has no reading for the sensor (completion code `DataNotPresent`) |
+| `getData()` | The [`GetSensorReadingResponseData`](apidocs/org/metricshub/ipmi/core/coding/commands/sdr/GetSensorReadingResponseData.html), or `null` when the BMC returns no reading for the sensor: completion code `DataNotPresent`, or another error completion code, logged at `WARN` ([Errors that do not fail the call](timeouts-and-errors.html#errors-that-do-not-fail-the-call)) |
 | `getStates()` | The asserted states, as `sensorName=state|sensorName=state...`, or an empty string |
 
 ### Readings
@@ -99,8 +99,10 @@ CPU0_Status=Presence detected
 The raw states are available as
 `getData().getStatesAsserted(record.getSensorType(), record.getEventReadingType())`, a list of
 [`ReadingType`](apidocs/org/metricshub/ipmi/core/coding/commands/sdr/record/ReadingType.html).
-For OEM sensors (event/reading type `0x7F`), whose states the specification does not define,
-the state is the raw reading: `sensorName=0xHHLL`.
+For OEM sensors (event/reading types `0x70` to `0x7F`), whose states the specification does not
+define, the state is the raw value of the state bytes: `sensorName=0xHHLL` (`0xLL` when the BMC
+returns a single state byte). An OEM sensor with no state asserted reports no state, like any
+discrete sensor.
 
 ## Text output format
 

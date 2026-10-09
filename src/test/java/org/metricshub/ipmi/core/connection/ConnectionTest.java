@@ -2,6 +2,7 @@ package org.metricshub.ipmi.core.connection;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -33,7 +34,14 @@ import org.metricshub.ipmi.core.sm.actions.MessageAction;
 import org.metricshub.ipmi.core.sm.states.SessionValid;
 import org.metricshub.ipmi.core.transport.UdpMessage;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.CountDownLatch;
+import org.metricshub.ipmi.core.coding.commands.IpmiCommandCoder;
+import org.metricshub.ipmi.core.coding.payload.lan.NetworkFunction;
+import org.metricshub.ipmi.core.coding.payload.sol.SolAckState;
+import org.metricshub.ipmi.core.coding.sol.SolCoder;
+import org.metricshub.ipmi.core.connection.queue.MessageQueue;
+import org.metricshub.ipmi.core.connection.queue.QueueElement;
 import org.metricshub.ipmi.core.coding.commands.session.GetChannelCipherSuitesResponseData;
 import org.metricshub.ipmi.core.sm.actions.ResponseAction;
 
@@ -205,7 +213,7 @@ class ConnectionTest {
 	}
 
 	@Test
-	void theKeepAliveReplyIsDiscardedAndFreesItsTag() throws Exception {
+	void theKeepAliveIsAOneWayGetDeviceIdWhoseReplyIsDiscarded() throws Exception {
 		Connection connection = connect(TIMEOUT_MS);
 		try {
 			openSession(connection);
@@ -223,11 +231,20 @@ class ConnectionTest {
 			});
 			connection.run();
 			int keepAliveTag = 1; // the first tag of a new connection
-			// The keep-alive reply (command 38h) is not delivered, and its tag is free again
-			connection.notify(new MessageAction(reply(keepAliveTag, (byte) 0x38)));
-			assertEquals(-1, notifiedTag.get(), "the keep-alive reply must not reach the listeners");
+			MessageQueue queue = handler(connection, PayloadType.Ipmi).getMessageQueue();
+			QueueElement keepAlive = queue.getElement(keepAliveTag);
+			assertNotNull(keepAlive, "the keep-alive must hold its tag in the queue");
+			assertTrue(keepAlive.isOneWay());
+			IpmiCommandCoder command = (IpmiCommandCoder) keepAlive.getRequest();
+			assertEquals(NetworkFunction.ApplicationRequest, command.getNetworkFunction());
+			assertEquals(0x01, command.getCommandCode(), "Get Device ID");
 
-			// The same command sent by the application gets its reply
+			// The keep-alive reply is not delivered, and frees the tag
+			connection.notify(new MessageAction(reply(keepAliveTag, (byte) 0x01)));
+			assertEquals(-1, notifiedTag.get(), "the keep-alive reply must not reach the listeners");
+			assertNull(queue.getElement(keepAliveTag));
+
+			// A request sent by the application gets its reply
 			GetChannelAuthenticationCapabilities request = new GetChannelAuthenticationCapabilities(
 					IpmiVersion.V20,
 					IpmiVersion.V20,
@@ -241,6 +258,42 @@ class ConnectionTest {
 		} finally {
 			connection.disconnect();
 		}
+	}
+
+	@Test
+	void oneWayIpmiMessagesAreQueuedButNotTheSolAcknowledgements() throws Exception {
+		Connection connection = connect(60000);
+		try {
+			MessageHandler ipmi = handler(connection, PayloadType.Ipmi);
+			int tag = ipmi
+					.takeTag(
+							new GetChannelAuthenticationCapabilities(
+									IpmiVersion.V20,
+									IpmiVersion.V20,
+									CipherSuite.getEmpty(),
+									PrivilegeLevel.Callback,
+									(byte) 0xe),
+							true);
+			assertTrue(ipmi.getMessageQueue().getElement(tag).isOneWay());
+
+			// The BMC never acknowledges an ACK-only SOL packet: a stream of them must not fill the 8-slot window
+			MessageHandler sol = handler(connection, PayloadType.Sol);
+			for (int i = 0; i < 32; i++) {
+				int solTag = sol
+						.takeTag(new SolCoder((byte) (i % 15 + 1), (byte) 1, SolAckState.ACK, CipherSuite.getEmpty()), true);
+				assertTrue(solTag > 0, "ACK " + i + " got no tag");
+				assertNull(sol.getMessageQueue().getElement(solTag), "ACK " + i + " was queued");
+			}
+		} finally {
+			connection.disconnect();
+		}
+	}
+
+	@SuppressWarnings("unchecked")
+	private static MessageHandler handler(Connection connection, PayloadType payloadType) throws Exception {
+		Field field = Connection.class.getDeclaredField("messageHandlers");
+		field.setAccessible(true);
+		return ((Map<PayloadType, MessageHandler>) field.get(connection)).get(payloadType);
 	}
 
 	/** A minimal Application (07h) IPMI LAN response with the given tag (rqSeq, bits 7:2 of byte 4) and command. */
@@ -284,7 +337,7 @@ class ConnectionTest {
 					(byte) 0xe);
 			int tag = connection.sendMessage(request, false);
 
-			// A late reply to a one-way Get Device ID (command 01h) whose tag was reused by the request
+			// A late reply to a Get Device ID (command 01h) that timed out and whose tag was reused by the request
 			connection.notify(new MessageAction(reply(tag, (byte) 0x01)));
 			assertEquals(-1, notifiedTag.get(), "a reply to another command must not answer the queued request");
 

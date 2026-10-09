@@ -97,11 +97,12 @@ port (or always pass `0`), and call `tearDown()` when you are done with it.
 | `closeConnection(handle)` | Close and release the connection; the handle is no longer usable. |
 | `tearDown()` | Close every connection and release the local port. |
 
-The keep-alive is a `Connection.KeepAlive` request, a Get Channel Authentication Capabilities that
-the connection queues every `pingPeriod` ms while a session is open. Nobody owns it: its reply is
-discarded instead of being delivered to the listeners, and its timeout is not reported. A request
-of that class sent by the application gets the same treatment; send a plain
-`GetChannelAuthenticationCapabilities` to get the reply.
+The keep-alive is a Get Device ID that the connection sends one-way every `pingPeriod` ms while a
+session is open. A one-way IPMI message (the keep-alive, or a request sent with
+`sendOneWayMessage()`) is queued like any request: its tag stays reserved until its reply arrives
+or it times out, so that a late reply cannot be taken for the reply of a later request, and it
+takes one of the 8 slots of the message window until then. Its reply is discarded instead of
+being delivered to the listeners, and its timeout is not reported.
 
 ### Choosing the cipher suite
 

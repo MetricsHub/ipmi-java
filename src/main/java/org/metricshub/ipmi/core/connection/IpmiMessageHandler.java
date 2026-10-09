@@ -27,6 +27,7 @@ import org.metricshub.ipmi.core.coding.commands.IpmiCommandCoder;
 import org.metricshub.ipmi.core.coding.commands.ResponseData;
 import org.metricshub.ipmi.core.coding.payload.lan.IpmiLanMessage;
 import org.metricshub.ipmi.core.coding.protocol.Ipmiv20Message;
+import org.metricshub.ipmi.core.connection.queue.QueueElement;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -73,8 +74,9 @@ public class IpmiMessageHandler extends MessageHandler {
 		if (message.getPayload() instanceof IpmiLanMessage) {
 			IpmiLanMessage lanMessagePayload = (IpmiLanMessage) message.getPayload();
 
-			PayloadCoder coder = getMessageQueue().getMessageFromQueue(lanMessagePayload.getSequenceNumber());
 			int tag = lanMessagePayload.getSequenceNumber();
+			QueueElement element = getMessageQueue().getElement(tag);
+			PayloadCoder coder = element == null ? null : element.getRequest();
 
 			LOGGER.debug("Received message with tag " + tag);
 
@@ -86,19 +88,19 @@ public class IpmiMessageHandler extends MessageHandler {
 				return;
 			}
 
-			if (coder instanceof Connection.KeepAlive) {
-				// Nobody waits for the reply of the keep-alive: it only frees the tag
-				getMessageQueue().remove(tag);
-				return;
-			}
-
-			// A late reply to a one-way message, whose tag is not reserved, may carry the tag of a newer queued
-			// request: the reply of a request answers the command of that request, and the request stays queued
+			// A late reply to a request that timed out may carry the tag of a newer queued request: the reply of a
+			// request answers the command of that request, and the request stays queued
 			if (coder instanceof IpmiCommandCoder && !answers((IpmiCommandCoder) coder, lanMessagePayload)) {
 				LOGGER
 						.debug(
 								"Message tagged with " + tag + " answers another command than the queued request."
 										+ " Dropping stale message.");
+				return;
+			}
+
+			if (element.isOneWay()) {
+				// Nobody waits for the reply of a one-way message (the keep-alive): it only frees the tag
+				getMessageQueue().remove(tag);
 				return;
 			}
 

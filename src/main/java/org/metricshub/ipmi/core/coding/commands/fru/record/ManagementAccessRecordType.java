@@ -67,7 +67,7 @@ public enum ManagementAccessRecordType {
 		case COMPONENTMANAGEMENTURL:
 			return ComponentManagementURL;
 		default:
-			logger.error("Invalid value: " + value);
+			logger.debug("Invalid value: {}", value);
 			return Unspecified;
 		}
 	}

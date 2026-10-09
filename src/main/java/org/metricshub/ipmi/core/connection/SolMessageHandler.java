@@ -46,6 +46,15 @@ public class SolMessageHandler extends MessageHandler {
 	}
 
 	/**
+	 * The one-way SOL messages are the ACK-only packets, which go out with packet sequence number 0 and which the BMC
+	 * never acknowledges (IPMI 2.0 section 15.9): they are not queued, so that they hold no slot of the window.
+	 */
+	@Override
+	protected int takeTag(PayloadCoder payloadCoder, boolean isOneWay) {
+		return isOneWay ? getSequenceNumber() : super.takeTag(payloadCoder, isOneWay);
+	}
+
+	/**
 	 * Assuming that given message is SOL message, reads both data and acknowledge information from it,
 	 * notifying registered listeners about incoming data.
 	 *

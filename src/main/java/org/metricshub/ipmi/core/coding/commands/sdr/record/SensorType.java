@@ -231,7 +231,7 @@ public enum SensorType {
 			if (value >= OEM) {
 				return Oem;
 			}
-			logger.error("Invalid value: " + value);
+			logger.debug("Invalid value: {}", value);
 			return Oem;
 		}
 	}

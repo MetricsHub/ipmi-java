@@ -1119,7 +1119,19 @@ public enum ReadingType {
 	}
 
 	/**
-	 * Determines type of discrete sensor reading.
+	 * Tells whether an event/reading type is OEM: the IPMI 2.0 specification (Table 42-1) reserves {@code 70h} to
+	 * {@code 7Fh} for OEM use, and defines none of their states.
+	 *
+	 * @param eventReadingType the event/reading type code of a sensor record
+	 * @return true for an OEM event/reading type
+	 */
+	public static boolean isOem(int eventReadingType) {
+		return eventReadingType >= 0x70 && eventReadingType <= 0x7f;
+	}
+
+	/**
+	 * Determines type of discrete sensor reading. The states of an OEM event/reading type or of an OEM sensor type are
+	 * {@link #UnknownOEMEvent}.
 	 *
 	 * @param sensorType
 	 *        - {@link SensorType} of the sensor
@@ -1132,7 +1144,7 @@ public enum ReadingType {
 	 */
 	public static ReadingType parseInt(SensorType sensorType, int eventReadingType, int offset) {
 
-		if (sensorType == SensorType.Oem) {
+		if (sensorType == SensorType.Oem || isOem(eventReadingType)) {
 			return UnknownOEMEvent;
 		}
 
@@ -1670,10 +1682,8 @@ public enum ReadingType {
 		case MONITORASICIC:
 			return MonitorAsicIc;
 		default:
-			logger
-					.warn(
-							"Invalid value: " + value + " (" + Integer.toHexString(value)
-									+ ") for sensor " + sensorType);
+			// BMCs assert states the reading type does not define (HP iLO sets bits 6 and 7 of generic types)
+			logger.debug("Invalid value: {} ({}) for sensor {}", value, Integer.toHexString(value), sensorType);
 			return Unknown;
 		}
 	}

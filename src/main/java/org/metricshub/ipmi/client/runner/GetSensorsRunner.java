@@ -45,13 +45,15 @@ import org.metricshub.ipmi.core.coding.payload.CompletionCode;
 import org.metricshub.ipmi.core.coding.payload.lan.IPMIException;
 import org.metricshub.ipmi.core.coding.protocol.AuthenticationType;
 import org.metricshub.ipmi.core.common.TypeConverter;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Get Full And Compact Sensor records
  */
 public class GetSensorsRunner extends AbstractIpmiRunner<List<Sensor>> {
 
-	private static final int OEM_EVENT_READING_TYPE = 127;
+	private static final Logger LOGGER = LoggerFactory.getLogger(GetSensorsRunner.class);
 
 	public GetSensorsRunner(IpmiClientConfiguration ipmiConfiguration) {
 		super(ipmiConfiguration);
@@ -88,12 +90,9 @@ public class GetSensorsRunner extends AbstractIpmiRunner<List<Sensor>> {
 				// Only Full and Compact sensor records have a reading associated
 				// with them (see IPMI specification for details)
 				if (sensorRecord instanceof FullSensorRecord || sensorRecord instanceof CompactSensorRecord) {
-					int recordReadingId = TypeConverter
-							.byteToInt(((AbstractSensorRecord) sensorRecord).getSensorNumber());
-
 					// If our record has got a reading associated, we get request
 					// for it
-					GetSensorReadingResponseData data = getSensorRecordReading(recordReadingId);
+					GetSensorReadingResponseData data = getSensorRecordReading((AbstractSensorRecord) sensorRecord);
 
 					// Build the states e.g. deviceName=OK|deviceName=Device Present
 					String states = buildStates(data, sensorRecord);
@@ -146,11 +145,12 @@ public class GetSensorsRunner extends AbstractIpmiRunner<List<Sensor>> {
 			final AbstractSensorRecord record = (AbstractSensorRecord) sensorRecord;
 			final String deviceName = record.getName();
 
-			if (record.getEventReadingType() == OEM_EVENT_READING_TYPE) {
-				return buildOemState(data.getRaw(), deviceName);
-			}
-
 			final List<ReadingType> events = data.getStatesAsserted(record.getSensorType(), record.getEventReadingType());
+
+			// Like any discrete sensor, an OEM sensor with no state asserted reports no state
+			if (ReadingType.isOem(record.getEventReadingType())) {
+				return events.isEmpty() ? Utils.EMPTY : buildOemState(data.getRaw(), deviceName);
+			}
 
 			return appendReadingTypes(events, deviceName);
 
@@ -160,7 +160,7 @@ public class GetSensorsRunner extends AbstractIpmiRunner<List<Sensor>> {
 	}
 
 	/**
-	 * Build the state for oem event reading type (0x7f)
+	 * Build the state of an OEM event/reading type (70h-7Fh)
 	 *
 	 * @param raw a byte array of the raw IPMI command data
 	 * @param deviceName the name of the device
@@ -210,32 +210,36 @@ public class GetSensorsRunner extends AbstractIpmiRunner<List<Sensor>> {
 	}
 
 	/**
-	 * Using the given reading id run the GetSensorReading request to get reading data
+	 * Run the GetSensorReading request of a sensor record. A reading the BMC does not provide (DataNotPresent) or
+	 * refuses with another completion code costs that sensor its reading, not the whole walk.
 	 *
-	 * @param recordReadingId the reading identifier of the sensor record
-	 * @return {@link GetSensorReadingResponseData} instance
-	 * @throws Exception at sendMessage or if the error completion code is not DataNotPresent
+	 * @param sensorRecord the Full or Compact sensor record
+	 * @return {@link GetSensorReadingResponseData} instance, or <code>null</code> when the BMC returned no reading
+	 * @throws Exception at sendMessage when the BMC does not answer
 	 */
-	private GetSensorReadingResponseData getSensorRecordReading(final int recordReadingId) throws Exception {
+	GetSensorReadingResponseData getSensorRecordReading(final AbstractSensorRecord sensorRecord)
+			throws Exception {
+		int sensorNumber = TypeConverter.byteToInt(sensorRecord.getSensorNumber());
 		try {
-			// If we have a reading id means the reading data (e.g. temperature) is potentially available so let's perform the
-			// re
-			if (recordReadingId >= 0) {
-				return (GetSensorReadingResponseData) getConnector()
-						.sendMessage(
-								getHandle(),
-								new GetSensorReading(
-										IpmiVersion.V20,
-										getHandle().getCipherSuite(),
-										AuthenticationType.RMCPPlus,
-										recordReadingId));
-
-			}
+			return (GetSensorReadingResponseData) getConnector()
+					.sendMessage(
+							getHandle(),
+							new GetSensorReading(
+									IpmiVersion.V20,
+									getHandle().getCipherSuite(),
+									AuthenticationType.RMCPPlus,
+									sensorNumber));
 		} catch (IPMIException e) {
 			if (e.getCompletionCode() != CompletionCode.DataNotPresent) {
-				throw e;
+				LOGGER
+						.warn(
+								"Failed to read sensor {} ({}) on {}: {}",
+								sensorNumber,
+								sensorRecord.getName(),
+								getIpmiConfiguration().getHostname(),
+								e.getMessage());
 			}
+			return null;
 		}
-		return null;
 	}
 }

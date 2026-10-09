@@ -38,12 +38,30 @@ public class QueueElement {
 	private PayloadCoder request;
 	private ResponseData response;
 	private Date timestamp;
+	private final boolean oneWay;
 
 	public QueueElement(int id, PayloadCoder request) {
+		this(id, request, false);
+	}
+
+	/**
+	 * @param id the tag of the request
+	 * @param request the request awaiting its reply
+	 * @param oneWay true when nobody waits for the reply: the reply and the timeout of the request are not reported
+	 */
+	public QueueElement(int id, PayloadCoder request, boolean oneWay) {
 		this.id = id;
 		this.request = request;
+		this.oneWay = oneWay;
 		timestamp = new Date();
 		retries = 0;
+	}
+
+	/**
+	 * @return true when nobody waits for the reply: the element only reserves the tag until the reply or the timeout
+	 */
+	public boolean isOneWay() {
+		return oneWay;
 	}
 
 	public int getId() {
