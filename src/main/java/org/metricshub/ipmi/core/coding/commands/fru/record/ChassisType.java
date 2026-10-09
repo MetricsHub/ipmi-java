@@ -168,7 +168,7 @@ public enum ChassisType {
 		case LAPTOP:
 			return LapTop;
 		default:
-			logger.error("Invalid value: " + value);
+			logger.debug("Invalid value: {}", value);
 			return Other;
 		}
 	}

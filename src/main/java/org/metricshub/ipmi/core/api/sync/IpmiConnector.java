@@ -29,6 +29,7 @@ import org.metricshub.ipmi.core.coding.PayloadCoder;
 import org.metricshub.ipmi.core.coding.commands.PrivilegeLevel;
 import org.metricshub.ipmi.core.coding.commands.ResponseData;
 import org.metricshub.ipmi.core.coding.commands.session.GetChannelAuthenticationCapabilitiesResponseData;
+import org.metricshub.ipmi.core.coding.payload.CompletionCode;
 import org.metricshub.ipmi.core.coding.payload.lan.IPMIException;
 import org.metricshub.ipmi.core.coding.protocol.PayloadType;
 import org.metricshub.ipmi.core.coding.security.CipherSuite;
@@ -402,20 +403,15 @@ public class IpmiConnector {
 		ResponseData responseData = null;
 
 		int tries = 0;
-		int tag = -1;
 		boolean messageSent = false;
 
 		while (!messageSent) {
 			try {
 				++tries;
 
-				if (tag >= 0) {
-					tag = asyncConnector.retry(connectionHandle, tag, request.getSupportedPayloadType());
-				}
-
-				if (tag < 0) {
-					tag = asyncConnector.sendMessage(connectionHandle, request, !waitForResponse);
-				}
+				// A fresh tag for every try: the request that timed out or was answered left the queue, or is about
+				// to, and a reply to the same tag would then be dropped as an orphan
+				int tag = asyncConnector.sendMessage(connectionHandle, request, !waitForResponse);
 
 				logger.debug("Sending message with tag {}, try {}", tag, tries);
 
@@ -429,27 +425,36 @@ public class IpmiConnector {
 			} catch (IPMIException e) {
 				handleErrorResponse(tries, e);
 			} catch (Exception e) {
-				handleRetriesWhenException(tries, e);
+				// No reply in time: the BMC already had the whole message timeout, the request is sent again at once
+				handleRetriesWhenException(tries, e, false);
 			}
 		}
 
 		return responseData;
 	}
 
-	private void handleRetriesWhenException(int tries, Exception e) throws Exception {
+	/**
+	 * Throws the exception when the request was tried {@link #retries} times already, otherwise lets the caller send
+	 * it again, after a random pause of up to {@link #idleTime} ms if asked.
+	 */
+	private void handleRetriesWhenException(int tries, Exception e, boolean pause) throws Exception {
 		if (tries > retries) {
 			throw e;
-		} else {
-			long sleepTime = (random.nextLong() % (idleTime / 2)) + (idleTime / 2);
-
-			Thread.sleep(sleepTime);
-			logger.warn("Receiving message failed, retrying", e);
 		}
+		if (pause) {
+			long sleepTime = (random.nextLong() % (idleTime / 2)) + (idleTime / 2);
+			Thread.sleep(sleepTime);
+		}
+		logger.warn("Receiving message failed, retrying: {}: {}", e.getClass().getSimpleName(), e.getMessage());
 	}
 
+	/**
+	 * Retries a request the BMC answered with a transient completion code: after a pause when the BMC says it is busy,
+	 * at once after a timeout on its side (C3h), where it already waited for the device it could not reach.
+	 */
 	private void handleErrorResponse(int tries, IPMIException e) throws Exception {
 		if (e.getCompletionCode().isTransient()) {
-			handleRetriesWhenException(tries, e);
+			handleRetriesWhenException(tries, e, e.getCompletionCode() != CompletionCode.Timeout);
 		} else {
 			throw e;
 		}

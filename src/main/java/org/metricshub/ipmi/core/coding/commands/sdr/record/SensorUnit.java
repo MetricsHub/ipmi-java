@@ -532,7 +532,7 @@ public enum SensorUnit {
 		case CORRECTABLEERROR:
 			return CorrectableError;
 		default:
-			logger.error("Invalid value: " + value);
+			logger.debug("Invalid value: {}", value);
 			return Other;
 		}
 	}

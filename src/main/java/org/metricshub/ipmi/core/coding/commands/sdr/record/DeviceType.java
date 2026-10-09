@@ -172,7 +172,7 @@ public enum DeviceType {
 		case EEPROM24C02:
 			return Eeprom24C02;
 		default:
-			logger.error("Invalid value: " + value);
+			logger.debug("Invalid value: {}", value);
 			return Other;
 		}
 	}

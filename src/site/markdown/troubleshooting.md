@@ -64,6 +64,13 @@ one, check:
 With the [low-level API](low-level-api.html#privilege-level), open the session with the level the
 command needs (Operator for Chassis Control, Administrator for configuration commands).
 
+When commands that worked earlier in the same session start failing with `0xD4`, the BMC revoked
+the session. HP iLO 5 does so 120 s after the session opened, whatever its privilege level, and
+can do so after 60 s when a Get Channel Authentication Capabilities or a Set Session Privilege
+Level command is sent during the session (the library's keep-alive is a Get Device ID for that
+reason). Each `IpmiClient` call opens its own session; with the low-level API, open a new session
+for work that lasts longer.
+
 ## `... is not yet implemented.`
 
 `IllegalArgumentException: Confidentiality algorithm XRC4-128 is not yet implemented.` (or

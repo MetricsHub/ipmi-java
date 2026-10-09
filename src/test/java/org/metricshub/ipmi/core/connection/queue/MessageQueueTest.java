@@ -2,6 +2,7 @@ package org.metricshub.ipmi.core.connection.queue;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.Arrays;
@@ -137,15 +138,39 @@ class MessageQueueTest {
 	}
 
 	@Test
-	void aTimedOutKeepAliveIsNotReported() throws Exception {
+	void aTimedOutOneWayMessageIsNotReported() throws Exception {
 		MessageQueue queue = newQueue();
 		try {
 			connection.registerListener(recorder());
-			int keepAlive = queue.add(new Connection.KeepAlive(CipherSuite.getEmpty()));
+			int oneWay = queue.add(request(), true);
 			int request = queue.add(request());
 			Thread.sleep(TIMER_TICK_MS);
-			assertFalse(queue.containsId(keepAlive), "the keep-alive must leave the queue");
+			assertFalse(queue.containsId(oneWay), "the one-way message must leave the queue");
 			assertEquals(Collections.singletonList(request + ":Message timed out"), reported);
+		} finally {
+			queue.tearDown();
+		}
+	}
+
+	@Test
+	void aOneWayMessageHoldsItsTagAndItsSlotUntilItsReply() {
+		MessageQueue queue = newQueue();
+		try {
+			int oneWay = queue.add(request(), true);
+			assertTrue(queue.getElement(oneWay).isOneWay());
+			// The rest of the window, with requests answered at once
+			for (int i = 1; i < WINDOW_SIZE; i++) {
+				int tag = queue.add(request());
+				assertTrue(tag > 0 && tag != oneWay, "add " + i + " took tag " + tag);
+				assertFalse(queue.getElement(tag).isOneWay());
+				queue.remove(tag);
+			}
+			assertEquals(-1, queue.add(request()), "the window slides only once the one-way message is answered");
+
+			// Its reply frees the tag and the window
+			queue.remove(oneWay);
+			assertNull(queue.getElement(oneWay));
+			assertTrue(queue.add(request()) > 0);
 		} finally {
 			queue.tearDown();
 		}

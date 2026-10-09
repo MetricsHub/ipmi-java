@@ -136,6 +136,20 @@ public class MessageQueue extends TimerTask {
 	 *         that value.
 	 */
 	public int add(PayloadCoder request) {
+		return add(request, false);
+	}
+
+	/**
+	 * Adds request to the queue and generates the tag. A one-way request holds its tag like any other until its reply
+	 * arrives or it times out, so that a late reply cannot be taken for the reply of a newer request; its reply and
+	 * its timeout are not reported to the listeners.
+	 *
+	 * @param request the request to queue
+	 * @param oneWay true when nobody waits for the reply
+	 * @return Sequence number of the message if it was added to the queue, -1 otherwise. The tag used to identify
+	 *         message is equal to that value.
+	 */
+	public int add(PayloadCoder request, boolean oneWay) {
 		run();
 		boolean first = true;
 		synchronized (queue) {
@@ -166,7 +180,7 @@ public class MessageQueue extends TimerTask {
 
 					lastSequenceNumber = sequenceNumber;
 
-					QueueElement element = new QueueElement(sequenceNumber, request);
+					QueueElement element = new QueueElement(sequenceNumber, request, oneWay);
 
 					queue.add(element);
 					return sequenceNumber;
@@ -240,8 +254,10 @@ public class MessageQueue extends TimerTask {
 	}
 
 	/**
-	 * Returns the sequence number for a message that awaits no reply: it skips the tags of the queued requests, so
-	 * a reply to the one-way message can never be taken for the reply of a queued request.
+	 * Returns a sequence number for a message sent outside the queue (the Close Session request, the SOL ACK-only
+	 * packets): it skips the tags of the queued requests.
+	 *
+	 * @return a sequence number that no queued request holds
 	 */
 	public int getSequenceNumber() {
 		synchronized (lastSequenceNumberLock) {
@@ -252,6 +268,23 @@ public class MessageQueue extends TimerTask {
 			lastSequenceNumber = sequenceNumber;
 			return sequenceNumber;
 		}
+	}
+
+	/**
+	 * Returns the queued request with the given tag, with its one-way flag.
+	 *
+	 * @param tag the tag of the request
+	 * @return the {@link QueueElement} of the request, or null if no request with the given tag awaits a reply
+	 */
+	public QueueElement getElement(int tag) {
+		synchronized (queue) {
+			for (QueueElement element : queue) {
+				if (element.getId() == tag && element.getRequest() != null) {
+					return element;
+				}
+			}
+		}
+		return null;
 	}
 
 	/**
@@ -353,7 +386,7 @@ public class MessageQueue extends TimerTask {
 
 	/**
 	 * Removes the oldest message from the queue; when it timed out (rather than being answered), the response
-	 * listeners are told so, which lets the sender retry it with a fresh tag. Nobody waits for a keep-alive: its
+	 * listeners are told so, which lets the sender retry it with a fresh tag. Nobody waits for a one-way message: its
 	 * timeout is not reported.
 	 */
 	private void processObsoleteMessage(QueueElement message, boolean done) {
@@ -362,7 +395,7 @@ public class MessageQueue extends TimerTask {
 		queue.remove(0);
 		releaseTag(tag);
 
-		if (!done && !(message.getRequest() instanceof Connection.KeepAlive)) {
+		if (!done && !message.isOneWay()) {
 			logger.debug("Message timed out, tag: {}", tag);
 			try {
 				connection

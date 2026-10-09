@@ -351,7 +351,7 @@ public enum EntityId {
 		case BASEBOARD:
 			return Baseboard;
 		default:
-			logger.error("Invalid value: " + value);
+			logger.debug("Invalid value: {}", value);
 			return Other;
 		}
 	}

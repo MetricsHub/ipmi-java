@@ -24,6 +24,10 @@ The `IpmiClient` API is unchanged, and the client is more tolerant of real-world
   is 5 s by default (it was 5 minutes) and capped by the overall timeout, a retried message waits
   for the reply of the resent request, and the handshake steps wait for the elapsed time rather
   than a number of sleeps ([Timeouts and Errors](timeouts-and-errors.html));
+* a request is sent again at once after a lost reply or a timeout on the BMC side (`C3h`), where
+  1.2.02 paused for a random time of up to `idleTime` (4 s) before each resend: a collection on a
+  Dell iDRAC 8, which answers `C3h` for its absent FRUs and loses a few replies, took over two
+  minutes; the pause now only follows the completion codes that say the BMC is busy;
 * a BMC that never answers now fails the session handshake with
   `ExecutionException` wrapping `ConnectionException: Command timed out`, about 20 s into the
   call, where 1.2.02 threw `TimeoutException` at the overall timeout;
@@ -39,9 +43,19 @@ The `IpmiClient` API is unchanged, and the client is more tolerant of real-world
   reply is sent again;
 * the [keep-alive](configuration.html#keep-alive) is actually sent: with the default `pingPeriod`
   (`-1`) 1.2.02 sent no keep-alive at all, so a session could expire during a long collection; the
-  keep-alive is now one message every 30 s by default, whose reply is discarded, and a
-  Get Channel Authentication Capabilities command sent by the application in a session gets its
-  reply (1.2.02 dropped it, as it did the keep-alive replies);
+  keep-alive is now a Get Device ID every 30 s by default, whose reply is discarded (not the Get
+  Channel Authentication Capabilities of 1.2.02, after which HP iLO 5 revokes the session within
+  60 s), and a Get Channel Authentication Capabilities command sent by the application in a
+  session gets its reply (1.2.02 dropped it, as it did the keep-alive replies);
+* a one-way IPMI message (`IpmiConnector.sendOneWayMessage()`, `IpmiAsyncConnector.sendMessage()`
+  with `isOneWay`) is queued like any request: its tag stays reserved, and it takes a slot of the
+  8-message window, until its reply arrives or it times out, where 1.2.02 could reuse the tag at
+  once and take a late reply for the reply of a later request; its reply and its timeout are
+  still not reported (the Serial over LAN acknowledgements, which the BMC never answers, are not
+  queued);
+* a sensor whose Get Sensor Reading fails with an error completion code is returned without
+  reading, and a `WARN` names it, where 1.2.02 failed the whole call (it tolerated
+  `DataNotPresent` only);
 * `IpmiConnector.closeConnection()` releases the connection: its handle then throws
   `IllegalStateException` instead of addressing a disconnected connection, and a session that
   fails to be established by `SerialOverLan` closes its own connection instead of tearing down the
@@ -86,7 +100,18 @@ The decoders follow the IPMI 2.0 and FRU specifications more closely; the visibl
   Info fails, returns FRU 0 once, and stops reading a FRU at its first unreadable chunk instead of
   shifting the following chunks into the gap;
 * reserved values of the rate unit, modifier unit usage and power restore policy decode to
-  `None` or `Unknown` instead of throwing.
+  `None` or `Unknown` instead of throwing;
+* the sensors of the OEM event/reading types `70h` to `7Eh` (Cisco IMC, Dell iDRAC and Fujitsu iRMC
+  use them for presence and module sensors) report the raw value of their state bytes
+  (`sensorName=0xHHLL`) like those of `7Fh`, where 1.2.02 reported `sensorName=Unknown`; an OEM
+  sensor (`70h` to `7Fh`) with no state asserted reports no state, where 1.2.02 reported the
+  state bytes of a `7Fh` one; `ReadingType.parseInt()`, and so `getStatesAsserted()` and the event
+  of a SEL record, returns `UnknownOEMEvent` for the states of `70h` to `7Fh`, where 1.2.02
+  returned `Unknown` unless the sensor type was OEM; the new `ReadingType.isOem()` tells these
+  types apart;
+* a value the decoders do not model (an OEM or chassis-specific entity ID, a reserved device or
+  sensor type, a state the reading type does not define) is logged at `DEBUG` instead of `ERROR`
+  or `WARN`.
 
 Code that **uses the low-level API** to read FRUs: the `offset` and `countToRead` arguments of
 the `ReadFruData` constructors are now **in bytes** whatever the access unit of the device, and

@@ -88,7 +88,7 @@ public enum FruMultiRecordType {
 		case EXTENDEDCOMPATIBILITYRECORD:
 			return ExtendedCompatibilityRecord;
 		default:
-			logger.error("Invalid value: " + value);
+			logger.debug("Invalid value: {}", value);
 			return Unspecified;
 		}
 	}

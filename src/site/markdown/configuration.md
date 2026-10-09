@@ -93,9 +93,9 @@ this deadline; see [Timeouts and Errors](timeouts-and-errors.html).
 
 ### Keep-alive
 
-While a session is open, the client sends a no-op message (Get Channel Authentication
-Capabilities) every `pingPeriod` **milliseconds**, so that the BMC does not close the session for
-inactivity during a long collection.
+While a session is open, the client sends a no-op message (Get Device ID, as `ipmitool` does) every
+`pingPeriod` **milliseconds**, so that the BMC does not close the session for inactivity during a
+long collection.
 
 | `pingPeriod` | Behavior |
 | --- | --- |
