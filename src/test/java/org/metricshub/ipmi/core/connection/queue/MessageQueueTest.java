@@ -154,7 +154,12 @@ class MessageQueueTest {
 
 	@Test
 	void aOneWayMessageHoldsItsTagAndItsSlotUntilItsReply() {
-		MessageQueue queue = newQueue();
+		// Only the reply may release the one-way message here, not a timeout on a slow machine
+		MessageQueue queue = new MessageQueue(
+				connection,
+				60000,
+				IpmiLanMessage.MIN_SEQUENCE_NUMBER,
+				IpmiLanMessage.MAX_SEQUENCE_NUMBER);
 		try {
 			int oneWay = queue.add(request(), true);
 			assertTrue(queue.getElement(oneWay).isOneWay());

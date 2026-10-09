@@ -65,10 +65,11 @@ class IpmiConnectorTest {
 	private static final byte[] CHASSIS_STATUS = { 0x01, 0x00, 0x00 };
 
 	/**
-	 * Long enough for a pause before a resend to show: up to 20 s, where a resend without pause comes within the
-	 * message timeout plus one tick of the queue timer.
+	 * Long enough for any pause before a resend to show: a random pause of up to one hour either shows in the gap or
+	 * trips the timeout of the test, where a resend without pause comes within the message timeout plus one tick of
+	 * the queue timer.
 	 */
-	private static final String LONG_IDLE_TIME = "20000";
+	private static final String LONG_IDLE_TIME = "3600000";
 
 	@Test
 	void aBadReplyFailsTheStepAtOnceAndLeavesItRetriable() throws Exception {

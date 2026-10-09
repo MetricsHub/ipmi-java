@@ -51,7 +51,7 @@ sent once; the `ExecutionException` wraps the reason:
 Check the account with `ipmitool -I lanplus ... -L USER chassis status`: `ipmitool` reports
 `RAKP 2 HMAC is invalid` for a wrong password and `unauthorized name` for an unknown user.
 
-## `IPMIException: Insufficient privilege level` (`0xD4`)
+## `IPMIException: Cannot execute command due to insufficient privilege level ...` (`0xD4`)
 
 The BMC refused a command at the session's privilege level. `IpmiClient` always uses the
 **User** level, which the specification allows for every command it sends; if a BMC refuses
@@ -83,6 +83,7 @@ to make it use suite 3 or 17.
 | Symptom | Cause |
 | --- | --- |
 | `WARN Skipping SDR record ...` | A record that cannot be decoded is skipped; the other sensors are still returned. [SDR records](supported-commands.html#sdr-records) lists what is decoded. |
+| `WARN Failed to read sensor <n> (<name>) on <host>: ...` | The BMC refused the Get Sensor Reading of that sensor with an error completion code: the sensor is returned without reading or states, and the other sensors are still returned. With the `0xD4` message, the BMC may have revoked the session (see the `0xD4` section above). |
 | `WARN Failed to read FRU <id> at offset <n>, the FRU data is truncated there: Requested Sensor, data, or record not present` | The FRU is declared in the SDR repository but not present, for example an empty power supply bay. Usually harmless: the reading stops there and the areas read so far are decoded. |
 | `WARN Failed to read FRU <id>` | The BMC did not answer Get FRU Inventory Area Info for that FRU, or its data is not in the IPMI FRU format (for example the SPD data of a memory module, [#107](https://github.com/metricshub/ipmi-java/issues/107)). The other FRUs are still returned. |
 | `WARN The <area> info area at offset <n> is truncated: skipped` | The read stopped before the end of that area (see above): the complete areas of the FRU are still returned. |

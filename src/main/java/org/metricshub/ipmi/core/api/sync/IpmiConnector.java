@@ -434,8 +434,8 @@ public class IpmiConnector {
 	}
 
 	/**
-	 * Throws the exception when the request was tried {@link #retries} times already, otherwise lets the caller send
-	 * it again, after a random pause of up to {@link #idleTime} ms if asked.
+	 * Throws the exception when the request was already sent again {@link #retries} times (retries + 1 tries),
+	 * otherwise lets the caller send it again, after a random pause of up to {@link #idleTime} ms if asked.
 	 */
 	private void handleRetriesWhenException(int tries, Exception e, boolean pause) throws Exception {
 		if (tries > retries) {

@@ -25,9 +25,10 @@ The `IpmiClient` API is unchanged, and the client is more tolerant of real-world
   for the reply of the resent request, and the handshake steps wait for the elapsed time rather
   than a number of sleeps ([Timeouts and Errors](timeouts-and-errors.html));
 * a request is sent again at once after a lost reply or a timeout on the BMC side (`C3h`), where
-  1.2.02 paused for a random time of up to `idleTime` (4 s) before each resend: a collection on a
-  Dell iDRAC 8, which answers `C3h` for its absent FRUs and loses a few replies, took over two
-  minutes; the pause now only follows the completion codes that say the BMC is busy;
+  1.2.02 paused for a random time of up to `idleTime` (4 s) before each resend; with the 5 s
+  message timeout, these pauses made a collection on a Dell iDRAC 8, which answers `C3h` for its
+  absent FRUs and loses a few replies, take over two minutes; the pause now only follows the
+  completion codes that say the BMC is busy;
 * a BMC that never answers now fails the session handshake with
   `ExecutionException` wrapping `ConnectionException: Command timed out`, about 20 s into the
   call, where 1.2.02 threw `TimeoutException` at the overall timeout;
@@ -49,8 +50,9 @@ The `IpmiClient` API is unchanged, and the client is more tolerant of real-world
   session gets its reply (1.2.02 dropped it, as it did the keep-alive replies);
 * a one-way IPMI message (`IpmiConnector.sendOneWayMessage()`, `IpmiAsyncConnector.sendMessage()`
   with `isOneWay`) is queued like any request: its tag stays reserved, and it takes a slot of the
-  8-message window, until its reply arrives or it times out, where 1.2.02 could reuse the tag at
-  once and take a late reply for the reply of a later request; its reply and its timeout are
+  8-message window, until its reply arrives or it times out, where 1.2.02 did not reserve the tag,
+  so it could be handed out again while the reply was still on its way and a late reply taken for
+  the reply of a later request; its reply and its timeout are
   still not reported (the Serial over LAN acknowledgements, which the BMC never answers, are not
   queued);
 * a sensor whose Get Sensor Reading fails with an error completion code is returned without
