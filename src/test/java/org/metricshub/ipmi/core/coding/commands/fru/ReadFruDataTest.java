@@ -182,7 +182,7 @@ class ReadFruDataTest {
 		byte[] image = image();
 		// the data of the last multirecord (the power supply record) starts 5 bytes after its header, 24 bytes long:
 		// a Dell iDRAC 8 writes a record checksum off by one on genuine power supply records
-		image[image.length - 24 - 5 + 3] ^= 0x01;
+		image[image.length - 1] ^= 0x01;
 
 		List<FruRecord> records = decode(image);
 
