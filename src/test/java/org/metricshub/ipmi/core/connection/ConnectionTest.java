@@ -199,4 +199,40 @@ class ConnectionTest {
 			connection.disconnect();
 		}
 	}
+
+	@Test
+	void aListenerMayUnregisterItselfWhileNotified() throws Exception {
+		Connection connection = connect(TIMEOUT_MS);
+		try {
+			AtomicInteger notified = new AtomicInteger();
+			ConnectionListener oneShot = new ConnectionListener() {
+				@Override
+				public void processResponse(ResponseData responseData, int handle, int tag, Exception exception) {
+					connection.unregisterListener(this);
+				}
+
+				@Override
+				public void processRequest(IpmiPayload payload) {
+					connection.unregisterListener(this);
+				}
+			};
+			connection.registerListener(oneShot);
+			connection.registerListener(new ConnectionListener() {
+				@Override
+				public void processResponse(ResponseData responseData, int handle, int tag, Exception exception) {
+					notified.incrementAndGet();
+				}
+
+				@Override
+				public void processRequest(IpmiPayload payload) {
+					notified.incrementAndGet();
+				}
+			});
+			connection.notifyResponseListeners(0, 1, null, new Exception("timed out"));
+			connection.notifyResponseListeners(0, 2, null, new Exception("timed out"));
+			assertEquals(2, notified.get(), "the second listener must be notified each time");
+		} finally {
+			connection.disconnect();
+		}
+	}
 }

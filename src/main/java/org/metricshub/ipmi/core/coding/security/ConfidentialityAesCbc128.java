@@ -44,6 +44,7 @@ public class ConfidentialityAesCbc128 extends ConfidentialityAlgorithm {
 		Arrays.fill(CONST2, (byte) 2);
 	}
 
+	// The sending and receiving threads share this instance: encrypt() and decrypt() each init the cipher
 	private Cipher cipher;
 
 	private SecretKeySpec cipherKey;
@@ -54,7 +55,7 @@ public class ConfidentialityAesCbc128 extends ConfidentialityAlgorithm {
 	}
 
 	@Override
-	public void initialize(byte[] sik, AuthenticationAlgorithm authenticationAlgorithm)
+	public synchronized void initialize(byte[] sik, AuthenticationAlgorithm authenticationAlgorithm)
 			throws InvalidKeyException,
 			NoSuchAlgorithmException,
 			NoSuchPaddingException {
@@ -78,7 +79,7 @@ public class ConfidentialityAesCbc128 extends ConfidentialityAlgorithm {
 	}
 
 	@Override
-	public byte[] encrypt(byte[] data) throws InvalidKeyException {
+	public synchronized byte[] encrypt(byte[] data) throws InvalidKeyException {
 		int length = data.length + 17;
 		int pad = 0;
 		if (length % 16 != 0) {
@@ -115,7 +116,7 @@ public class ConfidentialityAesCbc128 extends ConfidentialityAlgorithm {
 	}
 
 	@Override
-	public byte[] decrypt(byte[] data) {
+	public synchronized byte[] decrypt(byte[] data) {
 
 		byte[] decrypted = null;
 		try {

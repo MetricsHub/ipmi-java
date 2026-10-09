@@ -48,7 +48,11 @@ The `IpmiClient` API is unchanged, and the client is more tolerant of real-world
   whole connector;
 * the `PropertiesManager` lookups are logged at `DEBUG` instead of `INFO`, the unused
   `cleaningFrequency` property is gone from `connection.properties`, and `Constants.TIMEOUT`,
-  which nothing reads, is deprecated.
+  which nothing reads, is deprecated;
+* the sending, receiving and keep-alive threads of a connection no longer race: the state
+  machine serializes transitions and received messages, the HMAC and AES objects of a cipher suite
+  are used by one thread at a time, and the listener lists can be changed while they are being
+  notified (a listener may unregister itself from its own callback).
 
 The decoders follow the IPMI 2.0 and FRU specifications more closely; the visible changes are:
 

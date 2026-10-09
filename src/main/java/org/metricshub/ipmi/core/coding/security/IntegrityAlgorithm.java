@@ -67,7 +67,7 @@ public abstract class IntegrityAlgorithm {
 	 * @param key - Session Integrity Key calculated during the opening of the
 	 *        session or user password if 'one-key' logins are enabled.
 	 */
-	public void initialize(byte[] key) throws InvalidKeyException {
+	public synchronized void initialize(byte[] key) throws InvalidKeyException {
 		this.sik = key;
 		final String algorithmName = getAlgorithmName();
 
@@ -103,14 +103,15 @@ public abstract class IntegrityAlgorithm {
 	public abstract byte getCode();
 
 	/**
-	 * Creates AuthCode field for message.
+	 * Creates AuthCode field for message. Synchronized: the sending, receiving and keep-alive threads share this
+	 * instance and its {@link Mac}.
 	 *
 	 * @param base - data starting with the AuthType/Format field up to and
 	 *        including the field that immediately precedes the AuthCode field
 	 * @return AuthCode field. Might be null if empty AuthCOde field is generated.
 	 * @see Rakp1#calculateSik(org.metricshub.ipmi.core.coding.commands.session.Rakp1ResponseData)
 	 */
-	public byte[] generateAuthCode(final byte[] base) {
+	public synchronized byte[] generateAuthCode(final byte[] base) {
 
 		if (sik == null) {
 			throw new NullPointerException("Algorithm not initialized.");

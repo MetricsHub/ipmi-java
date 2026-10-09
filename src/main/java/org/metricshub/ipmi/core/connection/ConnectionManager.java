@@ -34,13 +34,17 @@ import java.io.IOException;
 import java.net.InetAddress;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.CopyOnWriteArrayList;
 
 /**
  * Manages multiple {@link Connection}s
  */
 public class ConnectionManager {
 	private Messenger messenger;
+	// Copy-on-write: looked up without a lock by the receiving thread, which holds a state machine lock, while
+	// connect() takes a state machine lock under the list lock
 	private List<Connection> connections;
+	private final Object connectionsLock = new Object();
 
 	private static final Object SESSIONLESS_TAG_LOCK = new Object();
 	private static int sessionlessTag;
@@ -104,7 +108,7 @@ public class ConnectionManager {
 	}
 
 	private void initialize() {
-		connections = new ArrayList<Connection>();
+		connections = new CopyOnWriteArrayList<Connection>();
 		if (pingPeriod == -1) {
 			pingPeriod = Long.parseLong(PropertiesManager.getInstance().getProperty("pingPeriod"));
 		}
@@ -123,11 +127,9 @@ public class ConnectionManager {
 	 * Closes all open connections and disconnects {@link UdpListener}.
 	 */
 	public void close() {
-		synchronized (connections) {
-			for (Connection connection : connections) {
-				if (connection != null && connection.isActive()) {
-					connection.disconnect();
-				}
+		for (Connection connection : connections) {
+			if (connection != null && connection.isActive()) {
+				connection.disconnect();
 			}
 		}
 		messenger.closeConnection();
@@ -187,10 +189,7 @@ public class ConnectionManager {
 	 *        - index of the connection to return
 	 */
 	public Connection getConnection(int index) {
-		Connection connection;
-		synchronized (connections) {
-			connection = connections.get(index);
-		}
+		Connection connection = connections.get(index);
 		if (connection == null) {
 			throw new IllegalStateException("Connection " + index + " is closed");
 		}
@@ -202,10 +201,7 @@ public class ConnectionManager {
 	 * closed connection does nothing.
 	 */
 	public void closeConnection(int index) {
-		Connection connection;
-		synchronized (connections) {
-			connection = connections.set(index, null);
-		}
+		Connection connection = connections.set(index, null);
 		if (connection != null) {
 			connection.disconnect();
 		}
@@ -220,14 +216,12 @@ public class ConnectionManager {
 	 * @return First {@link Connection} to the address or null if none found
 	 */
 	public Connection getConnection(InetAddress address, int port) {
-		synchronized (connections) {
-			for (Connection connection : connections) {
-				if (connection != null
-						&& connection.isActive()
-						&& connection.getRemoteMachineAddress().equals(address)
-						&& connection.getRemoteMachinePort() == port) {
-					return connection;
-				}
+		for (Connection connection : connections) {
+			if (connection != null
+					&& connection.isActive()
+					&& connection.getRemoteMachineAddress().equals(address)
+					&& connection.getRemoteMachinePort() == port) {
+				return connection;
 			}
 		}
 		return null;
@@ -254,7 +248,7 @@ public class ConnectionManager {
 
 	private int connect(InetAddress address, int port, long connectionPingPeriod, boolean skipCiphers)
 			throws IOException {
-		synchronized (connections) {
+		synchronized (connectionsLock) {
 			Connection connection = new Connection(messenger, connections.size());
 			connection.connect(address, port, connectionPingPeriod, skipCiphers);
 			connections.add(connection);

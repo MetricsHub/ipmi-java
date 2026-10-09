@@ -24,8 +24,8 @@ package org.metricshub.ipmi.core.sm;
 
 import java.io.IOException;
 import java.net.InetAddress;
-import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.CopyOnWriteArrayList;
 
 import org.metricshub.ipmi.core.coding.rmcp.RmcpDecoder;
 import org.metricshub.ipmi.core.common.Constants;
@@ -44,15 +44,15 @@ import org.metricshub.ipmi.core.transport.UdpMessage;
  */
 public class StateMachine implements UdpListener {
 
-	private List<MachineObserver> observers;
+	private final List<MachineObserver> observers = new CopyOnWriteArrayList<MachineObserver>();
 
-	private State current;
+	private volatile State current;
 
 	private Messenger messenger;
-	private InetAddress remoteMachineAddress;
-	private int remoteMachinePort;
+	private volatile InetAddress remoteMachineAddress;
+	private volatile int remoteMachinePort;
 
-	private boolean initialized;
+	private volatile boolean initialized;
 
 	public State getCurrent() {
 		return current;
@@ -72,7 +72,6 @@ public class StateMachine implements UdpListener {
 	 */
 	public StateMachine(Messenger messenger) {
 		this.messenger = messenger;
-		observers = new ArrayList<MachineObserver>();
 		initialized = false;
 	}
 
@@ -154,7 +153,8 @@ public class StateMachine implements UdpListener {
 
 	/**
 	 * Performs a {@link State} transition according to the event and
-	 * {@link #current} state
+	 * {@link #current} state. Transitions and received messages are serialized, so a late reply cannot interleave
+	 * with the timeout or close of the request it answers.
 	 *
 	 * @param event
 	 *        - {@link StateMachineEvent} invoking the transition
@@ -162,7 +162,7 @@ public class StateMachine implements UdpListener {
 	 *         - when machine was not yet started
 	 * @see #start(InetAddress, int)
 	 */
-	public void doTransition(StateMachineEvent event) {
+	public synchronized void doTransition(StateMachineEvent event) {
 		if (!initialized) {
 			throw new NullPointerException("State machine not started");
 		}
@@ -170,7 +170,7 @@ public class StateMachine implements UdpListener {
 	}
 
 	@Override
-	public void notifyMessage(UdpMessage message) {
+	public synchronized void notifyMessage(UdpMessage message) {
 		if (message.getAddress().equals(getRemoteMachineAddress()) && message.getPort() == getRemoteMachinePort()) {
 			current.doAction(this, RmcpDecoder.decode(message.getMessage()));
 		}
