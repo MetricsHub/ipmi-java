@@ -32,6 +32,10 @@ import org.metricshub.ipmi.core.sm.StateMachine;
 import org.metricshub.ipmi.core.sm.actions.MessageAction;
 import org.metricshub.ipmi.core.sm.states.SessionValid;
 import org.metricshub.ipmi.core.transport.UdpMessage;
+import java.util.List;
+import java.util.concurrent.CountDownLatch;
+import org.metricshub.ipmi.core.coding.commands.session.GetChannelCipherSuitesResponseData;
+import org.metricshub.ipmi.core.sm.actions.ResponseAction;
 
 class ConnectionTest {
 
@@ -318,6 +322,44 @@ class ConnectionTest {
 			connection.notifyResponseListeners(0, 1, null, new Exception("timed out"));
 			connection.notifyResponseListeners(0, 2, null, new Exception("timed out"));
 			assertEquals(2, notified.get(), "the second listener must be notified each time");
+		} finally {
+			connection.disconnect();
+		}
+	}
+
+	@Test
+	void aReplyPublishedWhileTheTimeoutIsPendingIsNotLost() throws Exception {
+		Connection connection = connect(TIMEOUT_MS);
+		try {
+			Field field = Connection.class.getDeclaredField("stateMachine");
+			field.setAccessible(true);
+			StateMachine machine = (StateMachine) field.get(connection);
+			AtomicReference<Throwable> publisherFailure = new AtomicReference<>();
+			CountDownLatch published = new CountDownLatch(1);
+			// Plays the receiving thread: takes the state machine lock once the request is sent, keeps it past the
+			// deadline (the waiter times out meanwhile and blocks on the lock), then publishes the reply under it
+			Thread publisher = new Thread(() -> {
+				try {
+					Thread.sleep(TIMEOUT_MS / 2);
+					synchronized (machine) {
+						Thread.sleep(2 * TIMEOUT_MS);
+						GetChannelCipherSuitesResponseData data = new GetChannelCipherSuitesResponseData();
+						data.setCipherSuiteData(new byte[0]);
+						connection.notify(new ResponseAction(data));
+						published.countDown();
+					}
+				} catch (Throwable t) {
+					publisherFailure.set(t);
+				}
+			});
+			publisher.start();
+
+			List<CipherSuite> suites = connection.getAvailableCipherSuites(1);
+
+			publisher.join(5000);
+			assertEquals(null, publisherFailure.get());
+			assertEquals(0, published.getCount(), "the reply was published before the waiter could proceed");
+			assertTrue(suites.isEmpty(), "the reply, not a timeout, ends the step");
 		} finally {
 			connection.disconnect();
 		}

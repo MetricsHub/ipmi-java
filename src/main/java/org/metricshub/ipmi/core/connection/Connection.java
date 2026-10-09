@@ -349,8 +349,14 @@ public class Connection extends TimerTask implements MachineObserver {
 		}
 
 		if (lastAction == null) {
-			stateMachine.doTransition(new Timeout());
-			throw new ConnectionException("Command timed out");
+			// The receiving thread publishes a reply under the state machine lock: once we hold it, a reply that
+			// is not there yet cannot be processed before the timeout rolls the state back
+			synchronized (stateMachine) {
+				if (lastAction == null) {
+					stateMachine.doTransition(new Timeout());
+					throw new ConnectionException("Command timed out");
+				}
+			}
 		}
 		if (!(lastAction instanceof ResponseAction || lastAction instanceof GetSikAction)) {
 			if (lastAction instanceof ErrorAction) {
