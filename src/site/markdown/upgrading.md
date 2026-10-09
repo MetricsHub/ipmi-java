@@ -44,9 +44,8 @@ The `IpmiClient` API is unchanged, and the client is more tolerant of real-world
   reply is sent again;
 * the [keep-alive](configuration.html#keep-alive) is actually sent: with the default `pingPeriod`
   (`-1`) 1.2.02 sent no keep-alive at all, so a session could expire during a long collection; the
-  keep-alive is now a Get Device ID every 30 s by default, whose reply is discarded (not the Get
-  Channel Authentication Capabilities of 1.2.02, after which HP iLO 5 revokes the session within
-  60 s), and a Get Channel Authentication Capabilities command sent by the application in a
+  keep-alive is now a Get Device ID every 30 s by default, as `ipmitool` sends, whose reply is
+  discarded, and a Get Channel Authentication Capabilities command sent by the application in a
   session gets its reply (1.2.02 dropped it, as it did the keep-alive replies);
 * a one-way IPMI message (`IpmiConnector.sendOneWayMessage()`, `IpmiAsyncConnector.sendMessage()`
   with `isOneWay`) is queued like any request: its tag stays reserved, and it takes a slot of the

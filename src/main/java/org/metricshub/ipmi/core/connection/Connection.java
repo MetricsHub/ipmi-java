@@ -687,8 +687,7 @@ public class Connection extends TimerTask implements MachineObserver {
 	}
 
 	/**
-	 * The keep-alive request: a Get Device ID, as ipmitool sends. HP iLO 5 revokes the privileges of a session 60 s
-	 * after a Get Channel Authentication Capabilities or a Set Session Privilege Level sent in it, instead of 120 s.
+	 * The keep-alive request: a Get Device ID, as ipmitool sends.
 	 */
 	private static final class KeepAlive extends IpmiCommandCoder {
 

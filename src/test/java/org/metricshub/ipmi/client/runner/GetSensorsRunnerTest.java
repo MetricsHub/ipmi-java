@@ -144,7 +144,7 @@ class GetSensorsRunnerTest {
 			final CompactSensorRecord record = new CompactSensorRecord();
 			record.setName(DEVICE_NAME);
 
-			// HP iLO answers D4h once it revoked the session
+			// HP iLO answers D4h once the session was revoked
 			failure.set(new IPMIException(CompletionCode.InsufficentPrivilege));
 			assertNull(runner.getSensorRecordReading(record));
 
