@@ -45,7 +45,7 @@ public class ConnectionManager {
 	// connect() takes a state machine lock under the list lock
 	private List<Connection> connections;
 	private final Object connectionsLock = new Object();
-	private boolean closed;
+	private volatile boolean closed;
 
 	private static final Object SESSIONLESS_TAG_LOCK = new Object();
 	private static int sessionlessTag;
@@ -130,10 +130,12 @@ public class ConnectionManager {
 	public void close() {
 		synchronized (connectionsLock) {
 			closed = true;
-			for (Connection connection : connections) {
-				if (connection != null && connection.isActive()) {
-					connection.disconnect();
-				}
+		}
+		// Outside the lock: disconnect() unregisters from the messenger, whose receiving thread holds its own lock
+		// while it notifies the application, which may create or close connections
+		for (Connection connection : connections) {
+			if (connection != null && connection.isActive()) {
+				connection.disconnect();
 			}
 		}
 		messenger.closeConnection();
@@ -252,15 +254,22 @@ public class ConnectionManager {
 
 	private int connect(InetAddress address, int port, long connectionPingPeriod, boolean skipCiphers)
 			throws IOException {
+		Connection connection;
 		synchronized (connectionsLock) {
 			if (closed) {
 				throw new IllegalStateException("The connection manager is closed");
 			}
-			Connection connection = new Connection(messenger, connections.size());
-			connection.connect(address, port, connectionPingPeriod, skipCiphers);
+			connection = new Connection(messenger, connections.size());
 			connections.add(connection);
-			return connections.size() - 1;
 		}
+		// Outside the lock: connect() registers with the messenger (see close())
+		connection.connect(address, port, connectionPingPeriod, skipCiphers);
+		if (closed) {
+			// close() ran meanwhile and may have missed this connection
+			connection.disconnect();
+			throw new IllegalStateException("The connection manager is closed");
+		}
+		return connection.getHandle();
 	}
 
 	/**

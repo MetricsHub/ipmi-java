@@ -135,4 +135,19 @@ class MessageQueueTest {
 			queue.tearDown();
 		}
 	}
+
+	@Test
+	void aTimedOutKeepAliveIsNotReported() throws Exception {
+		MessageQueue queue = newQueue();
+		try {
+			connection.registerListener(recorder());
+			int keepAlive = queue.add(new Connection.KeepAlive(CipherSuite.getEmpty()));
+			int request = queue.add(request());
+			Thread.sleep(TIMER_TICK_MS);
+			assertFalse(queue.containsId(keepAlive), "the keep-alive must leave the queue");
+			assertEquals(Collections.singletonList(request + ":Message timed out"), reported);
+		} finally {
+			queue.tearDown();
+		}
+	}
 }

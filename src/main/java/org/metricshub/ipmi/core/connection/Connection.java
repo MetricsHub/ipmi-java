@@ -669,10 +669,15 @@ public class Connection extends TimerTask implements MachineObserver {
 
 	/**
 	 * The keep-alive request: queued like any request, so that its tag stays reserved until its reply arrives or it
-	 * times out, and recognized by {@link IpmiMessageHandler}, which discards its reply.
+	 * times out, but owned by nobody: its reply is discarded and its timeout is not reported to the listeners.
 	 */
-	static final class KeepAlive extends GetChannelAuthenticationCapabilities {
-		KeepAlive(CipherSuite cipherSuite) {
+	public static final class KeepAlive extends GetChannelAuthenticationCapabilities {
+		/**
+		 * Creates the keep-alive request of a session.
+		 *
+		 * @param cipherSuite the {@link CipherSuite} of the session
+		 */
+		public KeepAlive(CipherSuite cipherSuite) {
 			super(IpmiVersion.V20, IpmiVersion.V20, cipherSuite, PrivilegeLevel.Callback, TypeConverter.intToByte(0xe));
 		}
 	}
