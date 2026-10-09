@@ -136,4 +136,15 @@ class ConnectionManagerTest {
 			manager.close();
 		}
 	}
+
+	@Test
+	void aClosedManagerCreatesNoConnection() throws Exception {
+		ConnectionManager manager = new ConnectionManager(new SilentMessenger());
+		int handle = manager.createConnection(InetAddress.getLoopbackAddress(), 623);
+		manager.close();
+		assertFalse(manager.getConnection(handle).isActive(), "close() disconnects the connections");
+		assertThrows(
+				IllegalStateException.class,
+				() -> manager.createConnection(InetAddress.getLoopbackAddress(), 623));
+	}
 }

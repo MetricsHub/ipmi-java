@@ -24,6 +24,7 @@ package org.metricshub.ipmi.core.sm;
 
 import java.io.IOException;
 import java.net.InetAddress;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 
@@ -45,6 +46,12 @@ import org.metricshub.ipmi.core.transport.UdpMessage;
 public class StateMachine implements UdpListener {
 
 	private final List<MachineObserver> observers = new CopyOnWriteArrayList<MachineObserver>();
+
+	/**
+	 * Actions emitted by the states while the lock is held, dispatched by {@link #doTransition(StateMachineEvent)}
+	 * and {@link #notifyMessage(UdpMessage)} once they release it, so that no observer runs under the lock.
+	 */
+	private final List<StateMachineAction> pendingActions = new ArrayList<StateMachineAction>();
 
 	private volatile State current;
 
@@ -100,17 +107,39 @@ public class StateMachine implements UdpListener {
 	}
 
 	/**
-	 * Sends a notification of an action to all {@link MachineObserver}s
+	 * Sends a notification of an action to all {@link MachineObserver}s. Called by a state during a transition, the
+	 * notification is deferred until the transition releases the lock.
 	 *
 	 * @param action
 	 *        - a {@link StateMachineAction} to perform
 	 */
 	public void doExternalAction(StateMachineAction action) {
+		if (Thread.holdsLock(this)) {
+			pendingActions.add(action);
+		} else {
+			notifyObservers(action);
+		}
+	}
+
+	private void notifyObservers(StateMachineAction action) {
 		for (MachineObserver observer : observers) {
 			if (observer != null) {
 				observer.notify(action);
 			}
 		}
+	}
+
+	private void dispatch(List<StateMachineAction> actions) {
+		for (StateMachineAction action : actions) {
+			notifyObservers(action);
+		}
+	}
+
+	/** Returns the actions emitted so far and clears them; called under the lock. */
+	private List<StateMachineAction> drainPendingActions() {
+		List<StateMachineAction> actions = new ArrayList<StateMachineAction>(pendingActions);
+		pendingActions.clear();
+		return actions;
 	}
 
 	/**
@@ -154,7 +183,7 @@ public class StateMachine implements UdpListener {
 	/**
 	 * Performs a {@link State} transition according to the event and
 	 * {@link #current} state. Transitions and received messages are serialized, so a late reply cannot interleave
-	 * with the timeout or close of the request it answers.
+	 * with the timeout or close of the request it answers; the observers are notified once the lock is released.
 	 *
 	 * @param event
 	 *        - {@link StateMachineEvent} invoking the transition
@@ -162,18 +191,29 @@ public class StateMachine implements UdpListener {
 	 *         - when machine was not yet started
 	 * @see #start(InetAddress, int)
 	 */
-	public synchronized void doTransition(StateMachineEvent event) {
-		if (!initialized) {
-			throw new NullPointerException("State machine not started");
+	public void doTransition(StateMachineEvent event) {
+		List<StateMachineAction> actions;
+		synchronized (this) {
+			if (!initialized) {
+				throw new NullPointerException("State machine not started");
+			}
+			current.doTransition(this, event);
+			actions = drainPendingActions();
 		}
-		current.doTransition(this, event);
+		dispatch(actions);
 	}
 
 	@Override
-	public synchronized void notifyMessage(UdpMessage message) {
-		if (message.getAddress().equals(getRemoteMachineAddress()) && message.getPort() == getRemoteMachinePort()) {
-			current.doAction(this, RmcpDecoder.decode(message.getMessage()));
+	public void notifyMessage(UdpMessage message) {
+		if (!message.getAddress().equals(getRemoteMachineAddress()) || message.getPort() != getRemoteMachinePort()) {
+			return;
 		}
+		List<StateMachineAction> actions;
+		synchronized (this) {
+			current.doAction(this, RmcpDecoder.decode(message.getMessage()));
+			actions = drainPendingActions();
+		}
+		dispatch(actions);
 	}
 
 	/**
