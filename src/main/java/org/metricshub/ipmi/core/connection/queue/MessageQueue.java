@@ -353,7 +353,8 @@ public class MessageQueue extends TimerTask {
 
 	/**
 	 * Removes the oldest message from the queue; when it timed out (rather than being answered), the response
-	 * listeners are told so, which lets the sender retry it with a fresh tag.
+	 * listeners are told so, which lets the sender retry it with a fresh tag. Nobody waits for a keep-alive: its
+	 * timeout is not reported.
 	 */
 	private void processObsoleteMessage(QueueElement message, boolean done) {
 		int tag = message.getId();
@@ -361,7 +362,7 @@ public class MessageQueue extends TimerTask {
 		queue.remove(0);
 		releaseTag(tag);
 
-		if (!done) {
+		if (!done && !(message.getRequest() instanceof Connection.KeepAlive)) {
 			logger.debug("Message timed out, tag: {}", tag);
 			try {
 				connection
