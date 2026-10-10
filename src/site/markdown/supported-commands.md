@@ -42,6 +42,7 @@ ones `IpmiClient` uses. A command not listed here can be added by
 | Activate Payload (SOL) | `ActivateSolPayload` | App / `48h` | |
 | Deactivate Payload | `DeactivatePayload` | App / `49h` | |
 | Get Payload Activation Status | `GetPayloadActivationStatus` | App / `4Ah` | |
+| Get Payload Instance Info | `GetPayloadInstanceInfo` | App / `4Bh` | |
 | Get Channel Payload Support | `GetChannelPayloadSupport` | App / `4Eh` | |
 
 The `IpmiClient` calls need nothing above the **User** privilege; Chassis Control needs

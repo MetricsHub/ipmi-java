@@ -82,9 +82,10 @@ holds one of the BMC's few session slots until the BMC expires it.
 
 `openSession()` takes the password as a `String`, sent in UTF-8, or as a `byte[]`, sent as is
 (a literal `null` password needs a cast to choose between the two). The connection keeps its own
-copy of the password, to open a [Serial over LAN](serial-over-lan.html) session, so you can clear
-your array once the session is open. The BMC stores at most 20 bytes of password and of BMC key,
-and 16 of user name: a longer one fails with `IllegalArgumentException` before anything is sent.
+copy of the password and of the BMC key, to open a [Serial over LAN](serial-over-lan.html)
+session, so you can clear your arrays once the session is open. The BMC stores at most 20 bytes of
+password and of BMC key, and 16 of user name: a longer one fails with `IllegalArgumentException`
+before anything is sent.
 The handshake checks that each reply of the BMC is for this session and confirms the requested
 algorithms; otherwise it fails with `IllegalArgumentException: ... does not match the request`.
 

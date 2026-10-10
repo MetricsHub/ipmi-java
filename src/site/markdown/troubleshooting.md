@@ -1,4 +1,4 @@
-keywords: troubleshooting, timeout, command timed out, login, authentication check failed, unauthorized name, insufficient privilege, 0xd4, ipmitool, ipmiutil, debug
+keywords: troubleshooting, timeout, command timed out, login, authentication check failed, unauthorized name, insufficient privilege, 0xd4, serial over lan, ipmitool, ipmiutil, debug
 description: Diagnose the usual failures of the IPMI Java Client — timeouts, authentication errors, insufficient privilege, missing sensors or FRUs — and compare with ipmitool and ipmiutil.
 
 # Troubleshooting
@@ -104,6 +104,17 @@ MD5-128 integrity): choose a suite whose `isSupported()` is `true`.
   ([#102](https://github.com/metricshub/ipmi-java/issues/102)).
 * **Lost replies** stall a call until the per-message timeout: shorten it
   ([Timeouts and Errors](timeouts-and-errors.html#library-wide-defaults)).
+
+## Closing a Serial over LAN console fails with `Message timed out`
+
+`close()` throws `IOException` caused by `ConnectionException: Message timed out` when the BMC does
+not answer Deactivate Payload within the 4 tries of the
+[per-message timeout](timeouts-and-errors.html#per-message-timeout-and-retries). The console still
+closes the sessions it opened and tears down the connector it owns.
+
+We saw it on a Dell iDRAC whose server did not read its serial port: after characters were written
+to the console, the BMC answered nothing, from any session, for about 30 s. Open a new console or
+session after that delay.
 
 ## Equivalent `ipmitool` and `ipmiutil` commands
 

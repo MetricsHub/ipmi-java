@@ -141,8 +141,9 @@ port, so a stateless firewall must accept UDP replies from the BMC's port on the
 range.
 
 [Serial over LAN](serial-over-lan.html) may use another UDP port: the BMC returns the port of the
-SOL payload when it is activated, usually the same one, and the console then opens a second
-session on that port. Allow it too if your BMC announces a different one.
+SOL payload when it is activated, usually the same one (623 on all the BMCs we tested), and the
+console then opens a second session on that port, with the same credentials and BMC key. Allow it
+too if your BMC announces a different one.
 
 ## Checking access with `ipmitool` or `ipmiutil`
 
