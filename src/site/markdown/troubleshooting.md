@@ -28,7 +28,7 @@ The BMC did not answer in time. A BMC that never answers fails the session hands
 | Wrong address: the server's operating system instead of its BMC | The BMC has its own IP address (`ipmitool lan print 1` on the server). |
 | IPMI over LAN disabled on the BMC | [Enabling IPMI over LAN](preparing-the-bmc.html#enabling-ipmi-over-lan) |
 | UDP port 623 filtered | [Firewall](preparing-the-bmc.html#firewall) |
-| An IPMI 1.5-only BMC | Such BMCs never answer the RMCP+ requests of the client, starting with Get Channel Cipher Suites. |
+| An IPMI 1.5-only BMC | Such BMCs never answer the RMCP+ requests of the client, starting with Get Channel Cipher Suites ([#154](https://github.com/metricshub/ipmi-java/issues/154)). |
 | A lost UDP reply | Retried after the [per-message timeout](timeouts-and-errors.html#per-message-timeout-and-retries); the call only fails when 4 tries in a row get no reply. |
 | Several sessions to the same BMC at the same time | BMCs drop replies under concurrent sessions: query each BMC [from one thread at a time](configuration.html#thread-safety). |
 | A large SDR repository or many FRUs on a slow BMC | Raise the [timeout](configuration.html#timeout): 120 s is a safe value. |
