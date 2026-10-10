@@ -151,6 +151,14 @@ public class SolCoder extends PayloadCoder {
 		this.acknowledgeOnly = true;
 	}
 
+	/**
+	 * @return whether the packet only acknowledges a packet of the BMC: it goes out with packet sequence number 0, and
+	 *         the BMC does not acknowledge it
+	 */
+	public boolean isAcknowledgeOnly() {
+		return acknowledgeOnly;
+	}
+
 	@Override
 	public PayloadType getSupportedPayloadType() {
 		return PayloadType.Sol;

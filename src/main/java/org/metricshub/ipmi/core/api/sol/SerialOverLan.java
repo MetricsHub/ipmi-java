@@ -757,8 +757,8 @@ public class SerialOverLan implements Closeable {
 	 *
 	 * @param operations
 	 *        a bunch of {@link SolOperation}s that should be invoked
-	 * @return true if the BMC acknowledged the packet (it executes the operations even when it NACKs the packet),
-	 *         false otherwise.
+	 * @return true if the packet was sent (its acknowledgement is not awaited: many BMCs never acknowledge a packet
+	 *         without characters), false otherwise.
 	 */
 	public boolean invokeOperations(SolOperation... operations) {
 		Set<SolOperation> operationSet = EnumSet.noneOf(SolOperation.class);
@@ -797,7 +797,7 @@ public class SerialOverLan implements Closeable {
 	 * Sends characters in a packet, then what the BMC did not accept of it in new packets (IPMI 2.0 table 15-2).
 	 */
 	private boolean sendMessage(byte[] characterData) {
-		SolResponseData responseData = sendPayload(characterPacket(characterData), true);
+		SolResponseData responseData = sendPayload(characterPacket(characterData));
 
 		notifyResponseListeners(characterData, new HashSet<SolOperation>(), responseData);
 
@@ -810,7 +810,7 @@ public class SerialOverLan implements Closeable {
 							responseData.getAcceptedCharactersNumber(),
 							remainingCharacterData.length);
 
-			responseData = sendPayload(characterPacket(remainingCharacterData), true);
+			responseData = sendPayload(characterPacket(remainingCharacterData));
 
 			notifyResponseListeners(remainingCharacterData, new HashSet<SolOperation>(), responseData);
 		}
@@ -832,16 +832,24 @@ public class SerialOverLan implements Closeable {
 	}
 
 	/**
-	 * Sends a packet of operations: the BMC executes them even when it NACKs the packet, which is then not sent again.
+	 * Sends a packet of operations, without characters, and does not wait for its acknowledgement: many BMCs never
+	 * acknowledge a packet without characters (seen on Supermicro, Cisco IMC and Fujitsu iRMC), and the BMC executes the
+	 * operations even when it NACKs the packet (IPMI 2.0 table 15-2).
 	 */
 	private boolean sendMessage(Set<SolOperation> operations) {
-		SolCoder payloadCoder = new SolCoder(operations, session.getConnectionHandle().getCipherSuite());
-
-		SolResponseData responseData = sendPayload(payloadCoder, false);
-
-		notifyResponseListeners(new byte[0], operations, responseData);
-
-		return responseData != null;
+		try {
+			connector
+					.sendOneWayMessage(
+							session.getConnectionHandle(),
+							new SolCoder(operations, session.getConnectionHandle().getCipherSuite()));
+			return true;
+		} catch (Exception e) {
+			if (e instanceof InterruptedException) {
+				Thread.currentThread().interrupt();
+			}
+			LOGGER.error("Error while sending SOL operations", e);
+			return false;
+		}
 	}
 
 	private void notifyResponseListeners(
@@ -856,20 +864,18 @@ public class SerialOverLan implements Closeable {
 	}
 
 	/**
-	 * Sends a packet and, when asked, sends it again while the BMC NACKs it without accepting a character (its buffer
+	 * Sends a packet, and sends it again while the BMC NACKs it without accepting a character (its buffer
 	 * is full, or the server is off), after a growing pause that leaves the BMC time to pass its characters on.
 	 *
 	 * @return the acknowledgement of the BMC, or null
 	 */
-	private SolResponseData sendPayload(PayloadCoder payloadCoder, boolean retryNacks) {
+	private SolResponseData sendPayload(PayloadCoder payloadCoder) {
 		ConnectionHandle connectionHandle = session.getConnectionHandle();
 
 		try {
 			SolResponseData responseData = (SolResponseData) connector.sendMessage(connectionHandle, payloadCoder);
 
-			for (int retry = 1; retryNacks
-					&& isNackForWholeMessage(responseData)
-					&& retry <= connector.getRetries(); retry++) {
+			for (int retry = 1; isNackForWholeMessage(responseData) && retry <= connector.getRetries(); retry++) {
 				// ponytail: linear pause (100, 200, 300 ms by default), the SOL retry interval of the BMC is not read
 				Thread.sleep(NACK_PAUSE_MS * retry);
 

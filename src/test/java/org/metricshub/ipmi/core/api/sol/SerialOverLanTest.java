@@ -435,10 +435,10 @@ class SerialOverLanTest {
 
 	@Test
 	@Timeout(30)
-	void operationsAreSentWithoutCharacters() throws Exception {
+	void operationsAreSentWithoutCharactersNorWaitingForTheirAck() throws Exception {
 		try (FakeRmcpPlusBmc bmc = solBmc(null)) {
-			// The server is off: the BMC NACKs the packet, but executes the operation
-			bmc.replySol(0);
+			// Like many BMCs, this one does not acknowledge a packet without characters
+			bmc.replySol(LOSE_ACK);
 			try (
 					SerialOverLan sol = new SerialOverLan(
 							new IpmiConnector(0, 0),
@@ -447,12 +447,17 @@ class SerialOverLanTest {
 							USER,
 							PASSWORD,
 							SUITE_17)) {
+				long start = System.nanoTime();
 				assertTrue(sol.invokeOperations(SolOperation.Break));
-				assertEquals(1, dataPackets(bmc).size(), "a NACKed operation is not sent again");
+				assertTrue(sol.writeByte((byte) 'a'));
+				assertTrue(System.nanoTime() - start < TimeUnit.SECONDS.toNanos(2), "the ACK of the operations is not awaited");
+				await(() -> dataPackets(bmc).size() == 2, "the BMC receives both packets");
 				FakeRmcpPlusBmc.SolPacket packet = dataPackets(bmc).get(0);
 				assertEquals(0, packet.data.length);
 				assertEquals(0x10, packet.operation);
-				assertEquals(1, packet.sequenceNumber, "the BMC acknowledges a packet with a sequence number");
+				assertEquals(1, packet.sequenceNumber, "a sequence number, which the BMC is to acknowledge");
+				assertEquals(2, dataPackets(bmc).get(1).sequenceNumber);
+				assertEquals("a", new String(bmc.getSolReceived(), StandardCharsets.US_ASCII));
 			}
 			assertEquals(Collections.emptyList(), bmc.getErrors());
 		}
