@@ -101,9 +101,12 @@ public class IpmiMessageHandler extends MessageHandler {
 				return;
 			}
 
+			// Out of the queue before the listeners hear of the reply: the queue must not report the request again, as
+			// timed out or failed, meanwhile
+			getMessageQueue().remove(element);
+
 			if (element.isOneWay()) {
 				// Nobody waits for the reply of a one-way message (the keep-alive): it only frees the tag
-				getMessageQueue().remove(tag);
 				return;
 			}
 
@@ -113,7 +116,6 @@ public class IpmiMessageHandler extends MessageHandler {
 			} catch (Exception e) {
 				getConnection().notifyResponseListeners(getConnection().getHandle(), tag, null, e);
 			}
-			getMessageQueue().remove(tag);
 		}
 	}
 

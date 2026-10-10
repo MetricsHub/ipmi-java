@@ -59,12 +59,27 @@ public interface ConnectionListener {
 
 	/**
 	 * Notifies the {@link ConnectionListener} of a payload the remote system sent on its own initiative (Serial over
-	 * LAN data).
+	 * LAN data). Does nothing by default.
+	 *
+	 * @param payload
+	 *        - the payload received
+	 * @deprecated implement {@link #processRequest(IpmiPayload, int)}, which tells the connection
+	 */
+	@Deprecated
+	default void processRequest(IpmiPayload payload) {
+		// The listeners written for 1.2.02 implement this method
+	}
+
+	/**
+	 * Notifies the {@link ConnectionListener} of a payload the remote system sent on its own initiative (Serial over
+	 * LAN data). Calls {@link #processRequest(IpmiPayload)} by default.
 	 *
 	 * @param payload
 	 *        - the payload received
 	 * @param handle
 	 *        - the id of the connection that received the payload
 	 */
-	void processRequest(IpmiPayload payload, int handle);
+	default void processRequest(IpmiPayload payload, int handle) {
+		processRequest(payload);
+	}
 }

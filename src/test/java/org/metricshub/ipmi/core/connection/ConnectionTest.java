@@ -312,6 +312,25 @@ class ConnectionTest {
 		}
 	}
 
+	@Test
+	void anAcknowledgementInANewPacketWithTheNumberOfAnOlderOneIsApplied() throws Exception {
+		Connection connection = connect(60000);
+		try {
+			MessageHandler sol = handler(connection, PayloadType.Sol);
+			int first = sol.takeTag(new SolCoder(new byte[] { 'a' }, CipherSuite.getEmpty()), false);
+			connection.notify(new MessageAction(solPacket(7, first)));
+			// 14 packets of output, which acknowledge nothing: the numbers of the BMC wrap around to 7
+			for (int i = 8; i <= 21; i++) {
+				connection.notify(new MessageAction(solPacket((i - 1) % 15 + 1, 0)));
+			}
+			int second = sol.takeTag(new SolCoder(new byte[] { 'b' }, CipherSuite.getEmpty()), false);
+			connection.notify(new MessageAction(solPacket(7, second)));
+			assertNull(sol.getMessageQueue().getElement(second), "the new packet 7 acknowledges the second packet");
+		} finally {
+			connection.disconnect();
+		}
+	}
+
 	/** A SOL packet of the BMC with one character, which also ACKs the given packet of the console (table 15-2). */
 	private static Ipmiv20Message solPacket(int sequenceNumber, int acknowledged) {
 		Ipmiv20Message packet = new Ipmiv20Message(null);

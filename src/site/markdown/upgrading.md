@@ -158,7 +158,8 @@ they open:
 * `writeBytes()` sends all the data: from the third packet on, 1.2.02 lost the data or threw
   `IllegalArgumentException` (on a Supermicro BMC, a 600-character write failed after 20 s with only
   its first packet delivered); a packet carries at most 255 characters;
-* the packets of the console are numbered 1, 2, 3...: its acknowledgements no longer take a
+* the packets of the console are numbered 1, 2, 3..., from 1 again at each activation of the
+  payload, as `ipmitool` does: its acknowledgements no longer take a
   number, which made 1.2.02 reuse the number of the previous packet after 14 packets of the BMC
   (a BMC drops such a packet as a retry), and a packet whose acknowledgement is lost is sent again
   with its number, where 1.2.02 sent it as a new packet, which the BMC passed to the server again;
@@ -171,7 +172,8 @@ they open:
   the next packet;
 * a packet that the BMC sends again is read once (1.2.02 repeated a piece of console output at
   each lost acknowledgement), every packet with a sequence number is acknowledged, also one
-  without characters, a full buffer suspends the BMC until one read resumes it, and a
+  without characters, a full buffer suspends the BMC until a read resumes it (the Resume ACK is
+  sent again, every 100 ms at most, until the packet comes back), and a
   `SolDeactivated` status sent in a packet without sequence number reaches the event listeners;
 * `readXxx(count, timeout)` waits on the buffer instead of polling it every millisecond, and
   returns when the 2048-byte buffer is full;
@@ -254,7 +256,7 @@ subclassed anyway).
 | Class | Change |
 | --- | --- |
 | `SerialOverLan` | New constructor with a `bmcKey`; `invokeOperations()` returns `true` once the packet is sent |
-| `ConnectionListener` | `processRequest(IpmiPayload)` becomes `processRequest(IpmiPayload, int handle)`: the handle of the connection that received the payload |
+| `ConnectionListener` | New `processRequest(IpmiPayload, int handle)`, with the handle of the connection that received the payload, which the connection calls; `processRequest(IpmiPayload)`, which it calls by default, is deprecated, and both have a default implementation |
 | `InboundMessageListener` | New default method `isPayloadSupported(IpmiPayload, int handle)`, which the connector calls: override it to take the payloads of a single connection |
 | `IpmiConnector` | New `unregisterIncomingMessageListener(InboundMessageListener)` |
 | `InboundSolMessageListener` | New `readBytes(int, int timeout)`, `getLineOperations()` and `setLineOperations(Set)` |
@@ -265,7 +267,8 @@ subclassed anyway).
 | `SolCoder` | New ACK-only constructor with the line states, and `isAcknowledgeOnly()`; the operations-only constructor sends no character |
 | `GetPayloadInstanceInfo` | New command (IPMI 2.0 section 24.5) |
 | `GetChannelPayloadSupport(byte)`, `DeactivatePayload(PayloadType, int)`, `GetPayloadActivationStatus(PayloadType)` | Deprecated: they build requests for cipher suite 0, which a session of another suite discards |
-| `MessageQueue` | New `add(PayloadCoder, boolean, int tag)` and `retry(int tag)`, which restarts the timeout of a request sent again; `tearDown()` reports the requests still waiting as failed |
+| `MessageQueue` | New `add(PayloadCoder, boolean, int tag)`, `remove(QueueElement)`, `resetSequenceNumber()`, and `retry(int tag)`, which restarts the timeout of a request sent again; `tearDown()` reports the requests still waiting as failed |
+| `IpmiConnector` | A request whose connection is closed meanwhile fails at once with `IllegalStateException` instead of being sent again |
 | `IpmiMessageHandler` | The tags of the IPMI requests go from 16 to 63, above the SOL packet sequence numbers, so that a reply is never taken for one of the other payload type |
 
 ### Sensor records

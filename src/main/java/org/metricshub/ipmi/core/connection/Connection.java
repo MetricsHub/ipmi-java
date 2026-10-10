@@ -28,6 +28,7 @@ import org.metricshub.ipmi.core.coding.commands.IpmiCommandCoder;
 import org.metricshub.ipmi.core.coding.commands.IpmiVersion;
 import org.metricshub.ipmi.core.coding.commands.PrivilegeLevel;
 import org.metricshub.ipmi.core.coding.commands.ResponseData;
+import org.metricshub.ipmi.core.coding.commands.payload.ActivatePayload;
 import org.metricshub.ipmi.core.coding.commands.session.GetChannelAuthenticationCapabilitiesResponseData;
 import org.metricshub.ipmi.core.coding.commands.session.GetChannelCipherSuitesResponseData;
 import org.metricshub.ipmi.core.coding.commands.session.OpenSessionResponseData;
@@ -667,6 +668,11 @@ public class Connection extends TimerTask implements MachineObserver {
 	 *         messages. If this happens session needs to be restarted.
 	 */
 	public int sendMessage(PayloadCoder payloadCoder, boolean isOneWay) throws ConnectionException {
+		if (payloadCoder instanceof ActivatePayload) {
+			// A new activation of the payload numbers its packets from 1 again
+			((SolMessageHandler) messageHandlers.get(PayloadType.Sol)).resetPacketNumbers();
+		}
+
 		MessageHandler messageHandler = messageHandlers.get(payloadCoder.getSupportedPayloadType());
 
 		if (messageHandler == null) {

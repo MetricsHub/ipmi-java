@@ -125,6 +125,11 @@ public class SerialOverLan implements Closeable {
 	 * The connection of the session where the payload was last activated, or null.
 	 */
 	private ConnectionHandle activatedConnection;
+
+	/**
+	 * The session where Activate Payload was last sent, whether it was answered or not.
+	 */
+	private Session activationSession;
 	private int payloadInstance;
 	private int maxPayloadSize;
 	private boolean closed;
@@ -352,6 +357,7 @@ public class SerialOverLan implements Closeable {
 		ConnectionHandle connectionHandle = payloadSession.getConnectionHandle();
 		try {
 			this.payloadInstance = getFirstAvailablePayloadInstance(ipmiConnector, connectionHandle);
+			this.activationSession = payloadSession;
 
 			ActivateSolPayload activatePayload = new ActivateSolPayload(connectionHandle.getCipherSuite(), payloadInstance);
 			ActivateSolPayloadResponseData activatePayloadResponseData = getActivatePayloadResponse(
@@ -928,18 +934,28 @@ public class SerialOverLan implements Closeable {
 	}
 
 	/**
-	 * Deactivates the payload activated in a session that the console does not close, when the console fails to open.
+	 * Deactivates the payload activated in a session that the console does not close, when the console fails to open:
+	 * where the activation was confirmed, or where Activate Payload got no reply but the payload is active in that very
+	 * session (never in the session of another console).
 	 */
 	private void deactivatePayloadOfOthers() {
-		if (activatedConnection != null && !ownedConnections.contains(activatedConnection)) {
-			try {
+		try {
+			if (activatedConnection != null && !ownedConnections.contains(activatedConnection)) {
 				deactivatePayload(activatedConnection);
-			} catch (Exception e) {
-				if (e instanceof InterruptedException) {
-					Thread.currentThread().interrupt();
-				}
-				LOGGER.warn("Cannot deactivate the SOL payload after a failed activation", e);
 			}
+			if (activationSession != null) {
+				ConnectionHandle attempted = activationSession.getConnectionHandle();
+				if (attempted != activatedConnection
+						&& !ownedConnections.contains(attempted)
+						&& isActiveInSession(connector, activationSession)) {
+					deactivatePayload(attempted);
+				}
+			}
+		} catch (Exception e) {
+			if (e instanceof InterruptedException) {
+				Thread.currentThread().interrupt();
+			}
+			LOGGER.warn("Cannot deactivate the SOL payload after a failed activation", e);
 		}
 	}
 

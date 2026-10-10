@@ -390,31 +390,30 @@ public class IpmiConnector {
 			throws Exception {
 		MessageListener listener = new MessageListener(connectionHandle);
 		asyncConnector.registerListener(listener);
+		try {
+			int retryResult = asyncConnector.retry(connectionHandle, tag, messagePayloadType);
 
-		int retryResult = asyncConnector.retry(connectionHandle, tag, messagePayloadType);
-
-		ResponseData data = retryResult != -1 ? listener.waitForAnswer(tag) : null;
-
-		asyncConnector.unregisterListener(listener);
-
-		return data;
+			return retryResult != -1 ? listener.waitForAnswer(tag) : null;
+		} finally {
+			asyncConnector.unregisterListener(listener);
+		}
 	}
 
 	private ResponseData sendMessage(ConnectionHandle connectionHandle, PayloadCoder request, boolean waitForResponse)
 			throws Exception {
 		MessageListener listener = new MessageListener(connectionHandle);
 
-		if (waitForResponse) {
-			asyncConnector.registerListener(listener);
+		if (!waitForResponse) {
+			return sendThroughAsyncConnector(request, connectionHandle, listener, false);
 		}
 
-		ResponseData data = sendThroughAsyncConnector(request, connectionHandle, listener, waitForResponse);
-
-		if (waitForResponse) {
+		// Unregistered whatever the outcome: a listener left behind would keep every later reply of the connection
+		asyncConnector.registerListener(listener);
+		try {
+			return sendThroughAsyncConnector(request, connectionHandle, listener, true);
+		} finally {
 			asyncConnector.unregisterListener(listener);
 		}
-
-		return data;
 	}
 
 	private ResponseData sendThroughAsyncConnector(
@@ -443,7 +442,8 @@ public class IpmiConnector {
 				}
 
 				messageSent = true;
-			} catch (IllegalArgumentException | InterruptedException e) {
+			} catch (IllegalArgumentException | IllegalStateException | InterruptedException e) {
+				// A wrong request, a closed connection, an interruption: sending it again cannot help
 				throw e;
 			} catch (IPMIException e) {
 				handleErrorResponse(tries, e);
@@ -505,7 +505,7 @@ public class IpmiConnector {
 
 	/**
 	 * Closes the connection with the given handle, without closing its session: the requests still waiting for a
-	 * reply on the connection fail with a {@link ConnectionException}.
+	 * reply on the connection fail, with a {@link ConnectionException} or an {@link IllegalStateException}.
 	 *
 	 * @param handle the handle of the connection
 	 */
@@ -515,7 +515,7 @@ public class IpmiConnector {
 
 	/**
 	 * Finalizes the connector and closes all connections, without closing their sessions: the requests still waiting
-	 * for a reply fail with a {@link ConnectionException}.
+	 * for a reply fail, with a {@link ConnectionException} or an {@link IllegalStateException}.
 	 */
 	public void tearDown() {
 		asyncConnector.tearDown();

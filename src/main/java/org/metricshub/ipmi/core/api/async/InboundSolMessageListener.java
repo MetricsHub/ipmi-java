@@ -62,9 +62,16 @@ public class InboundSolMessageListener implements InboundMessageListener {
 	private final List<SolEventListener> eventListeners;
 
 	/**
-	 * The packet answered with a Suspend NACK for lack of room, resumed once read: the BMC then sends it again.
+	 * The pause between two Resume ACKs of a packet that the BMC does not send again: the Resume ACK may be lost.
+	 */
+	private static final long RESUME_INTERVAL_NANOS = TimeUnit.MILLISECONDS.toNanos(100);
+
+	/**
+	 * The packet answered with a Suspend NACK for lack of room, until the BMC sends it again and it is accepted: the
+	 * reads that make room for it resume the BMC.
 	 */
 	private SolInboundMessage suspendedPacket;
+	private long lastResumeNanos;
 
 	/**
 	 * The sequence number of the last packet accepted, and its number of characters: the BMC sends a packet again,
@@ -125,13 +132,12 @@ public class InboundSolMessageListener implements InboundMessageListener {
 				if (sequenceNumber != 0) {
 					lastSequenceNumber = sequenceNumber;
 					lastCharacterCount = characters.length;
+					suspendedPacket = null;
 				}
-			} else if (sequenceNumber != 0) {
-				suspendedPacket = packet;
-			} else {
+			} else if (sequenceNumber == 0) {
 				LOGGER.warn("Dropping {} characters received in a SOL packet without sequence number", characters.length);
 			}
-			// The readers waiting for characters: they arrived, or none will until a read makes room
+			// The readers waiting for characters
 			buffer.notifyAll();
 		}
 
@@ -139,6 +145,21 @@ public class InboundSolMessageListener implements InboundMessageListener {
 			// Every packet with a sequence number is acknowledged, with the count of its characters, even when it
 			// carries none (IPMI 2.0 section 15.11)
 			acknowledge(packet, accepted ? SolAckState.ACK : SolAckState.NACK, accepted ? characters.length : 0);
+		}
+
+		if (!accepted && sequenceNumber != 0) {
+			// Recorded once the Suspend NACK is sent, so that no Resume ACK can overtake it; a read may have made room
+			// meanwhile, and no other will come for a reader waiting for more characters
+			SolInboundMessage resume;
+			synchronized (buffer) {
+				suspendedPacket = packet;
+				lastResumeNanos = System.nanoTime() - RESUME_INTERVAL_NANOS;
+				resume = takeResume();
+				buffer.notifyAll();
+			}
+			if (resume != null) {
+				acknowledge(resume, SolAckState.ACK, 0);
+			}
 		}
 
 		Set<SolStatus> statuses = packet.getStatusField().getStatuses();
@@ -197,19 +218,33 @@ public class InboundSolMessageListener implements InboundMessageListener {
 	 */
 	public byte[] readBytes(int numberOfBytes) {
 		byte[] result;
-		SolInboundMessage resumed = null;
+		SolInboundMessage resume;
 		synchronized (buffer) {
 			result = buffer.read(numberOfBytes);
-			if (suspendedPacket != null && suspendedPacket.getData().length <= buffer.remainingSpace()) {
-				resumed = suspendedPacket;
-				suspendedPacket = null;
-			}
+			resume = takeResume();
 		}
-		if (resumed != null) {
-			// A Resume ACK, sent once: the BMC sends the packet again at once
-			acknowledge(resumed, SolAckState.ACK, 0);
+		if (resume != null) {
+			acknowledge(resume, SolAckState.ACK, 0);
 		}
 		return result;
+	}
+
+	/**
+	 * Returns the suspended packet when there is room for it and no Resume ACK was sent for it lately: the BMC sends it
+	 * again at once when it gets the Resume ACK (IPMI 2.0 table 15-3), and is sent another one if that one is lost.
+	 * Called with the buffer locked.
+	 *
+	 * @return the packet to resume, or null
+	 */
+	private SolInboundMessage takeResume() {
+		if (suspendedPacket == null
+				|| suspendedPacket.getData().length > buffer.remainingSpace()
+				|| System.nanoTime() - lastResumeNanos < RESUME_INTERVAL_NANOS) {
+			return null;
+		}
+		// ponytail: a Resume ACK every 100 ms until the packet comes back, whatever the round trip to the BMC
+		lastResumeNanos = System.nanoTime();
+		return suspendedPacket;
 	}
 
 	/**
@@ -224,19 +259,37 @@ public class InboundSolMessageListener implements InboundMessageListener {
 	 */
 	public byte[] readBytes(int numberOfBytes, int timeout) {
 		long deadline = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(timeout);
-		synchronized (buffer) {
-			long remaining = deadline - System.nanoTime();
-			while (buffer.size() < numberOfBytes && suspendedPacket == null && remaining > 0) {
-				try {
-					TimeUnit.NANOSECONDS.timedWait(buffer, remaining);
-				} catch (InterruptedException e) {
-					Thread.currentThread().interrupt();
+		while (true) {
+			SolInboundMessage resume;
+			synchronized (buffer) {
+				long remaining = deadline - System.nanoTime();
+				if (buffer.size() >= numberOfBytes || remaining <= 0 || isFull()) {
 					break;
 				}
-				remaining = deadline - System.nanoTime();
+				// While waiting for a suspended packet to come back, its Resume ACK is sent again from time to time
+				resume = takeResume();
+				if (resume == null) {
+					try {
+						TimeUnit.NANOSECONDS.timedWait(buffer, Math.min(remaining, RESUME_INTERVAL_NANOS));
+					} catch (InterruptedException e) {
+						Thread.currentThread().interrupt();
+						break;
+					}
+					continue;
+				}
 			}
+			acknowledge(resume, SolAckState.ACK, 0);
 		}
 		return readBytes(numberOfBytes);
+	}
+
+	/**
+	 * Tells whether no character can arrive before a read: the buffer is full, or a packet is suspended for lack of
+	 * room. Called with the buffer locked.
+	 */
+	private boolean isFull() {
+		return buffer.remainingSpace() == 0
+				|| suspendedPacket != null && suspendedPacket.getData().length > buffer.remainingSpace();
 	}
 
 	/**

@@ -219,7 +219,8 @@ public class MessageQueue extends TimerTask {
 	}
 
 	/**
-	 * Returns the queued request with the given tag, which is about to be sent again, and restarts its timeout.
+	 * Returns the queued request with the given tag, which is about to be sent again, and restarts its timeout: the
+	 * request moves to the end of the queue, which stays in the order of the timeouts, with its tag.
 	 *
 	 * @param tag the tag of the request
 	 * @return the request, or null if no request with the given tag awaits a reply
@@ -230,8 +231,39 @@ public class MessageQueue extends TimerTask {
 			if (element == null) {
 				return null;
 			}
+			queue.remove(element);
 			element.resetTimestamp();
+			queue.add(element);
 			return element.getRequest();
+		}
+	}
+
+	/**
+	 * Removes the given element from the queue, if it is still there: a request sent again under the same tag is
+	 * another element, which stays.
+	 *
+	 * @param element the element of the request answered
+	 */
+	public void remove(QueueElement element) {
+		synchronized (queue) {
+			int index = -1;
+			for (int i = 0; i < queue.size(); i++) {
+				if (queue.get(i) == element) {
+					index = i;
+					break;
+				}
+			}
+			removeIndex(index, element.getId());
+		}
+	}
+
+	/**
+	 * Numbers the next request from the first sequence number again: a new SOL payload activation numbers its packets
+	 * from 1.
+	 */
+	public void resetSequenceNumber() {
+		synchronized (lastSequenceNumberLock) {
+			lastSequenceNumber = minSequenceNumber - 1;
 		}
 	}
 
@@ -250,18 +282,25 @@ public class MessageQueue extends TimerTask {
 				}
 				++i;
 			}
-			if (index == 0) {
-				queue.remove(0);
-				releaseTag(tag);
-				while (!queue.isEmpty() && queue.get(0).getRequest() == null) {
-					int additionalTag = queue.get(0).getId();
-					queue.remove(0);
-					releaseTag(additionalTag);
-				}
-			} else if (index > 0) {
-				queue.get(index).setRequest(null);
-			}
+			removeIndex(index, tag);
+		}
+	}
 
+	/**
+	 * Removes the element at the given index, with the answered elements that then head the queue; an element behind
+	 * the head is only marked as answered, to keep the tags of the head reserved. Called with the queue locked.
+	 */
+	private void removeIndex(int index, int tag) {
+		if (index == 0) {
+			queue.remove(0);
+			releaseTag(tag);
+			while (!queue.isEmpty() && queue.get(0).getRequest() == null) {
+				int additionalTag = queue.get(0).getId();
+				queue.remove(0);
+				releaseTag(additionalTag);
+			}
+		} else if (index > 0) {
+			queue.get(index).setRequest(null);
 		}
 	}
 
@@ -298,8 +337,8 @@ public class MessageQueue extends TimerTask {
 	}
 
 	/**
-	 * Returns a sequence number for a message sent outside the queue (the Close Session request, the SOL ACK-only
-	 * packets): it skips the tags of the queued requests.
+	 * Returns a sequence number for a message sent outside the queue (the Close Session request): it skips the tags of
+	 * the queued requests.
 	 *
 	 * @return a sequence number that no queued request holds
 	 */

@@ -153,6 +153,52 @@ class MessageQueueTest {
 	}
 
 	@Test
+	void aRetriedRequestRestartsItsTimeoutWithoutDelayingTheOthers() throws Exception {
+		MessageQueue queue = newQueue();
+		try {
+			connection.registerListener(recorder());
+			int retried = queue.add(request());
+			int other = queue.add(request());
+			Thread.sleep(TIMEOUT_MS * 3 / 4);
+			assertTrue(queue.retry(retried) != null);
+			Thread.sleep(TIMEOUT_MS * 3 / 4);
+			queue.run();
+			// The other request timed out, behind the retried one, which has a new timeout
+			assertEquals(Collections.singletonList(other + ":Message timed out"), reported);
+			assertTrue(queue.containsId(retried));
+		} finally {
+			queue.tearDown();
+		}
+	}
+
+	@Test
+	void tearingDownReportsTheRequestsWaitingButNotThoseAnswered() {
+		MessageQueue queue = newQueue();
+		connection.registerListener(recorder());
+		int answered = queue.add(request());
+		int waiting = queue.add(request());
+		queue.remove(queue.getElement(answered));
+		queue.tearDown();
+		assertEquals(Collections.singletonList(waiting + ":Connection closed"), reported);
+	}
+
+	@Test
+	void anElementIsRemovedOnlyByItself() {
+		MessageQueue queue = newQueue();
+		try {
+			int tag = queue.add(request());
+			QueueElement first = queue.getElement(tag);
+			queue.remove(tag);
+			// The same tag again, for a request sent again
+			assertEquals(tag, queue.add(request(), false, tag));
+			queue.remove(first);
+			assertTrue(queue.containsId(tag), "removing the first element must leave the second one");
+		} finally {
+			queue.tearDown();
+		}
+	}
+
+	@Test
 	void aOneWayMessageHoldsItsTagAndItsSlotUntilItsReply() {
 		// Only the reply may release the one-way message here, not a timeout on a slow machine
 		MessageQueue queue = new MessageQueue(

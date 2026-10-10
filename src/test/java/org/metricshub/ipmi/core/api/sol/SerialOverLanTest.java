@@ -385,8 +385,8 @@ class SerialOverLanTest {
 	@Timeout(30)
 	void aPacketTheBmcCannotTakeIsSentAgainAfterAPause() throws Exception {
 		try (FakeRmcpPlusBmc bmc = solBmc(null)) {
-			// The buffer of the BMC is full three times: 600 ms of pauses, longer than the message timeout, which each
-			// retry restarts
+			// The buffer of the BMC is full three times: 600 ms of pauses, longer than the message timeout (see
+			// MessageQueueTest for the restart of the timeout)
 			bmc.replySol(0, 0, 0);
 			IpmiConnector connector = new IpmiConnector(0, 0);
 			try {
@@ -643,29 +643,103 @@ class SerialOverLanTest {
 							USER,
 							PASSWORD,
 							SUITE_17)) {
-				// 2048 characters fill the buffer
-				for (int i = 1; i <= 8; i++) {
-					bmc.sendSol(i, 0, text(256));
-				}
-				bmc.sendSol(9, 0, utf8("0123456789"));
-				await(() -> acks(bmc) == 9, "the console answers each packet");
-				assertEquals("9/0 NACK", ack(bmc.getSolPackets().get(8)), "a Suspend NACK");
+				fillBuffer(bmc);
+				bmc.sendSol(10, 0, utf8("0123456789"));
+				await(() -> acks(bmc) == 10, "the console answers each packet");
+				assertEquals("10/0 NACK", ack(bmc.getSolPackets().get(9)), "a Suspend NACK");
 
-				// The read does not wait for characters that cannot arrive, and resumes the BMC once
+				// The read does not wait for characters that cannot arrive, and resumes the BMC
 				long start = System.nanoTime();
 				assertEquals(2048, sol.readBytes(4096, 10000).length);
 				assertTrue(System.nanoTime() - start < TimeUnit.SECONDS.toNanos(5));
-				sol.readBytes();
-				sol.readBytes();
-				await(() -> acks(bmc) == 10, "the console sends a Resume ACK");
-				assertEquals("9/0", ack(bmc.getSolPackets().get(9)));
+				await(() -> resumes(bmc) == 1, "the console sends a Resume ACK");
 
-				bmc.sendSol(9, 0, utf8("0123456789"));
+				// The BMC does not send the packet again (the Resume ACK was lost): a later read resumes it again
+				Thread.sleep(150);
+				sol.readBytes();
+				await(() -> resumes(bmc) == 2, "the console sends the Resume ACK again");
+
+				bmc.sendSol(10, 0, utf8("0123456789"));
 				assertEquals("0123456789", sol.readString(StandardCharsets.US_ASCII, 10, 5000));
-				await(() -> acks(bmc) == 11, "the console acknowledges the packet sent again");
-				assertEquals("9/10", ack(bmc.getSolPackets().get(10)));
+				await(
+						() -> bmc.getSolPackets().stream().anyMatch(packet -> "10/10".equals(ack(packet))),
+						"the console acknowledges the packet sent again");
+				Thread.sleep(150);
+				sol.readBytes();
+				Thread.sleep(50);
+				assertEquals(2, resumes(bmc), "no Resume ACK once the packet is accepted");
 			}
 			assertEquals(Collections.emptyList(), bmc.getErrors());
+		}
+	}
+
+	@Test
+	@Timeout(30)
+	void aReadReturnsOnceTheBufferIsFull() throws Exception {
+		try (FakeRmcpPlusBmc bmc = solBmc(null)) {
+			try (
+					SerialOverLan sol = new SerialOverLan(
+							new IpmiConnector(0, 0),
+							host(bmc),
+							bmc.getPort(),
+							USER,
+							PASSWORD,
+							SUITE_17)) {
+				// Exactly 2048 characters, and nothing more
+				fillBuffer(bmc);
+				await(() -> acks(bmc) == 9, "the console acknowledges each packet");
+				long start = System.nanoTime();
+				assertEquals(2048, sol.readBytes(4096, 10000).length);
+				assertTrue(System.nanoTime() - start < TimeUnit.SECONDS.toNanos(5));
+			}
+		}
+	}
+
+	@Test
+	@Timeout(30)
+	void aConsoleOpenedAgainOnTheSameSessionNumbersItsPacketsFrom1() throws Exception {
+		try (FakeRmcpPlusBmc bmc = solBmc(null)) {
+			IpmiConnector connector = new IpmiConnector(0, 0);
+			try {
+				Session session = openSession(connector, bmc, null);
+				SerialOverLan sol = new SerialOverLan(connector, session);
+				assertTrue(sol.writeByte((byte) 'a'));
+				assertTrue(sol.writeByte((byte) 'b'));
+				sol.close();
+				sol = new SerialOverLan(connector, session);
+				assertTrue(sol.writeByte((byte) 'c'));
+				sol.close();
+				assertArrayEquals(
+						new int[]
+						{ 1, 2, 1 },
+						dataPackets(bmc).stream().mapToInt(packet -> packet.sequenceNumber).toArray());
+				assertEquals(Collections.emptyList(), bmc.getErrors());
+			} finally {
+				connector.tearDown();
+			}
+		}
+	}
+
+	@Test
+	@Timeout(30)
+	void anActivationWithoutReplyIsUndoneInTheSessionOfTheApplication() throws Exception {
+		try (FakeRmcpPlusBmc bmc = solBmc(null)) {
+			// Get Payload Activation Status, Activate Payload (refused at User), Set Session Privilege Level, then the 4
+			// tries of Activate Payload: the first one activates the payload, and no reply comes back
+			for (int request = 4; request <= 7; request++) {
+				bmc.inject(request, Fault.DROP);
+			}
+			IpmiConnector connector = new IpmiConnector(0, 0);
+			try {
+				Session session = openSession(connector, bmc, null);
+				assertThrows(SOLException.class, () -> new SerialOverLan(connector, session));
+				assertFalse(bmc.isSolActive(), "the payload active in the session of the application is deactivated");
+				// The next console can open
+				new SerialOverLan(connector, session).close();
+				assertEquals(Collections.emptyList(), bmc.getErrors());
+			} finally {
+				connector.tearDown();
+			}
 		}
 	}
 
@@ -817,6 +891,29 @@ class SerialOverLanTest {
 			text[i] = (byte) ('a' + i % 26);
 		}
 		return text;
+	}
+
+	/**
+	 * Fills the 2048-byte buffer of the console with 9 packets of the BMC (numbers 1 to 9), of at most 248 characters
+	 * like those of real BMCs.
+	 */
+	private static void fillBuffer(FakeRmcpPlusBmc bmc) throws Exception {
+		for (int i = 1; i <= 8; i++) {
+			bmc.sendSol(i, 0, text(248));
+		}
+		bmc.sendSol(9, 0, text(2048 - 8 * 248));
+	}
+
+	/**
+	 * @return how many Resume ACKs (ACK of 0 characters of a packet) the BMC received
+	 */
+	private static long resumes(FakeRmcpPlusBmc bmc) {
+		return bmc
+				.getSolPackets()
+				.stream()
+				.filter(packet -> packet.sequenceNumber == 0 && packet.ackSequenceNumber != 0)
+				.filter(packet -> !packet.isNack() && packet.acceptedCharacters == 0)
+				.count();
 	}
 
 	/**
