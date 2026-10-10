@@ -99,10 +99,20 @@ public class MessageQueue extends TimerTask {
 	 */
 	public void tearDown() {
 		timer.cancel();
+		clear("Connection closed");
+	}
+
+	/**
+	 * Removes every request from the queue and frees their tags: those still waiting for a reply are reported as
+	 * failed, the one-way ones are dropped.
+	 *
+	 * @param failure the message of the {@link ConnectionException} reported to the requests still waiting
+	 */
+	public void clear(String failure) {
 		synchronized (queue) {
 			while (!queue.isEmpty()) {
 				QueueElement element = queue.get(0);
-				processObsoleteMessage(element, element.getRequest() == null, "Connection closed");
+				processObsoleteMessage(element, element.getRequest() == null, failure);
 			}
 		}
 	}

@@ -128,8 +128,7 @@ public class InboundSolMessageListener implements InboundMessageListener {
 		boolean accepted;
 		synchronized (buffer) {
 			retry = sequenceNumber != 0 && sequenceNumber == lastSequenceNumber;
-			int received = retry ? Math.min(lastCharacterCount, characters.length) : 0;
-			byte[] newCharacters = Arrays.copyOfRange(characters, received, characters.length);
+			byte[] newCharacters = Arrays.copyOfRange(characters, characters.length - unseen(packet), characters.length);
 			accepted = newCharacters.length <= buffer.remainingSpace();
 			if (accepted) {
 				buffer.write(newCharacters);
@@ -242,7 +241,7 @@ public class InboundSolMessageListener implements InboundMessageListener {
 	 */
 	private SolInboundMessage takeResume() {
 		if (suspendedPacket == null
-				|| suspendedPacket.getData().length > buffer.remainingSpace()
+				|| unseen(suspendedPacket) > buffer.remainingSpace()
 				|| System.nanoTime() - lastResumeNanos < RESUME_INTERVAL_NANOS) {
 			return null;
 		}
@@ -292,8 +291,19 @@ public class InboundSolMessageListener implements InboundMessageListener {
 	 * room. Called with the buffer locked.
 	 */
 	private boolean isFull() {
-		return buffer.remainingSpace() == 0
-				|| suspendedPacket != null && suspendedPacket.getData().length > buffer.remainingSpace();
+		return buffer.remainingSpace() == 0 || suspendedPacket != null && unseen(suspendedPacket) > buffer.remainingSpace();
+	}
+
+	/**
+	 * Returns how many characters of a packet were not received yet: all of them, except when the BMC sends the last
+	 * packet accepted again, with the characters it may have appended (IPMI 2.0 section 15.9). Called with the buffer
+	 * locked.
+	 */
+	private int unseen(SolInboundMessage packet) {
+		int length = packet.getData().length;
+		int sequenceNumber = packet.getSequenceNumber();
+		return sequenceNumber != 0 && sequenceNumber == lastSequenceNumber ?
+				length - Math.min(lastCharacterCount, length) : length;
 	}
 
 	/**

@@ -264,7 +264,7 @@ subclassed anyway).
 | `ConnectionHandle` | New `getBmcKey()` and `setBmcKey(byte[])`, which keeps a copy |
 | `Session`, `SessionManager`, `Connection` | New `getManagedSystemSessionId()`, and a `Session` constructor and a `registerSession()` overload that take it |
 | `CipherSuite` | New `copy()`: an uninitialized instance of the same suite, since opening a session keys its suite |
-| `SolMessage`, `SolResponseData` | `getAcceptedCharacterCount()` and `getAcceptedCharactersNumber()` return an `int` from 0 to 255 instead of a signed `byte` |
+| `SolMessage`, `SolResponseData` | `getAcceptedCharacterCount()` and `getAcceptedCharactersNumber()` return an `int` from 0 to 255 instead of a signed `byte`; the `SolResponseData` constructor takes the count as an `int` (the one with a `byte` is deprecated) |
 | `SolCoder` | New ACK-only constructor with the line states, and `isAcknowledgeOnly()`; the operations-only constructor sends no character |
 | `GetPayloadInstanceInfo` | New command (IPMI 2.0 section 24.5) |
 | `GetChannelPayloadSupport(byte)`, `DeactivatePayload(PayloadType, int)`, `GetPayloadActivationStatus(PayloadType)` | Deprecated: they build requests for cipher suite 0, which a session of another suite discards |

@@ -412,6 +412,57 @@ class SerialOverLanTest {
 
 	@Test
 	@Timeout(30)
+	void aNackedPacketWhoseResendLosesItsAckIsSentAgainWithItsNumber() throws Exception {
+		try (FakeRmcpPlusBmc bmc = solBmc(null)) {
+			// The buffer of the BMC is full, then the BMC takes the packet but its ACK is lost
+			bmc.replySol(0, LOSE_ACK);
+			IpmiConnector connector = new IpmiConnector(0, 0);
+			try {
+				SerialOverLan sol = new SerialOverLan(connector, openSession(connector, bmc, null));
+				assertTrue(sol.writeString("ls\r", StandardCharsets.US_ASCII));
+				assertEquals("ls\r", new String(bmc.getSolReceived(), StandardCharsets.US_ASCII), "received once");
+				assertArrayEquals(
+						new int[]
+						{ 1, 1, 1 },
+						dataPackets(bmc).stream().mapToInt(packet -> packet.sequenceNumber).toArray());
+				sol.close();
+			} finally {
+				connector.tearDown();
+			}
+			assertEquals(Collections.emptyList(), bmc.getErrors());
+		}
+	}
+
+	@Test
+	@Timeout(30)
+	void aNewActivationRetiresTheOperationsLeftWithoutAcknowledgement() throws Exception {
+		try (FakeRmcpPlusBmc bmc = solBmc(null)) {
+			bmc.replySol(LOSE_ACK);
+			IpmiConnector connector = new IpmiConnector(0, 0);
+			try {
+				Session session = openSession(connector, bmc, null);
+				// The operations would hold their number until long after the console is opened again
+				connector.setTimeout(session.getConnectionHandle(), 10000);
+				SerialOverLan sol = new SerialOverLan(connector, session);
+				assertTrue(sol.invokeOperations(SolOperation.FlushOutbound));
+				await(() -> dataPackets(bmc).size() == 1, "the BMC receives the operations");
+				sol.close();
+				sol = new SerialOverLan(connector, session);
+				assertTrue(sol.writeByte((byte) 'c'));
+				sol.close();
+				assertArrayEquals(
+						new int[]
+						{ 1, 1 },
+						dataPackets(bmc).stream().mapToInt(packet -> packet.sequenceNumber).toArray());
+			} finally {
+				connector.tearDown();
+			}
+			assertEquals(Collections.emptyList(), bmc.getErrors());
+		}
+	}
+
+	@Test
+	@Timeout(30)
 	void aPartialNackOfMoreThan127Characters() throws Exception {
 		try (FakeRmcpPlusBmc bmc = solBmc(null)) {
 			bmc.replySol(200);
@@ -702,6 +753,33 @@ class SerialOverLanTest {
 
 	@Test
 	@Timeout(30)
+	void aRetryWithAppendedCharactersIsResumedOnceTheyFit() throws Exception {
+		try (FakeRmcpPlusBmc bmc = solBmc(null)) {
+			try (
+					SerialOverLan sol = new SerialOverLan(
+							new IpmiConnector(0, 0),
+							host(bmc),
+							bmc.getPort(),
+							USER,
+							PASSWORD,
+							SUITE_17)) {
+				int packets = fillBuffer(bmc);
+				int last = (packets - 1) % 15 + 1;
+				int lastLength = BUFFER - (packets - 1) * 248;
+				// The BMC sends its last packet again with 10 characters more, which do not fit
+				bmc.sendSol(last, 0, text(lastLength + 10));
+				await(() -> acks(bmc) == packets + 1, "the console answers the packet");
+				assertEquals(last + "/0 NACK", ack(bmc.getSolPackets().get(packets)), "a Suspend NACK");
+				// Room for the 10 new characters: the BMC is resumed
+				assertEquals(10, sol.readBytes(10).length);
+				await(() -> resumes(bmc) == 1, "the console sends a Resume ACK");
+			}
+			assertEquals(Collections.emptyList(), bmc.getErrors());
+		}
+	}
+
+	@Test
+	@Timeout(30)
 	void aReadReturnsOnceTheBufferIsFull() throws Exception {
 		try (FakeRmcpPlusBmc bmc = solBmc(null)) {
 			try (
@@ -920,8 +998,8 @@ class SerialOverLanTest {
 	}
 
 	/**
-	 * Fills the buffer of the console with packets of the BMC of at most 248 characters, like those of real BMCs, one at
-	 * a time: a burst of datagrams could overflow the socket.
+	 * Fills the buffer of the console with packets of the BMC of at most 248 characters, like those of real BMCs, 16 at
+	 * a time: a longer burst of datagrams could overflow the socket.
 	 *
 	 * @return the number of packets sent, numbered from 1 to 15 in a loop
 	 */
@@ -930,9 +1008,9 @@ class SerialOverLanTest {
 		for (int sent = 0; sent < BUFFER; sent += 248) {
 			bmc.sendSol(packets % 15 + 1, 0, text(Math.min(248, BUFFER - sent)));
 			packets++;
-			long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
-			while (acks(bmc) < packets && System.nanoTime() < deadline) {
-				Thread.sleep(1);
+			if (packets % 16 == 0 || sent + 248 >= BUFFER) {
+				int expected = packets;
+				await(() -> acks(bmc) == expected, "the console acknowledges packet " + expected);
 			}
 		}
 		return packets;

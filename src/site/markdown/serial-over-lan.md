@@ -62,7 +62,7 @@ always returns the suite it was built with, whether the BMC offers it or not.
 | `SerialOverLan(connector, host, user, password, selector)` | New session on UDP port 623 |
 | `SerialOverLan(connector, host, port, user, password, selector)` | New session on another port |
 | `SerialOverLan(connector, host, port, user, password, bmcKey, selector)` | New session on a BMC configured for two-key logins: the [BMC key](configuration.html#bmc-key) as raw bytes |
-| `SerialOverLan(connector, session)` | Reuse a session opened with the low-level API: closing the console leaves it, and the connector, open |
+| `SerialOverLan(connector, session)` | Reuse a session opened with the low-level API, for one console at a time: closing the console leaves the session, and the connector, open |
 
 If the BMC serves SOL on another UDP port (Activate Payload returns it), the console activates the
 payload in a session on that port, as the IPMI specification requires: it uses the session

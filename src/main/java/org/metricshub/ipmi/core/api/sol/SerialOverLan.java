@@ -48,6 +48,7 @@ import org.metricshub.ipmi.core.coding.sol.SolCoder;
 import org.metricshub.ipmi.core.coding.sol.SolResponseData;
 import org.metricshub.ipmi.core.common.Constants;
 import org.metricshub.ipmi.core.common.TypeConverter;
+import org.metricshub.ipmi.core.connection.ConnectionException;
 import org.metricshub.ipmi.core.connection.Session;
 import org.metricshub.ipmi.core.connection.SessionException;
 import org.metricshub.ipmi.core.connection.SessionManager;
@@ -887,11 +888,7 @@ public class SerialOverLan implements Closeable {
 				// ponytail: linear pause (100, 200, 300 ms by default), the SOL retry interval of the BMC is not read
 				Thread.sleep(NACK_PAUSE_MS * retry);
 
-				responseData = (SolResponseData) connector
-						.retryMessage(
-								connectionHandle,
-								responseData.getRequestSequenceNumber(),
-								PayloadType.Sol);
+				responseData = resendPayload(connectionHandle, payloadCoder, responseData.getRequestSequenceNumber());
 			}
 
 			return responseData;
@@ -993,6 +990,22 @@ public class SerialOverLan implements Closeable {
 		if (ownsConnector) {
 			connector.tearDown();
 		}
+	}
+
+	/**
+	 * Sends a NACKed packet again, with its number: when the acknowledgement of that copy is lost, or the packet timed
+	 * out during the pause, it is sent again as after any timeout, still with its number.
+	 */
+	private SolResponseData resendPayload(ConnectionHandle connectionHandle, PayloadCoder payloadCoder, byte tag)
+			throws Exception {
+		SolResponseData responseData;
+		try {
+			responseData = (SolResponseData) connector.retryMessage(connectionHandle, tag, PayloadType.Sol);
+		} catch (ConnectionException e) {
+			responseData = null;
+		}
+		return responseData != null ?
+				responseData : (SolResponseData) connector.sendMessage(connectionHandle, payloadCoder);
 	}
 
 	private boolean isNackForWholeMessage(SolResponseData responseData) {

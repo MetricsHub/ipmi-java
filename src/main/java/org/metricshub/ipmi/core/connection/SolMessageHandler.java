@@ -86,9 +86,12 @@ public class SolMessageHandler extends MessageHandler {
 	}
 
 	/**
-	 * Numbers the packets from 1 again, both ways, as a new activation of the payload does (ipmitool, OpenBMC).
+	 * Numbers the packets from 1 again, both ways, as a new activation of the payload does (ipmitool, OpenBMC): the
+	 * packets of the previous activation still queued (operations whose acknowledgement never came) leave the queue
+	 * with their numbers.
 	 */
 	public synchronized void resetPacketNumbers() {
+		getMessageQueue().clear("SOL payload activated again");
 		getMessageQueue().resetSequenceNumber();
 		lastPacket = null;
 		lastTag = 0;
