@@ -199,6 +199,43 @@ public class MessageQueue extends TimerTask {
 	}
 
 	/**
+	 * Adds request to the queue under the given tag, when no other request holds it: a SOL packet sent again keeps its
+	 * packet sequence number.
+	 *
+	 * @param request the request to queue
+	 * @param oneWay true when nobody waits for the reply
+	 * @param tag the tag of the request
+	 * @return the tag, or -1 when the tag is taken or the queue is full
+	 */
+	public int add(PayloadCoder request, boolean oneWay, int tag) {
+		run();
+		synchronized (queue) {
+			if (queue.size() >= QUEUE_SIZE || !reserveTag(tag)) {
+				return -1;
+			}
+			queue.add(new QueueElement(tag, request, oneWay));
+			return tag;
+		}
+	}
+
+	/**
+	 * Returns the queued request with the given tag, which is about to be sent again, and restarts its timeout.
+	 *
+	 * @param tag the tag of the request
+	 * @return the request, or null if no request with the given tag awaits a reply
+	 */
+	public PayloadCoder retry(int tag) {
+		synchronized (queue) {
+			QueueElement element = getElement(tag);
+			if (element == null) {
+				return null;
+			}
+			element.resetTimestamp();
+			return element.getRequest();
+		}
+	}
+
+	/**
 	 * Removes message with the given tag from the queue.
 	 */
 	public void remove(int tag) {

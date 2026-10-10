@@ -371,8 +371,8 @@ public class FakeRmcpPlusBmc implements AutoCloseable {
 	}
 
 	/**
-	 * Sets how the BMC answers the next SOL packets with character data from the console, one value per packet: the
-	 * number of characters accepted (all of them when greater than the data, a NACK when fewer), or
+	 * Sets how the BMC answers the next SOL packets with a sequence number from the console, one value per packet: the
+	 * number of characters accepted (all of them when greater than the data, a NACK when fewer or 0), or
 	 * {@link #LOSE_ACK}. The packets after these are accepted. A packet sent again with the sequence number of a packet
 	 * accepted already is acknowledged again, without taking its data again (IPMI 2.0 section 15.9).
 	 *
@@ -733,6 +733,7 @@ public class FakeRmcpPlusBmc implements AutoCloseable {
 		}
 		int accepted;
 		Integer reply;
+		boolean nack;
 		synchronized (solReceived) {
 			if (received.sequenceNumber == lastSolSequenceNumber && lastSolAccepted) {
 				// A retry of a packet accepted already, whose ACK was lost: its content need not be checked
@@ -743,17 +744,15 @@ public class FakeRmcpPlusBmc implements AutoCloseable {
 				accepted = reply == null || reply < 0 ? received.data.length : Math.min(reply, received.data.length);
 				solReceived.write(received.data, 0, accepted);
 			}
+			// A NACK when the BMC takes fewer characters than the packet carries, or none (even of an empty packet)
+			nack = reply != null && reply != LOSE_ACK && reply < Math.max(received.data.length, 1);
 			lastSolSequenceNumber = received.sequenceNumber;
-			lastSolAccepted = accepted == received.data.length;
+			lastSolAccepted = !nack;
 		}
 		if (reply != null && reply == LOSE_ACK) {
 			return null;
 		}
-		return new byte[] {
-				0x00,
-				(byte) received.sequenceNumber,
-				(byte) accepted,
-				(byte) (accepted < received.data.length ? SOL_NACK : 0x00) };
+		return new byte[] { 0x00, (byte) received.sequenceNumber, (byte) accepted, (byte) (nack ? SOL_NACK : 0x00) };
 	}
 
 	/**

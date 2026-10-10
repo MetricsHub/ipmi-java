@@ -27,10 +27,13 @@ import org.metricshub.ipmi.core.api.sync.IpmiConnector;
 import org.metricshub.ipmi.core.coding.payload.IpmiPayload;
 import org.metricshub.ipmi.core.coding.payload.sol.SolAckState;
 import org.metricshub.ipmi.core.coding.payload.sol.SolInboundMessage;
+import org.metricshub.ipmi.core.coding.payload.sol.SolOperation;
 import org.metricshub.ipmi.core.coding.payload.sol.SolStatus;
 import org.metricshub.ipmi.core.coding.sol.SolCoder;
 import org.metricshub.ipmi.core.common.ByteBuffer;
 
+import java.util.Collections;
+import java.util.EnumSet;
 import java.util.List;
 import java.util.Set;
 
@@ -52,6 +55,11 @@ public class InboundSolMessageListener implements InboundMessageListener {
 	private final List<SolEventListener> eventListeners;
 
 	private SolInboundMessage waitingMessage;
+
+	/**
+	 * The serial line states the console holds, set in every packet it sends.
+	 */
+	private volatile Set<SolOperation> lineOperations = Collections.emptySet();
 
 	public InboundSolMessageListener(IpmiConnector connector, ConnectionHandle connectionHandle,
 			List<SolEventListener> eventListeners) {
@@ -128,6 +136,7 @@ public class InboundSolMessageListener implements InboundMessageListener {
 						solPayload.getSequenceNumber(),
 						(byte) 0,
 						SolAckState.NACK,
+						lineOperations,
 						connectionHandle.getCipherSuite());
 				connector.sendOneWayMessage(connectionHandle, solNack);
 
@@ -147,6 +156,7 @@ public class InboundSolMessageListener implements InboundMessageListener {
 						solPayload.getSequenceNumber(),
 						(byte) characterData.length,
 						SolAckState.ACK,
+						lineOperations,
 						connectionHandle.getCipherSuite());
 				connector.sendOneWayMessage(connectionHandle, solAck);
 
@@ -165,11 +175,31 @@ public class InboundSolMessageListener implements InboundMessageListener {
 					solPayload.getSequenceNumber(),
 					(byte) 0,
 					SolAckState.ACK,
+					lineOperations,
 					connectionHandle.getCipherSuite());
 			connector.sendOneWayMessage(connectionHandle, solResumeAck);
 		} catch (Exception e) {
 			LOGGER.error("Could not send Resume ACK for packet " + solPayload.getSequenceNumber(), e);
 		}
+	}
+
+	/**
+	 * @return the serial line states (CTS, DCD/DSR, Ring) that the console holds in every packet it sends
+	 */
+	public Set<SolOperation> getLineOperations() {
+		return lineOperations;
+	}
+
+	/**
+	 * Sets the serial line states (CTS, DCD/DSR, Ring) that the console holds in every packet it sends: they are levels,
+	 * which a packet without them releases (IPMI 2.0 table 15-2).
+	 *
+	 * @param lineOperations the line states to hold
+	 */
+	public void setLineOperations(Set<SolOperation> lineOperations) {
+		Set<SolOperation> copy = EnumSet.noneOf(SolOperation.class);
+		copy.addAll(lineOperations);
+		this.lineOperations = Collections.unmodifiableSet(copy);
 	}
 
 	/**

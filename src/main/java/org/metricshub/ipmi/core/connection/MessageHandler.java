@@ -138,7 +138,7 @@ public abstract class MessageHandler {
 	public int retryMessage(int tag, StateMachine stateMachine, int sessionId) throws ConnectionException {
 		validateSessionState(stateMachine);
 
-		PayloadCoder payloadCoder = messageQueue.getMessageFromQueue(tag);
+		PayloadCoder payloadCoder = messageQueue.retry(tag);
 
 		if (payloadCoder == null) {
 			return -1;

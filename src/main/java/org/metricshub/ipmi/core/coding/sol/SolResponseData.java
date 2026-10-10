@@ -51,7 +51,7 @@ public class SolResponseData implements ResponseData {
 	/**
 	 * Number of characters accepted from the corresponding message.
 	 */
-	private final byte acceptedCharactersNumber;
+	private final int acceptedCharactersNumber;
 
 	/**
 	 * Creates new instance of {@link SolResponseData} filled with given data.
@@ -60,9 +60,11 @@ public class SolResponseData implements ResponseData {
 	 *        Acknowledge status for corresponding request message
 	 * @param statuses
 	 *        Set of statuses
+	 * @param acceptedCharactersNumber
+	 *        Number of characters accepted from the corresponding message, 0 to 255
 	 */
 	public SolResponseData(byte requestSequenceNumber, SolAckState acknowledgeState, Set<SolStatus> statuses,
-			byte acceptedCharactersNumber) {
+			int acceptedCharactersNumber) {
 		this.requestSequenceNumber = requestSequenceNumber;
 		this.acknowledgeState = acknowledgeState;
 		this.statuses = statuses;
@@ -81,7 +83,10 @@ public class SolResponseData implements ResponseData {
 		return statuses;
 	}
 
-	public byte getAcceptedCharactersNumber() {
+	/**
+	 * @return the number of characters accepted from the corresponding message, 0 to 255
+	 */
+	public int getAcceptedCharactersNumber() {
 		return acceptedCharactersNumber;
 	}
 

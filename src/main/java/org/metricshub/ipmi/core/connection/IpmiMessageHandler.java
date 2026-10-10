@@ -26,6 +26,7 @@ import org.metricshub.ipmi.core.coding.PayloadCoder;
 import org.metricshub.ipmi.core.coding.commands.IpmiCommandCoder;
 import org.metricshub.ipmi.core.coding.commands.ResponseData;
 import org.metricshub.ipmi.core.coding.payload.lan.IpmiLanMessage;
+import org.metricshub.ipmi.core.coding.payload.sol.SolMessage;
 import org.metricshub.ipmi.core.coding.protocol.Ipmiv20Message;
 import org.metricshub.ipmi.core.connection.queue.QueueElement;
 
@@ -42,7 +43,9 @@ public class IpmiMessageHandler extends MessageHandler {
 	private static final Logger LOGGER = LoggerFactory.getLogger(IpmiMessageHandler.class);
 
 	public IpmiMessageHandler(Connection connection, int timeout) throws IOException {
-		super(connection, timeout, IpmiLanMessage.MIN_SEQUENCE_NUMBER, IpmiLanMessage.MAX_SEQUENCE_NUMBER);
+		// The tags start above the SOL packet sequence numbers (1 to 15): the replies of both payload types are reported
+		// to the same listeners with their connection and tag only, which must not be ambiguous
+		super(connection, timeout, SolMessage.MAX_SEQUENCE_NUMBER + 1, IpmiLanMessage.MAX_SEQUENCE_NUMBER);
 	}
 
 	/**

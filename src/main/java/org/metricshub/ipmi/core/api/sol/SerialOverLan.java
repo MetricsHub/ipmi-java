@@ -59,6 +59,8 @@ import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
+import java.util.EnumSet;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -70,6 +72,28 @@ import java.util.concurrent.CopyOnWriteArrayList;
 public class SerialOverLan implements Closeable {
 
 	private static final Logger LOGGER = LoggerFactory.getLogger(SerialOverLan.class);
+
+	/**
+	 * The most characters a packet carries: the BMC acknowledges them with a count of one byte (IPMI 2.0 table 15-2).
+	 */
+	private static final int MAX_PACKET_CHARACTERS = 255;
+
+	/**
+	 * The pause before sending again a packet that the BMC NACKed, multiplied by the number of the retry.
+	 */
+	private static final long NACK_PAUSE_MS = 100;
+
+	/**
+	 * The operations that are serial line states, which the console holds in every packet (IPMI 2.0 table 15-2).
+	 */
+	private static final Set<SolOperation> LINE_OPERATIONS = Collections
+			.unmodifiableSet(EnumSet.of(SolOperation.RingWOR, SolOperation.CTS, SolOperation.DCD_DSR));
+
+	/**
+	 * One write at a time: SOL allows a single packet in flight (IPMI 2.0 table 15-2), and the packets of a write must
+	 * not mix with those of another.
+	 */
+	private final Object writeLock = new Object();
 
 	private final IpmiConnector connector;
 	private final Session session;
@@ -437,37 +461,24 @@ public class SerialOverLan implements Closeable {
 	}
 
 	/**
-	 * Writes bytes array to the port.
+	 * Writes bytes array to the port, in packets of the size the BMC accepts.
 	 * This operation blocks until all data can be sent to remote server and is either accepted or rejected by the server.
+	 * When it fails, the server may have received the first bytes already.
 	 *
 	 * @param buffer
 	 *        an array of bytes to write
 	 * @return true if all bytes were successfully sent and acknowledged by remote server, false otherwise.
 	 */
 	public boolean writeBytes(byte[] buffer) {
-		boolean result = true;
-
-		int maxBufferSize = maxPayloadSize - SolMessage.PAYLOAD_HEADER_LENGTH;
-		byte[] remainingBytes = buffer;
-		int currentIndex = 0;
-
-		while (remainingBytes.length - currentIndex > maxBufferSize) {
-			byte[] bufferChunk = Arrays.copyOfRange(remainingBytes, currentIndex, maxBufferSize);
-			currentIndex += maxBufferSize;
-
-			result &= sendMessage(bufferChunk);
-
-			if (!result) {
-				return false;
+		int packetSize = Math.min(maxPayloadSize - SolMessage.PAYLOAD_HEADER_LENGTH, MAX_PACKET_CHARACTERS);
+		synchronized (writeLock) {
+			for (int from = 0; from < buffer.length; from += packetSize) {
+				if (!sendMessage(Arrays.copyOfRange(buffer, from, Math.min(from + packetSize, buffer.length)))) {
+					return false;
+				}
 			}
+			return true;
 		}
-
-		if (remainingBytes.length - currentIndex > 0) {
-			remainingBytes = Arrays.copyOfRange(remainingBytes, currentIndex, remainingBytes.length);
-			result &= sendMessage(remainingBytes);
-		}
-
-		return result;
 	}
 
 	/**
@@ -726,20 +737,27 @@ public class SerialOverLan implements Closeable {
 	}
 
 	/**
-	 * Invokes given SOL-specific operations on remote serial port.
+	 * Invokes given SOL-specific operations on remote serial port. {@link SolOperation#Break},
+	 * {@link SolOperation#FlushInbound} and {@link SolOperation#FlushOutbound} act once; {@link SolOperation#CTS},
+	 * {@link SolOperation#DCD_DSR} and {@link SolOperation#RingWOR} are line states, which the console holds in every
+	 * packet it sends until the next call: call this method without them to release them.
 	 *
 	 * @param operations
 	 *        a bunch of {@link SolOperation}s that should be invoked
-	 * @return true if operations were successfully sent and acknowledged by remote server, false otherwise.
+	 * @return true if the BMC acknowledged the packet (it executes the operations even when it NACKs the packet),
+	 *         false otherwise.
 	 */
 	public boolean invokeOperations(SolOperation... operations) {
-		Set<SolOperation> operationSet = new HashSet<SolOperation>();
+		Set<SolOperation> operationSet = EnumSet.noneOf(SolOperation.class);
+		operationSet.addAll(Arrays.asList(operations));
+		Set<SolOperation> lineOperations = EnumSet.noneOf(SolOperation.class);
+		lineOperations.addAll(operationSet);
+		lineOperations.retainAll(LINE_OPERATIONS);
 
-		for (SolOperation operation : operations) {
-			operationSet.add(operation);
+		synchronized (writeLock) {
+			inboundMessageListener.setLineOperations(lineOperations);
+			return sendMessage(operationSet);
 		}
-
-		return sendMessage(operationSet);
 	}
 
 	/**
@@ -762,10 +780,11 @@ public class SerialOverLan implements Closeable {
 		eventListeners.remove(listener);
 	}
 
+	/**
+	 * Sends characters in a packet, then what the BMC did not accept of it in new packets (IPMI 2.0 table 15-2).
+	 */
 	private boolean sendMessage(byte[] characterData) {
-		SolCoder payloadCoder = new SolCoder(characterData, session.getConnectionHandle().getCipherSuite());
-
-		SolResponseData responseData = sendPayload(payloadCoder);
+		SolResponseData responseData = sendPayload(characterPacket(characterData), true);
 
 		notifyResponseListeners(characterData, new HashSet<SolOperation>(), responseData);
 
@@ -778,10 +797,7 @@ public class SerialOverLan implements Closeable {
 							responseData.getAcceptedCharactersNumber(),
 							remainingCharacterData.length);
 
-			SolCoder partialPayloadCoder = new SolCoder(
-					remainingCharacterData,
-					session.getConnectionHandle().getCipherSuite());
-			responseData = sendPayload(partialPayloadCoder);
+			responseData = sendPayload(characterPacket(remainingCharacterData), true);
 
 			notifyResponseListeners(remainingCharacterData, new HashSet<SolOperation>(), responseData);
 		}
@@ -789,14 +805,30 @@ public class SerialOverLan implements Closeable {
 		return responseData != null && responseData.getAcknowledgeState() == SolAckState.ACK;
 	}
 
+	/**
+	 * @return a packet of characters, with the line states the console holds
+	 */
+	private SolCoder characterPacket(byte[] characterData) {
+		return new SolCoder(
+				characterData,
+				(byte) 0,
+				(byte) 0,
+				SolAckState.ACK,
+				inboundMessageListener.getLineOperations(),
+				session.getConnectionHandle().getCipherSuite());
+	}
+
+	/**
+	 * Sends a packet of operations: the BMC executes them even when it NACKs the packet, which is then not sent again.
+	 */
 	private boolean sendMessage(Set<SolOperation> operations) {
 		SolCoder payloadCoder = new SolCoder(operations, session.getConnectionHandle().getCipherSuite());
 
-		SolResponseData responseData = sendPayload(payloadCoder);
+		SolResponseData responseData = sendPayload(payloadCoder, false);
 
 		notifyResponseListeners(new byte[0], operations, responseData);
 
-		return responseData != null && responseData.getAcknowledgeState() == SolAckState.ACK;
+		return responseData != null;
 	}
 
 	private void notifyResponseListeners(
@@ -810,16 +842,23 @@ public class SerialOverLan implements Closeable {
 		}
 	}
 
-	private SolResponseData sendPayload(PayloadCoder payloadCoder) {
+	/**
+	 * Sends a packet and, when asked, sends it again while the BMC NACKs it without accepting a character (its buffer
+	 * is full, or the server is off), after a growing pause that leaves the BMC time to pass its characters on.
+	 *
+	 * @return the acknowledgement of the BMC, or null
+	 */
+	private SolResponseData sendPayload(PayloadCoder payloadCoder, boolean retryNacks) {
 		ConnectionHandle connectionHandle = session.getConnectionHandle();
 
 		try {
 			SolResponseData responseData = (SolResponseData) connector.sendMessage(connectionHandle, payloadCoder);
 
-			int actualRetries = 0;
-
-			while (isNackForWholeMessage(responseData) && actualRetries < connector.getRetries()) {
-				actualRetries++;
+			for (int retry = 1; retryNacks
+					&& isNackForWholeMessage(responseData)
+					&& retry <= connector.getRetries(); retry++) {
+				// ponytail: linear pause (100, 200, 300 ms by default), the SOL retry interval of the BMC is not read
+				Thread.sleep(NACK_PAUSE_MS * retry);
 
 				responseData = (SolResponseData) connector
 						.retryMessage(
@@ -829,6 +868,9 @@ public class SerialOverLan implements Closeable {
 			}
 
 			return responseData;
+		} catch (InterruptedException e) {
+			Thread.currentThread().interrupt();
+			return null;
 		} catch (Exception e) {
 			LOGGER.error("Error while sending message", e);
 			return null;

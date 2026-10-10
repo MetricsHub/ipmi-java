@@ -1,5 +1,6 @@
 package org.metricshub.ipmi.core.api.sol;
 
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -14,9 +15,12 @@ import java.io.IOException;
 import java.net.InetAddress;
 import java.nio.charset.StandardCharsets;
 import java.util.Collections;
+import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.function.BooleanSupplier;
+import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
@@ -26,6 +30,7 @@ import org.metricshub.ipmi.core.coding.commands.IpmiVersion;
 import org.metricshub.ipmi.core.coding.commands.PrivilegeLevel;
 import org.metricshub.ipmi.core.coding.commands.chassis.GetChassisStatus;
 import org.metricshub.ipmi.core.coding.commands.chassis.GetChassisStatusResponseData;
+import org.metricshub.ipmi.core.coding.payload.sol.SolOperation;
 import org.metricshub.ipmi.core.coding.protocol.AuthenticationType;
 import org.metricshub.ipmi.core.coding.security.CipherSuite;
 import org.metricshub.ipmi.core.connection.Session;
@@ -285,6 +290,248 @@ class SerialOverLanTest {
 		}
 	}
 
+	@Test
+	@Timeout(30)
+	void aLongWriteIsSentInPacketsOfTheSizeTheBmcAccepts() throws Exception {
+		// 10 characters per packet: 3 full packets and a short one
+		assertWrittenInPackets(14, 35, 10, 10, 10, 5);
+		// At most 255 characters per packet, which a 1-byte count acknowledges
+		assertWrittenInPackets(300, 600, 255, 255, 90);
+	}
+
+	private static void assertWrittenInPackets(int payloadSize, int length, int... packetSizes) throws Exception {
+		try (FakeRmcpPlusBmc bmc = new FakeRmcpPlusBmc(SUITES, USER, utf8(PASSWORD), null)) {
+			bmc.enableSol(bmc.getPort(), payloadSize, ADMINISTRATOR);
+			try (
+					SerialOverLan sol = new SerialOverLan(
+							new IpmiConnector(0, 0),
+							host(bmc),
+							bmc.getPort(),
+							USER,
+							PASSWORD,
+							SUITE_17)) {
+				byte[] data = text(length);
+				assertTrue(sol.writeBytes(data));
+				assertArrayEquals(data, bmc.getSolReceived());
+				assertArrayEquals(packetSizes, dataPackets(bmc).stream().mapToInt(packet -> packet.data.length).toArray());
+				// One packet after the other: 1, 2, 3...
+				assertArrayEquals(
+						IntStream.rangeClosed(1, packetSizes.length).toArray(),
+						dataPackets(bmc).stream().mapToInt(packet -> packet.sequenceNumber).toArray());
+			}
+			assertEquals(Collections.emptyList(), bmc.getErrors());
+		}
+	}
+
+	@Test
+	@Timeout(30)
+	void theAcknowledgementsOfTheConsoleUseNoSequenceNumber() throws Exception {
+		try (FakeRmcpPlusBmc bmc = solBmc(null)) {
+			try (
+					SerialOverLan sol = new SerialOverLan(
+							new IpmiConnector(0, 0),
+							host(bmc),
+							bmc.getPort(),
+							USER,
+							PASSWORD,
+							SUITE_17)) {
+				assertTrue(sol.writeByte((byte) 'a'));
+				// 14 packets of the BMC, which the console acknowledges, used to make the next packet reuse number 1
+				for (int i = 1; i <= 14; i++) {
+					bmc.sendSol(i, 0, utf8("x"));
+					int acknowledged = i;
+					await(() -> acks(bmc) == acknowledged, "the console acknowledges packet " + i);
+				}
+				assertTrue(sol.writeByte((byte) 'b'));
+				assertArrayEquals(
+						new int[]
+						{ 1, 2 },
+						dataPackets(bmc).stream().mapToInt(packet -> packet.sequenceNumber).toArray());
+				assertEquals("ab", new String(bmc.getSolReceived(), StandardCharsets.US_ASCII));
+			}
+			assertEquals(Collections.emptyList(), bmc.getErrors());
+		}
+	}
+
+	@Test
+	@Timeout(30)
+	void aPacketWhoseAckIsLostIsSentAgainWithItsSequenceNumber() throws Exception {
+		try (FakeRmcpPlusBmc bmc = solBmc(null)) {
+			bmc.replySol(LOSE_ACK);
+			IpmiConnector connector = new IpmiConnector(0, 0);
+			try {
+				SerialOverLan sol = new SerialOverLan(connector, openSession(connector, bmc, null));
+				assertTrue(sol.writeString("reboot\r", StandardCharsets.US_ASCII));
+				assertEquals("reboot\r", new String(bmc.getSolReceived(), StandardCharsets.US_ASCII), "received once");
+				assertArrayEquals(
+						new int[]
+						{ 1, 1 },
+						dataPackets(bmc).stream().mapToInt(packet -> packet.sequenceNumber).toArray());
+				sol.close();
+			} finally {
+				connector.tearDown();
+			}
+			assertEquals(Collections.emptyList(), bmc.getErrors());
+		}
+	}
+
+	@Test
+	@Timeout(30)
+	void aPacketTheBmcCannotTakeIsSentAgainAfterAPause() throws Exception {
+		try (FakeRmcpPlusBmc bmc = solBmc(null)) {
+			// The buffer of the BMC is full three times: 600 ms of pauses, longer than the message timeout, which each
+			// retry restarts
+			bmc.replySol(0, 0, 0);
+			IpmiConnector connector = new IpmiConnector(0, 0);
+			try {
+				SerialOverLan sol = new SerialOverLan(connector, openSession(connector, bmc, null));
+				long start = System.nanoTime();
+				assertTrue(sol.writeString("ls\r", StandardCharsets.US_ASCII));
+				assertTrue(System.nanoTime() - start >= TimeUnit.MILLISECONDS.toNanos(600), "100, 200, then 300 ms");
+				assertEquals("ls\r", new String(bmc.getSolReceived(), StandardCharsets.US_ASCII));
+				assertArrayEquals(
+						new int[]
+						{ 1, 1, 1, 1 },
+						dataPackets(bmc).stream().mapToInt(packet -> packet.sequenceNumber).toArray());
+				sol.close();
+			} finally {
+				connector.tearDown();
+			}
+			assertEquals(Collections.emptyList(), bmc.getErrors());
+		}
+	}
+
+	@Test
+	@Timeout(30)
+	void aPartialNackOfMoreThan127Characters() throws Exception {
+		try (FakeRmcpPlusBmc bmc = solBmc(null)) {
+			bmc.replySol(200);
+			try (
+					SerialOverLan sol = new SerialOverLan(
+							new IpmiConnector(0, 0),
+							host(bmc),
+							bmc.getPort(),
+							USER,
+							PASSWORD,
+							SUITE_17)) {
+				byte[] data = text(251);
+				assertTrue(sol.writeBytes(data));
+				assertArrayEquals(data, bmc.getSolReceived());
+				// The rest goes in the next packet
+				assertArrayEquals(
+						new int[]
+						{ 251, 51 },
+						dataPackets(bmc).stream().mapToInt(packet -> packet.data.length).toArray());
+			}
+			assertEquals(Collections.emptyList(), bmc.getErrors());
+		}
+	}
+
+	@Test
+	@Timeout(30)
+	void operationsAreSentWithoutCharacters() throws Exception {
+		try (FakeRmcpPlusBmc bmc = solBmc(null)) {
+			// The server is off: the BMC NACKs the packet, but executes the operation
+			bmc.replySol(0);
+			try (
+					SerialOverLan sol = new SerialOverLan(
+							new IpmiConnector(0, 0),
+							host(bmc),
+							bmc.getPort(),
+							USER,
+							PASSWORD,
+							SUITE_17)) {
+				assertTrue(sol.invokeOperations(SolOperation.Break));
+				assertEquals(1, dataPackets(bmc).size(), "a NACKed operation is not sent again");
+				FakeRmcpPlusBmc.SolPacket packet = dataPackets(bmc).get(0);
+				assertEquals(0, packet.data.length);
+				assertEquals(0x10, packet.operation);
+				assertEquals(1, packet.sequenceNumber, "the BMC acknowledges a packet with a sequence number");
+			}
+			assertEquals(Collections.emptyList(), bmc.getErrors());
+		}
+	}
+
+	@Test
+	@Timeout(30)
+	void lineStatesAreHeldInEveryPacketUntilReleased() throws Exception {
+		try (FakeRmcpPlusBmc bmc = solBmc(null)) {
+			try (
+					SerialOverLan sol = new SerialOverLan(
+							new IpmiConnector(0, 0),
+							host(bmc),
+							bmc.getPort(),
+							USER,
+							PASSWORD,
+							SUITE_17)) {
+				assertTrue(sol.invokeOperations(SolOperation.CTS, SolOperation.Break));
+				assertTrue(sol.writeByte((byte) 'a'));
+				bmc.sendSol(1, 0, utf8("b"));
+				await(() -> acks(bmc) == 1, "the console acknowledges the packet");
+				assertTrue(sol.invokeOperations());
+				assertTrue(sol.writeByte((byte) 'c'));
+				// CTS (bit 3) and Break (bit 4), then CTS in the data and in the ACK, then nothing
+				assertArrayEquals(
+						new int[]
+						{ 0x18, 0x08, 0x08, 0x00, 0x00 },
+						bmc.getSolPackets().stream().mapToInt(packet -> packet.operation).toArray());
+			}
+			assertEquals(Collections.emptyList(), bmc.getErrors());
+		}
+	}
+
+	@Test
+	@Timeout(30)
+	void concurrentWritesDoNotMix() throws Exception {
+		try (FakeRmcpPlusBmc bmc = new FakeRmcpPlusBmc(SUITES, USER, utf8(PASSWORD), null)) {
+			bmc.enableSol(bmc.getPort(), 14, ADMINISTRATOR);
+			try (
+					SerialOverLan sol = new SerialOverLan(
+							new IpmiConnector(0, 0),
+							host(bmc),
+							bmc.getPort(),
+							USER,
+							PASSWORD,
+							SUITE_17)) {
+				String first = String.join("", Collections.nCopies(100, "a"));
+				String second = String.join("", Collections.nCopies(100, "b"));
+				CompletableFuture<Boolean> other = CompletableFuture
+						.supplyAsync(() -> sol.writeString(second, StandardCharsets.US_ASCII));
+				assertTrue(sol.writeString(first, StandardCharsets.US_ASCII));
+				assertTrue(other.get(10, TimeUnit.SECONDS));
+				String received = new String(bmc.getSolReceived(), StandardCharsets.US_ASCII);
+				assertTrue(received.equals(first + second) || received.equals(second + first), received);
+			}
+			assertEquals(Collections.emptyList(), bmc.getErrors());
+		}
+	}
+
+	@Test
+	@Timeout(30)
+	void anInterruptedWriteKeepsTheInterruptStatus() throws Exception {
+		try (FakeRmcpPlusBmc bmc = solBmc(null)) {
+			bmc.replySol(LOSE_ACK);
+			try (
+					SerialOverLan sol = new SerialOverLan(
+							new IpmiConnector(0, 0),
+							host(bmc),
+							bmc.getPort(),
+							USER,
+							PASSWORD,
+							SUITE_17)) {
+				CompletableFuture<Boolean> interrupted = new CompletableFuture<>();
+				Thread writer = new Thread(() -> {
+					sol.writeByte((byte) 'a');
+					interrupted.complete(Thread.currentThread().isInterrupted());
+				});
+				writer.start();
+				await(() -> bmc.getSolReceived().length == 1, "the BMC receives the character");
+				writer.interrupt();
+				assertTrue(interrupted.get(2, TimeUnit.SECONDS));
+			}
+		}
+	}
+
 	/**
 	 * A BMC that serves SOL on its own port.
 	 */
@@ -315,6 +562,24 @@ class SerialOverLanTest {
 
 	private static void assertTornDown(IpmiConnector connector) {
 		assertThrows(IllegalStateException.class, () -> connector.createConnection(InetAddress.getLoopbackAddress()));
+	}
+
+	/**
+	 * @return the packets of the console that the BMC acknowledges (those with a sequence number)
+	 */
+	private static List<FakeRmcpPlusBmc.SolPacket> dataPackets(FakeRmcpPlusBmc bmc) {
+		return bmc.getSolPackets().stream().filter(packet -> packet.sequenceNumber != 0).collect(Collectors.toList());
+	}
+
+	/**
+	 * @return printable characters, all different within 26
+	 */
+	private static byte[] text(int length) {
+		byte[] text = new byte[length];
+		for (int i = 0; i < length; i++) {
+			text[i] = (byte) ('a' + i % 26);
+		}
+		return text;
 	}
 
 	/**

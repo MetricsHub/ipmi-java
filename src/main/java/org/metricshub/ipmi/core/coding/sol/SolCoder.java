@@ -108,7 +108,8 @@ public class SolCoder extends PayloadCoder {
 	 *        {@link CipherSuite} containing authentication, confidentiality and integrity algorithms for this session
 	 */
 	public SolCoder(Set<SolOperation> operations, CipherSuite cipherSuite) {
-		this(new byte[] { '\0' }, (byte) 0, (byte) 0, SolAckState.ACK, operations, cipherSuite);
+		// No character data: the packet keeps a sequence number, so that the BMC acknowledges it
+		this(new byte[0], (byte) 0, (byte) 0, SolAckState.ACK, operations, cipherSuite);
 	}
 
 	/**
@@ -125,7 +126,27 @@ public class SolCoder extends PayloadCoder {
 	 *        {@link CipherSuite} containing authentication, confidentiality and integrity algorithms for this session.
 	 */
 	public SolCoder(byte ackNackSequenceNumber, byte acceptedCharacters, SolAckState ackState, CipherSuite cipherSuite) {
-		this(null, ackNackSequenceNumber, acceptedCharacters, ackState, new HashSet<SolOperation>(), cipherSuite);
+		this(ackNackSequenceNumber, acceptedCharacters, ackState, new HashSet<SolOperation>(), cipherSuite);
+	}
+
+	/**
+	 * Creates new {@link SolCoder}. Use this constructor for ACK/NACK packet, that only sends ACK/NACK for specific
+	 * remote message, with the state of the serial lines the console holds.
+	 *
+	 * @param ackNackSequenceNumber
+	 *        sequence number of packet that is ACKd/NACKd
+	 * @param acceptedCharacters
+	 *        number of characters accepted from the ACKd/NACKd packet
+	 * @param ackState
+	 *        actual acknowledge state - {@link SolAckState#ACK} or {@link SolAckState#NACK}
+	 * @param operations
+	 *        the operations of the packet: the serial line states the console holds
+	 * @param cipherSuite
+	 *        {@link CipherSuite} containing authentication, confidentiality and integrity algorithms for this session.
+	 */
+	public SolCoder(byte ackNackSequenceNumber, byte acceptedCharacters, SolAckState ackState,
+			Set<SolOperation> operations, CipherSuite cipherSuite) {
+		this(null, ackNackSequenceNumber, acceptedCharacters, ackState, operations, cipherSuite);
 
 		this.acknowledgeOnly = true;
 	}

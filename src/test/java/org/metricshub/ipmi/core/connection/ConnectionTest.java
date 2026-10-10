@@ -39,6 +39,7 @@ import java.util.concurrent.CountDownLatch;
 import org.metricshub.ipmi.core.coding.commands.IpmiCommandCoder;
 import org.metricshub.ipmi.core.coding.payload.lan.NetworkFunction;
 import org.metricshub.ipmi.core.coding.payload.sol.SolAckState;
+import org.metricshub.ipmi.core.coding.payload.sol.SolMessage;
 import org.metricshub.ipmi.core.coding.sol.SolCoder;
 import org.metricshub.ipmi.core.connection.queue.MessageQueue;
 import org.metricshub.ipmi.core.connection.queue.QueueElement;
@@ -230,7 +231,7 @@ class ConnectionTest {
 				}
 			});
 			connection.run();
-			int keepAliveTag = 1; // the first tag of a new connection
+			int keepAliveTag = SolMessage.MAX_SEQUENCE_NUMBER + 1; // the first IPMI tag of a new connection
 			MessageQueue queue = handler(connection, PayloadType.Ipmi).getMessageQueue();
 			QueueElement keepAlive = queue.getElement(keepAliveTag);
 			assertNotNull(keepAlive, "the keep-alive must hold its tag in the queue");
@@ -283,6 +284,21 @@ class ConnectionTest {
 						.takeTag(new SolCoder((byte) (i % 15 + 1), (byte) 1, SolAckState.ACK, CipherSuite.getEmpty()), true);
 				assertTrue(solTag > 0, "ACK " + i + " got no tag");
 				assertNull(sol.getMessageQueue().getElement(solTag), "ACK " + i + " was queued");
+			}
+		} finally {
+			connection.disconnect();
+		}
+	}
+
+	@Test
+	void ipmiTagsAreAboveTheSolSequenceNumbers() throws Exception {
+		// The replies of both payload types reach the listeners with their tag only
+		Connection connection = connect(60000);
+		try {
+			MessageHandler ipmi = handler(connection, PayloadType.Ipmi);
+			for (int i = 0; i < 100; i++) {
+				int tag = ipmi.getSequenceNumber();
+				assertTrue(tag > SolMessage.MAX_SEQUENCE_NUMBER && tag <= 63, "tag " + tag);
 			}
 		} finally {
 			connection.disconnect();

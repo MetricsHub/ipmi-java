@@ -41,17 +41,38 @@ public class SolMessageHandler extends MessageHandler {
 
 	private static final Logger LOGGER = LoggerFactory.getLogger(SolMessageHandler.class);
 
+	/**
+	 * The last packet queued, and its tag, which is its packet sequence number.
+	 */
+	private PayloadCoder lastPacket;
+	private int lastTag;
+
 	public SolMessageHandler(Connection connection, int timeout) throws IOException {
 		super(connection, timeout, SolMessage.MIN_SEQUENCE_NUMBER, SolMessage.MAX_SEQUENCE_NUMBER);
 	}
 
 	/**
 	 * The one-way SOL messages are the ACK-only packets, which go out with packet sequence number 0 and which the BMC
-	 * never acknowledges (IPMI 2.0 section 15.9): they are not queued, so that they hold no slot of the window.
+	 * never acknowledges (IPMI 2.0 section 15.9): they are neither queued nor numbered, so that they hold no slot of the
+	 * window and leave the packet sequence numbers to the packets the BMC acknowledges, which then follow each other.
+	 * A packet sent again after a timeout keeps its packet sequence number, as table 15-2 requires: the BMC takes it for
+	 * the retry it is, and does not pass its characters to the server a second time.
 	 */
 	@Override
-	protected int takeTag(PayloadCoder payloadCoder, boolean isOneWay) {
-		return isOneWay ? getSequenceNumber() : super.takeTag(payloadCoder, isOneWay);
+	protected synchronized int takeTag(PayloadCoder payloadCoder, boolean isOneWay) {
+		if (isOneWay) {
+			// Any tag lets the packet go: SolCoder sends 0 as the sequence number of an ACK-only packet
+			return SolMessage.MIN_SEQUENCE_NUMBER;
+		}
+		if (payloadCoder == lastPacket) {
+			int tag = getMessageQueue().add(payloadCoder, false, lastTag);
+			if (tag > 0) {
+				return tag;
+			}
+		}
+		lastTag = super.takeTag(payloadCoder, false);
+		lastPacket = payloadCoder;
+		return lastTag;
 	}
 
 	/**

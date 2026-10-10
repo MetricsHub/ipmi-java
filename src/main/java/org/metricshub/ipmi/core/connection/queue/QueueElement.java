@@ -58,6 +58,13 @@ public class QueueElement {
 	}
 
 	/**
+	 * Restarts the timeout of the request, which is sent again.
+	 */
+	void resetTimestamp() {
+		timestamp = new Date();
+	}
+
+	/**
 	 * @return true when nobody waits for the reply: the element only reserves the tag until the reply or the timeout
 	 */
 	public boolean isOneWay() {
