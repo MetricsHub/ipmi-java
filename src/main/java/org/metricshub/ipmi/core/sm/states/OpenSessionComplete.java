@@ -45,15 +45,15 @@ public class OpenSessionComplete extends State {
 		if (machineEvent instanceof OpenSessionAck) {
 			OpenSessionAck event = (OpenSessionAck) machineEvent;
 
-			Rakp1 rakp1 = new Rakp1(
-					event.getManagedSystemSessionId(),
-					event.getPrivilegeLevel(),
-					event.getUsername(),
-					event.getPassword(),
-					event.getBmcKey(),
-					event.getCipherSuite());
-
 			try {
+				Rakp1 rakp1 = new Rakp1(
+						event.getManagedSystemSessionId(),
+						event.getPrivilegeLevel(),
+						event.getUsername(),
+						event.getPassword(),
+						event.getBmcKey(),
+						event.getCipherSuite());
+
 				stateMachine.setCurrent(new Rakp1Waiting(event.getSequenceNumber(), rakp1));
 				stateMachine
 						.sendMessage(
@@ -65,7 +65,7 @@ public class OpenSessionComplete extends State {
 												0,
 												0));
 			} catch (Exception e) {
-				stateMachine.setCurrent(this);
+				stateMachine.setCurrent(new Authcap());
 				stateMachine.doExternalAction(new ErrorAction(e));
 			}
 		} else {

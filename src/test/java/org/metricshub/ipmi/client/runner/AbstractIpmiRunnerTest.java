@@ -1,14 +1,24 @@
 package org.metricshub.ipmi.client.runner;
 
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+
+import java.nio.charset.StandardCharsets;
+import java.util.List;
+import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 
 import org.junit.jupiter.api.Test;
 import org.metricshub.ipmi.client.IpmiClientConfiguration;
 import org.metricshub.ipmi.core.coding.commands.sdr.record.FullSensorRecord;
 import org.metricshub.ipmi.core.coding.commands.sdr.record.OemRecord;
+import org.metricshub.ipmi.core.coding.security.CipherSuite;
+import org.metricshub.ipmi.core.connection.ConnectionException;
 
 class AbstractIpmiRunnerTest {
 
@@ -70,5 +80,43 @@ class AbstractIpmiRunnerTest {
 
 		assertTrue(AbstractIpmiRunner.isTruncated(new byte[] { 0x00, 0x00, 0x51 }), "header itself is incomplete");
 		assertTrue(AbstractIpmiRunner.isTruncated(null));
+	}
+
+	/** Suites with the given IDs (the choice only looks at the IDs). */
+	private static List<CipherSuite> offered(int... ids) {
+		return IntStream
+				.of(ids)
+				.mapToObj(id -> new CipherSuite((byte) id, (byte) 0, (byte) 0, (byte) 0))
+				.collect(Collectors.toList());
+	}
+
+	@Test
+	void theCipherSuiteIsChosenByIdNotByPosition() throws Exception {
+		// A Lenovo XCC offers 1 to 19: the 4th of the list, suite 4 (xRC4-128), used to be chosen
+		CipherSuite suite = AbstractIpmiRunner.chooseCipherSuite(offered(IntStream.rangeClosed(1, 19).toArray()));
+		assertEquals(17, suite.getId());
+		// A Cisco IMC offers 0 to 14
+		assertEquals(3, AbstractIpmiRunner.chooseCipherSuite(offered(IntStream.rangeClosed(0, 14).toArray())).getId());
+		// Then the other suites with integrity
+		assertEquals(8, AbstractIpmiRunner.chooseCipherSuite(offered(0, 1, 2, 6, 7, 8)).getId());
+		assertEquals(2, AbstractIpmiRunner.chooseCipherSuite(offered(2, 7)).getId());
+	}
+
+	@Test
+	void suitesWithoutIntegrityAreNeverChosen() {
+		ConnectionException e = assertThrows(
+				ConnectionException.class,
+				() -> AbstractIpmiRunner.chooseCipherSuite(offered(0, 1, 4, 6, 11, 15)));
+		assertTrue(e.getMessage().contains("offered: 0, 1, 4, 6, 11, 15"), e.getMessage());
+		assertThrows(ConnectionException.class, () -> AbstractIpmiRunner.chooseCipherSuite(null));
+	}
+
+	@Test
+	void thePasswordIsEncodedInUtf8() {
+		assertArrayEquals(
+				"pässwörd".getBytes(StandardCharsets.UTF_8),
+				AbstractIpmiRunner.encodePassword("pässwörd".toCharArray()));
+		assertArrayEquals(new byte[0], AbstractIpmiRunner.encodePassword(new char[0]));
+		assertNull(AbstractIpmiRunner.encodePassword(null));
 	}
 }

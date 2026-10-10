@@ -51,18 +51,22 @@ chosen by the operating system for each session.
 
 `username` and `password` are the IPMI account of the BMC: see
 [Preparing the BMC](preparing-the-bmc.html#creating-the-account). Both are sent to the BMC
-encoded in UTF-8, whatever the platform charset. The password is a `char[]`; the library converts
-it to a `String` internally to open the session and does not clear the array, so clear it
-yourself once you no longer need the configuration.
+encoded in UTF-8, whatever the platform charset. The BMC stores at most 16 bytes of user name and
+20 bytes of password: a longer one fails the login with `IllegalArgumentException` (an empty
+password is valid). The password is a `char[]`; the library encodes it to bytes without going
+through an immutable `String`, and the connection keeps a copy of these bytes until the end of the
+call. The library does not clear the array: clear it yourself once you no longer need the
+configuration.
 
 The client opens every session with the **User** privilege level, which is enough for every
 `IpmiClient` method.
 
 ### BMC key
 
-`bmcKey` is the **BMC key (Kg)** of the BMC, as raw bytes, for BMCs configured with *two-key*
-logins. Leave it `null` (the default on virtually every BMC): the session keys are then derived
-from the password. See [Preparing the BMC](preparing-the-bmc.html#bmc-key-kg).
+`bmcKey` is the **BMC key (Kg)** of the BMC, as raw bytes (at most 20), for BMCs configured with
+*two-key* logins. Leave it `null` (the default on virtually every BMC): the session keys are then
+derived from the password. A key of zero bytes only is the default value of a BMC and is treated
+as no key. See [Preparing the BMC](preparing-the-bmc.html#bmc-key-kg).
 
 ### skipAuth
 
@@ -72,11 +76,10 @@ picked:
 
 | `skipAuth` | Before opening the session | Cipher suite | Privilege |
 | --- | --- | --- | --- |
-| `false` (recommended) | Get Channel Cipher Suites, then Get Channel Authentication Capabilities | Picked from the BMC's list, [by position](preparing-the-bmc.html#how-ipmiclient-chooses-the-suite) | User |
+| `false` (recommended) | Get Channel Cipher Suites, then Get Channel Authentication Capabilities | The [preferred suite](preparing-the-bmc.html#how-ipmiclient-chooses-the-suite) the BMC offers: 17, 3, 8, 16, 2 or 7 | User |
 | `true` | Nothing: the session is opened directly | Always **3** (RAKP-HMAC-SHA1, HMAC-SHA1-96, AES-CBC-128) | User |
 
-Use `true` to force suite 3 on a BMC whose suite list would make the position rule pick a suite
-the client does not implement, or to save two round trips per call.
+Use `true` to force suite 3, or to save two round trips per call.
 
 ### Timeout
 

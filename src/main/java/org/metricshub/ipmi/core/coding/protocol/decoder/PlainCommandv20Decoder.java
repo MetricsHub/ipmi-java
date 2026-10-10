@@ -49,10 +49,6 @@ public class PlainCommandv20Decoder extends Protocolv20Decoder {
 			int length,
 			ConfidentialityAlgorithm confidentialityAlgorithm,
 			PayloadType payloadType) {
-		byte[] payload = new byte[length];
-
-		System.arraycopy(rawData, offset, payload, 0, length);
-
-		return new PlainMessage(confidentialityAlgorithm.decrypt(payload));
+		return new PlainMessage(decryptPayload(rawData, offset, length, confidentialityAlgorithm));
 	}
 }

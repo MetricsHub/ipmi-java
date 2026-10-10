@@ -48,7 +48,7 @@ public class AuthenticationRakpHmacMd5 extends AuthenticationAlgorithm {
 
 	@Override
 	public int getIntegrityCheckBaseLength() {
-		return 12;
+		return 16; // the full HMAC-MD5 (IPMI 2.0 section 13.28.3)
 	}
 
 	@Override

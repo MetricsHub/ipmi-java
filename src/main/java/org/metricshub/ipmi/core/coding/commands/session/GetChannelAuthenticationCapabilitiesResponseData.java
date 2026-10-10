@@ -39,7 +39,7 @@ public class GetChannelAuthenticationCapabilitiesResponseData implements Respons
 	private byte channelNumber;
 
 	/**
-	 * IPMI v2.0 support.
+	 * Whether the channel supports IPMI v2.0 (RMCP+) connections, as reported in the extended capabilities.
 	 */
 	private boolean ipmiv20Support;
 
@@ -103,6 +103,10 @@ public class GetChannelAuthenticationCapabilitiesResponseData implements Respons
 		this.ipmiv20Support = ipmiv20Support;
 	}
 
+	/**
+	 * @return whether the channel supports IPMI v2.0 (RMCP+) connections, as reported in the extended capabilities
+	 *         of the reply (false when the BMC does not report them)
+	 */
 	public boolean isIpmiv20Support() {
 		return ipmiv20Support;
 	}

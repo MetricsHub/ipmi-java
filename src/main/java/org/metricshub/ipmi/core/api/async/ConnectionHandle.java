@@ -27,6 +27,7 @@ import org.metricshub.ipmi.core.coding.security.CipherSuite;
 import org.metricshub.ipmi.core.connection.Connection;
 
 import java.net.InetAddress;
+import java.nio.charset.StandardCharsets;
 
 /**
  * Handle to the {@link Connection}
@@ -38,7 +39,10 @@ public class ConnectionHandle {
 	private InetAddress remoteAddress;
 	private int remotePort;
 	private String user;
-	private String password;
+	/**
+	 * The password of the session, as sent to the BMC, kept to open the Serial over LAN session.
+	 */
+	private byte[] password;
 
 	public ConnectionHandle(int handle, InetAddress remoteAddress, int remotePort) {
 		this.handle = handle;
@@ -82,12 +86,33 @@ public class ConnectionHandle {
 		this.user = user;
 	}
 
+	/**
+	 * @return the password of the session, decoded from UTF-8, or null
+	 */
 	public String getPassword() {
+		return password == null ? null : new String(password, StandardCharsets.UTF_8);
+	}
+
+	/**
+	 * @param password the password of the session, sent to the BMC in UTF-8
+	 */
+	public void setPassword(String password) {
+		this.password = password == null ? null : password.getBytes(StandardCharsets.UTF_8);
+	}
+
+	/**
+	 * @return the password of the session, as sent to the BMC, or null
+	 */
+	public byte[] getPasswordBytes() {
 		return password;
 	}
 
-	public void setPassword(String password) {
-		this.password = password;
+	/**
+	 * @param passwordBytes the password of the session, as sent to the BMC: the handle keeps a copy, so the caller can
+	 *        clear the array
+	 */
+	public void setPasswordBytes(byte[] passwordBytes) {
+		this.password = passwordBytes == null ? null : passwordBytes.clone();
 	}
 
 	@Override

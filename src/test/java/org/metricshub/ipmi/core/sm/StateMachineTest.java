@@ -85,4 +85,25 @@ class StateMachineTest {
 		assertTrue(actions.get(0) instanceof MessageAction, String.valueOf(actions.get(0)));
 		assertFalse(lockHeld.get(), "an in-session message must not be dispatched under the lock");
 	}
+
+	@Test
+	void aMalformedDatagramIsDroppedWithoutAnException() {
+		start(new SilentMessenger());
+		machine.setCurrent(new SessionValid(CipherSuite.getEmpty(), SESSION_ID));
+		byte[][] datagrams = {
+				{}, // not even an RMCP header
+				{ 0x06, 0x00, (byte) 0xff, 0x07 }, // an IPMI message with no session header
+				{ 0x06, 0x00, (byte) 0xff, 0x07, 0x06 }, // an RMCP+ message cut after its first byte
+				{ 0x06, 0x00, (byte) 0xff, 0x06, 0x00, 0x00 } }; // an ASF message
+		for (byte[] datagram : datagrams) {
+			UdpMessage message = new UdpMessage();
+			message.setAddress(InetAddress.getLoopbackAddress());
+			message.setPort(623);
+			message.setMessage(datagram);
+
+			// An exception would skip the other listeners of the messenger
+			machine.notifyMessage(message);
+		}
+		assertTrue(actions.isEmpty(), String.valueOf(actions));
+	}
 }

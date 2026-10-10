@@ -44,6 +44,7 @@ import org.metricshub.ipmi.core.connection.SessionManager;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.net.InetAddress;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.TimeUnit;
@@ -300,12 +301,46 @@ public class IpmiAsyncConnector implements ConnectionListener {
 			String password,
 			byte[] bmcKey)
 			throws Exception {
+		return openSession(
+				connectionHandle,
+				username,
+				password == null ? null : password.getBytes(StandardCharsets.UTF_8),
+				bmcKey);
+	}
+
+	/**
+	 * Establishes the session with the remote host, with the password as bytes: the caller can then clear them
+	 * once the session is open, which an immutable {@link String} does not allow.
+	 *
+	 * @param connectionHandle
+	 *        - {@link ConnectionHandle} associated with the remote host.
+	 * @param username
+	 *        - the username
+	 * @param password
+	 *        - password matching the username, as sent to the BMC (UTF-8 for a text password), at most 20 bytes
+	 * @param bmcKey
+	 *        - the key that should be provided if the two-key
+	 *        authentication is enabled, null otherwise.
+	 * @return object representing newly created {@link Session}
+	 * @throws ConnectionException
+	 *         when connection is in the state that does not allow to
+	 *         perform this operation.
+	 * @throws Exception
+	 *         when sending message to the managed system or initializing
+	 *         one of the cipherSuite's algorithms fails
+	 */
+	public Session openSession(
+			ConnectionHandle connectionHandle,
+			String username,
+			byte[] password,
+			byte[] bmcKey)
+			throws Exception {
 		Session session = null;
 		int tries = 0;
 		boolean succeded = false;
 
 		connectionHandle.setUser(username);
-		connectionHandle.setPassword(password);
+		connectionHandle.setPasswordBytes(password);
 
 		while (tries <= retries && !succeded) {
 			try {

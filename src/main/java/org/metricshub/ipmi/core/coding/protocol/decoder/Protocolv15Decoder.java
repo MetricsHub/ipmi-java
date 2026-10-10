@@ -55,6 +55,11 @@ public class Protocolv15Decoder extends ProtocolDecoder {
 
 		byte[] raw = rmcpMessage.getData();
 
+		// Auth Type, Session Sequence Number, Session ID, [AuthCode,] Message Length
+		if (raw.length < 10) {
+			throw new IllegalArgumentException("Message is truncated");
+		}
+
 		message.setAuthenticationType(decodeAuthenticationType(raw[0]));
 
 		int offset = 1;
@@ -72,6 +77,9 @@ public class Protocolv15Decoder extends ProtocolDecoder {
 		offset += 4;
 
 		if (message.getAuthenticationType() != AuthenticationType.None) {
+			if (raw.length < 26) {
+				throw new IllegalArgumentException("Message is truncated");
+			}
 			message.setAuthCode(decodeAuthCode(raw, offset));
 			offset += 16;
 		}
@@ -80,6 +88,10 @@ public class Protocolv15Decoder extends ProtocolDecoder {
 
 		message.setPayloadLength(payloadLength);
 		++offset;
+
+		if (raw.length < offset + payloadLength) {
+			throw new IllegalArgumentException("Message is truncated");
+		}
 
 		message
 				.setPayload(

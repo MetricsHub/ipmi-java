@@ -23,8 +23,13 @@ package org.metricshub.ipmi.client.runner;
  */
 
 import java.net.InetAddress;
+import java.nio.ByteBuffer;
+import java.nio.CharBuffer;
+import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.Callable;
+import java.util.stream.Collectors;
 
 import org.metricshub.ipmi.client.IpmiClientConfiguration;
 import org.metricshub.ipmi.core.api.async.ConnectionHandle;
@@ -40,6 +45,7 @@ import org.metricshub.ipmi.core.coding.protocol.AuthenticationType;
 import org.metricshub.ipmi.core.coding.security.CipherSuite;
 import org.metricshub.ipmi.core.common.TypeConverter;
 import org.metricshub.ipmi.core.connection.Connection;
+import org.metricshub.ipmi.core.connection.ConnectionException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -53,6 +59,16 @@ public abstract class AbstractIpmiRunner<T> implements AutoCloseable, Callable<T
 	private static final Logger LOGGER = LoggerFactory.getLogger(AbstractIpmiRunner.class);
 
 	private static final int DEFAULT_LOCAL_UDP_PORT = 0;
+
+	/**
+	 * The cipher suites the client may choose, by order of preference (IPMI 2.0 table 22-20): those that sign every
+	 * message, and encrypt it when possible (17: RAKP-HMAC-SHA256, HMAC-SHA256-128, AES-CBC-128; 3: RAKP-HMAC-SHA1,
+	 * HMAC-SHA1-96, AES-CBC-128; 8: RAKP-HMAC-MD5, HMAC-MD5-128, AES-CBC-128; then 16, 2 and 7, the same without
+	 * encryption). Suites without integrity (0, 1, 6, 15) are never chosen: the list of suites comes
+	 * unauthenticated, so falling back to them would let an attacker downgrade the session to one whose replies can be
+	 * forged.
+	 */
+	private static final int[] PREFERRED_CIPHER_SUITES = { 17, 3, 8, 16, 2, 7 };
 
 	/**
 	 * This is the value of Last Record ID (FFFFh). In order to retrieve the full set of SDR records, client must repeat
@@ -157,8 +173,24 @@ public abstract class AbstractIpmiRunner<T> implements AutoCloseable, Callable<T
 				.openSession(
 						handle,
 						ipmiConfiguration.getUsername(),
-						String.valueOf(ipmiConfiguration.getPassword()),
+						encodePassword(ipmiConfiguration.getPassword()),
 						ipmiConfiguration.getBmcKey());
+	}
+
+	/**
+	 * Encodes the password in UTF-8 without going through an immutable {@link String}.
+	 *
+	 * @param password the password, or null
+	 * @return the UTF-8 bytes of the password, or null
+	 */
+	static byte[] encodePassword(char[] password) {
+		if (password == null) {
+			return null;
+		}
+		ByteBuffer buffer = StandardCharsets.UTF_8.encode(CharBuffer.wrap(password));
+		byte[] bytes = Arrays.copyOf(buffer.array(), buffer.limit());
+		Arrays.fill(buffer.array(), (byte) 0);
+		return bytes;
 	}
 
 	/**
@@ -188,30 +220,38 @@ public abstract class AbstractIpmiRunner<T> implements AutoCloseable, Callable<T
 	}
 
 	/**
-	 * Get the available cipher suite. Get the last available if many cipher suites coexist.<br>
+	 * Gets the cipher suites offered by the BMC and picks the first of 17, 3, 8, 16, 2 and 7 that it offers.
 	 *
 	 * @return {@link CipherSuite} instance
-	 * @throws Exception when sending message to the managed system fails or suites not found
+	 * @throws Exception when sending message to the managed system fails, or when the BMC offers none of the
+	 *         preferred suites
 	 */
 	protected CipherSuite getAvailableCipherSuite() throws Exception {
+		return chooseCipherSuite(connector.getAvailableCipherSuites(handle));
+	}
 
-		// Get cipher suites supported by the remote host
-		List<CipherSuite> suites = connector.getAvailableCipherSuites(handle);
-
-		if (suites == null || suites.isEmpty()) {
-			throw new Exception("Cannot get the available cipher suites.");
+	/**
+	 * Picks the first suite of 17, 3, 8, 16, 2 and 7 that the BMC offers.
+	 *
+	 * @param suites the suites offered by the BMC
+	 * @return the chosen suite
+	 * @throws ConnectionException when the BMC offers none of them
+	 */
+	static CipherSuite chooseCipherSuite(List<CipherSuite> suites) throws ConnectionException {
+		if (suites != null) {
+			for (int id : PREFERRED_CIPHER_SUITES) {
+				for (CipherSuite suite : suites) {
+					if (suite.getId() == id) {
+						return suite;
+					}
+				}
+			}
 		}
-
-		// Return the cipher suite based on the available suites length
-		if (suites.size() > 3) {
-			return suites.get(3);
-		} else if (suites.size() > 2) {
-			return suites.get(2);
-		} else if (suites.size() > 1) {
-			return suites.get(1);
-		}
-
-		return suites.get(0);
+		throw new ConnectionException(
+				"The BMC offers none of the cipher suites 17, 3, 8, 16, 2 and 7 (offered: "
+						+ (suites == null ?
+								"none" : suites.stream().map(suite -> String.valueOf(suite.getId())).collect(Collectors.joining(", ")))
+						+ ")");
 	}
 
 	/**

@@ -26,7 +26,6 @@ import org.metricshub.ipmi.core.coding.commands.IpmiCommandCoder;
 import org.metricshub.ipmi.core.coding.commands.IpmiVersion;
 import org.metricshub.ipmi.core.coding.commands.PrivilegeLevel;
 import org.metricshub.ipmi.core.coding.commands.ResponseData;
-import org.metricshub.ipmi.core.coding.payload.CompletionCode;
 import org.metricshub.ipmi.core.coding.payload.IpmiPayload;
 import org.metricshub.ipmi.core.coding.payload.PlainMessage;
 import org.metricshub.ipmi.core.coding.payload.lan.IPMIException;
@@ -232,15 +231,7 @@ public class OpenSession extends IpmiCommandCoder {
 					"This is not a response for Open Session command");
 		}
 
-		byte[] payload = message.getPayload().getPayloadData();
-
-		if (payload[1] != 0) {
-			throw new IPMIException(
-					CompletionCode
-							.parseInt(
-									TypeConverter
-											.byteToInt(payload[1])));
-		}
+		byte[] payload = validateSessionSetupResponse(message);
 
 		if (payload.length < 36) {
 			throw new IllegalArgumentException("Invalid payload length");
@@ -274,19 +265,19 @@ public class OpenSession extends IpmiCommandCoder {
 
 		System.arraycopy(payload, 12, auth, 0, 8);
 
-		data.setAuthenticationAlgorithm(auth[4]);
+		data.setAuthenticationAlgorithm(TypeConverter.intToByte(auth[4] & 0x3f)); // bits 7:6 reserved
 
 		byte[] integr = new byte[8];
 
 		System.arraycopy(payload, 20, integr, 0, 8);
 
-		data.setIntegrityAlgorithm(integr[4]);
+		data.setIntegrityAlgorithm(TypeConverter.intToByte(integr[4] & 0x3f)); // bits 7:6 reserved
 
 		byte[] conf = new byte[8];
 
 		System.arraycopy(payload, 28, conf, 0, 8);
 
-		data.setConfidentialityAlgorithm(conf[4]);
+		data.setConfidentialityAlgorithm(TypeConverter.intToByte(conf[4] & 0x3f)); // bits 7:6 reserved
 
 		return data;
 	}

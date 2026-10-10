@@ -32,6 +32,7 @@ import org.metricshub.ipmi.core.coding.protocol.AuthenticationType;
 import org.metricshub.ipmi.core.coding.protocol.IpmiMessage;
 import org.metricshub.ipmi.core.coding.protocol.PayloadType;
 import org.metricshub.ipmi.core.coding.security.CipherSuite;
+import org.metricshub.ipmi.core.common.TypeConverter;
 
 /**
  * A wrapper for IPMI command.
@@ -95,6 +96,26 @@ public abstract class IpmiCommandCoder extends PayloadCoder {
 			throw new IPMIException(completionCode, response.getRawCompletionCode());
 		}
 		return response.getIpmiCommandData();
+	}
+
+	/**
+	 * Checks an RMCP+ session setup response (Open Session Response, RAKP Message 2 or 4): its payload holds at least
+	 * the message tag and the status code, and the status code reports no error.
+	 *
+	 * @param message the response
+	 * @return the payload of the response
+	 * @throws IPMIException when the status code reports an error
+	 * @throws IllegalArgumentException when the payload is too short
+	 */
+	protected static byte[] validateSessionSetupResponse(IpmiMessage message) throws IPMIException {
+		byte[] payload = message.getPayload().getPayloadData();
+		if (payload.length < 2) {
+			throw new IllegalArgumentException("Invalid payload length");
+		}
+		if (payload[1] != 0) {
+			throw new IPMIException(CompletionCode.parseInt(TypeConverter.byteToInt(payload[1])));
+		}
+		return payload;
 	}
 
 	/**

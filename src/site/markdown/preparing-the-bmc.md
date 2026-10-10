@@ -61,9 +61,9 @@ ipmitool channel setaccess 1 3 link=on ipmi=on callin=on privilege=2
 ```
 
 > [!NOTE]
-> IPMI passwords are at most **20 bytes** (16 on older BMCs), and the account must be enabled
-> *and* allowed on the LAN channel (`ipmi=on`): an account that can log in to the web interface
-> is not necessarily allowed to log in over IPMI.
+> IPMI passwords are at most **20 bytes** (16 on older BMCs; the client refuses a longer one),
+> and the account must be enabled *and* allowed on the LAN channel (`ipmi=on`): an account that
+> can log in to the web interface is not necessarily allowed to log in over IPMI.
 
 If the BMC enforces a maximum privilege per cipher suite (`Cipher Suite Priv Max` in
 `ipmitool lan print 1`), make sure the suite the client uses allows at least `USER`.
@@ -97,13 +97,21 @@ one of them. Prefer **17** where available.
 ### How `IpmiClient` chooses the suite
 
 By default (`skipAuth` set to `false`), each call first asks the BMC for its list of cipher
-suites (Get Channel Cipher Suites), then picks one **by its position in that list**: the 4th
-suite if the BMC offers at least 4, otherwise the 3rd, the 2nd, or the only one. A BMC that
-offers `3, 17` gets suite 17; a BMC that offers `0, 1, 2, 3, 17` gets suite 3.
+suites (Get Channel Cipher Suites), then picks the first of these suites that the BMC offers:
 
-The suite is not checked against the table above. If the position rule lands on a suite the
-client does not implement (an xRC4 or MD5-128 suite), the session cannot be opened. To control the
-suite:
+1. **17**, then **3**, then 8: messages signed and encrypted;
+2. 16, then 2, then 7: messages signed, not encrypted.
+
+A Lenovo XCC that offers suites 1 to 19 gets suite 17, a Cisco IMC that offers 0 to 14 gets
+suite 3. The client never chooses a suite without integrity (0, 1, 6, 15), even when the BMC
+offers nothing else: the list of suites is not authenticated, so an attacker on the network
+could otherwise make the client fall back to a session whose replies can be forged. A BMC that
+offers none of the six fails the call with `ConnectionException: The BMC offers none of the
+cipher suites 17, 3, 8, 16, 2 and 7 (offered: ...)`. The algorithms of a suite are those of the
+table above, whatever the BMC's record of the suite says, and the OEM suites a BMC may list (as
+Cisco IMC does) are ignored.
+
+To control the suite:
 
 * **restrict the suites offered by the BMC** — `ipmitool lan print 1` lists them
   (`RMCP+ Cipher Suites`), and the web interface or `ipmitool lan set 1 cipher_privs` can disable
@@ -118,7 +126,8 @@ suite:
 Some BMCs can be configured with a **BMC key (Kg)** for *two-key* logins: the session keys are
 then derived from this key instead of the user's password. When it is set, pass it as the
 `bmcKey` of the [configuration](configuration.html#bmc-key) (the same key as `ipmitool -k` or
-`-y`). Leave `bmcKey` to `null` otherwise: this is the default on virtually every BMC.
+`-y`, at most 20 bytes). Leave `bmcKey` to `null` otherwise: this is the default on virtually
+every BMC, whose key is then all zeros (a key of zeros only is treated as no key).
 
 ## Firewall
 

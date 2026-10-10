@@ -28,7 +28,7 @@ The BMC did not answer in time. A BMC that never answers fails the session hands
 | Wrong address: the server's operating system instead of its BMC | The BMC has its own IP address (`ipmitool lan print 1` on the server). |
 | IPMI over LAN disabled on the BMC | [Enabling IPMI over LAN](preparing-the-bmc.html#enabling-ipmi-over-lan) |
 | UDP port 623 filtered | [Firewall](preparing-the-bmc.html#firewall) |
-| An IPMI 1.5-only BMC | Such BMCs never answer the RMCP+ Open Session request ([#91](https://github.com/metricshub/ipmi-java/issues/91)). |
+| An IPMI 1.5-only BMC | Such BMCs never answer the RMCP+ requests of the client, starting with Get Channel Cipher Suites ([#154](https://github.com/metricshub/ipmi-java/issues/154)). |
 | A lost UDP reply | Retried after the [per-message timeout](timeouts-and-errors.html#per-message-timeout-and-retries); the call only fails when 4 tries in a row get no reply. |
 | Several sessions to the same BMC at the same time | BMCs drop replies under concurrent sessions: query each BMC [from one thread at a time](configuration.html#thread-safety). |
 | A large SDR repository or many FRUs on a slow BMC | Raise the [timeout](configuration.html#timeout): 120 s is a safe value. |
@@ -47,6 +47,8 @@ sent once; the `ExecutionException` wraps the reason:
 | `IllegalArgumentException: Authentication check failed` | The BMC's proof does not match the password: **wrong password** (or wrong [BMC key](configuration.html#bmc-key)). |
 | `IPMIException: Unauthorized name.` | **Unknown user**, or a user not allowed to log in over the LAN channel. |
 | Another `IPMIException` (`Invalid role.`, ...) | The account is not allowed the User privilege level, or the BMC refused the cipher suite. |
+| `IllegalArgumentException: Password is too long. ...` (or `Username is too long. ...`, `BMC key is too long. ...`) | The password or the BMC key is longer than the 20 bytes a BMC stores, or the user name longer than 16 bytes: the BMC cannot have it. Nothing is sent to the BMC. |
+| `IllegalArgumentException: Open Session Response does not match the request` (or `RAKP Message 2`, `RAKP Message 4`) | A handshake reply of the BMC is for another session, or confirms other algorithms than the requested ones. It is not sent again. |
 
 Check the account with `ipmitool -I lanplus ... -L USER chassis status`: `ipmitool` reports
 `RAKP 2 HMAC is invalid` for a wrong password and `unauthorized name` for an unknown user.
@@ -70,12 +72,17 @@ what happens when another client deletes the sessions, for example a management 
 as an administrator; the revocation shows at a whole minute of the session's age (60 s, 120 s,
 ...). Each `IpmiClient` call opens its own session, so the next call works again.
 
-## `... is not yet implemented.`
+## `The BMC offers none of the cipher suites 17, 3, 8, 16, 2 and 7`
 
+`IpmiClient` only opens sessions with a cipher suite whose messages are signed
+([How `IpmiClient` chooses the suite](preparing-the-bmc.html#how-ipmiclient-chooses-the-suite)), and
+the message lists the suites the BMC offers. Enable suite 17 or 3 on the BMC (in its web
+interface, or with `ipmitool lan set 1 cipher_privs`).
+
+With the [low-level API](low-level-api.html#choosing-the-cipher-suite), a suite that uses an
+algorithm the client does not implement fails with
 `IllegalArgumentException: Confidentiality algorithm XRC4-128 is not yet implemented.` (or
-MD5-128 integrity): the cipher suite chosen for the session uses an algorithm the client does not
-implement. See [How `IpmiClient` chooses the suite](preparing-the-bmc.html#how-ipmiclient-chooses-the-suite)
-to make it use suite 3 or 17.
+MD5-128 integrity): choose a suite whose `isSupported()` is `true`.
 
 ## Sensors or FRUs are missing
 

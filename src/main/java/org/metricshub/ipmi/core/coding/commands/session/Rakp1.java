@@ -26,7 +26,6 @@ import org.metricshub.ipmi.core.coding.commands.IpmiCommandCoder;
 import org.metricshub.ipmi.core.coding.commands.IpmiVersion;
 import org.metricshub.ipmi.core.coding.commands.PrivilegeLevel;
 import org.metricshub.ipmi.core.coding.commands.ResponseData;
-import org.metricshub.ipmi.core.coding.payload.CompletionCode;
 import org.metricshub.ipmi.core.coding.payload.IpmiPayload;
 import org.metricshub.ipmi.core.coding.payload.PlainMessage;
 import org.metricshub.ipmi.core.coding.payload.lan.IPMIException;
@@ -43,6 +42,7 @@ import org.metricshub.ipmi.core.common.TypeConverter;
 import java.nio.charset.StandardCharsets;
 import java.security.InvalidKeyException;
 import java.security.NoSuchAlgorithmException;
+import java.util.Arrays;
 
 /**
  * <p>
@@ -57,6 +57,17 @@ import java.security.NoSuchAlgorithmException;
  * </p>
  */
 public class Rakp1 extends IpmiCommandCoder {
+
+	/**
+	 * Maximum length of the password and of the BMC key (Kg) in IPMI v2.0, in bytes (IPMI 2.0 tables 22-30 and
+	 * 22-35).
+	 */
+	private static final int MAX_KEY_LENGTH = 20;
+
+	/**
+	 * Maximum length of the user name, in bytes (IPMI 2.0 table 13-11).
+	 */
+	private static final int MAX_USERNAME_LENGTH = 16;
 
 	/**
 	 * The Managed System's Session ID for this session. Must be as returned by
@@ -78,9 +89,9 @@ public class Rakp1 extends IpmiCommandCoder {
 	private String username;
 
 	/**
-	 * Password matching username.
+	 * Password matching username, as sent to the BMC (at most 20 bytes).
 	 */
-	private String password;
+	private byte[] password;
 
 	/**
 	 * Kg key associated with the target BMC. Should be null if Get Channel
@@ -109,11 +120,29 @@ public class Rakp1 extends IpmiCommandCoder {
 	}
 
 	public void setUsername(String username) {
-		if (username.getBytes(StandardCharsets.UTF_8).length > 16) {
-			throw new IllegalArgumentException(
-					"Username is too long. It's length cannot exceed 16 bytes");
-		}
+		checkLength("Username", username.getBytes(StandardCharsets.UTF_8), MAX_USERNAME_LENGTH);
 		this.username = username;
+	}
+
+	/**
+	 * Checks the credentials of a session against what a BMC stores: a user name of at most 16 bytes in UTF-8, a
+	 * password and a BMC key (Kg) of at most 20 bytes.
+	 *
+	 * @param username the user name
+	 * @param password the password as sent to the BMC, or null
+	 * @param bmcKey the BMC key, or null
+	 * @throws IllegalArgumentException when one of them is too long
+	 */
+	public static void checkCredentials(String username, byte[] password, byte[] bmcKey) {
+		checkLength("Username", username.getBytes(StandardCharsets.UTF_8), MAX_USERNAME_LENGTH);
+		checkLength("Password", password, MAX_KEY_LENGTH);
+		checkLength("BMC key", bmcKey, MAX_KEY_LENGTH);
+	}
+
+	private static void checkLength(String name, byte[] value, int maxLength) {
+		if (value != null && value.length > maxLength) {
+			throw new IllegalArgumentException(name + " is too long. Its length cannot exceed " + maxLength + " bytes");
+		}
 	}
 
 	public String getUsername() {
@@ -127,19 +156,17 @@ public class Rakp1 extends IpmiCommandCoder {
 		return username.getBytes(StandardCharsets.UTF_8);
 	}
 
-	private void setPassword(String password) {
+	private void setPassword(byte[] password) {
+		checkLength("Password", password, MAX_KEY_LENGTH);
 		this.password = password;
 	}
 
-	public String getPassword() {
-		return password;
-	}
-
 	/**
-	 * @return the password as the key of the authentication algorithm, encoded in UTF-8 (empty when null)
+	 * @return the password as the key of the authentication algorithm (Kuid), zero-padded to 20 bytes as the BMC
+	 *         stores it: the same HMAC as the password itself, and a valid key for an empty password
 	 */
 	byte[] getPasswordBytes() {
-		return password == null ? new byte[0] : password.getBytes(StandardCharsets.UTF_8);
+		return Arrays.copyOf(password == null ? new byte[0] : password, MAX_KEY_LENGTH);
 	}
 
 	private void setConsoleRandomNumber(byte[] randomNumber) {
@@ -151,6 +178,7 @@ public class Rakp1 extends IpmiCommandCoder {
 	}
 
 	private void setBmcKey(byte[] bmcKey) {
+		checkLength("BMC key", bmcKey, MAX_KEY_LENGTH);
 		this.bmcKey = bmcKey;
 	}
 
@@ -174,7 +202,7 @@ public class Rakp1 extends IpmiCommandCoder {
 	 *        wishes to assume for this session. It's length cannot exceed
 	 *        16.
 	 * @param password
-	 *        - password matching username
+	 *        - password matching username, as sent to the BMC (UTF-8 for a text password), at most 20 bytes
 	 * @param bmcKey
 	 *        - BMC specific key. Should be null if Get Channel
 	 *        Authentication Capabilities Response indicated that Kg is
@@ -186,7 +214,7 @@ public class Rakp1 extends IpmiCommandCoder {
 	 *        confidentiality and integrity algorithms for this session.
 	 */
 	public Rakp1(int managedSystemSessionId, PrivilegeLevel privilegeLevel,
-			String username, String password, byte[] bmcKey,
+			String username, byte[] password, byte[] bmcKey,
 			CipherSuite cipherSuite) {
 		super(IpmiVersion.V20, cipherSuite, AuthenticationType.RMCPPlus);
 		setManagedSystemSessionId(managedSystemSessionId);
@@ -195,19 +223,7 @@ public class Rakp1 extends IpmiCommandCoder {
 		setPassword(password);
 		this.setBmcKey(bmcKey);
 
-		// prepare random number
-		byte[] random = new byte[16];
-
-		for (int i = 0; i < 4; ++i) {
-			byte[] rand = TypeConverter
-					.intToLittleEndianByteArray(
-							Randomizer
-									.getInt());
-
-			System.arraycopy(rand, 0, random, 4 * i, 4);
-		}
-
-		setConsoleRandomNumber(random);
+		setConsoleRandomNumber(Randomizer.getBytes(16));
 	}
 
 	@Override
@@ -292,7 +308,7 @@ public class Rakp1 extends IpmiCommandCoder {
 			throw new IllegalArgumentException("This is not RAKP 2 message!");
 		}
 
-		byte[] payload = message.getPayload().getPayloadData();
+		byte[] payload = validateSessionSetupResponse(message);
 
 		Rakp1ResponseData data = new Rakp1ResponseData();
 
@@ -300,15 +316,11 @@ public class Rakp1 extends IpmiCommandCoder {
 
 		data.setStatusCode(payload[1]);
 
-		if (payload[1] != 0) {
-			throw new IPMIException(
-					CompletionCode
-							.parseInt(
-									TypeConverter
-											.byteToInt(payload[1])));
-		}
+		int length = getCipherSuite()
+				.getAuthenticationAlgorithm()
+				.getKeyLength();
 
-		if (payload.length < 40) {
+		if (payload.length < 40 + length) {
 			throw new IllegalArgumentException("Invalid payload length");
 		}
 
@@ -333,16 +345,7 @@ public class Rakp1 extends IpmiCommandCoder {
 
 		data.setManagedSystemRandomNumber(managedSystemRandomNumber);
 
-		byte[] key = null;
-
-		int length = getCipherSuite()
-				.getAuthenticationAlgorithm()
-				.getKeyLength();
-
-		if (length > 0) {
-			key = new byte[length];
-			System.arraycopy(payload, 40, key, 0, length);
-		}
+		byte[] key = Arrays.copyOfRange(payload, 40, 40 + length);
 
 		if (!getCipherSuite()
 				.getAuthenticationAlgorithm()
@@ -414,7 +417,8 @@ public class Rakp1 extends IpmiCommandCoder {
 			throws InvalidKeyException,
 			NoSuchAlgorithmException {
 		byte[] key = null;
-		if (getBmcKey() == null || getBmcKey().length <= 0) {
+		// An all-zero Kg is the default value, which means one-key logins (IPMI 2.0 section 13.33)
+		if (getBmcKey() == null || Arrays.equals(getBmcKey(), new byte[getBmcKey().length])) {
 			key = getPasswordBytes();
 		} else {
 			key = getBmcKey();

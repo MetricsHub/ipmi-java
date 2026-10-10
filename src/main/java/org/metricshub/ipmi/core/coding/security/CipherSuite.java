@@ -40,7 +40,36 @@ import java.util.function.Supplier;
  */
 public class CipherSuite {
 
+	/**
+	 * Message of the exceptions about algorithms this library does not implement.
+	 */
 	public static final String NOT_YET_IMPLEMENTED_MESSAGE = "Not yet implemented.";
+
+	/**
+	 * The authentication, confidentiality and integrity algorithms of the standard cipher suites 0 to 19 (IPMI 2.0
+	 * table 22-20).
+	 */
+	private static final byte[][] STANDARD_SUITES = {
+			{ SecurityConstants.AA_RAKP_NONE, SecurityConstants.CA_NONE, SecurityConstants.IA_NONE },
+			{ SecurityConstants.AA_RAKP_HMAC_SHA1, SecurityConstants.CA_NONE, SecurityConstants.IA_NONE },
+			{ SecurityConstants.AA_RAKP_HMAC_SHA1, SecurityConstants.CA_NONE, SecurityConstants.IA_HMAC_SHA1_96 },
+			{ SecurityConstants.AA_RAKP_HMAC_SHA1, SecurityConstants.CA_AES_CBC128, SecurityConstants.IA_HMAC_SHA1_96 },
+			{ SecurityConstants.AA_RAKP_HMAC_SHA1, SecurityConstants.CA_XRC4_128, SecurityConstants.IA_HMAC_SHA1_96 },
+			{ SecurityConstants.AA_RAKP_HMAC_SHA1, SecurityConstants.CA_XRC4_40, SecurityConstants.IA_HMAC_SHA1_96 },
+			{ SecurityConstants.AA_RAKP_HMAC_MD5, SecurityConstants.CA_NONE, SecurityConstants.IA_NONE },
+			{ SecurityConstants.AA_RAKP_HMAC_MD5, SecurityConstants.CA_NONE, SecurityConstants.IA_HMAC_MD5_128 },
+			{ SecurityConstants.AA_RAKP_HMAC_MD5, SecurityConstants.CA_AES_CBC128, SecurityConstants.IA_HMAC_MD5_128 },
+			{ SecurityConstants.AA_RAKP_HMAC_MD5, SecurityConstants.CA_XRC4_128, SecurityConstants.IA_HMAC_MD5_128 },
+			{ SecurityConstants.AA_RAKP_HMAC_MD5, SecurityConstants.CA_XRC4_40, SecurityConstants.IA_HMAC_MD5_128 },
+			{ SecurityConstants.AA_RAKP_HMAC_MD5, SecurityConstants.CA_NONE, SecurityConstants.IA_MD5_128 },
+			{ SecurityConstants.AA_RAKP_HMAC_MD5, SecurityConstants.CA_AES_CBC128, SecurityConstants.IA_MD5_128 },
+			{ SecurityConstants.AA_RAKP_HMAC_MD5, SecurityConstants.CA_XRC4_128, SecurityConstants.IA_MD5_128 },
+			{ SecurityConstants.AA_RAKP_HMAC_MD5, SecurityConstants.CA_XRC4_40, SecurityConstants.IA_MD5_128 },
+			{ SecurityConstants.AA_RAKP_HMAC_SHA256, SecurityConstants.CA_NONE, SecurityConstants.IA_NONE },
+			{ SecurityConstants.AA_RAKP_HMAC_SHA256, SecurityConstants.CA_NONE, SecurityConstants.IA_HMAC_SHA256_128 },
+			{ SecurityConstants.AA_RAKP_HMAC_SHA256, SecurityConstants.CA_AES_CBC128, SecurityConstants.IA_HMAC_SHA256_128 },
+			{ SecurityConstants.AA_RAKP_HMAC_SHA256, SecurityConstants.CA_XRC4_128, SecurityConstants.IA_HMAC_SHA256_128 },
+			{ SecurityConstants.AA_RAKP_HMAC_SHA256, SecurityConstants.CA_XRC4_40, SecurityConstants.IA_HMAC_SHA256_128 } };
 
 	private byte id;
 
@@ -52,10 +81,21 @@ public class CipherSuite {
 	private ConfidentialityAlgorithm ca;
 	private IntegrityAlgorithm ia;
 
+	/**
+	 * @return the ID of the cipher suite (IPMI 2.0 table 22-20)
+	 */
 	public byte getId() {
 		return id;
 	}
 
+	/**
+	 * Creates a cipher suite.
+	 *
+	 * @param id the ID of the cipher suite
+	 * @param authenticationAlgorithm the code of the authentication algorithm ({@link SecurityConstants})
+	 * @param confidentialityAlgorithm the code of the confidentiality algorithm
+	 * @param integrityAlgorithm the code of the integrity algorithm
+	 */
 	public CipherSuite(byte id, byte authenticationAlgorithm,
 			byte confidentialityAlgorithm, byte integrityAlgorithm) {
 		this.id = id;
@@ -71,6 +111,7 @@ public class CipherSuite {
 	 *        - Session Integrity Key calculated during the opening of the
 	 *        session or user password if 'one-key' logins are enabled.
 	 * @throws IllegalArgumentException
+	 *         - when an algorithm of the suite is not implemented
 	 * @throws InvalidKeyException
 	 *         - when initiation of the algorithm fails
 	 * @throws NoSuchAlgorithmException
@@ -89,6 +130,7 @@ public class CipherSuite {
 	/**
 	 * Returns instance of AuthenticationAlgorithm class.
 	 *
+	 * @return the authentication algorithm of the suite
 	 * @throws IllegalArgumentException when authentication algorithm code is
 	 *         incorrect.
 	 */
@@ -113,6 +155,7 @@ public class CipherSuite {
 	/**
 	 * Returns instance of IntegrityAlgorithm class.
 	 *
+	 * @return the integrity algorithm of the suite
 	 * @throws IllegalArgumentException when integrity algorithm code is incorrect.
 	 */
 	public IntegrityAlgorithm getIntegrityAlgorithm() {
@@ -139,6 +182,7 @@ public class CipherSuite {
 	/**
 	 * Returns instance of ConfidentialityAlgorithm class.
 	 *
+	 * @return the confidentiality algorithm of the suite
 	 * @throws IllegalArgumentException
 	 *         when confidentiality algorithm code is incorrect.
 	 */
@@ -175,13 +219,20 @@ public class CipherSuite {
 	 * Builds Cipher Suites collection from raw data received by
 	 * {@link GetChannelCipherSuites} commands. Cannot be executed in
 	 * {@link GetChannelCipherSuitesResponseData} since data comes in 16-byte
-	 * packets and is fragmented. Supports only one integrity and one
-	 * confidentiality algorithm per suite.
+	 * packets and is fragmented.
+	 * <p>
+	 * A standard record (IPMI 2.0 table 22-19) is C0h, the suite ID, then the algorithm tags. The algorithms of the
+	 * standard suites 0 to 19 are those of IPMI 2.0 table 22-20, whatever the tags say, as in ipmitool and FreeIPMI:
+	 * the records come unauthenticated, and a suite 17 whose tags were stripped must not become a suite without
+	 * integrity. OEM records (C1h, the OEM suite ID, a 3-byte IANA, then the tags), whose suite IDs are vendor-specific,
+	 * records with a reserved suite ID, and malformed or truncated records are skipped.
+	 * </p>
 	 *
 	 * @param bytes
 	 *        - concatenated Cipher Suite Records received by
 	 *        {@link GetChannelCipherSuites} commands.
-	 * @return list of Cipher Suites supported by BMC.
+	 * @return list of the standard Cipher Suites offered by BMC, in the BMC's order (including suites whose
+	 *         algorithms this library does not implement, see {@link #isSupported()})
 	 */
 	public static List<CipherSuite> getCipherSuites(byte[] bytes) {
 		ArrayList<CipherSuite> suites = new ArrayList<CipherSuite>();
@@ -189,38 +240,46 @@ public class CipherSuite {
 		int offset = 0;
 
 		while (offset < bytes.length) {
-			byte id = bytes[offset + 1];
-			if (bytes[offset] == TypeConverter.intToByte(0xC0)) {
-				offset += 2;
-			} else {
-				offset += 5;
+			int start = TypeConverter.byteToInt(bytes[offset]);
+			if (start != 0xC0 && start != 0xC1) {
+				++offset; // not the start of a record: resynchronize on the next one
+				continue;
 			}
-			byte aa = bytes[offset];
-			byte ca = -1;
-			byte ia = -1;
-			++offset;
-			while (offset < bytes.length
-					&& bytes[offset] != TypeConverter.intToByte(0xC0)
-					&& bytes[offset] != TypeConverter.intToByte(0xC1)) {
-				if ((TypeConverter.byteToInt(bytes[offset]) & 0xC0) == 0x80) {
-					ca = TypeConverter
-							.intToByte(
-									TypeConverter
-											.byteToInt(bytes[offset])
-											& 0x3f);
-				} else if ((TypeConverter.byteToInt(bytes[offset]) & 0xC0) == 0x40) {
-					ia = TypeConverter
-							.intToByte(
-									TypeConverter
-											.byteToInt(bytes[offset])
-											& 0x3f);
-				}
+			int tags = offset + (start == 0xC0 ? 2 : 5);
+			if (tags >= bytes.length) {
+				break; // truncated record
+			}
+			int id = TypeConverter.byteToInt(bytes[offset + 1]);
+			// The tags end at the next record: their bits 7:6 are never 11b
+			offset = tags;
+			while (offset < bytes.length && (bytes[offset] & 0xC0) != 0xC0) {
 				++offset;
 			}
-			suites.add(new CipherSuite(id, aa, ca, ia));
+			if (start == 0xC0 && id < STANDARD_SUITES.length) {
+				byte[] algorithms = STANDARD_SUITES[id];
+				suites.add(new CipherSuite((byte) id, algorithms[0], algorithms[1], algorithms[2]));
+			}
 		}
 
 		return suites;
+	}
+
+	/**
+	 * Tells whether this library implements the algorithms of this suite. The suites listed by
+	 * {@link #getCipherSuites(byte[])} include the ones it does not implement (MD5-128 integrity, xRC4
+	 * confidentiality), which fail when the session is opened.
+	 *
+	 * @return true when the authentication, integrity and confidentiality algorithms are all implemented
+	 */
+	public boolean isSupported() {
+		try {
+			getAuthenticationAlgorithm();
+			getIntegrityAlgorithm();
+			getConfidentialityAlgorithm();
+			return true;
+		} catch (IllegalArgumentException e) {
+			return false;
+		}
 	}
 
 	/**

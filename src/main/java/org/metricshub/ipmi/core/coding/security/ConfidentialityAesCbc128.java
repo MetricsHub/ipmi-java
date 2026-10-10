@@ -134,13 +134,19 @@ public class ConfidentialityAesCbc128 extends ConfidentialityAlgorithm {
 			throw new IllegalArgumentException("Decryption failed", e);
 		}
 
-		int pad = TypeConverter.byteToInt(decrypted[decrypted.length - 1]);
+		// Confidentiality Pad: 0 to 15 bytes 01h, 02h, 03h... then the Pad Length (IPMI 2.0 section 13.29)
+		int pad = decrypted.length == 0 ? -1 : TypeConverter.byteToInt(decrypted[decrypted.length - 1]);
+		if (pad < 0 || pad > 15 || pad >= decrypted.length) {
+			throw new IllegalArgumentException("Invalid confidentiality pad length");
+		}
+		int length = decrypted.length - pad - 1;
+		for (int i = 0; i < pad; ++i) {
+			if (TypeConverter.byteToInt(decrypted[length + i]) != i + 1) {
+				throw new IllegalArgumentException("Invalid confidentiality pad");
+			}
+		}
 
-		byte[] result = new byte[decrypted.length - pad - 1];
-
-		System.arraycopy(decrypted, 0, result, 0, result.length);
-
-		return result;
+		return Arrays.copyOf(decrypted, length);
 	}
 
 	@Override

@@ -289,6 +289,29 @@ public class IpmiConnector {
 	}
 
 	/**
+	 * Establishes the session with the remote host, with the password as bytes: the caller can then clear them
+	 * once the session is open, which an immutable {@link String} does not allow.
+	 *
+	 * @param connectionHandle
+	 *        - {@link ConnectionHandle} associated with the remote host.
+	 * @param username
+	 *        - the username
+	 * @param password
+	 *        - password matching the username, as sent to the BMC (UTF-8 for a text password), at most 20 bytes
+	 * @param bmcKey
+	 *        - the key that should be provided if the two-key authentication is enabled, null otherwise.
+	 * @return object representing newly created {@link Session}
+	 * @throws ConnectionException
+	 *         when connection is in the state that does not allow to perform this operation.
+	 * @throws Exception
+	 *         when sending message to the managed system or initializing one of the cipherSuite's algorithms fails
+	 */
+	public Session openSession(ConnectionHandle connectionHandle, String username, byte[] password, byte[] bmcKey)
+			throws Exception {
+		return asyncConnector.openSession(connectionHandle, username, password, bmcKey);
+	}
+
+	/**
 	 * Returns session already bound to given connection handle fulfilling given criteria.
 	 *
 	 * @param remoteAddress

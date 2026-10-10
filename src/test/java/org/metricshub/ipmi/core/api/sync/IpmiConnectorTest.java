@@ -121,7 +121,7 @@ class IpmiConnectorTest {
 		try (FakeBmc bmc = new FakeBmc(request -> {
 			arrivals.add(System.nanoTime());
 			Integer completionCode = completionCodeOfTry.apply(arrivals.size());
-			return completionCode == null ? null : sessionReply(request, completionCode, CHASSIS_STATUS);
+			return completionCode == null ? null : sessionReply(request, completionCode, CHASSIS_STATUS, arrivals.size());
 		})) {
 			// No keep-alive: the BMC sees the requests of the test only
 			IpmiConnector connector = new IpmiConnector(0, 0);
@@ -165,9 +165,10 @@ class IpmiConnectorTest {
 
 	/**
 	 * The reply of a BMC to an IPMI request sent in a session of cipher suite 0 (neither authenticated nor
-	 * encrypted): same tag and command, response network function, given completion code and data.
+	 * encrypted): same tag and command, response network function, given completion code and data, and the given
+	 * session sequence number (a BMC numbers its replies 1, 2, 3...: a number received twice is dropped).
 	 */
-	private static byte[] sessionReply(byte[] request, int completionCode, byte[] data) {
+	private static byte[] sessionReply(byte[] request, int completionCode, byte[] data, int sequenceNumber) {
 		byte[] payload = new byte[8 + data.length];
 		payload[0] = (byte) 0x81;
 		payload[1] = (byte) ((((request[PAYLOAD_OFFSET + 1] & 0xff) >> 2) + 1) << 2);
@@ -195,7 +196,7 @@ class IpmiConnectorTest {
 				0x00,
 				0x00,
 				0x00,
-				0x01,
+				(byte) sequenceNumber,
 				0x00,
 				0x00,
 				0x00,

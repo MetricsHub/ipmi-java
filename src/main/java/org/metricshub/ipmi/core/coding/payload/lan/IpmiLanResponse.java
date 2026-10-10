@@ -65,9 +65,13 @@ public class IpmiLanResponse extends IpmiLanMessage {
 	 *
 	 * @param rawData
 	 * @throws IllegalArgumentException
-	 *         when checksum is corrupted
+	 *         when the message is too short or a checksum is corrupted
 	 */
 	public IpmiLanResponse(byte[] rawData) {
+		// rqAddr, netFn/rqLUN, checksum 1, rsAddr, rqSeq/rsLUN, cmd, completion code, checksum 2
+		if (rawData.length < 8) {
+			throw new IllegalArgumentException("IPMI LAN response is too short: " + rawData.length + " bytes");
+		}
 		setRequesterAddress(rawData[0]);
 		setNetworkFunctionCode(
 				TypeConverter
