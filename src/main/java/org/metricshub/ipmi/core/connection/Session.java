@@ -30,15 +30,34 @@ import org.metricshub.ipmi.core.api.async.ConnectionHandle;
 public class Session {
 
 	private final int sessionId;
+	private final int managedSystemSessionId;
 	private final ConnectionHandle connectionHandle;
 
 	public Session(int sessionId, ConnectionHandle connectionHandle) {
+		this(sessionId, 0, connectionHandle);
+	}
+
+	/**
+	 * @param sessionId the remote console session ID
+	 * @param managedSystemSessionId the managed system session ID, which the BMC generated
+	 * @param connectionHandle the connection of the session
+	 */
+	public Session(int sessionId, int managedSystemSessionId, ConnectionHandle connectionHandle) {
 		this.sessionId = sessionId;
+		this.managedSystemSessionId = managedSystemSessionId;
 		this.connectionHandle = connectionHandle;
 	}
 
 	public int getSessionId() {
 		return sessionId;
+	}
+
+	/**
+	 * @return the managed system session ID, which the BMC generated and reports in its commands (Get Payload Instance
+	 *         Info), or 0 when unknown
+	 */
+	public int getManagedSystemSessionId() {
+		return managedSystemSessionId;
 	}
 
 	public ConnectionHandle getConnectionHandle() {

@@ -119,6 +119,13 @@ public class Connection extends TimerTask implements MachineObserver {
 		return handle;
 	}
 
+	/**
+	 * @return the managed system session ID of the last session opened, which the BMC generated
+	 */
+	public int getManagedSystemSessionId() {
+		return managedSystemSessionId;
+	}
+
 	private Map<PayloadType, MessageHandler> messageHandlers;
 
 	private Timer timer;

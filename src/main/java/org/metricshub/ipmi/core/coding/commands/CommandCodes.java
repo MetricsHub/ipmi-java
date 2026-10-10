@@ -125,6 +125,11 @@ public final class CommandCodes {
 	public static final byte GET_PAYLOAD_ACTIVATION_STATUS = 0x4A;
 
 	/**
+	 * An IPMI code for Get Payload Instance Info command
+	 */
+	public static final byte GET_PAYLOAD_INSTANCE_INFO = 0x4B;
+
+	/**
 	 * An IPMI code for Get Channel Cipher Suites command
 	 */
 	public static final byte GET_CHANNEL_CIPHER_SUITES = 0x54;

@@ -169,11 +169,27 @@ public class SessionManager {
 	 * @return newly created session object or session already registered for the connection
 	 */
 	public Session registerSession(int newSessionId, ConnectionHandle connectionHandle) {
+		return registerSession(newSessionId, 0, connectionHandle);
+	}
+
+	/**
+	 * Either returns the {@link Session} registered for given connection, or creates new IPMI {@link Session}
+	 * and registers it for the given connection handle, if no session was found for the connection.
+	 *
+	 * @param newSessionId
+	 *        the remote console session ID of the new session
+	 * @param managedSystemSessionId
+	 *        the managed system session ID of the new session, which the BMC generated
+	 * @param connectionHandle
+	 *        handle of the connection, for which this session should be registered.
+	 * @return newly created session object or session already registered for the connection
+	 */
+	public Session registerSession(int newSessionId, int managedSystemSessionId, ConnectionHandle connectionHandle) {
 		if (connectionHandle.getUser() == null || connectionHandle.getRemoteAddress() == null) {
 			throw new IllegalArgumentException("Given connection handle is incomplete (lacks user or remote address)");
 		}
 
-		Session newSession = new Session(newSessionId, connectionHandle);
+		Session newSession = new Session(newSessionId, managedSystemSessionId, connectionHandle);
 		Session currentSession = sessionsPerConnectionHandle.putIfAbsent(connectionHandle.getHandle(), newSession);
 
 		return currentSession != null ? currentSession : newSession;

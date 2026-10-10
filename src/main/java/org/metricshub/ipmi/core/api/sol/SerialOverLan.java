@@ -33,6 +33,8 @@ import org.metricshub.ipmi.core.coding.commands.payload.ActivateSolPayloadRespon
 import org.metricshub.ipmi.core.coding.commands.payload.DeactivatePayload;
 import org.metricshub.ipmi.core.coding.commands.payload.GetPayloadActivationStatus;
 import org.metricshub.ipmi.core.coding.commands.payload.GetPayloadActivationStatusResponseData;
+import org.metricshub.ipmi.core.coding.commands.payload.GetPayloadInstanceInfo;
+import org.metricshub.ipmi.core.coding.commands.payload.GetPayloadInstanceInfoResponseData;
 import org.metricshub.ipmi.core.coding.commands.session.SetSessionPrivilegeLevel;
 import org.metricshub.ipmi.core.coding.payload.CompletionCode;
 import org.metricshub.ipmi.core.coding.payload.lan.IPMIException;
@@ -82,6 +84,11 @@ public class SerialOverLan implements Closeable {
 	 * The pause before sending again a packet that the BMC NACKed, multiplied by the number of the retry.
 	 */
 	private static final long NACK_PAUSE_MS = 100;
+
+	/**
+	 * Completion code of Activate Payload: the payload is already active in a session (IPMI 2.0 table 24-2).
+	 */
+	private static final int PAYLOAD_ALREADY_ACTIVE = 0x80;
 
 	/**
 	 * The operations that are serial line states, which the console holds in every packet (IPMI 2.0 table 15-2).
@@ -232,7 +239,7 @@ public class SerialOverLan implements Closeable {
 		}
 
 		try {
-			int solPayloadPort = activatePayload(connector, session.getConnectionHandle());
+			int solPayloadPort = activatePayload(connector, session);
 
 			this.session = resolveSession(connector, session, solPayloadPort);
 
@@ -323,32 +330,33 @@ public class SerialOverLan implements Closeable {
 			ownedConnections.add(alternativeSession.getConnectionHandle());
 		}
 
-		activatePayload(ipmiConnector, alternativeSession.getConnectionHandle());
+		activatePayload(ipmiConnector, alternativeSession);
 
 		return alternativeSession;
 	}
 
 	/**
-	 * Tries to activate SOL payload in the session associated to given {@link ConnectionHandle}.
+	 * Tries to activate SOL payload in the given session.
 	 * If first activation try fails due to insufficient privileges, raises the session privileges
-	 * to maximum available and tries to activate payload once again.
+	 * to the level the session was opened for and tries to activate payload once again.
 	 *
 	 * @param ipmiConnector
 	 *        {@link IpmiConnector} that will be used for communication
-	 * @param connectionHandle
-	 *        {@link ConnectionHandle} representing single connection to managed system.
+	 * @param payloadSession
+	 *        the session where the payload is activated
 	 * @return UDP port number on which managed system listenes for SOL messages.
 	 * @throws SOLException
 	 *         when any unrecoverable error occurred.
 	 */
-	private int activatePayload(IpmiConnector ipmiConnector, ConnectionHandle connectionHandle) throws SOLException {
+	private int activatePayload(IpmiConnector ipmiConnector, Session payloadSession) throws SOLException {
+		ConnectionHandle connectionHandle = payloadSession.getConnectionHandle();
 		try {
 			this.payloadInstance = getFirstAvailablePayloadInstance(ipmiConnector, connectionHandle);
 
 			ActivateSolPayload activatePayload = new ActivateSolPayload(connectionHandle.getCipherSuite(), payloadInstance);
 			ActivateSolPayloadResponseData activatePayloadResponseData = getActivatePayloadResponse(
 					ipmiConnector,
-					connectionHandle,
+					payloadSession,
 					activatePayload);
 			this.activatedConnection = connectionHandle;
 
@@ -371,32 +379,55 @@ public class SerialOverLan implements Closeable {
 		}
 	}
 
+	/**
+	 * Sends Activate Payload, and once more after raising the privilege of the session when it is too low, or after
+	 * deactivating the payload when a lost reply left it active in this session.
+	 */
 	private ActivateSolPayloadResponseData getActivatePayloadResponse(
 			IpmiConnector ipmiConnector,
-			ConnectionHandle connectionHandle,
+			Session payloadSession,
 			ActivateSolPayload activatePayload)
 			throws Exception {
-		ActivateSolPayloadResponseData activatePayloadResponseData;
-
-		try {
-			activatePayloadResponseData = (ActivateSolPayloadResponseData) ipmiConnector
-					.sendMessage(
-							connectionHandle,
-							activatePayload);
-		} catch (IPMIException e) {
-			if (e.getCompletionCode() == CompletionCode.InsufficentPrivilege) {
-				raiseSessionPrivileges(ipmiConnector, connectionHandle);
-
-				activatePayloadResponseData = (ActivateSolPayloadResponseData) ipmiConnector
-						.sendMessage(
-								connectionHandle,
-								activatePayload);
-			} else {
-				throw e;
+		ConnectionHandle connectionHandle = payloadSession.getConnectionHandle();
+		boolean raised = false;
+		boolean deactivated = false;
+		while (true) {
+			try {
+				return (ActivateSolPayloadResponseData) ipmiConnector.sendMessage(connectionHandle, activatePayload);
+			} catch (IPMIException e) {
+				boolean alreadyActive = !deactivated && e.getRawCode() == PAYLOAD_ALREADY_ACTIVE;
+				if (!raised && e.getCompletionCode() == CompletionCode.InsufficentPrivilege) {
+					raiseSessionPrivileges(ipmiConnector, connectionHandle);
+					raised = true;
+				} else if (alreadyActive && isActiveInSession(ipmiConnector, payloadSession)) {
+					// The reply to Activate Payload was lost, and the request sent again found the payload active in this
+					// session: the port and the sizes of the payload are only in that reply, which a new activation gives
+					deactivatePayload(connectionHandle);
+					deactivated = true;
+				} else {
+					throw e;
+				}
 			}
 		}
+	}
 
-		return activatePayloadResponseData;
+	/**
+	 * Tells whether the payload instance is active in the given session (Get Payload Instance Info, IPMI 2.0 section
+	 * 24.5), rather than in the session of another console, which must keep it.
+	 */
+	private boolean isActiveInSession(IpmiConnector ipmiConnector, Session payloadSession) throws Exception {
+		ConnectionHandle connectionHandle = payloadSession.getConnectionHandle();
+		try {
+			GetPayloadInstanceInfoResponseData info = (GetPayloadInstanceInfoResponseData) ipmiConnector
+					.sendMessage(
+							connectionHandle,
+							new GetPayloadInstanceInfo(connectionHandle.getCipherSuite(), PayloadType.Sol, payloadInstance));
+			return info.getSessionId() != 0 && info.getSessionId() == payloadSession.getManagedSystemSessionId();
+		} catch (IPMIException e) {
+			// The command is optional
+			LOGGER.debug("Get Payload Instance Info failed", e);
+			return false;
+		}
 	}
 
 	/**
@@ -429,8 +460,8 @@ public class SerialOverLan implements Closeable {
 	}
 
 	/**
-	 * Sends proper command to managed system in order to raise user privileges in given session to maximum available
-	 * level.
+	 * Sends proper command to managed system in order to raise user privileges in given session to the level the session
+	 * was opened for (Administrator when unknown): the BMC refuses a higher one.
 	 *
 	 * @param ipmiConnector
 	 *        {@link IpmiConnector} that will be used for communication
@@ -440,11 +471,15 @@ public class SerialOverLan implements Closeable {
 	 *         If any exception occurred during communication.
 	 */
 	private void raiseSessionPrivileges(IpmiConnector ipmiConnector, ConnectionHandle connectionHandle) throws Exception {
+		PrivilegeLevel privilegeLevel = connectionHandle.getPrivilegeLevel();
+		if (privilegeLevel == null || privilegeLevel == PrivilegeLevel.MaximumAvailable) {
+			privilegeLevel = PrivilegeLevel.Administrator;
+		}
 		SetSessionPrivilegeLevel setSessionPrivilegeLevel = new SetSessionPrivilegeLevel(
 				IpmiVersion.V20,
 				connectionHandle.getCipherSuite(),
 				AuthenticationType.RMCPPlus,
-				PrivilegeLevel.Administrator);
+				privilegeLevel);
 		ipmiConnector.sendMessage(connectionHandle, setSessionPrivilegeLevel);
 	}
 

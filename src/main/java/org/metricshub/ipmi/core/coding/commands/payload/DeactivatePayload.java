@@ -76,11 +76,18 @@ public class DeactivatePayload extends IpmiCommandCoder {
 	}
 
 	/**
-	 * Creates new instance of the {@link DeactivatePayload} command for deactivating given {@link PayloadType}.
+	 * Creates new instance of the {@link DeactivatePayload} command for deactivating given {@link PayloadType}, in a
+	 * session of cipher suite 0.
 	 *
 	 * @param payloadType
 	 *        payload to be deactivated.
+	 * @param payloadInstance
+	 *        the instance of the payload, from 1
+	 * @deprecated the request goes out without integrity and confidentiality, which a session of another cipher suite
+	 *             discards: use {@link #DeactivatePayload(CipherSuite, PayloadType, int)} with the cipher suite of the
+	 *             session
 	 */
+	@Deprecated
 	public DeactivatePayload(PayloadType payloadType, int payloadInstance) {
 		this.payloadType = payloadType;
 		this.payloadInstance = payloadInstance;

@@ -41,6 +41,7 @@ import org.metricshub.ipmi.core.coding.security.CipherSuite;
 import org.metricshub.ipmi.core.connection.Session;
 import org.metricshub.ipmi.core.connection.SessionException;
 import org.metricshub.ipmi.core.transport.FakeRmcpPlusBmc;
+import org.metricshub.ipmi.core.transport.FakeRmcpPlusBmc.Fault;
 
 /**
  * Serial over LAN consoles against {@link FakeRmcpPlusBmc}, a BMC written from the IPMI 2.0 specification, over
@@ -539,6 +540,68 @@ class SerialOverLanTest {
 
 	@Test
 	@Timeout(30)
+	void theSessionIsRaisedToThePrivilegeItWasOpenedFor() throws Exception {
+		try (FakeRmcpPlusBmc bmc = new FakeRmcpPlusBmc(SUITES, USER, utf8(PASSWORD), null)) {
+			bmc.enableSol(bmc.getPort(), PAYLOAD_SIZE, FakeRmcpPlusBmc.OPERATOR);
+			IpmiConnector connector = new IpmiConnector(0, 0);
+			try {
+				// A session that cannot be raised above Operator: asking for Administrator fails
+				Session session = openSession(connector, bmc, null, PrivilegeLevel.Operator);
+				new SerialOverLan(connector, session).close();
+				assertEquals(Collections.emptyList(), bmc.getErrors());
+			} finally {
+				connector.tearDown();
+			}
+		}
+	}
+
+	@Test
+	@Timeout(30)
+	void aLostReplyToActivatePayloadIsRecovered() throws Exception {
+		try (FakeRmcpPlusBmc bmc = solBmc(null)) {
+			// Get Payload Activation Status, Activate Payload (refused: the session starts at User), Set Session
+			// Privilege Level, Activate Payload: its reply is lost, and the request sent again finds the payload active
+			bmc.inject(4, Fault.DROP);
+			IpmiConnector connector = new IpmiConnector(0, 0);
+			try {
+				SerialOverLan sol = new SerialOverLan(connector, openSession(connector, bmc, null));
+				assertTrue(bmc.isSolActive());
+				assertEquals(1, bmc.getCount(NETFN_APP, FakeRmcpPlusBmc.GET_PAYLOAD_INSTANCE_INFO));
+				assertEquals(1, bmc.getCount(NETFN_APP, DEACTIVATE_PAYLOAD));
+				assertEquals(4, bmc.getCount(NETFN_APP, FakeRmcpPlusBmc.ACTIVATE_PAYLOAD));
+				assertTrue(sol.writeString("ls\r", StandardCharsets.US_ASCII));
+				sol.close();
+				assertEquals(Collections.emptyList(), bmc.getErrors());
+			} finally {
+				connector.tearDown();
+			}
+		}
+	}
+
+	@Test
+	@Timeout(30)
+	void aPayloadActiveInAnotherSessionIsLeftToIt() throws Exception {
+		try (FakeRmcpPlusBmc bmc = solBmc(null)) {
+			bmc.handle(NETFN_APP, FakeRmcpPlusBmc.ACTIVATE_PAYLOAD, data -> new byte[] { (byte) 0x80 });
+			bmc
+					.handle(
+							NETFN_APP,
+							FakeRmcpPlusBmc.GET_PAYLOAD_INSTANCE_INFO,
+							data -> new byte[]
+							{ 0x00, 0x12, 0x34, 0x56, 0x78, 0, 0, 0, 0, 0, 0, 0, 0 });
+			IpmiConnector connector = new IpmiConnector(0, 0);
+			try {
+				Session session = openSession(connector, bmc, null);
+				assertThrows(SOLException.class, () -> new SerialOverLan(connector, session));
+				assertEquals(0, bmc.getCount(NETFN_APP, DEACTIVATE_PAYLOAD), "the console of the other session stays");
+			} finally {
+				connector.tearDown();
+			}
+		}
+	}
+
+	@Test
+	@Timeout(30)
 	void aPacketTheBmcSendsAgainIsReadOnce() throws Exception {
 		try (FakeRmcpPlusBmc bmc = solBmc(null)) {
 			try (
@@ -702,10 +765,22 @@ class SerialOverLanTest {
 	 * Opens a session of suite 17 that may be raised to Administrator, as an application would.
 	 */
 	private static Session openSession(IpmiConnector connector, FakeRmcpPlusBmc bmc, byte[] kg) throws Exception {
+		return openSession(connector, bmc, kg, PrivilegeLevel.Administrator);
+	}
+
+	/**
+	 * Opens a session of suite 17 that may be raised to the given privilege.
+	 */
+	private static Session openSession(
+			IpmiConnector connector,
+			FakeRmcpPlusBmc bmc,
+			byte[] kg,
+			PrivilegeLevel privilegeLevel)
+			throws Exception {
 		ConnectionHandle handle = connector.createConnection(bmc.getAddress(), bmc.getPort());
 		connector.setTimeout(handle, TIMEOUT_MS);
 		CipherSuite suite = SUITE_17.choose(connector.getAvailableCipherSuites(handle));
-		connector.getChannelAuthenticationCapabilities(handle, suite, PrivilegeLevel.Administrator);
+		connector.getChannelAuthenticationCapabilities(handle, suite, privilegeLevel);
 		return connector.openSession(handle, USER, PASSWORD, kg);
 	}
 

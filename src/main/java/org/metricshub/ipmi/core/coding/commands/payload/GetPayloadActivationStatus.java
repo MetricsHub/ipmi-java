@@ -57,6 +57,15 @@ public class GetPayloadActivationStatus extends IpmiCommandCoder {
 		this.payloadType = payloadType;
 	}
 
+	/**
+	 * Creates the command for a session of cipher suite 0.
+	 *
+	 * @param payloadType the payload type
+	 * @deprecated the request goes out without integrity and confidentiality, which a session of another cipher suite
+	 *             discards: use {@link #GetPayloadActivationStatus(CipherSuite, PayloadType)} with the cipher suite of
+	 *             the session
+	 */
+	@Deprecated
 	public GetPayloadActivationStatus(PayloadType payloadType) {
 		this.payloadType = payloadType;
 	}

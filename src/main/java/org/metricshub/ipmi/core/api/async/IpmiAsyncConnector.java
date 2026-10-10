@@ -355,7 +355,11 @@ public class IpmiAsyncConnector implements ConnectionListener {
 								password,
 								bmcKey);
 
-				session = sessionManager.registerSession(sessionId, connectionHandle);
+				session = sessionManager
+						.registerSession(
+								sessionId,
+								connectionManager.getConnection(connectionHandle.getHandle()).getManagedSystemSessionId(),
+								connectionHandle);
 
 				succeded = true;
 			} catch (Exception e) {
