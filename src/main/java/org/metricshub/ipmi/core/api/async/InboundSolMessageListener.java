@@ -32,16 +32,19 @@ import org.metricshub.ipmi.core.coding.payload.sol.SolStatus;
 import org.metricshub.ipmi.core.coding.sol.SolCoder;
 import org.metricshub.ipmi.core.common.ByteBuffer;
 
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Listener for inbound SOL messages sent by remote system to this application.
+ * Listener for inbound SOL messages sent by remote system to this application: it buffers their characters and
+ * acknowledges them (IPMI 2.0 sections 15.9 and 15.11).
  */
 public class InboundSolMessageListener implements InboundMessageListener {
 
@@ -49,12 +52,26 @@ public class InboundSolMessageListener implements InboundMessageListener {
 
 	static final int BUFFER_CAPACITY = 2048;
 
+	/**
+	 * The characters received; its monitor also guards the fields below, shared by the receiving thread and the
+	 * readers.
+	 */
 	private final ByteBuffer buffer = new ByteBuffer(BUFFER_CAPACITY);
 	private final IpmiConnector connector;
 	private final ConnectionHandle connectionHandle;
 	private final List<SolEventListener> eventListeners;
 
-	private SolInboundMessage waitingMessage;
+	/**
+	 * The packet answered with a Suspend NACK for lack of room, resumed once read: the BMC then sends it again.
+	 */
+	private SolInboundMessage suspendedPacket;
+
+	/**
+	 * The sequence number of the last packet accepted, and its number of characters: the BMC sends a packet again,
+	 * with the same number and possibly more characters, when it misses the acknowledgement (IPMI 2.0 section 15.9).
+	 */
+	private int lastSequenceNumber;
+	private int lastCharacterCount;
 
 	/**
 	 * The serial line states the console holds, set in every packet it sends.
@@ -82,104 +99,71 @@ public class InboundSolMessageListener implements InboundMessageListener {
 		return handle == connectionHandle.getHandle() && isPayloadSupported(payload);
 	}
 
+	/**
+	 * Buffers the characters of a packet, only those it did not receive already when the BMC sends a packet again,
+	 * acknowledges every packet with a sequence number (with a Suspend NACK when the characters do not fit), and
+	 * reports the statuses of each packet once.
+	 */
 	@Override
 	public void notify(IpmiPayload payload) {
-		if (isPayloadSupported(payload)) {
-			SolInboundMessage solPayload = (SolInboundMessage) payload;
-
-			byte[] characterData = solPayload.getData();
-
-			if (messageHasCharacterData(characterData)) {
-				processCharacterData(solPayload, characterData);
-			}
-
-			Set<SolStatus> statuses = solPayload.getStatusField().getStatuses();
-
-			if (messageHasStatuses(statuses)) {
-				processStatuses(statuses);
-			}
+		if (!isPayloadSupported(payload)) {
+			return;
 		}
-	}
+		SolInboundMessage packet = (SolInboundMessage) payload;
+		int sequenceNumber = packet.getSequenceNumber();
+		byte[] characters = packet.getData();
 
-	private void processCharacterData(SolInboundMessage solPayload, byte[] characterData) {
-		if (noSpaceForDataInBuffer(characterData)) {
-			sendNack(solPayload);
-		} else {
-			buffer.write(characterData);
-
-			sendAck(solPayload, characterData);
-		}
-	}
-
-	private void processStatuses(Set<SolStatus> statuses) {
-		for (SolEventListener listener : eventListeners) {
-			listener.processRequestEvent(statuses);
-		}
-	}
-
-	private boolean noSpaceForDataInBuffer(byte[] characterData) {
-		return characterData.length > buffer.remainingSpace();
-	}
-
-	private boolean messageHasCharacterData(byte[] characterData) {
-		return characterData != null && characterData.length > 0;
-	}
-
-	private boolean messageHasStatuses(Set<SolStatus> statuses) {
-		return statuses != null && !statuses.isEmpty();
-	}
-
-	private void sendNack(SolInboundMessage solPayload) {
-		if (solPayload.getSequenceNumber() != 0) {
-			try {
-				SolCoder solNack = new SolCoder(
-						solPayload.getSequenceNumber(),
-						(byte) 0,
-						SolAckState.NACK,
-						lineOperations,
-						connectionHandle.getCipherSuite());
-				connector.sendOneWayMessage(connectionHandle, solNack);
-
-				synchronized (buffer) {
-					waitingMessage = solPayload;
+		boolean retry;
+		boolean accepted;
+		synchronized (buffer) {
+			retry = sequenceNumber != 0 && sequenceNumber == lastSequenceNumber;
+			int received = retry ? Math.min(lastCharacterCount, characters.length) : 0;
+			byte[] newCharacters = Arrays.copyOfRange(characters, received, characters.length);
+			accepted = newCharacters.length <= buffer.remainingSpace();
+			if (accepted) {
+				buffer.write(newCharacters);
+				if (sequenceNumber != 0) {
+					lastSequenceNumber = sequenceNumber;
+					lastCharacterCount = characters.length;
 				}
-			} catch (Exception e) {
-				LOGGER.error("Could not send NACK for packet " + solPayload.getSequenceNumber(), e);
+			} else if (sequenceNumber != 0) {
+				suspendedPacket = packet;
+			} else {
+				LOGGER.warn("Dropping {} characters received in a SOL packet without sequence number", characters.length);
+			}
+			// The readers waiting for characters: they arrived, or none will until a read makes room
+			buffer.notifyAll();
+		}
+
+		if (sequenceNumber != 0) {
+			// Every packet with a sequence number is acknowledged, with the count of its characters, even when it
+			// carries none (IPMI 2.0 section 15.11)
+			acknowledge(packet, accepted ? SolAckState.ACK : SolAckState.NACK, accepted ? characters.length : 0);
+		}
+
+		Set<SolStatus> statuses = packet.getStatusField().getStatuses();
+		if (accepted && !retry && statuses != null && !statuses.isEmpty()) {
+			for (SolEventListener listener : eventListeners) {
+				listener.processRequestEvent(statuses);
 			}
 		}
 	}
 
-	private void sendAck(SolInboundMessage solPayload, byte[] characterData) {
-		if (solPayload.getSequenceNumber() != 0) {
-			try {
-				SolCoder solAck = new SolCoder(
-						solPayload.getSequenceNumber(),
-						(byte) characterData.length,
-						SolAckState.ACK,
-						lineOperations,
-						connectionHandle.getCipherSuite());
-				connector.sendOneWayMessage(connectionHandle, solAck);
-
-				synchronized (buffer) {
-					waitingMessage = null;
-				}
-			} catch (Exception e) {
-				LOGGER.error("Could not send ACK for packet " + solPayload.getSequenceNumber(), e);
-			}
-		}
-	}
-
-	private void sendResumeAck(SolInboundMessage solPayload) {
+	/**
+	 * Sends an ACK-only packet: an ACK of the given number of characters, a Suspend NACK (a NACK of 0 characters) or a
+	 * Resume ACK (an ACK of 0 characters), with the line states the console holds (IPMI 2.0 table 15-3).
+	 */
+	private void acknowledge(SolInboundMessage packet, SolAckState ackState, int characterCount) {
 		try {
-			SolCoder solResumeAck = new SolCoder(
-					solPayload.getSequenceNumber(),
-					(byte) 0,
-					SolAckState.ACK,
+			SolCoder acknowledgement = new SolCoder(
+					packet.getSequenceNumber(),
+					(byte) characterCount,
+					ackState,
 					lineOperations,
 					connectionHandle.getCipherSuite());
-			connector.sendOneWayMessage(connectionHandle, solResumeAck);
+			connector.sendOneWayMessage(connectionHandle, acknowledgement);
 		} catch (Exception e) {
-			LOGGER.error("Could not send Resume ACK for packet " + solPayload.getSequenceNumber(), e);
+			LOGGER.error("Could not send " + ackState + " for packet " + packet.getSequenceNumber(), e);
 		}
 	}
 
@@ -205,21 +189,54 @@ public class InboundSolMessageListener implements InboundMessageListener {
 	/**
 	 * Attempts to read given number of bytes from this {@link ByteBuffer}.
 	 * If buffer currently contains less bytes than requested, this method reads only available number of bytes.
+	 * When the read makes room for the packet suspended for lack of it, the BMC is told to send it again.
 	 *
 	 * @param numberOfBytes
 	 *        requested number of bytes to read
 	 * @return actual bytes that could be read from this buffer.
 	 */
 	public byte[] readBytes(int numberOfBytes) {
-		byte[] result = buffer.read(numberOfBytes);
-
+		byte[] result;
+		SolInboundMessage resumed = null;
 		synchronized (buffer) {
-			if (waitingMessage != null && waitingMessage.getData().length <= buffer.remainingSpace()) {
-				sendResumeAck(waitingMessage);
+			result = buffer.read(numberOfBytes);
+			if (suspendedPacket != null && suspendedPacket.getData().length <= buffer.remainingSpace()) {
+				resumed = suspendedPacket;
+				suspendedPacket = null;
 			}
 		}
-
+		if (resumed != null) {
+			// A Resume ACK, sent once: the BMC sends the packet again at once
+			acknowledge(resumed, SolAckState.ACK, 0);
+		}
 		return result;
+	}
+
+	/**
+	 * Reads at most the given number of bytes, once they are available, the buffer is full (no other character
+	 * arrives before a read), or the timeout expires.
+	 *
+	 * @param numberOfBytes
+	 *        requested number of bytes to read
+	 * @param timeout
+	 *        the longest wait, in milliseconds
+	 * @return the bytes read, possibly fewer than requested, or none
+	 */
+	public byte[] readBytes(int numberOfBytes, int timeout) {
+		long deadline = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(timeout);
+		synchronized (buffer) {
+			long remaining = deadline - System.nanoTime();
+			while (buffer.size() < numberOfBytes && suspendedPacket == null && remaining > 0) {
+				try {
+					TimeUnit.NANOSECONDS.timedWait(buffer, remaining);
+				} catch (InterruptedException e) {
+					Thread.currentThread().interrupt();
+					break;
+				}
+				remaining = deadline - System.nanoTime();
+			}
+		}
+		return readBytes(numberOfBytes);
 	}
 
 	/**

@@ -39,6 +39,7 @@ import java.util.concurrent.CountDownLatch;
 import org.metricshub.ipmi.core.coding.commands.IpmiCommandCoder;
 import org.metricshub.ipmi.core.coding.payload.lan.NetworkFunction;
 import org.metricshub.ipmi.core.coding.payload.sol.SolAckState;
+import org.metricshub.ipmi.core.coding.payload.sol.SolInboundMessage;
 import org.metricshub.ipmi.core.coding.payload.sol.SolMessage;
 import org.metricshub.ipmi.core.coding.sol.SolCoder;
 import org.metricshub.ipmi.core.connection.queue.MessageQueue;
@@ -288,6 +289,35 @@ class ConnectionTest {
 		} finally {
 			connection.disconnect();
 		}
+	}
+
+	@Test
+	void theAcknowledgementInAPacketTheBmcSendsAgainIsAppliedOnce() throws Exception {
+		Connection connection = connect(60000);
+		try {
+			MessageHandler sol = handler(connection, PayloadType.Sol);
+			int tag = sol.takeTag(new SolCoder(new byte[] { 'a' }, CipherSuite.getEmpty()), false);
+			connection.notify(new MessageAction(solPacket(7, tag)));
+			assertNull(sol.getMessageQueue().getElement(tag), "packet 7 of the BMC acknowledges the packet");
+
+			// A newer packet of the console has the same number, and the BMC sends its packet 7 again
+			assertEquals(
+					tag,
+					sol.getMessageQueue().add(new SolCoder(new byte[]
+					{ 'b' }, CipherSuite.getEmpty()), false, tag));
+			connection.notify(new MessageAction(solPacket(7, tag)));
+			assertNotNull(sol.getMessageQueue().getElement(tag), "the old ACK must not complete the newer packet");
+		} finally {
+			connection.disconnect();
+		}
+	}
+
+	/** A SOL packet of the BMC with one character, which also ACKs the given packet of the console (table 15-2). */
+	private static Ipmiv20Message solPacket(int sequenceNumber, int acknowledged) {
+		Ipmiv20Message packet = new Ipmiv20Message(null);
+		packet.setPayloadType(PayloadType.Sol);
+		packet.setPayload(new SolInboundMessage(new byte[] { (byte) sequenceNumber, (byte) acknowledged, 1, 0, 'x' }));
+		return packet;
 	}
 
 	@Test

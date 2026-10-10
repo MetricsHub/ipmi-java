@@ -47,6 +47,11 @@ public class SolMessageHandler extends MessageHandler {
 	private PayloadCoder lastPacket;
 	private int lastTag;
 
+	/**
+	 * The sequence number of the last packet of the BMC with one, read on the receiving thread only.
+	 */
+	private int lastInboundSequenceNumber;
+
 	public SolMessageHandler(Connection connection, int timeout) throws IOException {
 		super(connection, timeout, SolMessage.MIN_SEQUENCE_NUMBER, SolMessage.MAX_SEQUENCE_NUMBER);
 	}
@@ -86,16 +91,38 @@ public class SolMessageHandler extends MessageHandler {
 	protected void handleIncomingMessageInternal(Ipmiv20Message message) {
 		SolInboundMessage payload = (SolInboundMessage) message.getPayload();
 
-		if (payload.isAcknowledgeMessage()) {
-			handleIncomingAcknowledgeMessage(message, payload);
-		}
+		// The ACK/NACK carried by a packet that the BMC sends again was applied with the first copy: applied again, it
+		// could complete a newer packet that has the same number
+		boolean acknowledgement = payload.isAcknowledgeMessage()
+				&& !isRetry(payload)
+				&& handleIncomingAcknowledgeMessage(message, payload);
 
-		if (payload.isDataCarrier()) {
+		// Characters, or statuses that no packet of the console waits for (an informational packet: SOL deactivated)
+		if (payload.isDataCarrier() || !acknowledgement && !payload.getStatusField().getStatuses().isEmpty()) {
 			handleIncomingDataMessage(payload);
 		}
 	}
 
-	private void handleIncomingAcknowledgeMessage(Ipmiv20Message message, SolInboundMessage payload) {
+	/**
+	 * Tells whether the BMC sends its last packet again (the same non-zero sequence number, IPMI 2.0 table 15-2), and
+	 * remembers the number of the packet.
+	 */
+	private boolean isRetry(SolInboundMessage payload) {
+		int sequenceNumber = payload.getSequenceNumber();
+		if (sequenceNumber == 0) {
+			return false;
+		}
+		boolean retry = sequenceNumber == lastInboundSequenceNumber;
+		lastInboundSequenceNumber = sequenceNumber;
+		return retry;
+	}
+
+	/**
+	 * Reports the acknowledgement of a queued packet.
+	 *
+	 * @return whether a queued packet was acknowledged
+	 */
+	private boolean handleIncomingAcknowledgeMessage(Ipmiv20Message message, SolInboundMessage payload) {
 		PayloadCoder coder = getMessageQueue().getMessageFromQueue(payload.getAckNackSequenceNumber());
 		int tag = payload.getAckNackSequenceNumber();
 
@@ -103,7 +130,7 @@ public class SolMessageHandler extends MessageHandler {
 
 		if (coder == null) {
 			LOGGER.debug("No message tagged with " + tag + " in queue. Dropping orphan message.");
-			return;
+			return false;
 		}
 
 		try {
@@ -118,6 +145,7 @@ public class SolMessageHandler extends MessageHandler {
 		if (payload.getStatusField().getAckState() == SolAckState.ACK || payload.getAcceptedCharacterCount() > 0) {
 			getMessageQueue().remove(payload.getAckNackSequenceNumber());
 		}
+		return true;
 	}
 
 	private void handleIncomingDataMessage(SolInboundMessage payload) {

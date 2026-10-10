@@ -14,9 +14,13 @@ import static org.metricshub.ipmi.core.transport.FakeRmcpPlusBmc.NETFN_APP;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
 import java.util.Collections;
+import java.util.EnumSet;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.TimeUnit;
 import java.util.function.BooleanSupplier;
 import java.util.stream.Collectors;
@@ -31,6 +35,7 @@ import org.metricshub.ipmi.core.coding.commands.PrivilegeLevel;
 import org.metricshub.ipmi.core.coding.commands.chassis.GetChassisStatus;
 import org.metricshub.ipmi.core.coding.commands.chassis.GetChassisStatusResponseData;
 import org.metricshub.ipmi.core.coding.payload.sol.SolOperation;
+import org.metricshub.ipmi.core.coding.payload.sol.SolStatus;
 import org.metricshub.ipmi.core.coding.protocol.AuthenticationType;
 import org.metricshub.ipmi.core.coding.security.CipherSuite;
 import org.metricshub.ipmi.core.connection.Session;
@@ -530,6 +535,158 @@ class SerialOverLanTest {
 				assertTrue(interrupted.get(2, TimeUnit.SECONDS));
 			}
 		}
+	}
+
+	@Test
+	@Timeout(30)
+	void aPacketTheBmcSendsAgainIsReadOnce() throws Exception {
+		try (FakeRmcpPlusBmc bmc = solBmc(null)) {
+			try (
+					SerialOverLan sol = new SerialOverLan(
+							new IpmiConnector(0, 0),
+							host(bmc),
+							bmc.getPort(),
+							USER,
+							PASSWORD,
+							SUITE_17)) {
+				// The ACK of the console is lost twice, and the BMC appends characters the second time
+				bmc.sendSol(3, 0, utf8("abc"));
+				bmc.sendSol(3, 0, utf8("abc"));
+				bmc.sendSol(3, 0, utf8("abcde"));
+				await(() -> acks(bmc) == 3, "the console acknowledges each copy");
+				assertEquals("abcde", sol.readString(StandardCharsets.US_ASCII));
+				assertEquals(
+						Arrays.asList("3/3", "3/3", "3/5"),
+						bmc.getSolPackets().stream().map(SerialOverLanTest::ack).collect(Collectors.toList()));
+			}
+			assertEquals(Collections.emptyList(), bmc.getErrors());
+		}
+	}
+
+	@Test
+	@Timeout(30)
+	void aFullBufferSuspendsTheBmcUntilItIsRead() throws Exception {
+		try (FakeRmcpPlusBmc bmc = solBmc(null)) {
+			try (
+					SerialOverLan sol = new SerialOverLan(
+							new IpmiConnector(0, 0),
+							host(bmc),
+							bmc.getPort(),
+							USER,
+							PASSWORD,
+							SUITE_17)) {
+				// 2048 characters fill the buffer
+				for (int i = 1; i <= 8; i++) {
+					bmc.sendSol(i, 0, text(256));
+				}
+				bmc.sendSol(9, 0, utf8("0123456789"));
+				await(() -> acks(bmc) == 9, "the console answers each packet");
+				assertEquals("9/0 NACK", ack(bmc.getSolPackets().get(8)), "a Suspend NACK");
+
+				// The read does not wait for characters that cannot arrive, and resumes the BMC once
+				long start = System.nanoTime();
+				assertEquals(2048, sol.readBytes(4096, 10000).length);
+				assertTrue(System.nanoTime() - start < TimeUnit.SECONDS.toNanos(5));
+				sol.readBytes();
+				sol.readBytes();
+				await(() -> acks(bmc) == 10, "the console sends a Resume ACK");
+				assertEquals("9/0", ack(bmc.getSolPackets().get(9)));
+
+				bmc.sendSol(9, 0, utf8("0123456789"));
+				assertEquals("0123456789", sol.readString(StandardCharsets.US_ASCII, 10, 5000));
+				await(() -> acks(bmc) == 11, "the console acknowledges the packet sent again");
+				assertEquals("9/10", ack(bmc.getSolPackets().get(10)));
+			}
+			assertEquals(Collections.emptyList(), bmc.getErrors());
+		}
+	}
+
+	@Test
+	@Timeout(30)
+	void aStatusWithoutCharactersIsAcknowledgedAndReportedOnce() throws Exception {
+		try (FakeRmcpPlusBmc bmc = solBmc(null)) {
+			try (
+					SerialOverLan sol = new SerialOverLan(
+							new IpmiConnector(0, 0),
+							host(bmc),
+							bmc.getPort(),
+							USER,
+							PASSWORD,
+							SUITE_17)) {
+				List<Set<SolStatus>> events = new CopyOnWriteArrayList<>();
+				// A listener that unregisters itself must not keep the next one from being notified
+				sol.registerEventListener(new RecordingListener(events) {
+					@Override
+					public void processRequestEvent(Set<SolStatus> statuses) {
+						super.processRequestEvent(statuses);
+						sol.unregisterEventListener(this);
+					}
+				});
+				sol.registerEventListener(new RecordingListener(events));
+				bmc.sendSol(5, FakeRmcpPlusBmc.SOL_BREAK, new byte[0]);
+				bmc.sendSol(5, FakeRmcpPlusBmc.SOL_BREAK, new byte[0]);
+				await(() -> acks(bmc) == 2, "the console acknowledges each copy");
+				assertEquals(
+						Arrays.asList(EnumSet.of(SolStatus.Break), EnumSet.of(SolStatus.Break)),
+						events,
+						"each listener is told once");
+			}
+			assertEquals(Collections.emptyList(), bmc.getErrors());
+		}
+	}
+
+	@Test
+	@Timeout(30)
+	void aStatusInAnInformationalPacketReachesTheListeners() throws Exception {
+		try (FakeRmcpPlusBmc bmc = solBmc(null)) {
+			try (
+					SerialOverLan sol = new SerialOverLan(
+							new IpmiConnector(0, 0),
+							host(bmc),
+							bmc.getPort(),
+							USER,
+							PASSWORD,
+							SUITE_17)) {
+				List<Set<SolStatus>> events = new CopyOnWriteArrayList<>();
+				sol.registerEventListener(new RecordingListener(events));
+				// Another session deactivated SOL: the BMC says so in a packet without sequence number
+				bmc.sendSol(0, FakeRmcpPlusBmc.SOL_NACK | FakeRmcpPlusBmc.SOL_DEACTIVATED, new byte[0]);
+				await(() -> !events.isEmpty(), "the listener is told");
+				assertEquals(EnumSet.of(SolStatus.SolDeactivated), events.get(0));
+				assertEquals(0, acks(bmc), "a packet without sequence number is not acknowledged");
+			}
+		}
+	}
+
+	/**
+	 * Records the statuses of {@link #processRequestEvent(Set)}.
+	 */
+	private static class RecordingListener implements SolEventListener {
+		private final List<Set<SolStatus>> events;
+
+		RecordingListener(List<Set<SolStatus>> events) {
+			this.events = events;
+		}
+
+		@Override
+		public void processRequestEvent(Set<SolStatus> statuses) {
+			events.add(statuses);
+		}
+
+		@Override
+		public void processResponseEvent(
+				Set<SolStatus> statuses,
+				byte[] correspondingRequestData,
+				Set<SolOperation> correspondingRequestOperations) {
+			// not expected
+		}
+	}
+
+	/**
+	 * @return the acknowledgement of an ACK-only packet, as "sequence number/accepted characters", with " NACK"
+	 */
+	private static String ack(FakeRmcpPlusBmc.SolPacket packet) {
+		return packet.ackSequenceNumber + "/" + packet.acceptedCharacters + (packet.isNack() ? " NACK" : "");
 	}
 
 	/**

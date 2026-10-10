@@ -563,7 +563,8 @@ public class SerialOverLan implements Closeable {
 
 	/**
 	 * Reads at max given number of bytes from the port.
-	 * This operation blocks until given number of bytes is available to be read or until given timeout is hit.
+	 * This operation blocks until given number of bytes is available to be read, the buffer of 2048 bytes is full, or
+	 * the given timeout is hit.
 	 *
 	 * @param byteCount
 	 *        maximum number of bytes that should be read.
@@ -573,9 +574,7 @@ public class SerialOverLan implements Closeable {
 	 *         When the timeout is hit, returns just bytes that were available or empty array if no bytes were available.
 	 */
 	public byte[] readBytes(int byteCount, int timeout) {
-		waitForData(byteCount, timeout);
-
-		return readBytes(byteCount);
+		return inboundMessageListener.readBytes(byteCount, timeout);
 	}
 
 	/**
@@ -600,7 +599,10 @@ public class SerialOverLan implements Closeable {
 	 *         Returns empty array if no data was available.
 	 */
 	public int[] readIntArray(int byteCount) {
-		byte[] bytesArray = readBytes(byteCount);
+		return toIntArray(readBytes(byteCount));
+	}
+
+	private static int[] toIntArray(byte[] bytesArray) {
 		int[] intArray = new int[bytesArray.length];
 
 		for (int i = 0; i < bytesArray.length; i++) {
@@ -612,7 +614,8 @@ public class SerialOverLan implements Closeable {
 
 	/**
 	 * Reads at max given number of integer values (in range from 0 to 255) from the port.
-	 * This operation blocks until given number of bytes is available to be read or until given timeout is hit.
+	 * This operation blocks until given number of bytes is available to be read, the buffer of 2048 bytes is full, or
+	 * the given timeout is hit.
 	 *
 	 * @param byteCount
 	 *        maximum number of bytes that should be read.
@@ -623,9 +626,7 @@ public class SerialOverLan implements Closeable {
 	 *         When the timeout is hit, returns just data that was available or empty array if no data was available.
 	 */
 	public int[] readIntArray(int byteCount, int timeout) {
-		waitForData(byteCount, timeout);
-
-		return readIntArray(byteCount);
+		return toIntArray(readBytes(byteCount, timeout));
 	}
 
 	/**
@@ -655,7 +656,8 @@ public class SerialOverLan implements Closeable {
 	/**
 	 * Reads at max given number of bytes from the port, converting them to {@link String} using platform's default
 	 * {@link Charset}.
-	 * This operation blocks until given number of bytes is available to be read or until given timeout is hit.
+	 * This operation blocks until given number of bytes is available to be read, the buffer of 2048 bytes is full, or
+	 * the given timeout is hit.
 	 *
 	 * @param byteCount
 	 *        maximum number of bytes that should be read.
@@ -665,9 +667,7 @@ public class SerialOverLan implements Closeable {
 	 *         When the timeout is hit, returns just bytes that were available.
 	 */
 	public String readString(int byteCount, int timeout) {
-		waitForData(byteCount, timeout);
-
-		return readString(byteCount);
+		return readString(Charset.defaultCharset(), byteCount, timeout);
 	}
 
 	/**
@@ -698,7 +698,8 @@ public class SerialOverLan implements Closeable {
 
 	/**
 	 * Reads at max given number of bytes from the port, converting them to {@link String} using given {@link Charset}.
-	 * This operation blocks until given number of bytes is available to be read or until given timeout is hit.
+	 * This operation blocks until given number of bytes is available to be read, the buffer of 2048 bytes is full, or
+	 * the given timeout is hit.
 	 *
 	 * @param charset
 	 *        {@link Charset} that will be used when converting bytes to {@link String}
@@ -710,30 +711,7 @@ public class SerialOverLan implements Closeable {
 	 *         When the timeout is hit, returns just bytes that were available.
 	 */
 	public String readString(Charset charset, int byteCount, int timeout) {
-		waitForData(byteCount, timeout);
-
-		return readString(charset, byteCount);
-	}
-
-	private void waitForData(int wantedByteCount, int timeout) {
-		long startTime = System.currentTimeMillis();
-
-		while (isTooFewBytesAvailable(wantedByteCount) && timeoutNotHit(timeout, startTime)) {
-			try {
-				Thread.sleep(1);
-			} catch (InterruptedException e) {
-				Thread.currentThread().interrupt();
-				return;
-			}
-		}
-	}
-
-	private boolean isTooFewBytesAvailable(int wantedByteCount) {
-		return inboundMessageListener.getAvailableBytesCount() < wantedByteCount;
-	}
-
-	private boolean timeoutNotHit(int timeout, long startTime) {
-		return System.currentTimeMillis() - startTime < timeout;
+		return new String(readBytes(byteCount, timeout), charset);
 	}
 
 	/**
