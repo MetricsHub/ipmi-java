@@ -207,9 +207,11 @@ public class ConnectionManager {
 	 * closed connection does nothing.
 	 */
 	public void closeConnection(int index) {
-		Connection connection = connections.set(index, null);
+		Connection connection = connections.get(index);
 		if (connection != null) {
+			// Released once disconnected: the requests that the disconnection fails are reported with this handle
 			connection.disconnect();
+			connections.set(index, null);
 		}
 	}
 

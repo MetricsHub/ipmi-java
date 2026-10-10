@@ -54,8 +54,8 @@ class IpmiAsyncConnectorTest {
 				}
 			};
 			connector.registerIncomingPayloadListener(oneShot);
-			connector.processRequest(new PlainMessage(new byte[0]));
-			connector.processRequest(new PlainMessage(new byte[0]));
+			connector.processRequest(new PlainMessage(new byte[0]), 0);
+			connector.processRequest(new PlainMessage(new byte[0]), 0);
 			assertTrue(notified.get() == 1, "the one-shot listener was notified " + notified.get() + " times");
 		} finally {
 			connector.tearDown();

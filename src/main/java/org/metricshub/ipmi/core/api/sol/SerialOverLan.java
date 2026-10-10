@@ -56,11 +56,13 @@ import org.slf4j.LoggerFactory;
 import java.io.Closeable;
 import java.io.IOException;
 import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
-import java.util.LinkedList;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.CopyOnWriteArrayList;
 
 /**
  * Entry point for the Serial Over LAN (SOL) communication. Use all SOL operations through this class.
@@ -72,18 +74,34 @@ public class SerialOverLan implements Closeable {
 	private final IpmiConnector connector;
 	private final Session session;
 	private final InboundSolMessageListener inboundMessageListener;
-	private final List<SolEventListener> eventListeners;
+	/**
+	 * Notified on the receiving thread of the connector while the application may register or unregister listeners.
+	 */
+	private final List<SolEventListener> eventListeners = new CopyOnWriteArrayList<SolEventListener>();
 
-	private boolean isSessionInternal;
+	/**
+	 * Whether this console owns the connector, which closing the console tears down: the case of the constructors that
+	 * open their own session.
+	 */
+	private final boolean ownsConnector;
+
+	/**
+	 * The connections whose session this console opened, which closing the console closes.
+	 */
+	private final List<ConnectionHandle> ownedConnections = new ArrayList<ConnectionHandle>();
+
+	/**
+	 * The connection of the session where the payload was last activated, or null.
+	 */
+	private ConnectionHandle activatedConnection;
 	private int payloadInstance;
 	private int maxPayloadSize;
 	private boolean closed;
 
 	/**
 	 * Creates connection with IPMI using given {@link IpmiConnector}, connected to remote machine on given address and
-	 * port,
-	 * and opens a new {@link Session} for SOL communication.
-	 * This constructor should be used only when you have no other connection opened on this port.
+	 * port, and opens a new {@link Session} for SOL communication. The console owns the connector: closing the console,
+	 * or failing to open it, tears the connector down.
 	 *
 	 * @param connector
 	 *        {@link IpmiConnector} that will be used for communication
@@ -97,23 +115,48 @@ public class SerialOverLan implements Closeable {
 	 *        IPMI password
 	 * @param cipherSuiteSelectionHandler
 	 *        {@link CipherSuiteSelectionHandler} that will allow to select {@link CipherSuite} among available ones.
-	 * @throws SOLException when any problem occur during establishing session or activating SOL payload.
+	 * @throws SOLException when the SOL payload cannot be activated
+	 * @throws SessionException when the session cannot be opened
 	 */
 	public SerialOverLan(IpmiConnector connector, String remoteHost, int remotePort, String user, String password,
 			CipherSuiteSelectionHandler cipherSuiteSelectionHandler) throws SOLException, SessionException {
-		this(
-				connector,
-				SessionManager
-						.establishSession(connector, remoteHost, remotePort, user, password, cipherSuiteSelectionHandler));
-
-		this.isSessionInternal = true;
+		this(connector, remoteHost, remotePort, user, password, null, cipherSuiteSelectionHandler);
 	}
 
 	/**
 	 * Creates connection with IPMI using given {@link IpmiConnector}, connected to remote machine on given address and
-	 * default IPMI port,
-	 * and opens a new {@link Session} for SOL communication.
-	 * This constructor should be used only when you have no other connection opened on this port.
+	 * port, and opens a new {@link Session} for SOL communication, with the BMC key of a BMC configured for two-key
+	 * logins. The console owns the connector: closing the console, or failing to open it, tears the connector down.
+	 *
+	 * @param connector
+	 *        {@link IpmiConnector} that will be used for communication
+	 * @param remoteHost
+	 *        IP address of the remote server
+	 * @param remotePort
+	 *        UDP port number of the remote server
+	 * @param user
+	 *        IPMI user name
+	 * @param password
+	 *        IPMI password, sent in UTF-8
+	 * @param bmcKey
+	 *        the BMC key (Kg) as raw bytes, at most 20, or null for a one-key login
+	 * @param cipherSuiteSelectionHandler
+	 *        {@link CipherSuiteSelectionHandler} that will allow to select {@link CipherSuite} among available ones.
+	 * @throws SOLException when the SOL payload cannot be activated
+	 * @throws SessionException when the session cannot be opened
+	 */
+	public SerialOverLan(IpmiConnector connector, String remoteHost, int remotePort, String user, String password,
+			byte[] bmcKey, CipherSuiteSelectionHandler cipherSuiteSelectionHandler) throws SOLException, SessionException {
+		this(
+				connector,
+				openSession(connector, remoteHost, remotePort, user, password, bmcKey, cipherSuiteSelectionHandler),
+				true);
+	}
+
+	/**
+	 * Creates connection with IPMI using given {@link IpmiConnector}, connected to remote machine on given address and
+	 * default IPMI port, and opens a new {@link Session} for SOL communication. The console owns the connector: closing
+	 * the console, or failing to open it, tears the connector down.
 	 *
 	 * @param connector
 	 *        {@link IpmiConnector} that will be used for communication
@@ -125,7 +168,8 @@ public class SerialOverLan implements Closeable {
 	 *        IPMI password
 	 * @param cipherSuiteSelectionHandler
 	 *        {@link CipherSuiteSelectionHandler} that will allow to select {@link CipherSuite} among available ones.
-	 * @throws SOLException when any problem occur during establishing session or activating SOL payload.
+	 * @throws SOLException when the SOL payload cannot be activated
+	 * @throws SessionException when the session cannot be opened
 	 */
 	public SerialOverLan(IpmiConnector connector, String remoteHost, String user, String password,
 			CipherSuiteSelectionHandler cipherSuiteSelectionHandler) throws SOLException, SessionException {
@@ -135,38 +179,86 @@ public class SerialOverLan implements Closeable {
 	/**
 	 * Tries to open SOL communication on given existing session. When it appears that separate session must be opened
 	 * to handle SOL messages (for example SOL payload must be activated on separate port), the new connection and session
-	 * are automatically established.
+	 * are automatically established. Closing the console leaves the given session and the connector open, and closes
+	 * the session it opened, if any.
 	 *
 	 * @param connector
 	 *        {@link IpmiConnector} that will be used for communication
 	 * @param session
 	 *        Existing session that should be reused (if possible) for SOL communication.
+	 * @throws SOLException when the SOL payload cannot be activated
+	 * @throws SessionException when the session on the SOL payload port cannot be opened
 	 */
 	public SerialOverLan(IpmiConnector connector, Session session) throws SOLException, SessionException {
-		this.connector = connector;
-
-		int solPayloadPort = activatePayload(connector, session.getConnectionHandle());
-
-		this.session = resolveSession(connector, session.getConnectionHandle(), session, solPayloadPort);
-
-		this.eventListeners = new LinkedList<SolEventListener>();
-		this.inboundMessageListener = new InboundSolMessageListener(
-				connector,
-				this.session.getConnectionHandle(),
-				eventListeners);
-
-		connector.registerIncomingMessageListener(inboundMessageListener);
-		this.closed = false;
+		this(connector, session, false);
 	}
 
 	/**
-	 * Given potential session object, connection data and port on which SOL should be activated,
-	 * decides what session should be finally used to SOL communication.
+	 * Activates the SOL payload in the given session, or in a session on the port where the BMC serves it, and releases
+	 * what it opened when it fails.
+	 *
+	 * @param ownsSession whether the console opened the given session, and then owns the connector too
+	 */
+	private SerialOverLan(IpmiConnector connector, Session session, boolean ownsSession)
+			throws SOLException, SessionException {
+		this.connector = connector;
+		this.ownsConnector = ownsSession;
+		if (ownsSession) {
+			ownedConnections.add(session.getConnectionHandle());
+		}
+
+		try {
+			int solPayloadPort = activatePayload(connector, session.getConnectionHandle());
+
+			this.session = resolveSession(connector, session, solPayloadPort);
+
+			this.inboundMessageListener = new InboundSolMessageListener(
+					connector,
+					this.session.getConnectionHandle(),
+					eventListeners);
+			connector.registerIncomingMessageListener(inboundMessageListener);
+		} catch (SOLException | SessionException | RuntimeException e) {
+			deactivatePayloadOfOthers();
+			release();
+			throw e;
+		}
+	}
+
+	/**
+	 * Opens the session of a console that owns its connector, and tears the connector down when the session cannot be
+	 * opened.
+	 */
+	private static Session openSession(
+			IpmiConnector connector,
+			String remoteHost,
+			int remotePort,
+			String user,
+			String password,
+			byte[] bmcKey,
+			CipherSuiteSelectionHandler cipherSuiteSelectionHandler)
+			throws SessionException {
+		try {
+			return SessionManager
+					.establishSession(
+							connector,
+							remoteHost,
+							remotePort,
+							user,
+							password == null ? null : password.getBytes(StandardCharsets.UTF_8),
+							bmcKey,
+							cipherSuiteSelectionHandler);
+		} catch (SessionException | RuntimeException e) {
+			connector.tearDown();
+			throw e;
+		}
+	}
+
+	/**
+	 * Given potential session object and port on which SOL should be activated, decides what session should be finally
+	 * used to SOL communication.
 	 *
 	 * @param ipmiConnector
 	 *        {@link IpmiConnector} that will be used for communication
-	 * @param connectionHandle
-	 *        {@link ConnectionHandle} representing single connection to managed system.
 	 * @param currentSession
 	 *        Existing session that should be reused (if possible) for SOL communication.
 	 * @param solPayloadPort
@@ -177,45 +269,39 @@ public class SerialOverLan implements Closeable {
 	 * @throws SessionException
 	 *         If new session could not be established.
 	 */
-	private Session resolveSession(
-			IpmiConnector ipmiConnector,
-			ConnectionHandle connectionHandle,
-			Session currentSession,
-			int solPayloadPort)
+	private Session resolveSession(IpmiConnector ipmiConnector, Session currentSession, int solPayloadPort)
 			throws SOLException,
 			SessionException {
-		if (solPayloadPort != connectionHandle.getRemotePort()) {
-			Session alternativeSession = ipmiConnector
-					.getExistingSessionForCriteria(
-							connectionHandle.getRemoteAddress(),
-							solPayloadPort,
-							connectionHandle.getUser());
-
-			if (alternativeSession == null) {
-				CipherSuiteSelectionHandler cipherSuiteSelector = new SpecificCipherSuiteSelector(
-						connectionHandle.getCipherSuite());
-
-				alternativeSession = SessionManager
-						.establishSession(
-								ipmiConnector,
-								connectionHandle.getRemoteAddress().getHostAddress(),
-								solPayloadPort,
-								connectionHandle.getUser(),
-								connectionHandle.getPasswordBytes(),
-								cipherSuiteSelector);
-				this.isSessionInternal = true;
-
-			} else {
-				this.isSessionInternal = false;
-			}
-
-			activatePayload(ipmiConnector, alternativeSession.getConnectionHandle());
-
-			return alternativeSession;
-		} else {
-			this.isSessionInternal = false;
+		ConnectionHandle connectionHandle = currentSession.getConnectionHandle();
+		if (solPayloadPort == connectionHandle.getRemotePort()) {
 			return currentSession;
 		}
+
+		// The payload is actually activated in a session on the port of the payload, opened with the same credentials
+		// (IPMI 2.0 sections 15.10 and 24.1), or in the session already open there
+		Session alternativeSession = ipmiConnector
+				.getExistingSessionForCriteria(
+						connectionHandle.getRemoteAddress(),
+						solPayloadPort,
+						connectionHandle.getUser());
+
+		if (alternativeSession == null) {
+			alternativeSession = SessionManager
+					.establishSession(
+							ipmiConnector,
+							connectionHandle.getRemoteAddress().getHostAddress(),
+							solPayloadPort,
+							connectionHandle.getUser(),
+							connectionHandle.getPasswordBytes(),
+							connectionHandle.getBmcKey(),
+							// A suite of its own: opening the session keys the algorithms of its suite
+							new SpecificCipherSuiteSelector(connectionHandle.getCipherSuite().copy()));
+			ownedConnections.add(alternativeSession.getConnectionHandle());
+		}
+
+		activatePayload(ipmiConnector, alternativeSession.getConnectionHandle());
+
+		return alternativeSession;
 	}
 
 	/**
@@ -240,12 +326,23 @@ public class SerialOverLan implements Closeable {
 					ipmiConnector,
 					connectionHandle,
 					activatePayload);
+			this.activatedConnection = connectionHandle;
 
 			this.maxPayloadSize = activatePayloadResponseData.getInboundPayloadSize();
+			if (maxPayloadSize <= SolMessage.PAYLOAD_HEADER_LENGTH) {
+				throw new SOLException(
+						"The BMC announced an inbound SOL payload size of " + maxPayloadSize
+								+ " bytes, which leaves no room for character data");
+			}
 
 			return activatePayloadResponseData.getPayloadUdpPortNumber();
 
+		} catch (SOLException e) {
+			throw e;
 		} catch (Exception e) {
+			if (e instanceof InterruptedException) {
+				Thread.currentThread().interrupt();
+			}
 			throw new SOLException("Cannot activate SOL payload due to exception during activation process", e);
 		}
 	}
@@ -738,29 +835,76 @@ public class SerialOverLan implements Closeable {
 		}
 	}
 
+	/**
+	 * Deactivates the SOL payload, closes the sessions the console opened, and tears down the connector when the
+	 * console owns it: these are released even when the deactivation fails.
+	 *
+	 * @throws IOException when the BMC does not confirm the deactivation
+	 */
 	@Override
 	public synchronized void close() throws IOException {
-		if (!closed) {
-			try {
-				ConnectionHandle connectionHandle = session.getConnectionHandle();
-
-				DeactivatePayload deactivatePayload = new DeactivatePayload(
-						connectionHandle.getCipherSuite(),
-						PayloadType.Sol,
-						payloadInstance);
-
-				connector.sendMessage(connectionHandle, deactivatePayload);
-
-				if (isSessionInternal) {
-					connector.closeSession(connectionHandle);
-					connector.tearDown();
-				}
-
-				closed = true;
-			} catch (Exception e) {
-				throw new IOException("Error while closing Serial over LAN instance", e);
+		if (closed) {
+			return;
+		}
+		closed = true;
+		try {
+			deactivatePayload(session.getConnectionHandle());
+		} catch (Exception e) {
+			if (e instanceof InterruptedException) {
+				Thread.currentThread().interrupt();
 			}
+			throw new IOException("Error while closing Serial over LAN instance", e);
+		} finally {
+			release();
+		}
+	}
 
+	private void deactivatePayload(ConnectionHandle connectionHandle) throws Exception {
+		connector
+				.sendMessage(
+						connectionHandle,
+						new DeactivatePayload(connectionHandle.getCipherSuite(), PayloadType.Sol, payloadInstance));
+	}
+
+	/**
+	 * Deactivates the payload activated in a session that the console does not close, when the console fails to open.
+	 */
+	private void deactivatePayloadOfOthers() {
+		if (activatedConnection != null && !ownedConnections.contains(activatedConnection)) {
+			try {
+				deactivatePayload(activatedConnection);
+			} catch (Exception e) {
+				if (e instanceof InterruptedException) {
+					Thread.currentThread().interrupt();
+				}
+				LOGGER.warn("Cannot deactivate the SOL payload after a failed activation", e);
+			}
+		}
+	}
+
+	/**
+	 * Stops listening to the BMC, closes the sessions the console opened (the session on the payload port first), and
+	 * tears down the connector when the console owns it.
+	 */
+	private void release() {
+		if (inboundMessageListener != null) {
+			connector.unregisterIncomingMessageListener(inboundMessageListener);
+		}
+		for (int i = ownedConnections.size() - 1; i >= 0; i--) {
+			ConnectionHandle connectionHandle = ownedConnections.get(i);
+			try {
+				connector.closeSession(connectionHandle);
+			} catch (Exception e) {
+				if (e instanceof InterruptedException) {
+					Thread.currentThread().interrupt();
+				}
+				LOGGER.warn("Cannot close the session of the Serial over LAN console", e);
+			}
+			connector.closeConnection(connectionHandle);
+		}
+		ownedConnections.clear();
+		if (ownsConnector) {
+			connector.tearDown();
 		}
 	}
 

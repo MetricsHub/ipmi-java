@@ -707,10 +707,16 @@ public class Connection extends TimerTask implements MachineObserver {
 		}
 	}
 
+	/**
+	 * Notifies the listeners of a payload the remote system sent on its own initiative, with the handle of this
+	 * connection.
+	 *
+	 * @param payload the payload received
+	 */
 	public void notifyRequestListeners(IpmiPayload payload) {
 		for (ConnectionListener listener : listeners) {
 			if (listener != null) {
-				listener.processRequest(payload);
+				listener.processRequest(payload, handle);
 			}
 		}
 	}

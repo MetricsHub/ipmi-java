@@ -30,6 +30,12 @@ import java.util.Set;
 /**
  * Interface for Serial over LAN (SOL) events listener.
  * Events can be sent proactively by remote server or as a response for specific request.
+ * <p>
+ * {@link #processRequestEvent(Set)} is called on the receiving thread of the connector, which no other reply reaches
+ * while the listener runs: it must return quickly, and must not call the methods of {@link SerialOverLan} or of the
+ * connector that wait for a reply (writing, closing, opening a new console). Hand such work over to another thread,
+ * for example to open a new console after {@link SolStatus#SolDeactivated}.
+ * </p>
  */
 public interface SolEventListener {
 

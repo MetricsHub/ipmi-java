@@ -65,6 +65,15 @@ public class InboundSolMessageListener implements InboundMessageListener {
 		return payload instanceof SolInboundMessage;
 	}
 
+	/**
+	 * Takes the SOL packets of its own connection only: those of the other consoles of the connector are theirs to
+	 * buffer and acknowledge.
+	 */
+	@Override
+	public boolean isPayloadSupported(IpmiPayload payload, int handle) {
+		return handle == connectionHandle.getHandle() && isPayloadSupported(payload);
+	}
+
 	@Override
 	public void notify(IpmiPayload payload) {
 		if (isPayloadSupported(payload)) {

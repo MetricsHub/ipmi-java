@@ -94,10 +94,17 @@ public class MessageQueue extends TimerTask {
 	}
 
 	/**
-	 * Stops the MessageQueue
+	 * Stops the MessageQueue: the requests still waiting for a reply are reported as failed, since the timer that
+	 * would report their timeout stops.
 	 */
 	public void tearDown() {
 		timer.cancel();
+		synchronized (queue) {
+			while (!queue.isEmpty()) {
+				QueueElement element = queue.get(0);
+				processObsoleteMessage(element, element.getRequest() == null, "Connection closed");
+			}
+		}
 	}
 
 	private List<Integer> reservedTags;
@@ -369,7 +376,7 @@ public class MessageQueue extends TimerTask {
 					boolean done = oldestQueueElement.getRequest() == null;
 
 					if (messageJustTimedOut(oldestQueueElement) || done) {
-						processObsoleteMessage(oldestQueueElement, done);
+						processObsoleteMessage(oldestQueueElement, done, "Message timed out");
 					} else {
 						process = false;
 					}
@@ -385,25 +392,25 @@ public class MessageQueue extends TimerTask {
 	}
 
 	/**
-	 * Removes the oldest message from the queue; when it timed out (rather than being answered), the response
-	 * listeners are told so, which lets the sender retry it with a fresh tag. Nobody waits for a one-way message: its
-	 * timeout is not reported.
+	 * Removes the oldest message from the queue; when it timed out or the queue stops (rather than being answered),
+	 * the response listeners are told so, which lets the sender retry it with a fresh tag. Nobody waits for a one-way
+	 * message: its failure is not reported.
 	 */
-	private void processObsoleteMessage(QueueElement message, boolean done) {
+	private void processObsoleteMessage(QueueElement message, boolean done, String failure) {
 		int tag = message.getId();
 
 		queue.remove(0);
 		releaseTag(tag);
 
 		if (!done && !message.isOneWay()) {
-			logger.debug("Message timed out, tag: {}", tag);
+			logger.debug("{}, tag: {}", failure, tag);
 			try {
 				connection
 						.notifyResponseListeners(
 								connection.getHandle(),
 								tag,
 								null,
-								new ConnectionException("Message timed out"));
+								new ConnectionException(failure));
 			} catch (RuntimeException e) {
 				// A failing listener must not kill the timer thread that expires the other messages
 				logger.warn("Response listener failed while handling the timeout of tag {}", tag, e);

@@ -56,7 +56,7 @@ class MessageQueueTest {
 			}
 
 			@Override
-			public void processRequest(IpmiPayload payload) {
+			public void processRequest(IpmiPayload payload, int handle) {
 				// not used
 			}
 		};
@@ -100,7 +100,7 @@ class MessageQueueTest {
 				}
 
 				@Override
-				public void processRequest(IpmiPayload payload) {
+				public void processRequest(IpmiPayload payload, int handle) {
 					// not used
 				}
 			});

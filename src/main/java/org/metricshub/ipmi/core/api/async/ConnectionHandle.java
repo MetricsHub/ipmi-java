@@ -43,6 +43,10 @@ public class ConnectionHandle {
 	 * The password of the session, as sent to the BMC, kept to open the Serial over LAN session.
 	 */
 	private byte[] password;
+	/**
+	 * The BMC key (Kg) of the session, kept to open the Serial over LAN session.
+	 */
+	private byte[] bmcKey;
 
 	public ConnectionHandle(int handle, InetAddress remoteAddress, int remotePort) {
 		this.handle = handle;
@@ -113,6 +117,20 @@ public class ConnectionHandle {
 	 */
 	public void setPasswordBytes(byte[] passwordBytes) {
 		this.password = passwordBytes == null ? null : passwordBytes.clone();
+	}
+
+	/**
+	 * @return the BMC key (Kg) of the session, or null for a one-key login
+	 */
+	public byte[] getBmcKey() {
+		return bmcKey;
+	}
+
+	/**
+	 * @param bmcKey the BMC key (Kg) of the session, or null: the handle keeps a copy, so the caller can clear the array
+	 */
+	public void setBmcKey(byte[] bmcKey) {
+		this.bmcKey = bmcKey == null ? null : bmcKey.clone();
 	}
 
 	@Override

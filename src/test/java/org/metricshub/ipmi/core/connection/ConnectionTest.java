@@ -183,7 +183,7 @@ class ConnectionTest {
 				}
 
 				@Override
-				public void processRequest(IpmiPayload payload) {
+				public void processRequest(IpmiPayload payload, int handle) {
 					// not expected
 				}
 			});
@@ -225,7 +225,7 @@ class ConnectionTest {
 				}
 
 				@Override
-				public void processRequest(IpmiPayload payload) {
+				public void processRequest(IpmiPayload payload, int handle) {
 					// not expected
 				}
 			});
@@ -325,7 +325,7 @@ class ConnectionTest {
 				}
 
 				@Override
-				public void processRequest(IpmiPayload payload) {
+				public void processRequest(IpmiPayload payload, int handle) {
 					// not expected
 				}
 			});
@@ -362,7 +362,7 @@ class ConnectionTest {
 				}
 
 				@Override
-				public void processRequest(IpmiPayload payload) {
+				public void processRequest(IpmiPayload payload, int handle) {
 					// not expected
 				}
 			});
@@ -400,7 +400,7 @@ class ConnectionTest {
 				}
 
 				@Override
-				public void processRequest(IpmiPayload payload) {
+				public void processRequest(IpmiPayload payload, int handle) {
 					connection.unregisterListener(this);
 				}
 			};
@@ -412,7 +412,7 @@ class ConnectionTest {
 				}
 
 				@Override
-				public void processRequest(IpmiPayload payload) {
+				public void processRequest(IpmiPayload payload, int handle) {
 					notified.incrementAndGet();
 				}
 			});

@@ -341,6 +341,7 @@ public class IpmiAsyncConnector implements ConnectionListener {
 
 		connectionHandle.setUser(username);
 		connectionHandle.setPasswordBytes(password);
+		connectionHandle.setBmcKey(bmcKey);
 
 		while (tries <= retries && !succeded) {
 			try {
@@ -568,23 +569,24 @@ public class IpmiAsyncConnector implements ConnectionListener {
 	}
 
 	@Override
-	public void processRequest(IpmiPayload payload) {
+	public void processRequest(IpmiPayload payload, int handle) {
 		for (InboundMessageListener listener : inboundMessageListeners) {
-			if (listener.isPayloadSupported(payload)) {
+			if (listener.isPayloadSupported(payload, handle)) {
 				listener.notify(payload);
 			}
 		}
 	}
 
 	/**
-	 * Closes the connection with the given handle
+	 * Closes the connection with the given handle, and forgets its session. The requests still waiting for a reply
+	 * on the connection fail with a {@link ConnectionException}.
 	 */
 	public void closeConnection(ConnectionHandle handle) {
-		connectionManager
-				.getConnection(handle.getHandle())
-				.unregisterListener(
-						this);
+		Connection connection = connectionManager.getConnection(handle.getHandle());
+		// Still listening while the connection closes, to tell the requests waiting for a reply
 		connectionManager.closeConnection(handle.getHandle());
+		connection.unregisterListener(this);
+		sessionManager.unregisterSession(handle);
 	}
 
 	/**

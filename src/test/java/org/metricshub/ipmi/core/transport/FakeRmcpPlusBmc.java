@@ -1,9 +1,11 @@
 package org.metricshub.ipmi.core.transport;
 
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.InetAddress;
+import java.net.SocketAddress;
 import java.net.SocketException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
@@ -15,8 +17,10 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.Queue;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
@@ -35,9 +39,10 @@ import javax.crypto.spec.SecretKeySpec;
  * Channel Authentication Capabilities (IPMI v1.5 session-less, section 22.13), opens the sessions of cipher suites 3
  * (RAKP-HMAC-SHA1, HMAC-SHA1-96, AES-CBC-128) and 17 (RAKP-HMAC-SHA256, HMAC-SHA256-128, AES-CBC-128) for one user,
  * with an optional Kg (sections 13.17 to 13.23, 13.31 and 13.32), and answers the IPMI requests of the session (section
- * 13.6, AES-CBC-128 per section 13.29): Get Chassis Status, Close Session and the commands registered with
- * {@link #handle(int, int, Function)}. What the console sends that a BMC would reject is listed by
- * {@link #getErrors()}.
+ * 13.6, AES-CBC-128 per section 13.29): Get Chassis Status, Close Session, Set Session Privilege Level (sessions
+ * start at the User level, section 22.18) and the commands registered with {@link #handle(int, int, Function)}. With
+ * {@link #enableSol(int, int, int)}, it also serves one instance of the Serial over LAN payload (sections 15.9 to
+ * 15.11 and 24.1 to 24.4). What the console sends that a BMC would reject is listed by {@link #getErrors()}.
  * </p>
  */
 public class FakeRmcpPlusBmc implements AutoCloseable {
@@ -50,10 +55,36 @@ public class FakeRmcpPlusBmc implements AutoCloseable {
 	public static final int GET_CHASSIS_STATUS = 0x01;
 	/** Get Channel Authentication Capabilities (NetFn App). */
 	public static final int GET_CHANNEL_AUTHENTICATION_CAPABILITIES = 0x38;
+	/** Set Session Privilege Level (NetFn App). */
+	public static final int SET_SESSION_PRIVILEGE_LEVEL = 0x3b;
 	/** Close Session (NetFn App). */
 	public static final int CLOSE_SESSION = 0x3c;
+	/** Activate Payload (NetFn App). */
+	public static final int ACTIVATE_PAYLOAD = 0x48;
+	/** Deactivate Payload (NetFn App). */
+	public static final int DEACTIVATE_PAYLOAD = 0x49;
+	/** Get Payload Activation Status (NetFn App). */
+	public static final int GET_PAYLOAD_ACTIVATION_STATUS = 0x4a;
+	/** Get Payload Instance Info (NetFn App). */
+	public static final int GET_PAYLOAD_INSTANCE_INFO = 0x4b;
 	/** Get Channel Cipher Suites (NetFn App). */
 	public static final int GET_CHANNEL_CIPHER_SUITES = 0x54;
+
+	/** Privilege level User. */
+	public static final int USER = 2;
+	/** Privilege level Operator. */
+	public static final int OPERATOR = 3;
+	/** Privilege level Administrator. */
+	public static final int ADMINISTRATOR = 4;
+
+	/** Status bit of a SOL packet from the BMC: the packet is NACKed (IPMI 2.0 table 15-2). */
+	public static final int SOL_NACK = 0x40;
+	/** Status bit of a SOL packet from the BMC: SOL is deactivated. */
+	public static final int SOL_DEACTIVATED = 0x10;
+	/** Status bit of a SOL packet from the BMC: a break was detected. */
+	public static final int SOL_BREAK = 0x04;
+	/** Reply policy of {@link #replySol(int...)}: the packet is accepted, but its ACK is lost. */
+	public static final int LOSE_ACK = -1;
 
 	/** RMCP+ payload type of the Open Session Request (IPMI 2.0 table 13-16). */
 	public static final int OPEN_SESSION_REQUEST = 0x10;
@@ -118,6 +149,61 @@ public class FakeRmcpPlusBmc implements AutoCloseable {
 	private final AtomicInteger sessionRequests = new AtomicInteger();
 	private final List<String> errors = new CopyOnWriteArrayList<>();
 	private volatile Session session;
+	private volatile SocketAddress console;
+
+	private volatile int solPort;
+	private volatile int solInboundPayloadSize;
+	private volatile int solPrivilege;
+	private volatile boolean solActive;
+	private final Queue<Integer> solReplies = new ConcurrentLinkedQueue<>();
+	private final List<SolPacket> solPackets = new CopyOnWriteArrayList<>();
+	private final ByteArrayOutputStream solReceived = new ByteArrayOutputStream();
+	private int lastSolSequenceNumber;
+	private boolean lastSolAccepted;
+
+	/**
+	 * A SOL packet received from the console (IPMI 2.0 table 15-2).
+	 */
+	public static final class SolPacket {
+		/** Packet sequence number, 0 for an ACK-only packet. */
+		public final int sequenceNumber;
+		/** Sequence number of the packet of the BMC acknowledged, or 0. */
+		public final int ackSequenceNumber;
+		/** Accepted character count. */
+		public final int acceptedCharacters;
+		/** Operation/status byte. */
+		public final int operation;
+		/** Character data. */
+		public final byte[] data;
+
+		private SolPacket(byte[] packet) {
+			sequenceNumber = packet[0] & 0xff;
+			ackSequenceNumber = packet[1] & 0xff;
+			acceptedCharacters = packet[2] & 0xff;
+			operation = packet[3] & 0xff;
+			data = Arrays.copyOfRange(packet, 4, packet.length);
+		}
+
+		/**
+		 * @return whether the packet NACKs the packet of the BMC
+		 */
+		public boolean isNack() {
+			return (operation & SOL_NACK) != 0;
+		}
+
+		@Override
+		public String toString() {
+			return String
+					.format(
+							"seq %d, ack %d/%d%s, operation %02x, %d bytes",
+							sequenceNumber,
+							ackSequenceNumber,
+							acceptedCharacters,
+							isNack() ? " NACK" : "",
+							operation,
+							data.length);
+		}
+	}
 
 	/**
 	 * State of the session being opened or open.
@@ -139,6 +225,9 @@ public class FakeRmcpPlusBmc implements AutoCloseable {
 		private boolean active;
 		private volatile boolean closed;
 		private int sequenceNumber;
+		/** The privilege the console asked for in RAKP Message 1, the most the session can be raised to. */
+		private int maxPrivilege;
+		private volatile int privilege = USER;
 
 		private Session(int consoleId, int managedId, int[] algorithms) {
 			this.consoleId = consoleId;
@@ -166,6 +255,7 @@ public class FakeRmcpPlusBmc implements AutoCloseable {
 		handle(NETFN_APP, GET_CHANNEL_CIPHER_SUITES, this::getChannelCipherSuites);
 		handle(NETFN_APP, GET_CHANNEL_AUTHENTICATION_CAPABILITIES, this::getChannelAuthenticationCapabilities);
 		handle(NETFN_APP, CLOSE_SESSION, this::closeSession);
+		handle(NETFN_APP, SET_SESSION_PRIVILEGE_LEVEL, this::setSessionPrivilegeLevel);
 		handle(NETFN_CHASSIS, GET_CHASSIS_STATUS, data -> concat(new byte[1], CHASSIS_STATUS));
 		socket = new DatagramSocket(0, InetAddress.getLoopbackAddress());
 		Thread thread = new Thread(this::serve, "fake-rmcp-plus-bmc");
@@ -261,6 +351,77 @@ public class FakeRmcpPlusBmc implements AutoCloseable {
 		return new ArrayList<>(errors);
 	}
 
+	/**
+	 * Serves one instance of the SOL payload: Get Payload Activation Status, Activate Payload (which requires the given
+	 * privilege, and answers the given port: the payload is only active once activated in a session on that port),
+	 * Deactivate Payload, and the SOL packets, which the BMC accepts as {@link #replySol(int...)} says.
+	 *
+	 * @param payloadPort the UDP port where the BMC serves SOL, which Activate Payload returns
+	 * @param inboundPayloadSize the largest SOL payload the console may send, which Activate Payload returns
+	 * @param privilege the privilege level the session needs to activate the payload
+	 */
+	public void enableSol(int payloadPort, int inboundPayloadSize, int privilege) {
+		solPort = payloadPort;
+		solInboundPayloadSize = inboundPayloadSize;
+		solPrivilege = privilege;
+		handle(NETFN_APP, GET_PAYLOAD_ACTIVATION_STATUS, this::getPayloadActivationStatus);
+		handle(NETFN_APP, ACTIVATE_PAYLOAD, this::activatePayload);
+		handle(NETFN_APP, DEACTIVATE_PAYLOAD, this::deactivatePayload);
+		handle(NETFN_APP, GET_PAYLOAD_INSTANCE_INFO, this::getPayloadInstanceInfo);
+	}
+
+	/**
+	 * Sets how the BMC answers the next SOL packets with character data from the console, one value per packet: the
+	 * number of characters accepted (all of them when greater than the data, a NACK when fewer), or
+	 * {@link #LOSE_ACK}. The packets after these are accepted. A packet sent again with the sequence number of a packet
+	 * accepted already is acknowledged again, without taking its data again (IPMI 2.0 section 15.9).
+	 *
+	 * @param acceptedCharacters what the BMC accepts of each of the next packets
+	 */
+	public void replySol(int... acceptedCharacters) {
+		for (int accepted : acceptedCharacters) {
+			solReplies.add(accepted);
+		}
+	}
+
+	/**
+	 * Sends a SOL packet to the console, in the session.
+	 *
+	 * @param sequenceNumber the packet sequence number, 0 for an informational packet
+	 * @param status the status byte (table 15-2)
+	 * @param data the character data
+	 * @throws IOException when the packet cannot be sent
+	 * @throws GeneralSecurityException when the packet cannot be sealed
+	 */
+	public void sendSol(int sequenceNumber, int status, byte[] data) throws IOException, GeneralSecurityException {
+		byte[] packet = concat(new byte[] { (byte) sequenceNumber, 0, 0, (byte) status }, data);
+		byte[] datagram = seal(session, 0x01, packet, nextSequenceNumber(session), true);
+		socket.send(new DatagramPacket(datagram, datagram.length, console));
+	}
+
+	/**
+	 * @return whether the SOL payload is active
+	 */
+	public boolean isSolActive() {
+		return solActive;
+	}
+
+	/**
+	 * @return the SOL packets received from the console, in order
+	 */
+	public List<SolPacket> getSolPackets() {
+		return new ArrayList<>(solPackets);
+	}
+
+	/**
+	 * @return the characters of the console that the BMC accepted, in order
+	 */
+	public byte[] getSolReceived() {
+		synchronized (solReceived) {
+			return solReceived.toByteArray();
+		}
+	}
+
 	@Override
 	public void close() {
 		socket.close();
@@ -276,6 +437,7 @@ public class FakeRmcpPlusBmc implements AutoCloseable {
 				return; // closed
 			}
 			try {
+				console = packet.getSocketAddress();
 				byte[] reply = receive(Arrays.copyOf(packet.getData(), packet.getLength()));
 				if (reply != null) {
 					socket.send(new DatagramPacket(reply, reply.length, packet.getSocketAddress()));
@@ -396,6 +558,8 @@ public class FakeRmcpPlusBmc implements AutoCloseable {
 			return out.put((byte) 0x0d).putShort((short) 0).putInt(current.consoleId).array(); // unauthorized name
 		}
 		current.rm = Arrays.copyOfRange(request, 8, 24);
+		// RoleM: the maximum privilege requested, 0 for the highest one the user has
+		current.maxPrivilege = (request[24] & 0x0f) == 0 ? ADMINISTRATOR : request[24] & 0x0f;
 		current.rc = new byte[16];
 		random.nextBytes(current.rc);
 		current.identity = concat(new byte[] { request[24], request[27] }, name);
@@ -473,7 +637,9 @@ public class FakeRmcpPlusBmc implements AutoCloseable {
 			errors.add("Packet of no open session: " + hex(datagram));
 			return null;
 		}
-		if ((datagram[5] & 0xff) != 0xc0) {
+		// An IPMI message (0h) or a SOL packet (1h), encrypted and authenticated
+		int payloadType = datagram[5] & 0x3f;
+		if ((datagram[5] & 0xc0) != 0xc0 || payloadType > 0x01) {
 			errors.add("Packet neither encrypted nor authenticated in the session: " + hex(datagram));
 			return null;
 		}
@@ -494,6 +660,10 @@ public class FakeRmcpPlusBmc implements AutoCloseable {
 			return null;
 		}
 		byte[] request = decrypt(current, Arrays.copyOfRange(datagram, 16, end));
+		if (request != null && payloadType == 0x01) {
+			byte[] solReply = sol(request);
+			return solReply == null ? null : seal(current, 0x01, solReply, nextSequenceNumber(current), true);
+		}
 		byte[] response = request == null ? null : respond(request);
 		if (response == null) {
 			return null;
@@ -503,13 +673,13 @@ public class FakeRmcpPlusBmc implements AutoCloseable {
 			return null;
 		}
 		if (fault == Fault.PLAINTEXT) {
-			return seal(current, response, ++current.sequenceNumber, false);
+			return seal(current, 0x00, response, nextSequenceNumber(current), false);
 		}
 		byte[] reply = seal(
 				current,
+				0x00,
 				response,
-				fault == Fault.REUSED_SEQUENCE_NUMBER ?
-						current.sequenceNumber : ++current.sequenceNumber,
+				fault == Fault.REUSED_SEQUENCE_NUMBER ? current.sequenceNumber : nextSequenceNumber(current),
 				true);
 		if (fault == Fault.FLIP_AUTH_CODE) {
 			reply[reply.length - 1] ^= 0x01;
@@ -544,12 +714,138 @@ public class FakeRmcpPlusBmc implements AutoCloseable {
 	}
 
 	/**
-	 * Builds a packet of the session for the console, encrypted and authenticated, or neither.
+	 * Handles a SOL packet of the console (IPMI 2.0 table 15-2): the BMC acknowledges every packet with a non-zero
+	 * sequence number (section 15.11) in an ACK-only packet, and returns it, or null.
 	 */
-	private byte[] seal(Session current, byte[] message, int sequenceNumber, boolean protect)
+	private byte[] sol(byte[] packet) {
+		if (packet.length < 4) {
+			errors.add("Truncated SOL packet: " + hex(packet));
+			return null;
+		}
+		if (!solActive) {
+			errors.add("SOL packet while the payload is not active: " + hex(packet));
+			return null;
+		}
+		SolPacket received = new SolPacket(packet);
+		solPackets.add(received);
+		if (received.sequenceNumber == 0) {
+			return null; // ACK-only packets are not acknowledged
+		}
+		int accepted;
+		Integer reply;
+		synchronized (solReceived) {
+			if (received.sequenceNumber == lastSolSequenceNumber && lastSolAccepted) {
+				// A retry of a packet accepted already, whose ACK was lost: its content need not be checked
+				accepted = received.data.length;
+				reply = null;
+			} else {
+				reply = solReplies.poll();
+				accepted = reply == null || reply < 0 ? received.data.length : Math.min(reply, received.data.length);
+				solReceived.write(received.data, 0, accepted);
+			}
+			lastSolSequenceNumber = received.sequenceNumber;
+			lastSolAccepted = accepted == received.data.length;
+		}
+		if (reply != null && reply == LOSE_ACK) {
+			return null;
+		}
+		return new byte[] {
+				0x00,
+				(byte) received.sequenceNumber,
+				(byte) accepted,
+				(byte) (accepted < received.data.length ? SOL_NACK : 0x00) };
+	}
+
+	/**
+	 * Get Payload Activation Status (IPMI 2.0 table 24-6): one SOL instance.
+	 */
+	private byte[] getPayloadActivationStatus(byte[] data) {
+		return new byte[] { 0x00, 0x01, (byte) (solActive ? 0x01 : 0x00), 0x00 };
+	}
+
+	/**
+	 * Activate Payload (IPMI 2.0 table 24-2): payload type, instance, auxiliary data; answers the auxiliary data, the
+	 * inbound and outbound payload sizes, the UDP port and the VLAN, LS-byte first.
+	 */
+	private byte[] activatePayload(byte[] data) {
+		Session current = session;
+		if (data.length != 6 || (data[0] & 0x3f) != 0x01 || (data[1] & 0x0f) != 1) {
+			errors.add("Unexpected Activate Payload request: " + hex(data));
+			return new byte[] { (byte) 0xcc }; // invalid data field
+		}
+		if (current.privilege < solPrivilege) {
+			return new byte[] { (byte) 0xd4 }; // insufficient privilege
+		}
+		if (solActive) {
+			return new byte[] { (byte) 0x80 }; // payload already active
+		}
+		// The payload is only activated in a session on its port (section 24.1)
+		solActive = solPort == getPort();
+		return ByteBuffer
+				.allocate(13)
+				.order(ByteOrder.LITTLE_ENDIAN)
+				.put((byte) 0x00)
+				.putInt(0)
+				.putShort((short) solInboundPayloadSize)
+				.putShort((short) solInboundPayloadSize)
+				.putShort((short) solPort)
+				.putShort((short) 0xffff)
+				.array();
+	}
+
+	/**
+	 * Deactivate Payload (IPMI 2.0 table 24-3).
+	 */
+	private byte[] deactivatePayload(byte[] data) {
+		if (!solActive) {
+			return new byte[] { (byte) 0x80 }; // payload already deactivated
+		}
+		solActive = false;
+		return new byte[] { 0x00 };
+	}
+
+	/**
+	 * Get Payload Instance Info (IPMI 2.0 table 24-7): the managed system session ID of the session where the instance
+	 * is active, or 0, and 8 bytes of payload-specific information.
+	 */
+	private byte[] getPayloadInstanceInfo(byte[] data) {
+		Session current = session;
+		return ByteBuffer
+				.allocate(13)
+				.order(ByteOrder.LITTLE_ENDIAN)
+				.put((byte) 0x00)
+				.putInt(solActive ? current.managedId : 0)
+				.put(new byte[8])
+				.array();
+	}
+
+	/**
+	 * Set Session Privilege Level (IPMI 2.0 table 22-24): up to the privilege requested in RAKP Message 1.
+	 */
+	private byte[] setSessionPrivilegeLevel(byte[] data) {
+		Session current = session;
+		int requested = data[0] & 0x0f;
+		if (requested > current.maxPrivilege) {
+			return new byte[] { (byte) 0x81 }; // exceeds the privilege limit
+		}
+		if (requested != 0) {
+			current.privilege = requested;
+		}
+		return new byte[] { 0x00, (byte) current.privilege };
+	}
+
+	private synchronized int nextSequenceNumber(Session current) {
+		return ++current.sequenceNumber;
+	}
+
+	/**
+	 * Builds a packet of the session for the console, of the given payload type, encrypted and authenticated, or
+	 * neither.
+	 */
+	private byte[] seal(Session current, int payloadType, byte[] message, int sequenceNumber, boolean protect)
 			throws GeneralSecurityException {
 		if (!protect) {
-			return packet(0x00, current.consoleId, sequenceNumber, message);
+			return packet(payloadType, current.consoleId, sequenceNumber, message);
 		}
 		int confidentialityPad = 15 - message.length % 16;
 		byte[] plain = Arrays.copyOf(message, message.length + confidentialityPad + 1);
@@ -568,7 +864,7 @@ public class FakeRmcpPlusBmc implements AutoCloseable {
 				.order(ByteOrder.LITTLE_ENDIAN)
 				.put(RMCP_HEADER)
 				.put((byte) 0x06)
-				.put((byte) 0xc0)
+				.put((byte) (0xc0 | payloadType))
 				.putInt(current.consoleId)
 				.putInt(sequenceNumber)
 				.putShort((short) payload.length)
@@ -660,6 +956,8 @@ public class FakeRmcpPlusBmc implements AutoCloseable {
 			return new byte[] { (byte) 0x87 }; // invalid session ID
 		}
 		current.closed = true;
+		// The payloads of a session end with it (IPMI 2.0 section 24.2)
+		solActive = false;
 		return new byte[] { 0x00 };
 	}
 

@@ -90,6 +90,7 @@ public class SessionManager {
 				remotePort,
 				user,
 				password == null ? null : password.getBytes(StandardCharsets.UTF_8),
+				null,
 				cipherSuiteSelectionHandler);
 	}
 
@@ -101,6 +102,7 @@ public class SessionManager {
 	 * @param remotePort the UDP port of the BMC
 	 * @param user the user name
 	 * @param password the password, as sent to the BMC
+	 * @param bmcKey the BMC key (Kg) for a two-key login, or null
 	 * @param cipherSuiteSelectionHandler chooses the cipher suite among those the BMC offers
 	 * @return the new session
 	 * @throws SessionException when the session cannot be opened
@@ -111,6 +113,7 @@ public class SessionManager {
 			int remotePort,
 			String user,
 			byte[] password,
+			byte[] bmcKey,
 			CipherSuiteSelectionHandler cipherSuiteSelectionHandler)
 			throws SessionException {
 		ConnectionHandle handle = null;
@@ -127,7 +130,7 @@ public class SessionManager {
 
 			connector.getChannelAuthenticationCapabilities(handle, cipherSuite, PrivilegeLevel.Administrator);
 
-			return connector.openSession(handle, user, password, null);
+			return connector.openSession(handle, user, password, bmcKey);
 		} catch (Exception e) {
 			closeConnection(connector, handle);
 

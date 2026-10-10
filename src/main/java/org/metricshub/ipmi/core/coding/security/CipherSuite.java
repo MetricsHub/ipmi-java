@@ -105,6 +105,16 @@ public class CipherSuite {
 	}
 
 	/**
+	 * Returns a new instance of this suite, with uninitialized algorithms: opening a session keys the algorithms of its
+	 * suite, so two sessions must never share an instance.
+	 *
+	 * @return a cipher suite with the same ID and algorithms
+	 */
+	public CipherSuite copy() {
+		return new CipherSuite(id, authenticationAlgorithm, confidentialityAlgorithm, integrityAlgorithm);
+	}
+
+	/**
 	 * Initializes algorithms contained in this {@link CipherSuite}.
 	 *
 	 * @param sik

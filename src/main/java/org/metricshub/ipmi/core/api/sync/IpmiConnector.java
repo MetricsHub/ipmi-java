@@ -494,14 +494,28 @@ public class IpmiConnector {
 	}
 
 	/**
-	 * Closes the connection with the given handle
+	 * Unregisters an {@link InboundMessageListener}, which then no longer receives the requests of the remote systems.
+	 *
+	 * @param listener
+	 *        listener to be unregistered.
+	 */
+	public void unregisterIncomingMessageListener(InboundMessageListener listener) {
+		asyncConnector.unregisterIncomingPayloadListener(listener);
+	}
+
+	/**
+	 * Closes the connection with the given handle, without closing its session: the requests still waiting for a
+	 * reply on the connection fail with a {@link ConnectionException}.
+	 *
+	 * @param handle the handle of the connection
 	 */
 	public void closeConnection(ConnectionHandle handle) {
 		asyncConnector.closeConnection(handle);
 	}
 
 	/**
-	 * Finalizes the connector and closes all connections.
+	 * Finalizes the connector and closes all connections, without closing their sessions: the requests still waiting
+	 * for a reply fail with a {@link ConnectionException}.
 	 */
 	public void tearDown() {
 		asyncConnector.tearDown();

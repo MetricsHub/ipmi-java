@@ -57,5 +57,14 @@ public interface ConnectionListener {
 			int id,
 			Exception exception);
 
-	void processRequest(IpmiPayload payload);
+	/**
+	 * Notifies the {@link ConnectionListener} of a payload the remote system sent on its own initiative (Serial over
+	 * LAN data).
+	 *
+	 * @param payload
+	 *        - the payload received
+	 * @param handle
+	 *        - the id of the connection that received the payload
+	 */
+	void processRequest(IpmiPayload payload, int handle);
 }
