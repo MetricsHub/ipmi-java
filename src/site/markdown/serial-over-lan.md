@@ -91,9 +91,11 @@ with the same sequence number, so the BMC does not pass it to the server twice.
 | `writeString(String, Charset)` | A string, encoded with the given charset (`writeString(String)` uses the platform charset) |
 | `writeIntArray(int[])`, `writeInt(int)` | Values from 0 to 255, as bytes |
 
-Received characters are buffered as they arrive, up to **2048 bytes**: when the buffer is full,
-the BMC is told to hold its data until a read makes room. A packet that the BMC sends again
-(when an acknowledgement is lost) is buffered once. Reads take from this buffer:
+Received characters are buffered as they arrive, up to **64 KiB**: when the buffer is full, the
+BMC is told to hold its data (Suspend NACK) until a read makes room. Read often enough not to
+fill it: a Supermicro BMC takes the Suspend NACK for an acknowledgement and drops the characters
+it was asked to hold. A packet that the BMC sends again (when an acknowledgement is lost) is
+buffered once. Reads take from this buffer:
 
 | Method | Behavior |
 | --- | --- |

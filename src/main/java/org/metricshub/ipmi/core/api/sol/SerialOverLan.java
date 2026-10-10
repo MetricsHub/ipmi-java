@@ -604,7 +604,7 @@ public class SerialOverLan implements Closeable {
 
 	/**
 	 * Reads at max given number of bytes from the port.
-	 * This operation blocks until given number of bytes is available to be read, the buffer of 2048 bytes is full, or
+	 * This operation blocks until given number of bytes is available to be read, the buffer of 64 KiB is full, or
 	 * the given timeout is hit.
 	 *
 	 * @param byteCount
@@ -655,7 +655,7 @@ public class SerialOverLan implements Closeable {
 
 	/**
 	 * Reads at max given number of integer values (in range from 0 to 255) from the port.
-	 * This operation blocks until given number of bytes is available to be read, the buffer of 2048 bytes is full, or
+	 * This operation blocks until given number of bytes is available to be read, the buffer of 64 KiB is full, or
 	 * the given timeout is hit.
 	 *
 	 * @param byteCount
@@ -697,7 +697,7 @@ public class SerialOverLan implements Closeable {
 	/**
 	 * Reads at max given number of bytes from the port, converting them to {@link String} using platform's default
 	 * {@link Charset}.
-	 * This operation blocks until given number of bytes is available to be read, the buffer of 2048 bytes is full, or
+	 * This operation blocks until given number of bytes is available to be read, the buffer of 64 KiB is full, or
 	 * the given timeout is hit.
 	 *
 	 * @param byteCount
@@ -739,7 +739,7 @@ public class SerialOverLan implements Closeable {
 
 	/**
 	 * Reads at max given number of bytes from the port, converting them to {@link String} using given {@link Charset}.
-	 * This operation blocks until given number of bytes is available to be read, the buffer of 2048 bytes is full, or
+	 * This operation blocks until given number of bytes is available to be read, the buffer of 64 KiB is full, or
 	 * the given timeout is hit.
 	 *
 	 * @param charset

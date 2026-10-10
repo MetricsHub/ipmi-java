@@ -176,7 +176,8 @@ they open:
   sent again, every 100 ms at most, until the packet comes back), and a
   `SolDeactivated` status sent in a packet without sequence number reaches the event listeners;
 * `readXxx(count, timeout)` waits on the buffer instead of polling it every millisecond, and
-  returns when the 2048-byte buffer is full;
+  returns when the buffer is full; the buffer holds 64 KiB instead of 2 KiB, since a Supermicro BMC
+  drops the characters that a full buffer asks it to hold;
 * a console receives the SOL packets of its own connection only, where 1.2.02 gave every console
   of a connector the packets of all of them, and `close()` unregisters it;
 * the constructors that open their own session own the connector: they tear it down when the

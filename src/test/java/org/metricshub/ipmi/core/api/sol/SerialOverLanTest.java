@@ -66,6 +66,9 @@ class SerialOverLanTest {
 
 	private static final int TIMEOUT_MS = 500;
 
+	/** The capacity of the buffer of a console. */
+	private static final int BUFFER = 64 * 1024;
+
 	private static final CipherSuiteSelectionHandler SUITE_17 = suites -> suites
 			.stream()
 			.filter(suite -> suite.getId() == 17)
@@ -643,14 +646,15 @@ class SerialOverLanTest {
 							USER,
 							PASSWORD,
 							SUITE_17)) {
-				fillBuffer(bmc);
-				bmc.sendSol(10, 0, utf8("0123456789"));
-				await(() -> acks(bmc) == 10, "the console answers each packet");
-				assertEquals("10/0 NACK", ack(bmc.getSolPackets().get(9)), "a Suspend NACK");
+				int packets = fillBuffer(bmc);
+				int suspended = packets % 15 + 1;
+				bmc.sendSol(suspended, 0, utf8("0123456789"));
+				await(() -> acks(bmc) == packets + 1, "the console answers each packet");
+				assertEquals(suspended + "/0 NACK", ack(bmc.getSolPackets().get(packets)), "a Suspend NACK");
 
 				// The read does not wait for characters that cannot arrive, and resumes the BMC
 				long start = System.nanoTime();
-				assertEquals(2048, sol.readBytes(4096, 10000).length);
+				assertEquals(BUFFER, sol.readBytes(2 * BUFFER, 10000).length);
 				assertTrue(System.nanoTime() - start < TimeUnit.SECONDS.toNanos(5));
 				await(() -> resumes(bmc) == 1, "the console sends a Resume ACK");
 
@@ -659,10 +663,10 @@ class SerialOverLanTest {
 				sol.readBytes();
 				await(() -> resumes(bmc) == 2, "the console sends the Resume ACK again");
 
-				bmc.sendSol(10, 0, utf8("0123456789"));
+				bmc.sendSol(suspended, 0, utf8("0123456789"));
 				assertEquals("0123456789", sol.readString(StandardCharsets.US_ASCII, 10, 5000));
 				await(
-						() -> bmc.getSolPackets().stream().anyMatch(packet -> "10/10".equals(ack(packet))),
+						() -> bmc.getSolPackets().stream().anyMatch(packet -> (suspended + "/10").equals(ack(packet))),
 						"the console acknowledges the packet sent again");
 				Thread.sleep(150);
 				sol.readBytes();
@@ -685,11 +689,10 @@ class SerialOverLanTest {
 							USER,
 							PASSWORD,
 							SUITE_17)) {
-				// Exactly 2048 characters, and nothing more
+				// The capacity of the buffer exactly, and nothing more
 				fillBuffer(bmc);
-				await(() -> acks(bmc) == 9, "the console acknowledges each packet");
 				long start = System.nanoTime();
-				assertEquals(2048, sol.readBytes(4096, 10000).length);
+				assertEquals(BUFFER, sol.readBytes(2 * BUFFER, 10000).length);
 				assertTrue(System.nanoTime() - start < TimeUnit.SECONDS.toNanos(5));
 			}
 		}
@@ -894,14 +897,22 @@ class SerialOverLanTest {
 	}
 
 	/**
-	 * Fills the 2048-byte buffer of the console with 9 packets of the BMC (numbers 1 to 9), of at most 248 characters
-	 * like those of real BMCs.
+	 * Fills the buffer of the console with packets of the BMC of at most 248 characters, like those of real BMCs, one at
+	 * a time: a burst of datagrams could overflow the socket.
+	 *
+	 * @return the number of packets sent, numbered from 1 to 15 in a loop
 	 */
-	private static void fillBuffer(FakeRmcpPlusBmc bmc) throws Exception {
-		for (int i = 1; i <= 8; i++) {
-			bmc.sendSol(i, 0, text(248));
+	private static int fillBuffer(FakeRmcpPlusBmc bmc) throws Exception {
+		int packets = 0;
+		for (int sent = 0; sent < BUFFER; sent += 248) {
+			bmc.sendSol(packets % 15 + 1, 0, text(Math.min(248, BUFFER - sent)));
+			packets++;
+			long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
+			while (acks(bmc) < packets && System.nanoTime() < deadline) {
+				Thread.sleep(1);
+			}
 		}
-		bmc.sendSol(9, 0, text(2048 - 8 * 248));
+		return packets;
 	}
 
 	/**

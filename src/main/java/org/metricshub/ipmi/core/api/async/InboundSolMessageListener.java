@@ -50,7 +50,11 @@ public class InboundSolMessageListener implements InboundMessageListener {
 
 	private static final Logger LOGGER = LoggerFactory.getLogger(InboundSolMessageListener.class);
 
-	static final int BUFFER_CAPACITY = 2048;
+	/**
+	 * Room for 64 KiB of console output between two reads: the console suspends the BMC when it is full, and some BMCs
+	 * (Supermicro) take the Suspend NACK for an ACK and drop the characters.
+	 */
+	static final int BUFFER_CAPACITY = 64 * 1024;
 
 	/**
 	 * The characters received; its monitor also guards the fields below, shared by the receiving thread and the
