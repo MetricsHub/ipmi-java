@@ -101,6 +101,30 @@ class IpmiAsyncConnectorTest {
 	}
 
 	@Test
+	@SuppressWarnings("deprecation")
+	void theRequestsPassedWithoutConnectionReachTheListenersAsIn1202() throws Exception {
+		IpmiAsyncConnector connector = new IpmiAsyncConnector(0);
+		try {
+			AtomicInteger notified = new AtomicInteger();
+			connector.registerIncomingPayloadListener(new InboundMessageListener() {
+				@Override
+				public boolean isPayloadSupported(IpmiPayload payload) {
+					return true;
+				}
+
+				@Override
+				public void notify(IpmiPayload payload) {
+					notified.incrementAndGet();
+				}
+			});
+			connector.processRequest(new PlainMessage(new byte[0]));
+			assertEquals(1, notified.get());
+		} finally {
+			connector.tearDown();
+		}
+	}
+
+	@Test
 	void anInboundListenerMayUnregisterItselfWhileNotified() throws Exception {
 		IpmiAsyncConnector connector = new IpmiAsyncConnector(0);
 		try {

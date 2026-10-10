@@ -8,8 +8,10 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
 import java.net.InetAddress;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.Set;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
@@ -308,6 +310,57 @@ class ConnectionTest {
 			connection.notify(new MessageAction(solPacket(7, tag)));
 			assertNotNull(sol.getMessageQueue().getElement(tag), "the old ACK must not complete the newer packet");
 		} finally {
+			connection.disconnect();
+		}
+	}
+
+	@Test
+	void aReplyArrivingWhileTheConnectionClosesIsNotReportedAfterTheFailure() throws Exception {
+		Connection connection = connect(60000);
+		List<String> outcomes = new CopyOnWriteArrayList<>();
+		CountDownLatch matching = new CountDownLatch(1);
+		CountDownLatch closed = new CountDownLatch(1);
+		AtomicBoolean armed = new AtomicBoolean();
+		try {
+			openSession(connection);
+			connection.registerListener(new ConnectionListener() {
+				@Override
+				public void processResponse(ResponseData responseData, int handle, int tag, Exception exception) {
+					outcomes.add(exception == null ? "answered" : exception.getMessage());
+				}
+			});
+			MessageHandler ipmi = handler(connection, PayloadType.Ipmi);
+			// A request whose command code is read when its reply is matched: the test closes the connection then
+			int tag = ipmi
+					.takeTag(
+							new GetChannelAuthenticationCapabilities(
+									IpmiVersion.V20,
+									IpmiVersion.V20,
+									CipherSuite.getEmpty()) {
+								@Override
+								public byte getCommandCode() {
+									if (armed.getAndSet(false)) {
+										matching.countDown();
+										try {
+											closed.await(5, TimeUnit.SECONDS);
+										} catch (InterruptedException e) {
+											Thread.currentThread().interrupt();
+										}
+									}
+									return super.getCommandCode();
+								}
+							},
+							false);
+			armed.set(true);
+			Thread receiver = new Thread(() -> connection.notify(new MessageAction(reply(tag, (byte) 0x38))));
+			receiver.start();
+			assertTrue(matching.await(5, TimeUnit.SECONDS));
+			connection.disconnect();
+			closed.countDown();
+			receiver.join(5000);
+			assertEquals(Collections.singletonList("Connection closed"), outcomes);
+		} finally {
+			closed.countDown();
 			connection.disconnect();
 		}
 	}

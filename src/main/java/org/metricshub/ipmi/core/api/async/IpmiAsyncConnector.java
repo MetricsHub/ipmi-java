@@ -572,6 +572,22 @@ public class IpmiAsyncConnector implements ConnectionListener {
 		}
 	}
 
+	/**
+	 * Notifies the inbound listeners that take the payload from any connection, as 1.2.02 did.
+	 *
+	 * @param payload the payload received
+	 * @deprecated the connections call {@link #processRequest(IpmiPayload, int)}
+	 */
+	@Deprecated
+	@Override
+	public void processRequest(IpmiPayload payload) {
+		for (InboundMessageListener listener : inboundMessageListeners) {
+			if (listener.isPayloadSupported(payload)) {
+				listener.notify(payload);
+			}
+		}
+	}
+
 	@Override
 	public void processRequest(IpmiPayload payload, int handle) {
 		for (InboundMessageListener listener : inboundMessageListeners) {

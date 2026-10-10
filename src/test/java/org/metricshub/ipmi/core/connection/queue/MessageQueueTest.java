@@ -183,6 +183,19 @@ class MessageQueueTest {
 	}
 
 	@Test
+	void anElementThatTimedOutIsNotRemovedAgain() throws Exception {
+		MessageQueue queue = newQueue();
+		try {
+			QueueElement element = queue.getElement(queue.add(request()));
+			Thread.sleep(TIMEOUT_MS + 50);
+			queue.run();
+			assertFalse(queue.remove(element), "a reply after the timeout comes too late");
+		} finally {
+			queue.tearDown();
+		}
+	}
+
+	@Test
 	void anElementIsRemovedOnlyByItself() {
 		MessageQueue queue = newQueue();
 		try {

@@ -54,7 +54,7 @@ public class SolMessageHandler extends MessageHandler {
 	 * the BMC sends again has both.
 	 */
 	private int lastInboundSequenceNumber;
-	private int lastInboundAckNackSequenceNumber;
+	private int lastInboundAcknowledgement;
 
 	public SolMessageHandler(Connection connection, int timeout) throws IOException {
 		super(connection, timeout, SolMessage.MIN_SEQUENCE_NUMBER, SolMessage.MAX_SEQUENCE_NUMBER);
@@ -93,7 +93,7 @@ public class SolMessageHandler extends MessageHandler {
 		lastPacket = null;
 		lastTag = 0;
 		lastInboundSequenceNumber = 0;
-		lastInboundAckNackSequenceNumber = 0;
+		lastInboundAcknowledgement = 0;
 	}
 
 	/**
@@ -121,19 +121,20 @@ public class SolMessageHandler extends MessageHandler {
 	}
 
 	/**
-	 * Tells whether the BMC sends its last packet again (the same non-zero sequence number and the same acknowledgement,
-	 * IPMI 2.0 table 15-2), and remembers the packet.
+	 * Tells whether the BMC sends its last packet again (the same non-zero sequence number and the same acknowledgement:
+	 * number, ACK or NACK, and count, IPMI 2.0 table 15-2), and remembers the packet.
 	 */
 	private synchronized boolean isRetry(SolInboundMessage payload) {
 		int sequenceNumber = payload.getSequenceNumber();
 		if (sequenceNumber == 0) {
 			return false;
 		}
-		int ackNackSequenceNumber = payload.getAckNackSequenceNumber();
-		boolean retry = sequenceNumber == lastInboundSequenceNumber
-				&& ackNackSequenceNumber == lastInboundAckNackSequenceNumber;
+		int acknowledgement = payload.getAckNackSequenceNumber() << 16
+				| (payload.getStatusField().getAckState() == SolAckState.ACK ? 0 : 1 << 8)
+				| payload.getAcceptedCharacterCount();
+		boolean retry = sequenceNumber == lastInboundSequenceNumber && acknowledgement == lastInboundAcknowledgement;
 		lastInboundSequenceNumber = sequenceNumber;
-		lastInboundAckNackSequenceNumber = ackNackSequenceNumber;
+		lastInboundAcknowledgement = acknowledgement;
 		return retry;
 	}
 
@@ -160,7 +161,17 @@ public class SolMessageHandler extends MessageHandler {
 		if (element.isOneWay()
 				|| payload.getStatusField().getAckState() == SolAckState.ACK
 				|| payload.getAcceptedCharacterCount() > 0) {
-			getMessageQueue().remove(element);
+			if (!getMessageQueue().remove(element)) {
+				// The packet timed out meanwhile: the acknowledgement is that of the packet sent again under its number,
+				// if any
+				element = getMessageQueue().getElement(tag);
+				if (element == null || element.getRequest() != coder || !getMessageQueue().remove(element)) {
+					return false;
+				}
+			}
+		} else if (getMessageQueue().getElement(tag) != element) {
+			// The NACK of a packet that timed out meanwhile
+			return false;
 		}
 
 		// Nobody waits for the acknowledgement of the operations

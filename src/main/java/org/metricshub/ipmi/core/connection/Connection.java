@@ -668,7 +668,8 @@ public class Connection extends TimerTask implements MachineObserver {
 	 *         messages. If this happens session needs to be restarted.
 	 */
 	public int sendMessage(PayloadCoder payloadCoder, boolean isOneWay) throws ConnectionException {
-		if (payloadCoder instanceof ActivatePayload) {
+		if (payloadCoder instanceof ActivatePayload
+				&& ((ActivatePayload) payloadCoder).getPayloadType() == PayloadType.Sol) {
 			// A new activation of the payload numbers its packets from 1 again
 			((SolMessageHandler) messageHandlers.get(PayloadType.Sol)).resetPacketNumbers();
 		}

@@ -122,9 +122,10 @@ public class SerialOverLan implements Closeable {
 	private final List<ConnectionHandle> ownedConnections = new ArrayList<ConnectionHandle>();
 
 	/**
-	 * The connection of the session where the payload was last activated, or null.
+	 * The connection of the session where the payload was last activated, or null, and the instance activated there.
 	 */
 	private ConnectionHandle activatedConnection;
+	private int activatedInstance;
 
 	/**
 	 * The session where Activate Payload was last sent, whether it was answered or not.
@@ -365,6 +366,7 @@ public class SerialOverLan implements Closeable {
 					payloadSession,
 					activatePayload);
 			this.activatedConnection = connectionHandle;
+			this.activatedInstance = payloadInstance;
 
 			this.maxPayloadSize = activatePayloadResponseData.getInboundPayloadSize();
 			if (maxPayloadSize <= SolMessage.PAYLOAD_HEADER_LENGTH) {
@@ -408,7 +410,7 @@ public class SerialOverLan implements Closeable {
 				} else if (alreadyActive && isActiveInSession(ipmiConnector, payloadSession)) {
 					// The reply to Activate Payload was lost, and the request sent again found the payload active in this
 					// session: the port and the sizes of the payload are only in that reply, which a new activation gives
-					deactivatePayload(connectionHandle);
+					deactivatePayload(connectionHandle, payloadInstance);
 					deactivated = true;
 				} else {
 					throw e;
@@ -915,7 +917,7 @@ public class SerialOverLan implements Closeable {
 		}
 		closed = true;
 		try {
-			deactivatePayload(session.getConnectionHandle());
+			deactivatePayload(session.getConnectionHandle(), payloadInstance);
 		} catch (Exception e) {
 			if (e instanceof InterruptedException) {
 				Thread.currentThread().interrupt();
@@ -926,11 +928,11 @@ public class SerialOverLan implements Closeable {
 		}
 	}
 
-	private void deactivatePayload(ConnectionHandle connectionHandle) throws Exception {
+	private void deactivatePayload(ConnectionHandle connectionHandle, int instance) throws Exception {
 		connector
 				.sendMessage(
 						connectionHandle,
-						new DeactivatePayload(connectionHandle.getCipherSuite(), PayloadType.Sol, payloadInstance));
+						new DeactivatePayload(connectionHandle.getCipherSuite(), PayloadType.Sol, instance));
 	}
 
 	/**
@@ -941,22 +943,30 @@ public class SerialOverLan implements Closeable {
 	private void deactivatePayloadOfOthers() {
 		try {
 			if (activatedConnection != null && !ownedConnections.contains(activatedConnection)) {
-				deactivatePayload(activatedConnection);
+				deactivatePayload(activatedConnection, activatedInstance);
 			}
+		} catch (Exception e) {
+			warnDeactivationFailure(e);
+		}
+		try {
 			if (activationSession != null) {
 				ConnectionHandle attempted = activationSession.getConnectionHandle();
 				if (attempted != activatedConnection
 						&& !ownedConnections.contains(attempted)
 						&& isActiveInSession(connector, activationSession)) {
-					deactivatePayload(attempted);
+					deactivatePayload(attempted, payloadInstance);
 				}
 			}
 		} catch (Exception e) {
-			if (e instanceof InterruptedException) {
-				Thread.currentThread().interrupt();
-			}
-			LOGGER.warn("Cannot deactivate the SOL payload after a failed activation", e);
+			warnDeactivationFailure(e);
 		}
+	}
+
+	private static void warnDeactivationFailure(Exception e) {
+		if (e instanceof InterruptedException) {
+			Thread.currentThread().interrupt();
+		}
+		LOGGER.warn("Cannot deactivate the SOL payload after a failed activation", e);
 	}
 
 	/**

@@ -243,17 +243,16 @@ public class MessageQueue extends TimerTask {
 	 * another element, which stays.
 	 *
 	 * @param element the element of the request answered
+	 * @return whether the element was still waiting for its reply: false when it timed out or failed meanwhile, and was
+	 *         reported so
 	 */
-	public void remove(QueueElement element) {
+	public boolean remove(QueueElement element) {
 		synchronized (queue) {
-			int index = -1;
-			for (int i = 0; i < queue.size(); i++) {
-				if (queue.get(i) == element) {
-					index = i;
-					break;
-				}
-			}
+			// QueueElement does not override equals(): the element itself
+			int index = queue.indexOf(element);
+			boolean waiting = index >= 0 && element.getRequest() != null;
 			removeIndex(index, element.getId());
+			return waiting;
 		}
 	}
 
