@@ -257,7 +257,7 @@ subclassed anyway).
 | Class | Change |
 | --- | --- |
 | `SerialOverLan` | New constructor with a `bmcKey`; `invokeOperations()` returns `true` once the packet is sent |
-| `ConnectionListener` | New `processRequest(IpmiPayload, int handle)`, with the handle of the connection that received the payload, which the connection calls; `processRequest(IpmiPayload)`, which it calls by default, is deprecated, and both have a default implementation (`IpmiAsyncConnector.processRequest(IpmiPayload)` still notifies the inbound listeners, of any connection) |
+| `ConnectionListener` | New `processRequest(IpmiPayload, int handle)`, with the handle of the connection that received the payload, which the connection calls; `processRequest(IpmiPayload)`, which it calls by default, is deprecated, and both have a default implementation (`IpmiAsyncConnector.processRequest(IpmiPayload)` still notifies the inbound listeners, of any connection; a subclass of `IpmiAsyncConnector` that overrides it must override the new method instead, which the connections call) |
 | `InboundMessageListener` | New default method `isPayloadSupported(IpmiPayload, int handle)`, which the connector calls: override it to take the payloads of a single connection |
 | `IpmiConnector` | New `unregisterIncomingMessageListener(InboundMessageListener)` |
 | `InboundSolMessageListener` | New `readBytes(int, int timeout)`, `getLineOperations()` and `setLineOperations(Set)` |

@@ -110,12 +110,13 @@ public class SolMessageHandler extends MessageHandler {
 		// The ACK/NACK carried by a packet that the BMC sends again was applied with the first copy: applied again, it
 		// could complete a newer packet that has the same number
 		boolean retry = isRetry(payload);
-		boolean acknowledgement = payload.isAcknowledgeMessage()
+		boolean reported = payload.isAcknowledgeMessage()
 				&& !retry
 				&& handleIncomingAcknowledgeMessage(message, payload);
 
-		// Characters, or statuses that no packet of the console waits for (an informational packet: SOL deactivated)
-		if (payload.isDataCarrier() || !acknowledgement && !payload.getStatusField().getStatuses().isEmpty()) {
+		// Characters, or statuses that no packet of the console waits for (an informational packet: SOL deactivated, or
+		// the acknowledgement of operations)
+		if (payload.isDataCarrier() || !reported && !payload.getStatusField().getStatuses().isEmpty()) {
 			handleIncomingDataMessage(payload);
 		}
 	}
@@ -142,7 +143,7 @@ public class SolMessageHandler extends MessageHandler {
 	 * Reports the acknowledgement of a queued packet, after taking the packet out of the queue when the BMC accepted
 	 * characters: the queue must not report it again, as timed out or failed, meanwhile.
 	 *
-	 * @return whether a queued packet was acknowledged
+	 * @return whether the acknowledgement was reported to the sender of the packet, who waits for it
 	 */
 	private boolean handleIncomingAcknowledgeMessage(Ipmiv20Message message, SolInboundMessage payload) {
 		int tag = payload.getAckNackSequenceNumber();
@@ -158,9 +159,10 @@ public class SolMessageHandler extends MessageHandler {
 
 		// The packet leaves the queue when the BMC took it, wholly or partly; a NACKed one stays, to be sent again. Only
 		// this element is removed: a packet sent again under the same number is another one
-		if (element.isOneWay()
+		boolean taken = element.isOneWay()
 				|| payload.getStatusField().getAckState() == SolAckState.ACK
-				|| payload.getAcceptedCharacterCount() > 0) {
+				|| payload.getAcceptedCharacterCount() > 0;
+		if (taken) {
 			if (!getMessageQueue().remove(element)) {
 				// The packet timed out meanwhile: the acknowledgement is that of the packet sent again under its number,
 				// if any
@@ -174,16 +176,32 @@ public class SolMessageHandler extends MessageHandler {
 			return false;
 		}
 
-		// Nobody waits for the acknowledgement of the operations
-		if (!element.isOneWay()) {
-			try {
-				ResponseData responseData = coder.getResponseData(message);
-				getConnection().notifyResponseListeners(getConnection().getHandle(), tag, responseData, null);
-			} catch (Exception e) {
-				getConnection().notifyResponseListeners(getConnection().getHandle(), tag, null, e);
-			}
+		if (taken) {
+			// Acknowledged: the same packet sent again from now on is a new one, with a new number
+			forget(coder);
+		}
+
+		// Nobody waits for the acknowledgement of the operations: its statuses go to the request listeners
+		if (element.isOneWay()) {
+			return false;
+		}
+		try {
+			ResponseData responseData = coder.getResponseData(message);
+			getConnection().notifyResponseListeners(getConnection().getHandle(), tag, responseData, null);
+		} catch (Exception e) {
+			getConnection().notifyResponseListeners(getConnection().getHandle(), tag, null, e);
 		}
 		return true;
+	}
+
+	/**
+	 * Forgets the last packet queued once acknowledged: only a packet sent again before its acknowledgement keeps its
+	 * number.
+	 */
+	private synchronized void forget(PayloadCoder packet) {
+		if (lastPacket == packet) {
+			lastPacket = null;
+		}
 	}
 
 	private void handleIncomingDataMessage(SolInboundMessage payload) {

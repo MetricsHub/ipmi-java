@@ -366,6 +366,21 @@ class ConnectionTest {
 	}
 
 	@Test
+	void theSamePacketSentAgainAfterItsAcknowledgementGetsANewNumber() throws Exception {
+		Connection connection = connect(60000);
+		try {
+			MessageHandler sol = handler(connection, PayloadType.Sol);
+			SolCoder packet = new SolCoder(new byte[] { 'a' }, CipherSuite.getEmpty());
+			int first = sol.takeTag(packet, false);
+			connection.notify(new MessageAction(solPacket(7, first)));
+			// Not a retry: the BMC would take it for one and drop it
+			assertTrue(sol.takeTag(packet, false) != first);
+		} finally {
+			connection.disconnect();
+		}
+	}
+
+	@Test
 	void anAcknowledgementInANewPacketWithTheNumberOfAnOlderOneIsApplied() throws Exception {
 		Connection connection = connect(60000);
 		try {

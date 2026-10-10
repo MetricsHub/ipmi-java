@@ -468,6 +468,29 @@ class SerialOverLanTest {
 
 	@Test
 	@Timeout(30)
+	void theStatusesInTheAcknowledgementOfOperationsReachTheListeners() throws Exception {
+		try (FakeRmcpPlusBmc bmc = solBmc(null)) {
+			bmc.setSolStatus(FakeRmcpPlusBmc.SOL_CHARACTER_TRANSFER_UNAVAILABLE);
+			try (
+					SerialOverLan sol = new SerialOverLan(
+							new IpmiConnector(0, 0),
+							host(bmc),
+							bmc.getPort(),
+							USER,
+							PASSWORD,
+							SUITE_17)) {
+				List<Set<SolStatus>> events = new CopyOnWriteArrayList<>();
+				sol.registerEventListener(new RecordingListener(events));
+				assertTrue(sol.invokeOperations(SolOperation.FlushOutbound));
+				await(() -> !events.isEmpty(), "the listener is told");
+				assertEquals(EnumSet.of(SolStatus.CharacterTransferUnavailable), events.get(0));
+			}
+			assertEquals(Collections.emptyList(), bmc.getErrors());
+		}
+	}
+
+	@Test
+	@Timeout(30)
 	void lineStatesAreHeldInEveryPacketUntilReleased() throws Exception {
 		try (FakeRmcpPlusBmc bmc = solBmc(null)) {
 			try (

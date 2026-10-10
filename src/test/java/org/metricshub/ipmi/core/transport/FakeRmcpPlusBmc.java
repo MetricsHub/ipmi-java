@@ -79,6 +79,8 @@ public class FakeRmcpPlusBmc implements AutoCloseable {
 
 	/** Status bit of a SOL packet from the BMC: the packet is NACKed (IPMI 2.0 table 15-2). */
 	public static final int SOL_NACK = 0x40;
+	/** Status bit of a SOL packet from the BMC: the server is off, characters cannot reach it. */
+	public static final int SOL_CHARACTER_TRANSFER_UNAVAILABLE = 0x20;
 	/** Status bit of a SOL packet from the BMC: SOL is deactivated. */
 	public static final int SOL_DEACTIVATED = 0x10;
 	/** Status bit of a SOL packet from the BMC: a break was detected. */
@@ -155,6 +157,7 @@ public class FakeRmcpPlusBmc implements AutoCloseable {
 	private volatile int solInboundPayloadSize;
 	private volatile int solPrivilege;
 	private volatile boolean solActive;
+	private volatile int solStatus;
 	private final Queue<Integer> solReplies = new ConcurrentLinkedQueue<>();
 	private final List<SolPacket> solPackets = new CopyOnWriteArrayList<>();
 	private final ByteArrayOutputStream solReceived = new ByteArrayOutputStream();
@@ -382,6 +385,16 @@ public class FakeRmcpPlusBmc implements AutoCloseable {
 		for (int accepted : acceptedCharacters) {
 			solReplies.add(accepted);
 		}
+	}
+
+	/**
+	 * Sets the status bits the BMC puts in its acknowledgements from now on (table 15-2), for example
+	 * {@link #SOL_CHARACTER_TRANSFER_UNAVAILABLE} when the server is off.
+	 *
+	 * @param status the status bits
+	 */
+	public void setSolStatus(int status) {
+		solStatus = status;
 	}
 
 	/**
@@ -752,7 +765,11 @@ public class FakeRmcpPlusBmc implements AutoCloseable {
 		if (reply != null && reply == LOSE_ACK) {
 			return null;
 		}
-		return new byte[] { 0x00, (byte) received.sequenceNumber, (byte) accepted, (byte) (nack ? SOL_NACK : 0x00) };
+		return new byte[] {
+				0x00,
+				(byte) received.sequenceNumber,
+				(byte) accepted,
+				(byte) ((nack ? SOL_NACK : 0x00) | solStatus) };
 	}
 
 	/**
