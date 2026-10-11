@@ -812,6 +812,101 @@ class SerialOverLanTest {
 
 	@Test
 	@Timeout(30)
+	void aStatusNewInACopyOfAPacketIsReported() throws Exception {
+		try (FakeRmcpPlusBmc bmc = solBmc(null)) {
+			try (
+					SerialOverLan sol = new SerialOverLan(
+							new IpmiConnector(0, 0),
+							host(bmc),
+							bmc.getPort(),
+							USER,
+							PASSWORD,
+							SUITE_17)) {
+				List<Set<SolStatus>> events = new CopyOnWriteArrayList<>();
+				sol.registerEventListener(new RecordingListener(events));
+				// The ACK of the console is lost, and the BMC appends characters, and a break, to its packet
+				bmc.sendSol(3, 0, utf8("abc"));
+				bmc.sendSol(3, FakeRmcpPlusBmc.SOL_BREAK, utf8("abcde"));
+				bmc.sendSol(3, FakeRmcpPlusBmc.SOL_BREAK, utf8("abcde"));
+				await(() -> acks(bmc) == 3, "the console acknowledges each copy");
+				assertEquals(Collections.singletonList(EnumSet.of(SolStatus.Break)), events, "reported once");
+				assertEquals("abcde", sol.readString(StandardCharsets.US_ASCII));
+			}
+			assertEquals(Collections.emptyList(), bmc.getErrors());
+		}
+	}
+
+	@Test
+	@Timeout(30)
+	void theAcknowledgementOfAWriteReportsTheLineStatesOfItsPacket() throws Exception {
+		try (FakeRmcpPlusBmc bmc = solBmc(null)) {
+			try (
+					SerialOverLan sol = new SerialOverLan(
+							new IpmiConnector(0, 0),
+							host(bmc),
+							bmc.getPort(),
+							USER,
+							PASSWORD,
+							SUITE_17)) {
+				List<Set<SolOperation>> operations = new CopyOnWriteArrayList<>();
+				sol.registerEventListener(new RecordingListener(new CopyOnWriteArrayList<>()) {
+					@Override
+					public void processResponseEvent(
+							Set<SolStatus> statuses,
+							byte[] correspondingRequestData,
+							Set<SolOperation> correspondingRequestOperations) {
+						operations.add(correspondingRequestOperations);
+					}
+				});
+				assertTrue(sol.invokeOperations(SolOperation.CTS));
+				bmc.setSolStatus(FakeRmcpPlusBmc.SOL_CHARACTER_TRANSFER_UNAVAILABLE);
+				assertTrue(sol.writeByte((byte) 'a'));
+				assertEquals(Collections.singletonList(EnumSet.of(SolOperation.CTS)), operations);
+			}
+			assertEquals(Collections.emptyList(), bmc.getErrors());
+		}
+	}
+
+	@Test
+	@Timeout(30)
+	void aSecondConsoleThatCannotActivateLeavesTheFirstOneWorking() throws Exception {
+		try (FakeRmcpPlusBmc bmc = solBmc(null)) {
+			IpmiConnector connector = new IpmiConnector(0, 0);
+			try {
+				Session session = openSession(connector, bmc, null);
+				SerialOverLan sol = new SerialOverLan(connector, session);
+				assertTrue(sol.writeByte((byte) 'a'));
+				// A BMC with an instance free, which refuses it: the payload is active in another session
+				bmc
+						.handle(
+								NETFN_APP,
+								FakeRmcpPlusBmc.GET_PAYLOAD_ACTIVATION_STATUS,
+								data -> new byte[]
+								{ 0x00, 0x02, 0x01, 0x00 });
+				bmc.handle(NETFN_APP, FakeRmcpPlusBmc.ACTIVATE_PAYLOAD, data -> new byte[] { (byte) 0x80 });
+				bmc
+						.handle(
+								NETFN_APP,
+								FakeRmcpPlusBmc.GET_PAYLOAD_INSTANCE_INFO,
+								data -> new byte[]
+								{ 0x00, 0x12, 0x34, 0x56, 0x78, 0, 0, 0, 0, 0, 0, 0, 0 });
+				assertThrows(SOLException.class, () -> new SerialOverLan(connector, session));
+				// The first console goes on numbering its packets
+				assertTrue(sol.writeByte((byte) 'b'));
+				assertEquals("ab", new String(bmc.getSolReceived(), StandardCharsets.US_ASCII));
+				assertArrayEquals(
+						new int[]
+						{ 1, 2 },
+						dataPackets(bmc).stream().mapToInt(packet -> packet.sequenceNumber).toArray());
+				sol.close();
+			} finally {
+				connector.tearDown();
+			}
+		}
+	}
+
+	@Test
+	@Timeout(30)
 	void aLateShorterCopyOfAPacketDoesNotDuplicateItsCharacters() throws Exception {
 		try (FakeRmcpPlusBmc bmc = solBmc(null)) {
 			try (

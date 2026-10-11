@@ -64,7 +64,6 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.EnumSet;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -806,9 +805,10 @@ public class SerialOverLan implements Closeable {
 	 * Sends characters in a packet, then what the BMC did not accept of it in new packets (IPMI 2.0 table 15-2).
 	 */
 	private boolean sendMessage(byte[] characterData) {
-		SolResponseData responseData = sendPayload(characterPacket(characterData));
+		Set<SolOperation> lineOperations = inboundMessageListener.getLineOperations();
+		SolResponseData responseData = sendPayload(characterPacket(characterData, lineOperations));
 
-		notifyResponseListeners(characterData, new HashSet<SolOperation>(), responseData);
+		notifyResponseListeners(characterData, lineOperations, responseData);
 
 		byte[] remainingCharacterData = characterData;
 
@@ -819,9 +819,9 @@ public class SerialOverLan implements Closeable {
 							responseData.getAcceptedCharactersNumber(),
 							remainingCharacterData.length);
 
-			responseData = sendPayload(characterPacket(remainingCharacterData));
+			responseData = sendPayload(characterPacket(remainingCharacterData, lineOperations));
 
-			notifyResponseListeners(remainingCharacterData, new HashSet<SolOperation>(), responseData);
+			notifyResponseListeners(remainingCharacterData, lineOperations, responseData);
 		}
 
 		return responseData != null && responseData.getAcknowledgeState() == SolAckState.ACK;
@@ -830,13 +830,13 @@ public class SerialOverLan implements Closeable {
 	/**
 	 * @return a packet of characters, with the line states the console holds
 	 */
-	private SolCoder characterPacket(byte[] characterData) {
+	private SolCoder characterPacket(byte[] characterData, Set<SolOperation> lineOperations) {
 		return new SolCoder(
 				characterData,
 				(byte) 0,
 				(byte) 0,
 				SolAckState.ACK,
-				inboundMessageListener.getLineOperations(),
+				lineOperations,
 				session.getConnectionHandle().getCipherSuite());
 	}
 

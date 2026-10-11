@@ -86,9 +86,11 @@ public class InboundSolMessageListener implements InboundMessageListener {
 	private int lastCharacterCount;
 
 	/**
-	 * The sequence number of the last packet whose statuses were reported, accepted or not: a status is reported once.
+	 * The sequence number of the last packet with a status, and the statuses reported for it, accepted or not: a
+	 * status is reported once, and a copy of the packet may carry a new one.
 	 */
 	private int lastReportedSequenceNumber;
+	private final Set<SolStatus> lastReportedStatuses = EnumSet.noneOf(SolStatus.class);
 
 	/**
 	 * The serial line states the console holds, set in every packet it sends.
@@ -131,7 +133,7 @@ public class InboundSolMessageListener implements InboundMessageListener {
 		byte[] characters = packet.getData();
 
 		boolean accepted;
-		boolean report;
+		Set<SolStatus> statuses = EnumSet.noneOf(SolStatus.class);
 		synchronized (buffer) {
 			boolean retry = sequenceNumber != 0 && sequenceNumber == lastSequenceNumber;
 			byte[] newCharacters = Arrays.copyOfRange(characters, characters.length - unseen(packet), characters.length);
@@ -146,11 +148,19 @@ public class InboundSolMessageListener implements InboundMessageListener {
 			} else if (sequenceNumber == 0) {
 				LOGGER.warn("Dropping {} characters received in a SOL packet without sequence number", characters.length);
 			}
-			// The statuses of a packet are reported at its first copy, even when its characters must wait for room: the
-			// BMC may never send it again (SOL deactivated)
-			report = sequenceNumber == 0 || sequenceNumber != lastReportedSequenceNumber;
+			// The statuses of a packet are reported as they come, even when its characters must wait for room (the BMC may
+			// never send it again: SOL deactivated), and only once: a copy of the packet reports only a new status
+			Set<SolStatus> received = packet.getStatusField().getStatuses();
+			if (received != null) {
+				statuses.addAll(received);
+			}
 			if (sequenceNumber != 0) {
-				lastReportedSequenceNumber = sequenceNumber;
+				if (sequenceNumber != lastReportedSequenceNumber) {
+					lastReportedSequenceNumber = sequenceNumber;
+					lastReportedStatuses.clear();
+				}
+				statuses.removeAll(lastReportedStatuses);
+				lastReportedStatuses.addAll(statuses);
 			}
 			// The readers waiting for characters
 			buffer.notifyAll();
@@ -177,8 +187,7 @@ public class InboundSolMessageListener implements InboundMessageListener {
 			}
 		}
 
-		Set<SolStatus> statuses = packet.getStatusField().getStatuses();
-		if (report && statuses != null && !statuses.isEmpty()) {
+		if (!statuses.isEmpty()) {
 			for (SolEventListener listener : eventListeners) {
 				listener.processRequestEvent(statuses);
 			}

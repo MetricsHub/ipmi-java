@@ -25,9 +25,11 @@ package org.metricshub.ipmi.core.connection;
 import org.metricshub.ipmi.core.coding.PayloadCoder;
 import org.metricshub.ipmi.core.coding.commands.IpmiCommandCoder;
 import org.metricshub.ipmi.core.coding.commands.ResponseData;
+import org.metricshub.ipmi.core.coding.commands.payload.ActivatePayload;
 import org.metricshub.ipmi.core.coding.payload.lan.IpmiLanMessage;
 import org.metricshub.ipmi.core.coding.payload.sol.SolMessage;
 import org.metricshub.ipmi.core.coding.protocol.Ipmiv20Message;
+import org.metricshub.ipmi.core.coding.protocol.PayloadType;
 import org.metricshub.ipmi.core.connection.queue.QueueElement;
 
 import org.slf4j.Logger;
@@ -110,6 +112,10 @@ public class IpmiMessageHandler extends MessageHandler {
 
 			try {
 				ResponseData responseData = coder.getResponseData(message);
+				if (coder instanceof ActivatePayload && ((ActivatePayload) coder).getPayloadType() == PayloadType.Sol) {
+					// A new activation, confirmed: its SOL packets are numbered from 1 again, before the console sends any
+					getConnection().resetSolPacketNumbers();
+				}
 				getConnection().notifyResponseListeners(getConnection().getHandle(), tag, responseData, null);
 			} catch (Exception e) {
 				getConnection().notifyResponseListeners(getConnection().getHandle(), tag, null, e);
