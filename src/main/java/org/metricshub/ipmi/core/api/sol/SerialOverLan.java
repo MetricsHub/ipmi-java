@@ -41,6 +41,7 @@ import org.metricshub.ipmi.core.coding.payload.lan.IPMIException;
 import org.metricshub.ipmi.core.coding.payload.sol.SolAckState;
 import org.metricshub.ipmi.core.coding.payload.sol.SolMessage;
 import org.metricshub.ipmi.core.coding.payload.sol.SolOperation;
+import org.metricshub.ipmi.core.coding.payload.sol.SolStatus;
 import org.metricshub.ipmi.core.coding.protocol.AuthenticationType;
 import org.metricshub.ipmi.core.coding.protocol.PayloadType;
 import org.metricshub.ipmi.core.coding.security.CipherSuite;
@@ -811,8 +812,6 @@ public class SerialOverLan implements Closeable {
 				characterData,
 				lineOperations);
 
-		notifyResponseListeners(characterData, lineOperations, responseData);
-
 		byte[] remainingCharacterData = characterData;
 
 		while (isNackForMessagePart(responseData, remainingCharacterData.length)) {
@@ -826,8 +825,6 @@ public class SerialOverLan implements Closeable {
 					characterPacket(remainingCharacterData, lineOperations),
 					remainingCharacterData,
 					lineOperations);
-
-			notifyResponseListeners(remainingCharacterData, lineOperations, responseData);
 		}
 
 		return responseData != null && responseData.getAcknowledgeState() == SolAckState.ACK;
@@ -867,24 +864,36 @@ public class SerialOverLan implements Closeable {
 		}
 	}
 
+	/**
+	 * Reports the statuses of an answer of the BMC that were not reported for the packet yet.
+	 */
 	private void notifyResponseListeners(
 			byte[] characterData,
 			Set<SolOperation> solOperations,
-			SolResponseData responseData) {
-		if (responseData != null && responseData.getStatuses() != null && !responseData.getStatuses().isEmpty()) {
+			SolResponseData responseData,
+			Set<SolStatus> reported) {
+		if (responseData == null || responseData.getStatuses() == null) {
+			return;
+		}
+		Set<SolStatus> statuses = EnumSet.noneOf(SolStatus.class);
+		statuses.addAll(responseData.getStatuses());
+		statuses.removeAll(reported);
+		reported.addAll(statuses);
+		if (!statuses.isEmpty()) {
 			for (SolEventListener listener : eventListeners) {
-				listener.processResponseEvent(responseData.getStatuses(), characterData, solOperations);
+				listener.processResponseEvent(statuses, characterData, solOperations);
 			}
 		}
 	}
 
 	/**
 	 * Sends a packet, and sends it again while the BMC NACKs it without accepting a character (its buffer
-	 * is full, or the server is off), after a growing pause that leaves the BMC time to pass its characters on.
+	 * is full, or the server is off), after a growing pause that leaves the BMC time to pass its characters on. The
+	 * statuses of each answer are reported, once for the packet.
 	 *
 	 * @param payloadCoder the packet
-	 * @param characterData the characters of the packet, reported with the statuses of the NACKs
-	 * @param lineOperations the line states of the packet, reported with the statuses of the NACKs
+	 * @param characterData the characters of the packet, reported with the statuses of its answers
+	 * @param lineOperations the line states of the packet, reported with the statuses of its answers
 	 * @return the acknowledgement of the BMC, or null
 	 */
 	private SolResponseData sendPayload(
@@ -895,14 +904,16 @@ public class SerialOverLan implements Closeable {
 
 		try {
 			SolResponseData responseData = (SolResponseData) connector.sendMessage(connectionHandle, payloadCoder);
+			// The statuses of each answer: the next one may not repeat them
+			Set<SolStatus> reported = EnumSet.noneOf(SolStatus.class);
+			notifyResponseListeners(characterData, lineOperations, responseData, reported);
 
 			for (int retry = 1; isNackForWholeMessage(responseData) && retry <= connector.getRetries(); retry++) {
-				// The statuses of each NACK are reported: the next answer may not repeat them
-				notifyResponseListeners(characterData, lineOperations, responseData);
 				// ponytail: linear pause (100, 200, 300 ms by default), the SOL retry interval of the BMC is not read
 				Thread.sleep(NACK_PAUSE_MS * retry);
 
 				responseData = resendPayload(connectionHandle, payloadCoder, responseData.getRequestSequenceNumber());
+				notifyResponseListeners(characterData, lineOperations, responseData, reported);
 			}
 
 			return responseData;

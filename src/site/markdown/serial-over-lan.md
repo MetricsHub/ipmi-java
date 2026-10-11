@@ -129,8 +129,8 @@ A [`SolEventListener`](apidocs/org/metricshub/ipmi/core/api/sol/SolEventListener
 registered with `registerEventListener()` receives the status the BMC reports
 ([`SolStatus`](apidocs/org/metricshub/ipmi/core/coding/payload/sol/SolStatus.html):
 `CharacterTransferUnavailable`, `SolDeactivated`, `TransmitOverrun`, `Break`, `RtsAsserted`,
-`DtrAsserted`), either spontaneously (`processRequestEvent`), once per packet, or in the
-acknowledgement of a packet you wrote (`processResponseEvent`). The statuses in the
+`DtrAsserted`), either spontaneously (`processRequestEvent`) or in the acknowledgements of a
+packet you wrote (`processResponseEvent`), once per packet. The statuses in the
 acknowledgement of operations, which `invokeOperations()` does not wait for, go to
 `processRequestEvent`.
 

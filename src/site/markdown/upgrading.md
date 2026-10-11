@@ -172,8 +172,9 @@ they open:
   the next packet;
 * a packet that the BMC sends again is read once (1.2.02 repeated a piece of console output at
   each lost acknowledgement), every packet with a sequence number is acknowledged, also one
-  without characters, a full buffer suspends the BMC until a read resumes it (the Resume ACK is
-  sent again, every 100 ms at most, until the packet comes back), and a
+  without characters, a full buffer suspends the BMC until a read resumes it (the acknowledgement
+  that resumes it is sent again, every 100 ms at most, until a newer packet shows that the BMC
+  resumed), a status is reported once per packet, also when the BMC NACKs a packet you write, and a
   `SolDeactivated` status sent in a packet without sequence number reaches the event listeners;
 * `readXxx(count, timeout)` waits on the buffer instead of polling it every millisecond, and
   returns when the buffer is full; the buffer holds 64 KiB instead of 2 KiB, since a Supermicro BMC

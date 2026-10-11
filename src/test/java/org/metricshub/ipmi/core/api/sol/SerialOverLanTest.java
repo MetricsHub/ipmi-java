@@ -576,6 +576,40 @@ class SerialOverLanTest {
 
 	@Test
 	@Timeout(30)
+	void theStatusesOfTheAnswersOfAPacketAreReportedOnce() throws Exception {
+		try (FakeRmcpPlusBmc bmc = solBmc(null)) {
+			// The server is off: every answer of the BMC has the status, and its buffer is full once
+			bmc.setSolStatus(FakeRmcpPlusBmc.SOL_CHARACTER_TRANSFER_UNAVAILABLE);
+			bmc.replySol(0);
+			try (
+					SerialOverLan sol = new SerialOverLan(
+							new IpmiConnector(0, 0),
+							host(bmc),
+							bmc.getPort(),
+							USER,
+							PASSWORD,
+							SUITE_17)) {
+				List<Set<SolStatus>> statuses = new CopyOnWriteArrayList<>();
+				sol.registerEventListener(new RecordingListener(new CopyOnWriteArrayList<>()) {
+					@Override
+					public void processResponseEvent(
+							Set<SolStatus> responseStatuses,
+							byte[] correspondingRequestData,
+							Set<SolOperation> correspondingRequestOperations) {
+						statuses.add(responseStatuses);
+					}
+				});
+				assertTrue(sol.writeByte((byte) 'a'));
+				assertEquals(1, statuses.size(), "the NACK and the ACK of the packet");
+				assertTrue(sol.writeByte((byte) 'b'));
+				assertEquals(2, statuses.size(), "the ACK of the next packet");
+			}
+			assertEquals(Collections.emptyList(), bmc.getErrors());
+		}
+	}
+
+	@Test
+	@Timeout(30)
 	void lineStatesAreHeldInEveryPacketUntilReleased() throws Exception {
 		try (FakeRmcpPlusBmc bmc = solBmc(null)) {
 			try (
@@ -773,12 +807,10 @@ class SerialOverLanTest {
 
 				bmc.sendSol(suspended, 0, utf8("0123456789"));
 				assertEquals("0123456789", sol.readString(StandardCharsets.US_ASCII, 10, 5000));
-				await(
-						() -> bmc.getSolPackets().stream().anyMatch(packet -> (suspended + "/10").equals(ack(packet))),
-						"the console acknowledges the packet sent again");
-				Thread.sleep(150);
-				sol.readBytes();
-				Thread.sleep(50);
+				// The BMC may still be suspended (its copy left before the Suspend NACK arrived): the packet is
+				// acknowledged again, 10 times at most, without a Resume ACK
+				sol.readBytes(1, 2000);
+				assertEquals(11, acks(bmc, suspended + "/10"), "the ACK of the packet, then 10 Completion ACKs");
 				assertEquals(2, resumes(bmc), "no Resume ACK once the packet is accepted");
 			}
 			assertEquals(Collections.emptyList(), bmc.getErrors());
@@ -807,9 +839,19 @@ class SerialOverLanTest {
 				// A late copy of the packet, without the new characters, does not end the suspension
 				bmc.sendSol(last, 0, text(lastLength));
 				await(() -> acks(bmc) == packets + 2, "the console acknowledges the late copy");
-				// Room for the 10 new characters: the BMC is resumed
+				// Room for the 10 new characters: a Partial ACK resumes the BMC, which sends the packet again
 				assertEquals(10, sol.readBytes(10).length);
-				await(() -> resumes(bmc) == 1, "the console sends a Resume ACK");
+				await(() -> acks(bmc, last + "/" + lastLength) == 3, "the console sends a Partial ACK");
+				bmc.sendSol(last, 0, text(lastLength + 10));
+				await(() -> acks(bmc, last + "/" + (lastLength + 10)) == 1, "the console accepts the packet");
+				assertEquals(BUFFER, sol.readBytes(2 * BUFFER).length);
+				// A newer packet shows that the BMC resumed: the packet is not acknowledged again
+				bmc.sendSol(last % 15 + 1, 0, utf8("x"));
+				assertEquals("x", sol.readString(StandardCharsets.US_ASCII, 1, 5000));
+				await(() -> acks(bmc, (last % 15 + 1) + "/1") == 1, "the console acknowledges the newer packet");
+				long acknowledged = acks(bmc);
+				sol.readBytes(1, 500);
+				assertEquals(acknowledged, acks(bmc));
 			}
 			assertEquals(Collections.emptyList(), bmc.getErrors());
 		}
@@ -960,18 +1002,33 @@ class SerialOverLanTest {
 				StringBuilder expected = new StringBuilder();
 				int breaks = 0;
 				int copies = 0;
-				// Copies of earlier packets, delivered late: {packet index, sequence number, status, characters}
+				// The acknowledgement of every copy, with all the characters received of its packet
+				List<String> expectedAcks = new ArrayList<>();
+				// Copies of earlier packets, delivered late: {packet index, sequence number, status, characters, whole}
 				List<Object[]> late = new ArrayList<>();
 				for (int packet = 0; packet < 300; packet++) {
 					int sequenceNumber = packet % 15 + 1;
 					int status = random.nextInt(8) == 0 ? FakeRmcpPlusBmc.SOL_BREAK : 0;
 					String text = randomText(random, 1 + random.nextInt(20));
 					// Copies that grow up to the whole text: the BMC appends characters to a packet it sends again
-					int length = 1 + random.nextInt(text.length());
-					do {
-						// The status may only appear in a later copy; the last one, with the whole text, has it
+					List<Integer> lengths = new ArrayList<>();
+					for (int length = 1 + random.nextInt(text.length()); length < text.length(); length += 1
+							+ random.nextInt(text.length() - length)) {
+						lengths.add(length);
+					}
+					lengths.add(text.length());
+					if (lengths.size() > 1 && random.nextInt(4) == 0) {
+						// A copy overtakes the one before
+						int overtaken = random.nextInt(lengths.size() - 1);
+						Collections.swap(lengths, overtaken, overtaken + 1);
+					}
+					int received = 0;
+					for (int length : lengths) {
+						// The status may only appear in a copy before the one with the whole text, which has it
 						int copyStatus = length == text.length() || random.nextBoolean() ? status : 0;
 						bmc.sendSol(sequenceNumber, copyStatus, utf8(text.substring(0, length)));
+						received = Math.max(received, length);
+						expectedAcks.add(sequenceNumber + "/" + received);
 						copies++;
 						if (random.nextInt(4) == 0) {
 							// This copy also arrives after 1 to 6 newer packets
@@ -982,16 +1039,17 @@ class SerialOverLanTest {
 													packet + 1 + random.nextInt(6),
 													sequenceNumber,
 													copyStatus,
-													text.substring(0, length) });
+													text.substring(0, length),
+													text.length() });
 						}
-						length = length == text.length() ? -1 : length + 1 + random.nextInt(text.length() - length);
-					} while (length > 0);
+					}
 					expected.append(text);
 					breaks += status == 0 ? 0 : 1;
 					for (Iterator<Object[]> iterator = late.iterator(); iterator.hasNext();) {
 						Object[] copy = iterator.next();
 						if ((int) copy[0] == packet) {
 							bmc.sendSol((int) copy[1], (int) copy[2], utf8((String) copy[3]));
+							expectedAcks.add(copy[1] + "/" + copy[4]);
 							copies++;
 							iterator.remove();
 						}
@@ -1005,6 +1063,9 @@ class SerialOverLanTest {
 				await(() -> acks(bmc) == acknowledged, "the console acknowledges every copy");
 				assertEquals(expected.toString(), sol.readString(StandardCharsets.US_ASCII));
 				assertEquals(breaks, events.size(), "each break reported once");
+				assertEquals(
+						expectedAcks,
+						bmc.getSolPackets().stream().map(SerialOverLanTest::ack).collect(Collectors.toList()));
 			}
 			assertEquals(Collections.emptyList(), bmc.getErrors());
 		}
@@ -1065,6 +1126,34 @@ class SerialOverLanTest {
 				bmc.sendSol(3, 0, utf8("abcde"));
 				await(() -> acks(bmc) == 3, "the console acknowledges each copy");
 				assertEquals("abcde", sol.readString(StandardCharsets.US_ASCII));
+				// A shorter ACK would be a Partial ACK, after which the BMC sends the packet again
+				assertEquals(
+						Arrays.asList("3/5", "3/5", "3/5"),
+						bmc.getSolPackets().stream().map(SerialOverLanTest::ack).collect(Collectors.toList()));
+			}
+			assertEquals(Collections.emptyList(), bmc.getErrors());
+		}
+	}
+
+	@Test
+	@Timeout(30)
+	void aLateLongerCopyOfAnOlderPacketBringsNoCharacter() throws Exception {
+		try (FakeRmcpPlusBmc bmc = solBmc(null)) {
+			try (
+					SerialOverLan sol = new SerialOverLan(
+							new IpmiConnector(0, 0),
+							host(bmc),
+							bmc.getPort(),
+							USER,
+							PASSWORD,
+							SUITE_17)) {
+				// The ACK of packet 5 is lost, and its retries with 2 more characters are late: the BMC drops the packet
+				// once its retries are exhausted (IPMI 2.0 section 15.11) and goes on with packet 6
+				bmc.sendSol(5, 0, utf8("ab"));
+				bmc.sendSol(6, 0, utf8("ef"));
+				bmc.sendSol(5, 0, utf8("abcd"));
+				await(() -> acks(bmc) == 3, "the console acknowledges each copy");
+				assertEquals("abef", sol.readString(StandardCharsets.US_ASCII));
 			}
 			assertEquals(Collections.emptyList(), bmc.getErrors());
 		}
@@ -1317,6 +1406,17 @@ class SerialOverLanTest {
 				.stream()
 				.filter(packet -> packet.sequenceNumber == 0 && packet.ackSequenceNumber != 0)
 				.filter(packet -> !packet.isNack() && packet.acceptedCharacters == 0)
+				.count();
+	}
+
+	/**
+	 * @return how many ACK-only packets the BMC received with the given acknowledgement, as {@link #ack}
+	 */
+	private static long acks(FakeRmcpPlusBmc bmc, String acknowledgement) {
+		return bmc
+				.getSolPackets()
+				.stream()
+				.filter(packet -> packet.sequenceNumber == 0 && acknowledgement.equals(ack(packet)))
 				.count();
 	}
 
