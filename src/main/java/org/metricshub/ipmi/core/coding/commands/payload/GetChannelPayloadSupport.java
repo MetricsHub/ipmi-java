@@ -54,13 +54,17 @@ public class GetChannelPayloadSupport extends IpmiCommandCoder {
 	}
 
 	/**
-	 * Initiates class for both encoding and decoding.
+	 * Initiates class for both encoding and decoding, in a session of cipher suite 0.
 	 *
 	 * @param channelNumber
 	 *        - must be 0h-Bh or Eh-Fh <br>
 	 *        Eh = retrieve information for channel this request was issued
 	 *        on
+	 * @deprecated the request goes out without integrity and confidentiality, which a session of another cipher suite
+	 *             discards: use {@link #GetChannelPayloadSupport(byte, CipherSuite, AuthenticationType)} with the cipher
+	 *             suite of the session
 	 */
+	@Deprecated
 	public GetChannelPayloadSupport(byte channelNumber) {
 		super(IpmiVersion.V20, new CipherSuite((byte) 0, (byte) 0, (byte) 0, (byte) 0), AuthenticationType.RMCPPlus);
 		setChannelNumber(channelNumber);
@@ -137,11 +141,17 @@ public class GetChannelPayloadSupport extends IpmiCommandCoder {
 			InvalidKeyException {
 		byte[] responseData = validateResponse(message);
 
+		// Standard payloads 0-7 and 8-15, session setup payloads 0-7 and 8-15, OEM payloads 0-7 and 8-15, reserved
+		// (IPMI 2.0 table 24-10)
+		if (responseData.length < 8) {
+			throw new IllegalArgumentException("Invalid response length");
+		}
+
 		GetChannelPayloadSupportResponseData data = new GetChannelPayloadSupportResponseData();
 
 		data.setStandardPayloads(responseData[0]);
-		data.setSessionSetupPayloads(responseData[1]);
-		data.setOemPayloads(responseData[2]);
+		data.setSessionSetupPayloads(responseData[2]);
+		data.setOemPayloads(responseData[4]);
 
 		return data;
 	}

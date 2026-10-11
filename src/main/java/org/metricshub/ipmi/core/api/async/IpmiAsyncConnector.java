@@ -341,6 +341,7 @@ public class IpmiAsyncConnector implements ConnectionListener {
 
 		connectionHandle.setUser(username);
 		connectionHandle.setPasswordBytes(password);
+		connectionHandle.setBmcKey(bmcKey);
 
 		while (tries <= retries && !succeded) {
 			try {
@@ -354,7 +355,11 @@ public class IpmiAsyncConnector implements ConnectionListener {
 								password,
 								bmcKey);
 
-				session = sessionManager.registerSession(sessionId, connectionHandle);
+				session = sessionManager
+						.registerSession(
+								sessionId,
+								connectionManager.getConnection(connectionHandle.getHandle()).getManagedSystemSessionId(),
+								connectionHandle);
 
 				succeded = true;
 			} catch (Exception e) {
@@ -567,6 +572,13 @@ public class IpmiAsyncConnector implements ConnectionListener {
 		}
 	}
 
+	/**
+	 * Notifies the inbound listeners that take the payload from any connection, as 1.2.02 did.
+	 *
+	 * @param payload the payload received
+	 * @deprecated the connections call {@link #processRequest(IpmiPayload, int)}
+	 */
+	@Deprecated
 	@Override
 	public void processRequest(IpmiPayload payload) {
 		for (InboundMessageListener listener : inboundMessageListeners) {
@@ -576,15 +588,25 @@ public class IpmiAsyncConnector implements ConnectionListener {
 		}
 	}
 
+	@Override
+	public void processRequest(IpmiPayload payload, int handle) {
+		for (InboundMessageListener listener : inboundMessageListeners) {
+			if (listener.isPayloadSupported(payload, handle)) {
+				listener.notify(payload);
+			}
+		}
+	}
+
 	/**
-	 * Closes the connection with the given handle
+	 * Closes the connection with the given handle, and forgets its session. The requests still waiting for a reply
+	 * on the connection fail with a {@link ConnectionException}.
 	 */
 	public void closeConnection(ConnectionHandle handle) {
-		connectionManager
-				.getConnection(handle.getHandle())
-				.unregisterListener(
-						this);
+		Connection connection = connectionManager.getConnection(handle.getHandle());
+		// Still listening while the connection closes, to tell the requests waiting for a reply
 		connectionManager.closeConnection(handle.getHandle());
+		connection.unregisterListener(this);
+		sessionManager.unregisterSession(handle);
 	}
 
 	/**

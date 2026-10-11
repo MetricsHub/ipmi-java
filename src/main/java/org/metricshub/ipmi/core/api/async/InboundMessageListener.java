@@ -40,6 +40,21 @@ public interface InboundMessageListener {
 	boolean isPayloadSupported(IpmiPayload payload);
 
 	/**
+	 * Checks if given payload, received on the connection with the given handle, is for this
+	 * {@link InboundMessageListener}. The connector calls this method; by default, the listener takes the payloads of
+	 * every connection that {@link #isPayloadSupported(IpmiPayload)} supports.
+	 *
+	 * @param payload
+	 *        {@link IpmiPayload} instance to check
+	 * @param handle
+	 *        the id of the connection that received the payload ({@link ConnectionHandle#getHandle()})
+	 * @return true if this object handles the payload, false otherwise
+	 */
+	default boolean isPayloadSupported(IpmiPayload payload, int handle) {
+		return isPayloadSupported(payload);
+	}
+
+	/**
 	 * Notify listener about received inbound message.
 	 * This method should be invoked only with payload for which
 	 * {@link InboundMessageListener#isPayloadSupported(IpmiPayload)} returned true.

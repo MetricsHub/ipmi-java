@@ -8,8 +8,10 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
 import java.net.InetAddress;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.Set;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
@@ -39,6 +41,8 @@ import java.util.concurrent.CountDownLatch;
 import org.metricshub.ipmi.core.coding.commands.IpmiCommandCoder;
 import org.metricshub.ipmi.core.coding.payload.lan.NetworkFunction;
 import org.metricshub.ipmi.core.coding.payload.sol.SolAckState;
+import org.metricshub.ipmi.core.coding.payload.sol.SolInboundMessage;
+import org.metricshub.ipmi.core.coding.payload.sol.SolMessage;
 import org.metricshub.ipmi.core.coding.sol.SolCoder;
 import org.metricshub.ipmi.core.connection.queue.MessageQueue;
 import org.metricshub.ipmi.core.connection.queue.QueueElement;
@@ -183,7 +187,7 @@ class ConnectionTest {
 				}
 
 				@Override
-				public void processRequest(IpmiPayload payload) {
+				public void processRequest(IpmiPayload payload, int handle) {
 					// not expected
 				}
 			});
@@ -225,12 +229,12 @@ class ConnectionTest {
 				}
 
 				@Override
-				public void processRequest(IpmiPayload payload) {
+				public void processRequest(IpmiPayload payload, int handle) {
 					// not expected
 				}
 			});
 			connection.run();
-			int keepAliveTag = 1; // the first tag of a new connection
+			int keepAliveTag = SolMessage.MAX_SEQUENCE_NUMBER + 1; // the first IPMI tag of a new connection
 			MessageQueue queue = handler(connection, PayloadType.Ipmi).getMessageQueue();
 			QueueElement keepAlive = queue.getElement(keepAliveTag);
 			assertNotNull(keepAlive, "the keep-alive must hold its tag in the queue");
@@ -289,6 +293,156 @@ class ConnectionTest {
 		}
 	}
 
+	@Test
+	void theAcknowledgementInAPacketTheBmcSendsAgainIsAppliedOnce() throws Exception {
+		Connection connection = connect(60000);
+		try {
+			MessageHandler sol = handler(connection, PayloadType.Sol);
+			int tag = sol.takeTag(new SolCoder(new byte[] { 'a' }, CipherSuite.getEmpty()), false);
+			connection.notify(new MessageAction(solPacket(7, tag)));
+			assertNull(sol.getMessageQueue().getElement(tag), "packet 7 of the BMC acknowledges the packet");
+
+			// A newer packet of the console has the same number, and the BMC sends its packet 7 again
+			assertEquals(
+					tag,
+					sol.getMessageQueue().add(new SolCoder(new byte[]
+					{ 'b' }, CipherSuite.getEmpty()), false, tag));
+			connection.notify(new MessageAction(solPacket(7, tag)));
+			assertNotNull(sol.getMessageQueue().getElement(tag), "the old ACK must not complete the newer packet");
+		} finally {
+			connection.disconnect();
+		}
+	}
+
+	@Test
+	void aReplyArrivingWhileTheConnectionClosesIsNotReportedAfterTheFailure() throws Exception {
+		Connection connection = connect(60000);
+		List<String> outcomes = new CopyOnWriteArrayList<>();
+		CountDownLatch matching = new CountDownLatch(1);
+		CountDownLatch closed = new CountDownLatch(1);
+		AtomicBoolean armed = new AtomicBoolean();
+		try {
+			openSession(connection);
+			connection.registerListener(new ConnectionListener() {
+				@Override
+				public void processResponse(ResponseData responseData, int handle, int tag, Exception exception) {
+					outcomes.add(exception == null ? "answered" : exception.getMessage());
+				}
+			});
+			MessageHandler ipmi = handler(connection, PayloadType.Ipmi);
+			// A request whose command code is read when its reply is matched: the test closes the connection then
+			int tag = ipmi
+					.takeTag(
+							new GetChannelAuthenticationCapabilities(
+									IpmiVersion.V20,
+									IpmiVersion.V20,
+									CipherSuite.getEmpty()) {
+								@Override
+								public byte getCommandCode() {
+									if (armed.getAndSet(false)) {
+										matching.countDown();
+										try {
+											closed.await(5, TimeUnit.SECONDS);
+										} catch (InterruptedException e) {
+											Thread.currentThread().interrupt();
+										}
+									}
+									return super.getCommandCode();
+								}
+							},
+							false);
+			armed.set(true);
+			Thread receiver = new Thread(() -> connection.notify(new MessageAction(reply(tag, (byte) 0x38))));
+			receiver.start();
+			assertTrue(matching.await(5, TimeUnit.SECONDS));
+			connection.disconnect();
+			closed.countDown();
+			receiver.join(5000);
+			assertEquals(Collections.singletonList("Connection closed"), outcomes);
+		} finally {
+			closed.countDown();
+			connection.disconnect();
+		}
+	}
+
+	@Test
+	void theAcknowledgementInALateCopyOfAnOlderPacketIsNotApplied() throws Exception {
+		Connection connection = connect(60000);
+		try {
+			MessageHandler sol = handler(connection, PayloadType.Sol);
+			int tag = sol.takeTag(new SolCoder(new byte[] { 'a' }, CipherSuite.getEmpty()), false);
+			connection.notify(new MessageAction(solPacket(7, tag)));
+			connection.notify(new MessageAction(solPacket(8, 0)));
+			connection.notify(new MessageAction(solPacket(9, 0)));
+			// A newer packet of the console has the same number, and a copy of packet 7 arrives after packets 8 and 9
+			assertEquals(
+					tag,
+					sol.getMessageQueue().add(new SolCoder(new byte[]
+					{ 'b' }, CipherSuite.getEmpty()), false, tag));
+			connection.notify(new MessageAction(solPacket(7, tag)));
+			assertNotNull(sol.getMessageQueue().getElement(tag), "the old ACK must not complete the newer packet");
+		} finally {
+			connection.disconnect();
+		}
+	}
+
+	@Test
+	void theSamePacketSentAgainAfterItsAcknowledgementGetsANewNumber() throws Exception {
+		Connection connection = connect(60000);
+		try {
+			MessageHandler sol = handler(connection, PayloadType.Sol);
+			SolCoder packet = new SolCoder(new byte[] { 'a' }, CipherSuite.getEmpty());
+			int first = sol.takeTag(packet, false);
+			connection.notify(new MessageAction(solPacket(7, first)));
+			// Not a retry: the BMC would take it for one and drop it
+			assertTrue(sol.takeTag(packet, false) != first);
+		} finally {
+			connection.disconnect();
+		}
+	}
+
+	@Test
+	void anAcknowledgementInANewPacketWithTheNumberOfAnOlderOneIsApplied() throws Exception {
+		Connection connection = connect(60000);
+		try {
+			MessageHandler sol = handler(connection, PayloadType.Sol);
+			int first = sol.takeTag(new SolCoder(new byte[] { 'a' }, CipherSuite.getEmpty()), false);
+			connection.notify(new MessageAction(solPacket(7, first)));
+			// 14 packets of output, which acknowledge nothing: the numbers of the BMC wrap around to 7
+			for (int i = 8; i <= 21; i++) {
+				connection.notify(new MessageAction(solPacket((i - 1) % 15 + 1, 0)));
+			}
+			int second = sol.takeTag(new SolCoder(new byte[] { 'b' }, CipherSuite.getEmpty()), false);
+			connection.notify(new MessageAction(solPacket(7, second)));
+			assertNull(sol.getMessageQueue().getElement(second), "the new packet 7 acknowledges the second packet");
+		} finally {
+			connection.disconnect();
+		}
+	}
+
+	/** A SOL packet of the BMC with one character, which also ACKs the given packet of the console (table 15-2). */
+	private static Ipmiv20Message solPacket(int sequenceNumber, int acknowledged) {
+		Ipmiv20Message packet = new Ipmiv20Message(null);
+		packet.setPayloadType(PayloadType.Sol);
+		packet.setPayload(new SolInboundMessage(new byte[] { (byte) sequenceNumber, (byte) acknowledged, 1, 0, 'x' }));
+		return packet;
+	}
+
+	@Test
+	void ipmiTagsAreAboveTheSolSequenceNumbers() throws Exception {
+		// The replies of both payload types reach the listeners with their tag only
+		Connection connection = connect(60000);
+		try {
+			MessageHandler ipmi = handler(connection, PayloadType.Ipmi);
+			for (int i = 0; i < 100; i++) {
+				int tag = ipmi.getSequenceNumber();
+				assertTrue(tag > SolMessage.MAX_SEQUENCE_NUMBER && tag <= 63, "tag " + tag);
+			}
+		} finally {
+			connection.disconnect();
+		}
+	}
+
 	@SuppressWarnings("unchecked")
 	private static MessageHandler handler(Connection connection, PayloadType payloadType) throws Exception {
 		Field field = Connection.class.getDeclaredField("messageHandlers");
@@ -325,7 +479,7 @@ class ConnectionTest {
 				}
 
 				@Override
-				public void processRequest(IpmiPayload payload) {
+				public void processRequest(IpmiPayload payload, int handle) {
 					// not expected
 				}
 			});
@@ -362,7 +516,7 @@ class ConnectionTest {
 				}
 
 				@Override
-				public void processRequest(IpmiPayload payload) {
+				public void processRequest(IpmiPayload payload, int handle) {
 					// not expected
 				}
 			});
@@ -400,7 +554,7 @@ class ConnectionTest {
 				}
 
 				@Override
-				public void processRequest(IpmiPayload payload) {
+				public void processRequest(IpmiPayload payload, int handle) {
 					connection.unregisterListener(this);
 				}
 			};
@@ -412,7 +566,7 @@ class ConnectionTest {
 				}
 
 				@Override
-				public void processRequest(IpmiPayload payload) {
+				public void processRequest(IpmiPayload payload, int handle) {
 					notified.incrementAndGet();
 				}
 			});

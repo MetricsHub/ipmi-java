@@ -25,8 +25,11 @@ package org.metricshub.ipmi.core.connection;
 import org.metricshub.ipmi.core.coding.PayloadCoder;
 import org.metricshub.ipmi.core.coding.commands.IpmiCommandCoder;
 import org.metricshub.ipmi.core.coding.commands.ResponseData;
+import org.metricshub.ipmi.core.coding.commands.payload.ActivatePayload;
 import org.metricshub.ipmi.core.coding.payload.lan.IpmiLanMessage;
+import org.metricshub.ipmi.core.coding.payload.sol.SolMessage;
 import org.metricshub.ipmi.core.coding.protocol.Ipmiv20Message;
+import org.metricshub.ipmi.core.coding.protocol.PayloadType;
 import org.metricshub.ipmi.core.connection.queue.QueueElement;
 
 import org.slf4j.Logger;
@@ -42,7 +45,9 @@ public class IpmiMessageHandler extends MessageHandler {
 	private static final Logger LOGGER = LoggerFactory.getLogger(IpmiMessageHandler.class);
 
 	public IpmiMessageHandler(Connection connection, int timeout) throws IOException {
-		super(connection, timeout, IpmiLanMessage.MIN_SEQUENCE_NUMBER, IpmiLanMessage.MAX_SEQUENCE_NUMBER);
+		// The tags start above the SOL packet sequence numbers (1 to 15): the replies of both payload types are reported
+		// to the same listeners with their connection and tag only, which must not be ambiguous
+		super(connection, timeout, SolMessage.MAX_SEQUENCE_NUMBER + 1, IpmiLanMessage.MAX_SEQUENCE_NUMBER);
 	}
 
 	/**
@@ -98,19 +103,23 @@ public class IpmiMessageHandler extends MessageHandler {
 				return;
 			}
 
-			if (element.isOneWay()) {
-				// Nobody waits for the reply of a one-way message (the keep-alive): it only frees the tag
-				getMessageQueue().remove(tag);
+			// Out of the queue before the listeners hear of the reply, so that the queue cannot report the request as timed
+			// out or failed afterwards; when it did so already, the reply comes too late. Nobody waits for the reply of a
+			// one-way message (the keep-alive): it only frees the tag
+			if (!getMessageQueue().remove(element) || element.isOneWay()) {
 				return;
 			}
 
 			try {
 				ResponseData responseData = coder.getResponseData(message);
+				if (coder instanceof ActivatePayload && ((ActivatePayload) coder).getPayloadType() == PayloadType.Sol) {
+					// A new activation, confirmed: its SOL packets are numbered from 1 again, before the console sends any
+					getConnection().resetSolPacketNumbers();
+				}
 				getConnection().notifyResponseListeners(getConnection().getHandle(), tag, responseData, null);
 			} catch (Exception e) {
 				getConnection().notifyResponseListeners(getConnection().getHandle(), tag, null, e);
 			}
-			getMessageQueue().remove(tag);
 		}
 	}
 

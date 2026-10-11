@@ -56,7 +56,7 @@ class MessageQueueTest {
 			}
 
 			@Override
-			public void processRequest(IpmiPayload payload) {
+			public void processRequest(IpmiPayload payload, int handle) {
 				// not used
 			}
 		};
@@ -100,7 +100,7 @@ class MessageQueueTest {
 				}
 
 				@Override
-				public void processRequest(IpmiPayload payload) {
+				public void processRequest(IpmiPayload payload, int handle) {
 					// not used
 				}
 			});
@@ -147,6 +147,65 @@ class MessageQueueTest {
 			Thread.sleep(TIMER_TICK_MS);
 			assertFalse(queue.containsId(oneWay), "the one-way message must leave the queue");
 			assertEquals(Collections.singletonList(request + ":Message timed out"), reported);
+		} finally {
+			queue.tearDown();
+		}
+	}
+
+	@Test
+	void aRetriedRequestRestartsItsTimeoutWithoutDelayingTheOthers() throws Exception {
+		MessageQueue queue = newQueue();
+		try {
+			connection.registerListener(recorder());
+			int retried = queue.add(request());
+			int other = queue.add(request());
+			Thread.sleep(TIMEOUT_MS * 3 / 4);
+			assertTrue(queue.retry(retried) != null);
+			Thread.sleep(TIMEOUT_MS * 3 / 4);
+			queue.run();
+			// The other request timed out, behind the retried one, which has a new timeout
+			assertEquals(Collections.singletonList(other + ":Message timed out"), reported);
+			assertTrue(queue.containsId(retried));
+		} finally {
+			queue.tearDown();
+		}
+	}
+
+	@Test
+	void tearingDownReportsTheRequestsWaitingButNotThoseAnswered() {
+		MessageQueue queue = newQueue();
+		connection.registerListener(recorder());
+		int answered = queue.add(request());
+		int waiting = queue.add(request());
+		queue.remove(queue.getElement(answered));
+		queue.tearDown();
+		assertEquals(Collections.singletonList(waiting + ":Connection closed"), reported);
+	}
+
+	@Test
+	void anElementThatTimedOutIsNotRemovedAgain() throws Exception {
+		MessageQueue queue = newQueue();
+		try {
+			QueueElement element = queue.getElement(queue.add(request()));
+			Thread.sleep(TIMEOUT_MS + 50);
+			queue.run();
+			assertFalse(queue.remove(element), "a reply after the timeout comes too late");
+		} finally {
+			queue.tearDown();
+		}
+	}
+
+	@Test
+	void anElementIsRemovedOnlyByItself() {
+		MessageQueue queue = newQueue();
+		try {
+			int tag = queue.add(request());
+			QueueElement first = queue.getElement(tag);
+			queue.remove(tag);
+			// The same tag again, for a request sent again
+			assertEquals(tag, queue.add(request(), false, tag));
+			queue.remove(first);
+			assertTrue(queue.containsId(tag), "removing the first element must leave the second one");
 		} finally {
 			queue.tearDown();
 		}

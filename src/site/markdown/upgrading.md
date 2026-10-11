@@ -57,10 +57,11 @@ The `IpmiClient` API is unchanged, and the client is more tolerant of real-world
 * a sensor whose Get Sensor Reading fails with an error completion code is returned without
   reading, and a `WARN` names it, where 1.2.02 failed the whole call (it tolerated
   `DataNotPresent` only);
-* `IpmiConnector.closeConnection()` releases the connection: its handle then throws
-  `IllegalStateException` instead of addressing a disconnected connection, and a session that
-  fails to be established by `SerialOverLan` closes its own connection instead of tearing down the
-  whole connector;
+* `IpmiConnector.closeConnection()` releases the connection and forgets its session: its handle
+  then throws `IllegalStateException` instead of addressing a disconnected connection, and
+  `SessionManager.establishSession()` closes the connection of a session it fails to open instead
+  of tearing down the whole connector; closing a connection or tearing down the connector fails the
+  requests still waiting for a reply on it with `ConnectionException`, where they waited forever;
 * the `PropertiesManager` lookups are logged at `DEBUG` instead of `INFO`, the unused
   `cleaningFrequency` property is gone from `connection.properties`, and `Constants.TIMEOUT`,
   which nothing reads, is deprecated;
@@ -151,6 +152,51 @@ The decoders follow the IPMI 2.0 and FRU specifications more closely; the visibl
   sensor type, a state the reading type does not define) is logged at `DEBUG` instead of `ERROR`
   or `WARN`.
 
+[Serial over LAN](serial-over-lan.html) consoles follow the IPMI specification and release what
+they open:
+
+* `writeBytes()` sends all the data: from the third packet on, 1.2.02 lost the data or threw
+  `IllegalArgumentException` (on a Supermicro BMC, a 600-character write failed after 20 s with only
+  its first packet delivered); a packet carries at most 255 characters;
+* the packets of the console are numbered 1, 2, 3..., from 1 again at each activation of the
+  payload, as `ipmitool` does: its acknowledgements no longer take a
+  number, which made 1.2.02 reuse the number of the previous packet after 14 packets of the BMC
+  (a BMC drops such a packet as a retry), and a packet whose acknowledgement is lost is sent again
+  with its number, where 1.2.02 sent it as a new packet, which the BMC passed to the server again;
+* a partial NACK of more than 127 characters sends the rest (1.2.02 read the count as a negative
+  byte and gave up), and a packet that the BMC NACKs is sent again after a pause of 100, 200,
+  then 300 ms instead of at once;
+* `invokeOperations()` no longer types a NUL character with the operations, returns once the
+  packet is sent instead of waiting for an acknowledgement that many BMCs never send, and holds the
+  line states (`CTS`, `DCD_DSR`, `RingWOR`) until the next call, where 1.2.02 released them with
+  the next packet;
+* a packet that the BMC sends again is read once (1.2.02 repeated a piece of console output at
+  each lost acknowledgement), every packet with a sequence number is acknowledged, also one
+  without characters, a full buffer suspends the BMC until a read resumes it (the acknowledgement
+  that resumes it is sent again, every 100 ms at most, until a newer packet shows that the BMC
+  resumed), a status is reported once per packet, also when the BMC NACKs a packet you write, and a
+  `SolDeactivated` status sent in a packet without sequence number reaches the event listeners;
+* `readXxx(count, timeout)` waits on the buffer instead of polling it every millisecond, and
+  returns when the buffer is full; the buffer holds 64 KiB instead of 2 KiB, since a Supermicro BMC
+  drops the characters that a full buffer asks it to hold;
+* a console receives the SOL packets of its own connection only, where 1.2.02 gave every console
+  of a connector the packets of all of them, and `close()` unregisters it;
+* the constructors that open their own session own the connector: they tear it down when the
+  console cannot be opened, as `close()` does; `close()` closes every session the console opened,
+  including the one on the SOL port when the BMC serves SOL on another UDP port, and releases them
+  even when Deactivate Payload fails, where 1.2.02 threw before closing the session;
+* `SerialOverLan(connector, session)` never closes the caller's session or connector (1.2.02 tore
+  down the connector when the BMC served SOL on another port), and the session it opens on the SOL
+  port has the BMC key of the caller's session and its own cipher suite instance (1.2.02 shared the
+  caller's, which rekeyed the caller's session);
+* a new constructor takes the [BMC key](configuration.html#bmc-key), and the privilege of a session
+  is raised to the level it was opened for, not always to Administrator;
+* a lost reply to Activate Payload is recovered: when the payload turns out to be active in the
+  console's own session (Get Payload Instance Info), it is deactivated and activated again, where
+  1.2.02 failed with `80h`; a payload active in another session is never deactivated;
+* `GetChannelPayloadSupport` reads the session setup and OEM payloads at their offsets: 1.2.02
+  reported the session setup payloads of a Dell iDRAC or a Cisco IMC as the OEM payloads 0 to 5.
+
 Code that **uses the low-level API** to read FRUs: the `offset` and `countToRead` arguments of
 the `ReadFruData` constructors are now **in bytes** whatever the access unit of the device, and
 the offset alone is sent in words when Get FRU Inventory Area Info reports a word-addressed FRU
@@ -203,9 +249,29 @@ subclassed anyway).
 | `Protocolv20Decoder` | `decode()` throws `IllegalArgumentException` for a message that fails the integrity check, is not signed in a session with integrity, or is truncated |
 | `IpmiConnector`, `IpmiAsyncConnector` | New `openSession(ConnectionHandle, String username, byte[] password, byte[] bmcKey)`; a call with a literal `null` password now needs a cast: `(String) null` |
 | `ConnectionHandle` | The password is kept as bytes: new `getPasswordBytes()` and `setPasswordBytes(byte[])`, which keeps a copy |
-| `SessionManager` | New `establishSession(...)` overload with the password as a `byte[]` |
+| `SessionManager` | New `establishSession(...)` overload with the password as a `byte[]` and the BMC key |
 | `Rakp1` | The constructor takes the password as a `byte[]` of at most 20 bytes; `getPassword()` is removed; the new `checkCredentials(String, byte[], byte[])` checks the lengths, and the user name message now reads `Username is too long. Its length cannot exceed 16 bytes` |
 | `OpenSessionAck`, `Connection.startSession()`, `ConnectionManager.startSession()` | The password is a `byte[]` |
+
+### Serial over LAN and payloads
+
+| Class | Change |
+| --- | --- |
+| `SerialOverLan` | New constructor with a `bmcKey`; `invokeOperations()` returns `true` once the packet is sent |
+| `ConnectionListener` | New `processRequest(IpmiPayload, int handle)`, with the handle of the connection that received the payload, which the connection calls; `processRequest(IpmiPayload)`, which it calls by default, is deprecated, and both have a default implementation (`IpmiAsyncConnector.processRequest(IpmiPayload)` still notifies the inbound listeners, of any connection; a subclass of `IpmiAsyncConnector` that overrides it must override the new method instead, which the connections call) |
+| `InboundMessageListener` | New default method `isPayloadSupported(IpmiPayload, int handle)`, which the connector calls: override it to take the payloads of a single connection |
+| `IpmiConnector` | New `unregisterIncomingMessageListener(InboundMessageListener)` |
+| `InboundSolMessageListener` | New `readBytes(int, int timeout)`, `getLineOperations()` and `setLineOperations(Set)` |
+| `ConnectionHandle` | New `getBmcKey()` and `setBmcKey(byte[])`, which keeps a copy |
+| `Session`, `SessionManager`, `Connection` | New `getManagedSystemSessionId()`, and a `Session` constructor and a `registerSession()` overload that take it |
+| `CipherSuite` | New `copy()`: an uninitialized instance of the same suite, since opening a session keys its suite |
+| `SolMessage`, `SolResponseData` | `getAcceptedCharacterCount()` and `getAcceptedCharactersNumber()` return an `int` from 0 to 255 instead of a signed `byte`; the `SolResponseData` constructor takes the count as an `int` (the one with a `byte` is deprecated) |
+| `SolCoder` | New ACK-only constructor with the line states, and `isAcknowledgeOnly()`; the operations-only constructor sends no character |
+| `GetPayloadInstanceInfo` | New command (IPMI 2.0 section 24.5) |
+| `GetChannelPayloadSupport(byte)`, `DeactivatePayload(PayloadType, int)`, `GetPayloadActivationStatus(PayloadType)` | Deprecated: they build requests for cipher suite 0, which a session of another suite discards |
+| `MessageQueue` | New `add(PayloadCoder, boolean, int tag)`, `remove(QueueElement)`, `resetSequenceNumber()`, and `retry(int tag)`, which restarts the timeout of a request sent again; `tearDown()` reports the requests still waiting as failed |
+| `IpmiConnector` | A request whose connection is closed meanwhile fails at once with `IllegalStateException` instead of being sent again |
+| `IpmiMessageHandler` | The tags of the IPMI requests go from 16 to 63, above the SOL packet sequence numbers, so that a reply is never taken for one of the other payload type |
 
 ### Sensor records
 

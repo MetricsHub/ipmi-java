@@ -28,11 +28,14 @@ import org.metricshub.ipmi.core.coding.payload.sol.SolAckState;
 import org.metricshub.ipmi.core.coding.payload.sol.SolInboundMessage;
 import org.metricshub.ipmi.core.coding.payload.sol.SolMessage;
 import org.metricshub.ipmi.core.coding.protocol.Ipmiv20Message;
+import org.metricshub.ipmi.core.coding.sol.SolCoder;
+import org.metricshub.ipmi.core.connection.queue.QueueElement;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.util.Arrays;
 
 /**
  * Implementation of {@link MessageHandler} for {@link org.metricshub.ipmi.core.coding.protocol.PayloadType#Sol}.
@@ -41,17 +44,71 @@ public class SolMessageHandler extends MessageHandler {
 
 	private static final Logger LOGGER = LoggerFactory.getLogger(SolMessageHandler.class);
 
+	/**
+	 * The last packet queued, and its tag, which is its packet sequence number.
+	 */
+	private PayloadCoder lastPacket;
+	private int lastTag;
+
+	/**
+	 * How many packets of the BMC back a copy is recognized: fewer than the 15 sequence numbers, which a new packet uses
+	 * again.
+	 */
+	private static final int HISTORY = 7;
+
+	/**
+	 * The acknowledgements carried by the packets of the BMC seen lately, by sequence number (number, ACK or NACK,
+	 * count), and the rank of these packets: a copy of one (sent again, possibly late) carries the same acknowledgement,
+	 * applied already. Read and written on the receiving thread, and reset by the thread activating the payload.
+	 */
+	private final int[] inboundAcknowledgements = new int[SolMessage.MAX_SEQUENCE_NUMBER + 1];
+	private final long[] inboundRanks = new long[SolMessage.MAX_SEQUENCE_NUMBER + 1];
+	private long inboundPackets;
+	private int lastInboundSequenceNumber;
+
 	public SolMessageHandler(Connection connection, int timeout) throws IOException {
 		super(connection, timeout, SolMessage.MIN_SEQUENCE_NUMBER, SolMessage.MAX_SEQUENCE_NUMBER);
 	}
 
 	/**
-	 * The one-way SOL messages are the ACK-only packets, which go out with packet sequence number 0 and which the BMC
-	 * never acknowledges (IPMI 2.0 section 15.9): they are not queued, so that they hold no slot of the window.
+	 * The ACK-only packets go out with packet sequence number 0 and the BMC never acknowledges them (IPMI 2.0 section
+	 * 15.9): they are neither queued nor numbered, so that they hold no slot of the window and leave the packet sequence
+	 * numbers to the packets the BMC acknowledges, which then follow each other. The other one-way packets (the
+	 * operations, whose acknowledgement nobody waits for) are numbered and hold their number until it comes or times
+	 * out. A packet sent again after a timeout keeps its packet sequence number, as table 15-2 requires: the BMC takes it
+	 * for the retry it is, and does not pass its characters to the server a second time.
 	 */
 	@Override
-	protected int takeTag(PayloadCoder payloadCoder, boolean isOneWay) {
-		return isOneWay ? getSequenceNumber() : super.takeTag(payloadCoder, isOneWay);
+	protected synchronized int takeTag(PayloadCoder payloadCoder, boolean isOneWay) {
+		if (isOneWay && payloadCoder instanceof SolCoder && ((SolCoder) payloadCoder).isAcknowledgeOnly()) {
+			// Any tag lets the packet go: SolCoder sends 0 as the sequence number of an ACK-only packet
+			return SolMessage.MIN_SEQUENCE_NUMBER;
+		}
+		if (payloadCoder == lastPacket && lastTag > 0) {
+			int tag = getMessageQueue().add(payloadCoder, isOneWay, lastTag);
+			if (tag > 0) {
+				return tag;
+			}
+		}
+		lastTag = super.takeTag(payloadCoder, isOneWay);
+		lastPacket = payloadCoder;
+		return lastTag;
+	}
+
+	/**
+	 * Numbers the packets from 1 again, both ways, as a new activation of the payload does (ipmitool, OpenBMC): the
+	 * packets of the previous activation still queued (operations whose acknowledgement never came) leave the queue
+	 * with their numbers.
+	 */
+	public synchronized void resetPacketNumbers() {
+		getMessageQueue().clear("SOL payload activated again");
+		getMessageQueue().resetSequenceNumber();
+		lastPacket = null;
+		lastTag = 0;
+		Arrays.fill(inboundAcknowledgements, 0);
+		Arrays.fill(inboundRanks, 0);
+		inboundPackets = 0;
+		lastInboundSequenceNumber = 0;
 	}
 
 	/**
@@ -65,37 +122,106 @@ public class SolMessageHandler extends MessageHandler {
 	protected void handleIncomingMessageInternal(Ipmiv20Message message) {
 		SolInboundMessage payload = (SolInboundMessage) message.getPayload();
 
-		if (payload.isAcknowledgeMessage()) {
-			handleIncomingAcknowledgeMessage(message, payload);
-		}
+		// The ACK/NACK carried by a packet that the BMC sends again was applied with the first copy: applied again, it
+		// could complete a newer packet that has the same number
+		boolean retry = isRetry(payload);
+		boolean reported = payload.isAcknowledgeMessage()
+				&& !retry
+				&& handleIncomingAcknowledgeMessage(message, payload);
 
-		if (payload.isDataCarrier()) {
+		// Characters, or statuses that no packet of the console waits for (an informational packet: SOL deactivated, or
+		// the acknowledgement of operations)
+		if (payload.isDataCarrier() || !reported && !payload.getStatusField().getStatuses().isEmpty()) {
 			handleIncomingDataMessage(payload);
 		}
 	}
 
-	private void handleIncomingAcknowledgeMessage(Ipmiv20Message message, SolInboundMessage payload) {
-		PayloadCoder coder = getMessageQueue().getMessageFromQueue(payload.getAckNackSequenceNumber());
+	/**
+	 * Tells whether a packet of the BMC is a copy of a recent one (sent again, possibly late), which carries the
+	 * acknowledgement applied with the first copy (IPMI 2.0 table 15-2), and remembers the packet.
+	 */
+	private synchronized boolean isRetry(SolInboundMessage payload) {
+		int sequenceNumber = payload.getSequenceNumber();
+		if (sequenceNumber == 0) {
+			return false;
+		}
+		int acknowledgement = payload.getAckNackSequenceNumber() << 16
+				| (payload.getStatusField().getAckState() == SolAckState.ACK ? 0 : 1 << 8)
+				| payload.getAcceptedCharacterCount();
+		boolean recent = inboundRanks[sequenceNumber] != 0 && inboundPackets - inboundRanks[sequenceNumber] < HISTORY;
+		if (recent && inboundAcknowledgements[sequenceNumber] == acknowledgement) {
+			return true;
+		}
+		if (!recent || sequenceNumber != lastInboundSequenceNumber) {
+			inboundRanks[sequenceNumber] = ++inboundPackets;
+			lastInboundSequenceNumber = sequenceNumber;
+		}
+		inboundAcknowledgements[sequenceNumber] = acknowledgement;
+		return false;
+	}
+
+	/**
+	 * Reports the acknowledgement of a queued packet, after taking the packet out of the queue when the BMC accepted
+	 * characters: the queue must not report it again, as timed out or failed, meanwhile.
+	 *
+	 * @return whether the acknowledgement was reported to the sender of the packet, who waits for it
+	 */
+	private boolean handleIncomingAcknowledgeMessage(Ipmiv20Message message, SolInboundMessage payload) {
 		int tag = payload.getAckNackSequenceNumber();
+		QueueElement element = getMessageQueue().getElement(tag);
+		PayloadCoder coder = element == null ? null : element.getRequest();
 
 		LOGGER.debug("Received message with tag " + tag);
 
 		if (coder == null) {
 			LOGGER.debug("No message tagged with " + tag + " in queue. Dropping orphan message.");
-			return;
+			return false;
 		}
 
+		// The packet leaves the queue when the BMC took it, wholly or partly; a NACKed one stays, to be sent again. Only
+		// this element is removed: a packet sent again under the same number is another one
+		boolean taken = element.isOneWay()
+				|| payload.getStatusField().getAckState() == SolAckState.ACK
+				|| payload.getAcceptedCharacterCount() > 0;
+		if (taken) {
+			if (!getMessageQueue().remove(element)) {
+				// The packet timed out meanwhile: the acknowledgement is that of the packet sent again under its number,
+				// if any
+				element = getMessageQueue().getElement(tag);
+				if (element == null || element.getRequest() != coder || !getMessageQueue().remove(element)) {
+					return false;
+				}
+			}
+		} else if (getMessageQueue().getElement(tag) != element) {
+			// The NACK of a packet that timed out meanwhile
+			return false;
+		}
+
+		if (taken) {
+			// Acknowledged: the same packet sent again from now on is a new one, with a new number
+			forget(coder);
+		}
+
+		// Nobody waits for the acknowledgement of the operations: its statuses go to the request listeners
+		if (element.isOneWay()) {
+			return false;
+		}
 		try {
 			ResponseData responseData = coder.getResponseData(message);
 			getConnection().notifyResponseListeners(getConnection().getHandle(), tag, responseData, null);
 		} catch (Exception e) {
 			getConnection().notifyResponseListeners(getConnection().getHandle(), tag, null, e);
 		}
+		return true;
+	}
 
-		// Remove message from queue only when it was fully or partially acknowledged. Otherwise, we want to keep it in
-		// queue for further retries
-		if (payload.getStatusField().getAckState() == SolAckState.ACK || payload.getAcceptedCharacterCount() > 0) {
-			getMessageQueue().remove(payload.getAckNackSequenceNumber());
+	/**
+	 * Forgets the last packet queued once acknowledged: only a packet sent again before its acknowledgement keeps its
+	 * number.
+	 */
+	private synchronized void forget(PayloadCoder packet) {
+		if (lastPacket == packet) {
+			lastPacket = null;
 		}
 	}
 

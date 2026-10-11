@@ -25,6 +25,7 @@ package org.metricshub.ipmi.core.coding.sol;
 import org.metricshub.ipmi.core.coding.commands.ResponseData;
 import org.metricshub.ipmi.core.coding.payload.sol.SolAckState;
 import org.metricshub.ipmi.core.coding.payload.sol.SolStatus;
+import org.metricshub.ipmi.core.common.TypeConverter;
 
 import java.util.Set;
 
@@ -51,7 +52,7 @@ public class SolResponseData implements ResponseData {
 	/**
 	 * Number of characters accepted from the corresponding message.
 	 */
-	private final byte acceptedCharactersNumber;
+	private final int acceptedCharactersNumber;
 
 	/**
 	 * Creates new instance of {@link SolResponseData} filled with given data.
@@ -60,13 +61,34 @@ public class SolResponseData implements ResponseData {
 	 *        Acknowledge status for corresponding request message
 	 * @param statuses
 	 *        Set of statuses
+	 * @param acceptedCharactersNumber
+	 *        Number of characters accepted from the corresponding message, 0 to 255
 	 */
 	public SolResponseData(byte requestSequenceNumber, SolAckState acknowledgeState, Set<SolStatus> statuses,
-			byte acceptedCharactersNumber) {
+			int acceptedCharactersNumber) {
 		this.requestSequenceNumber = requestSequenceNumber;
 		this.acknowledgeState = acknowledgeState;
 		this.statuses = statuses;
 		this.acceptedCharactersNumber = acceptedCharactersNumber;
+	}
+
+	/**
+	 * Creates new instance of {@link SolResponseData} filled with given data, with the count as the byte of the packet.
+	 *
+	 * @param requestSequenceNumber
+	 *        Sequence number of the corresponding request message
+	 * @param acknowledgeState
+	 *        Acknowledge status for corresponding request message
+	 * @param statuses
+	 *        Set of statuses
+	 * @param acceptedCharactersNumber
+	 *        Number of characters accepted from the corresponding message, read as unsigned
+	 * @deprecated use {@link #SolResponseData(byte, SolAckState, Set, int)}, which takes the count as an int
+	 */
+	@Deprecated
+	public SolResponseData(byte requestSequenceNumber, SolAckState acknowledgeState, Set<SolStatus> statuses,
+			byte acceptedCharactersNumber) {
+		this(requestSequenceNumber, acknowledgeState, statuses, TypeConverter.byteToInt(acceptedCharactersNumber));
 	}
 
 	public byte getRequestSequenceNumber() {
@@ -81,7 +103,10 @@ public class SolResponseData implements ResponseData {
 		return statuses;
 	}
 
-	public byte getAcceptedCharactersNumber() {
+	/**
+	 * @return the number of characters accepted from the corresponding message, 0 to 255
+	 */
+	public int getAcceptedCharactersNumber() {
 		return acceptedCharactersNumber;
 	}
 

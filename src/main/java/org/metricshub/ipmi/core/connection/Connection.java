@@ -119,6 +119,13 @@ public class Connection extends TimerTask implements MachineObserver {
 		return handle;
 	}
 
+	/**
+	 * @return the managed system session ID of the last session opened, which the BMC generated
+	 */
+	public int getManagedSystemSessionId() {
+		return managedSystemSessionId;
+	}
+
 	private Map<PayloadType, MessageHandler> messageHandlers;
 
 	private Timer timer;
@@ -707,10 +714,24 @@ public class Connection extends TimerTask implements MachineObserver {
 		}
 	}
 
+	/**
+	 * Numbers the SOL packets from 1 again, both ways, once the BMC confirmed a new activation of the payload, as
+	 * ipmitool does.
+	 */
+	void resetSolPacketNumbers() {
+		((SolMessageHandler) messageHandlers.get(PayloadType.Sol)).resetPacketNumbers();
+	}
+
+	/**
+	 * Notifies the listeners of a payload the remote system sent on its own initiative, with the handle of this
+	 * connection.
+	 *
+	 * @param payload the payload received
+	 */
 	public void notifyRequestListeners(IpmiPayload payload) {
 		for (ConnectionListener listener : listeners) {
 			if (listener != null) {
-				listener.processRequest(payload);
+				listener.processRequest(payload, handle);
 			}
 		}
 	}

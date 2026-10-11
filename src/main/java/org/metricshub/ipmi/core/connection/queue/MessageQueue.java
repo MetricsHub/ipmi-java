@@ -94,10 +94,27 @@ public class MessageQueue extends TimerTask {
 	}
 
 	/**
-	 * Stops the MessageQueue
+	 * Stops the MessageQueue: the requests still waiting for a reply are reported as failed, since the timer that
+	 * would report their timeout stops.
 	 */
 	public void tearDown() {
 		timer.cancel();
+		clear("Connection closed");
+	}
+
+	/**
+	 * Removes every request from the queue and frees their tags: those still waiting for a reply are reported as
+	 * failed, the one-way ones are dropped.
+	 *
+	 * @param failure the message of the {@link ConnectionException} reported to the requests still waiting
+	 */
+	public void clear(String failure) {
+		synchronized (queue) {
+			while (!queue.isEmpty()) {
+				QueueElement element = queue.get(0);
+				processObsoleteMessage(element, element.getRequest() == null, failure);
+			}
+		}
 	}
 
 	private List<Integer> reservedTags;
@@ -192,6 +209,74 @@ public class MessageQueue extends TimerTask {
 	}
 
 	/**
+	 * Adds request to the queue under the given tag, when no other request holds it: a SOL packet sent again keeps its
+	 * packet sequence number.
+	 *
+	 * @param request the request to queue
+	 * @param oneWay true when nobody waits for the reply
+	 * @param tag the tag of the request
+	 * @return the tag, or -1 when the tag is taken or the queue is full
+	 */
+	public int add(PayloadCoder request, boolean oneWay, int tag) {
+		run();
+		synchronized (queue) {
+			if (queue.size() >= QUEUE_SIZE || !reserveTag(tag)) {
+				return -1;
+			}
+			queue.add(new QueueElement(tag, request, oneWay));
+			return tag;
+		}
+	}
+
+	/**
+	 * Returns the queued request with the given tag, which is about to be sent again, and restarts its timeout: the
+	 * request moves to the end of the queue, which stays in the order of the timeouts, with its tag.
+	 *
+	 * @param tag the tag of the request
+	 * @return the request, or null if no request with the given tag awaits a reply
+	 */
+	public PayloadCoder retry(int tag) {
+		synchronized (queue) {
+			QueueElement element = getElement(tag);
+			if (element == null) {
+				return null;
+			}
+			queue.remove(element);
+			element.resetTimestamp();
+			queue.add(element);
+			return element.getRequest();
+		}
+	}
+
+	/**
+	 * Removes the given element from the queue, if it is still there: a request sent again under the same tag is
+	 * another element, which stays.
+	 *
+	 * @param element the element of the request answered
+	 * @return whether the element was still waiting for its reply: false when it timed out or failed meanwhile, and was
+	 *         reported so
+	 */
+	public boolean remove(QueueElement element) {
+		synchronized (queue) {
+			// QueueElement does not override equals(): the element itself
+			int index = queue.indexOf(element);
+			boolean waiting = index >= 0 && element.getRequest() != null;
+			removeIndex(index, element.getId());
+			return waiting;
+		}
+	}
+
+	/**
+	 * Numbers the next request from the first sequence number again: a new SOL payload activation numbers its packets
+	 * from 1.
+	 */
+	public void resetSequenceNumber() {
+		synchronized (lastSequenceNumberLock) {
+			lastSequenceNumber = minSequenceNumber - 1;
+		}
+	}
+
+	/**
 	 * Removes message with the given tag from the queue.
 	 */
 	public void remove(int tag) {
@@ -206,18 +291,25 @@ public class MessageQueue extends TimerTask {
 				}
 				++i;
 			}
-			if (index == 0) {
-				queue.remove(0);
-				releaseTag(tag);
-				while (!queue.isEmpty() && queue.get(0).getRequest() == null) {
-					int additionalTag = queue.get(0).getId();
-					queue.remove(0);
-					releaseTag(additionalTag);
-				}
-			} else if (index > 0) {
-				queue.get(index).setRequest(null);
-			}
+			removeIndex(index, tag);
+		}
+	}
 
+	/**
+	 * Removes the element at the given index, with the answered elements that then head the queue; an element behind
+	 * the head is only marked as answered, to keep the tags of the head reserved. Called with the queue locked.
+	 */
+	private void removeIndex(int index, int tag) {
+		if (index == 0) {
+			queue.remove(0);
+			releaseTag(tag);
+			while (!queue.isEmpty() && queue.get(0).getRequest() == null) {
+				int additionalTag = queue.get(0).getId();
+				queue.remove(0);
+				releaseTag(additionalTag);
+			}
+		} else if (index > 0) {
+			queue.get(index).setRequest(null);
 		}
 	}
 
@@ -254,8 +346,8 @@ public class MessageQueue extends TimerTask {
 	}
 
 	/**
-	 * Returns a sequence number for a message sent outside the queue (the Close Session request, the SOL ACK-only
-	 * packets): it skips the tags of the queued requests.
+	 * Returns a sequence number for a message sent outside the queue (the Close Session request): it skips the tags of
+	 * the queued requests.
 	 *
 	 * @return a sequence number that no queued request holds
 	 */
@@ -369,7 +461,7 @@ public class MessageQueue extends TimerTask {
 					boolean done = oldestQueueElement.getRequest() == null;
 
 					if (messageJustTimedOut(oldestQueueElement) || done) {
-						processObsoleteMessage(oldestQueueElement, done);
+						processObsoleteMessage(oldestQueueElement, done, "Message timed out");
 					} else {
 						process = false;
 					}
@@ -385,25 +477,25 @@ public class MessageQueue extends TimerTask {
 	}
 
 	/**
-	 * Removes the oldest message from the queue; when it timed out (rather than being answered), the response
-	 * listeners are told so, which lets the sender retry it with a fresh tag. Nobody waits for a one-way message: its
-	 * timeout is not reported.
+	 * Removes the oldest message from the queue; when it timed out or the queue stops (rather than being answered),
+	 * the response listeners are told so, which lets the sender retry it with a fresh tag. Nobody waits for a one-way
+	 * message: its failure is not reported.
 	 */
-	private void processObsoleteMessage(QueueElement message, boolean done) {
+	private void processObsoleteMessage(QueueElement message, boolean done, String failure) {
 		int tag = message.getId();
 
 		queue.remove(0);
 		releaseTag(tag);
 
 		if (!done && !message.isOneWay()) {
-			logger.debug("Message timed out, tag: {}", tag);
+			logger.debug("{}, tag: {}", failure, tag);
 			try {
 				connection
 						.notifyResponseListeners(
 								connection.getHandle(),
 								tag,
 								null,
-								new ConnectionException("Message timed out"));
+								new ConnectionException(failure));
 			} catch (RuntimeException e) {
 				// A failing listener must not kill the timer thread that expires the other messages
 				logger.warn("Response listener failed while handling the timeout of tag {}", tag, e);

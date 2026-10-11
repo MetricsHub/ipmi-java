@@ -124,8 +124,11 @@ public abstract class SolMessage extends IpmiPayload {
 		return ackNackSequenceNumber;
 	}
 
-	public byte getAcceptedCharacterCount() {
-		return acceptedCharacterCount;
+	/**
+	 * @return the number of characters accepted from the packet acknowledged, 0 to 255
+	 */
+	public int getAcceptedCharacterCount() {
+		return TypeConverter.byteToInt(acceptedCharacterCount);
 	}
 
 	/**

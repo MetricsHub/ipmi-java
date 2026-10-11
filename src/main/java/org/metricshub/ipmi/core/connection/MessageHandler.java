@@ -138,7 +138,7 @@ public abstract class MessageHandler {
 	public int retryMessage(int tag, StateMachine stateMachine, int sessionId) throws ConnectionException {
 		validateSessionState(stateMachine);
 
-		PayloadCoder payloadCoder = messageQueue.getMessageFromQueue(tag);
+		PayloadCoder payloadCoder = messageQueue.retry(tag);
 
 		if (payloadCoder == null) {
 			return -1;
@@ -218,8 +218,7 @@ public abstract class MessageHandler {
 	}
 
 	/**
-	 * Returns a sequence number for a message sent outside the queue (the Close Session request, the SOL ACK-only
-	 * packets).
+	 * Returns a sequence number for a message sent outside the queue (the Close Session request).
 	 *
 	 * @return a sequence number that no queued request holds
 	 */
