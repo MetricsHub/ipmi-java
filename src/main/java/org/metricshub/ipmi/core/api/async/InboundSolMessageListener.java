@@ -79,33 +79,22 @@ public class InboundSolMessageListener implements InboundMessageListener {
 	private long lastResumeNanos;
 
 	/**
-	 * The sequence number of the last packet accepted, and the most characters accepted of it: the BMC sends a packet
-	 * again, with the same number and possibly more characters, when it misses the acknowledgement (IPMI 2.0 section
-	 * 15.9), and a late copy may be shorter.
+	 * How many packets back a copy of a packet is recognized: fewer than the 15 sequence numbers, which a new packet uses
+	 * again.
 	 */
+	private static final int HISTORY = 7;
+
+	/**
+	 * The packets of the BMC seen lately, by sequence number: the most characters accepted of their copies, the statuses
+	 * reported for them (as bits of the ordinals of {@link SolStatus}), and their rank among the packets seen, accepted
+	 * or not. The BMC sends a packet again, with the same number and possibly more characters or statuses, when it
+	 * misses the acknowledgement (IPMI 2.0 section 15.9), and a copy may arrive late, after newer packets, or shorter.
+	 */
+	private final byte[][] receivedCharacters = new byte[SolMessage.MAX_SEQUENCE_NUMBER + 1][];
+	private final int[] reportedStatuses = new int[SolMessage.MAX_SEQUENCE_NUMBER + 1];
+	private final long[] ranks = new long[SolMessage.MAX_SEQUENCE_NUMBER + 1];
+	private long seenPackets;
 	private int lastSequenceNumber;
-	private int lastCharacterCount;
-
-	/**
-	 * How many packets back a late copy (sent before the BMC got the acknowledgement and moved on) is recognized: fewer
-	 * than the 15 sequence numbers, which a new packet uses again.
-	 */
-	private static final int LATE_COPY_HISTORY = 7;
-
-	/**
-	 * The characters accepted of the recent packets, by sequence number, and their rank among the packets accepted: a
-	 * recent number with the same characters is a late copy, which has nothing new.
-	 */
-	private final byte[][] recentCharacters = new byte[SolMessage.MAX_SEQUENCE_NUMBER + 1][];
-	private final long[] recentRanks = new long[SolMessage.MAX_SEQUENCE_NUMBER + 1];
-	private long acceptedPackets;
-
-	/**
-	 * The sequence number of the last packet with a status, and the statuses reported for it, accepted or not: a
-	 * status is reported once, and a copy of the packet may carry a new one.
-	 */
-	private int lastReportedSequenceNumber;
-	private final Set<SolStatus> lastReportedStatuses = EnumSet.noneOf(SolStatus.class);
 
 	/**
 	 * The serial line states the console holds, set in every packet it sends.
@@ -150,29 +139,29 @@ public class InboundSolMessageListener implements InboundMessageListener {
 		boolean accepted;
 		Set<SolStatus> statuses = EnumSet.noneOf(SolStatus.class);
 		synchronized (buffer) {
-			boolean retry = sequenceNumber != 0 && sequenceNumber == lastSequenceNumber;
-			boolean stale = !retry && isLateCopy(packet);
-			byte[] newCharacters = stale ?
-					new byte[0] : Arrays.copyOfRange(characters, characters.length - unseen(packet), characters.length);
+			boolean copy = isCopy(packet);
+			int known = copy ? Math.min(receivedCharacters[sequenceNumber].length, characters.length) : 0;
+			byte[] newCharacters = Arrays.copyOfRange(characters, known, characters.length);
 			accepted = newCharacters.length <= buffer.remainingSpace();
-			if (stale) {
-				LOGGER.debug("Late copy of SOL packet {}: its characters were received already", sequenceNumber);
-			} else if (accepted) {
+			if (sequenceNumber != 0 && !copy) {
+				// A new packet, seen from now on, even when its characters must wait for room
+				ranks[sequenceNumber] = ++seenPackets;
+				receivedCharacters[sequenceNumber] = new byte[0];
+				reportedStatuses[sequenceNumber] = 0;
+				lastSequenceNumber = sequenceNumber;
+			}
+			if (accepted) {
 				buffer.write(newCharacters);
 				if (sequenceNumber != 0) {
-					if (!retry) {
-						recentRanks[sequenceNumber] = ++acceptedPackets;
+					if (characters.length > receivedCharacters[sequenceNumber].length) {
+						receivedCharacters[sequenceNumber] = characters;
 					}
-					lastSequenceNumber = sequenceNumber;
-					lastCharacterCount = retry ? Math.max(lastCharacterCount, characters.length) : characters.length;
-					if (!retry || characters.length > recentCharacters[sequenceNumber].length) {
-						recentCharacters[sequenceNumber] = characters;
-					}
-					// No longer suspended once a copy with all its characters, or a newer packet, is accepted: a late,
-					// shorter copy leaves the BMC waiting for its Resume ACK
+					// No longer suspended once a newer packet, or a copy with all the characters of the suspended one, is
+					// accepted: a late, shorter copy leaves the BMC waiting for its Resume ACK
 					if (suspendedPacket != null
-							&& (suspendedPacket.getSequenceNumber() != sequenceNumber
-									|| characters.length >= suspendedPacket.getData().length)) {
+							&& (!copy
+									|| suspendedPacket.getSequenceNumber() == sequenceNumber
+											&& characters.length >= suspendedPacket.getData().length)) {
 						suspendedPacket = null;
 					}
 				}
@@ -182,17 +171,16 @@ public class InboundSolMessageListener implements InboundMessageListener {
 			// The statuses of a packet are reported as they come, even when its characters must wait for room (the BMC may
 			// never send it again: SOL deactivated), and only once: a copy of the packet reports only a new status
 			Set<SolStatus> received = packet.getStatusField().getStatuses();
-			if (received != null && !stale) {
-				statuses.addAll(received);
-			}
-			// A late copy leaves the statuses remembered for the last packet as they are
-			if (sequenceNumber != 0 && !stale) {
-				if (sequenceNumber != lastReportedSequenceNumber) {
-					lastReportedSequenceNumber = sequenceNumber;
-					lastReportedStatuses.clear();
+			if (received != null) {
+				for (SolStatus status : received) {
+					int bit = 1 << status.ordinal();
+					if (sequenceNumber == 0 || (reportedStatuses[sequenceNumber] & bit) == 0) {
+						statuses.add(status);
+						if (sequenceNumber != 0) {
+							reportedStatuses[sequenceNumber] |= bit;
+						}
+					}
 				}
-				statuses.removeAll(lastReportedStatuses);
-				lastReportedStatuses.addAll(statuses);
 			}
 			// The readers waiting for characters
 			buffer.notifyAll();
@@ -348,32 +336,30 @@ public class InboundSolMessageListener implements InboundMessageListener {
 	}
 
 	/**
-	 * Tells whether a packet is a late copy of a recent packet, other than the last one: the same sequence number,
-	 * accepted fewer than {@link #LATE_COPY_HISTORY} packets ago, and characters that were all received then. Called with
-	 * the buffer locked.
+	 * Tells whether a packet is a copy of a recent packet of the BMC: of the last one (a retry), or of an older one
+	 * (late), whose characters then start like those received. Called with the buffer locked.
 	 */
-	private boolean isLateCopy(SolInboundMessage packet) {
+	private boolean isCopy(SolInboundMessage packet) {
 		int sequenceNumber = packet.getSequenceNumber();
+		byte[] received = sequenceNumber == 0 ? null : receivedCharacters[sequenceNumber];
+		if (received == null || seenPackets - ranks[sequenceNumber] >= HISTORY) {
+			return false;
+		}
+		if (sequenceNumber == lastSequenceNumber) {
+			return true;
+		}
 		byte[] characters = packet.getData();
-		byte[] received = recentCharacters[sequenceNumber];
-		return sequenceNumber != 0
-				&& sequenceNumber != lastSequenceNumber
-				&& received != null
-				&& acceptedPackets - recentRanks[sequenceNumber] < LATE_COPY_HISTORY
-				&& characters.length <= received.length
-				&& Arrays.equals(characters, Arrays.copyOf(received, characters.length));
+		int common = Math.min(received.length, characters.length);
+		return Arrays.equals(Arrays.copyOf(received, common), Arrays.copyOf(characters, common));
 	}
 
 	/**
-	 * Returns how many characters of a packet were not received yet: all of them, except when the BMC sends the last
-	 * packet accepted again, with the characters it may have appended (IPMI 2.0 section 15.9). Called with the buffer
-	 * locked.
+	 * Returns how many characters of a packet were not received yet: all of them, except for a copy of a recent packet,
+	 * which may have characters appended (IPMI 2.0 section 15.9). Called with the buffer locked.
 	 */
 	private int unseen(SolInboundMessage packet) {
 		int length = packet.getData().length;
-		int sequenceNumber = packet.getSequenceNumber();
-		return sequenceNumber != 0 && sequenceNumber == lastSequenceNumber ?
-				length - Math.min(lastCharacterCount, length) : length;
+		return isCopy(packet) ? Math.max(0, length - receivedCharacters[packet.getSequenceNumber()].length) : length;
 	}
 
 	/**

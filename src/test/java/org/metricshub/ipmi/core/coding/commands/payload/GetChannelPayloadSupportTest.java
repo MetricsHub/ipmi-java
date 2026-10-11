@@ -36,6 +36,8 @@ class GetChannelPayloadSupportTest {
 		GetChannelPayloadSupport command = new GetChannelPayloadSupport();
 		assertThrows(
 				IllegalArgumentException.class,
-				() -> command.getResponseData(response(CommandCodes.GET_CHANNEL_PAYLOAD_SUPPORT, 0x00, 0x03, 0x00)));
+				() -> command
+						.getResponseData(
+								response(CommandCodes.GET_CHANNEL_PAYLOAD_SUPPORT, 0x00, 0x03, 0x00, 0x3f, 0, 0, 0, 0)));
 	}
 }

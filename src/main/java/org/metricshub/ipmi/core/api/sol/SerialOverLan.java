@@ -806,7 +806,10 @@ public class SerialOverLan implements Closeable {
 	 */
 	private boolean sendMessage(byte[] characterData) {
 		Set<SolOperation> lineOperations = inboundMessageListener.getLineOperations();
-		SolResponseData responseData = sendPayload(characterPacket(characterData, lineOperations));
+		SolResponseData responseData = sendPayload(
+				characterPacket(characterData, lineOperations),
+				characterData,
+				lineOperations);
 
 		notifyResponseListeners(characterData, lineOperations, responseData);
 
@@ -819,7 +822,10 @@ public class SerialOverLan implements Closeable {
 							responseData.getAcceptedCharactersNumber(),
 							remainingCharacterData.length);
 
-			responseData = sendPayload(characterPacket(remainingCharacterData, lineOperations));
+			responseData = sendPayload(
+					characterPacket(remainingCharacterData, lineOperations),
+					remainingCharacterData,
+					lineOperations);
 
 			notifyResponseListeners(remainingCharacterData, lineOperations, responseData);
 		}
@@ -876,15 +882,23 @@ public class SerialOverLan implements Closeable {
 	 * Sends a packet, and sends it again while the BMC NACKs it without accepting a character (its buffer
 	 * is full, or the server is off), after a growing pause that leaves the BMC time to pass its characters on.
 	 *
+	 * @param payloadCoder the packet
+	 * @param characterData the characters of the packet, reported with the statuses of the NACKs
+	 * @param lineOperations the line states of the packet, reported with the statuses of the NACKs
 	 * @return the acknowledgement of the BMC, or null
 	 */
-	private SolResponseData sendPayload(PayloadCoder payloadCoder) {
+	private SolResponseData sendPayload(
+			PayloadCoder payloadCoder,
+			byte[] characterData,
+			Set<SolOperation> lineOperations) {
 		ConnectionHandle connectionHandle = session.getConnectionHandle();
 
 		try {
 			SolResponseData responseData = (SolResponseData) connector.sendMessage(connectionHandle, payloadCoder);
 
 			for (int retry = 1; isNackForWholeMessage(responseData) && retry <= connector.getRetries(); retry++) {
+				// The statuses of each NACK are reported: the next answer may not repeat them
+				notifyResponseListeners(characterData, lineOperations, responseData);
 				// ponytail: linear pause (100, 200, 300 ms by default), the SOL retry interval of the BMC is not read
 				Thread.sleep(NACK_PAUSE_MS * retry);
 

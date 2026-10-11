@@ -159,6 +159,8 @@ public class FakeRmcpPlusBmc implements AutoCloseable {
 	private volatile boolean solActive;
 	private volatile int solStatus;
 	private final Queue<Integer> solReplies = new ConcurrentLinkedQueue<>();
+	/** The status of each reply of {@link #solReplies}, -1 for {@link #solStatus}. */
+	private final Queue<Integer> solReplyStatuses = new ConcurrentLinkedQueue<>();
 	private final List<SolPacket> solPackets = new CopyOnWriteArrayList<>();
 	private final ByteArrayOutputStream solReceived = new ByteArrayOutputStream();
 	private int lastSolSequenceNumber;
@@ -383,7 +385,21 @@ public class FakeRmcpPlusBmc implements AutoCloseable {
 	 */
 	public void replySol(int... acceptedCharacters) {
 		for (int accepted : acceptedCharacters) {
-			solReplies.add(accepted);
+			replySolWithStatus(accepted, -1);
+		}
+	}
+
+	/**
+	 * Sets how the BMC answers the next SOL packet with a sequence number from the console, as
+	 * {@link #replySol(int...)}, with the given status bits in the reply.
+	 *
+	 * @param acceptedCharacters what the BMC accepts of the packet
+	 * @param status the status bits of the reply (table 15-2)
+	 */
+	public void replySolWithStatus(int acceptedCharacters, int status) {
+		synchronized (solReplies) {
+			solReplies.add(acceptedCharacters);
+			solReplyStatuses.add(status);
 		}
 	}
 
@@ -746,6 +762,7 @@ public class FakeRmcpPlusBmc implements AutoCloseable {
 		}
 		int accepted;
 		Integer reply;
+		int status = solStatus;
 		boolean nack;
 		synchronized (solReceived) {
 			if (received.sequenceNumber == lastSolSequenceNumber && lastSolAccepted) {
@@ -753,7 +770,13 @@ public class FakeRmcpPlusBmc implements AutoCloseable {
 				accepted = received.data.length;
 				reply = null;
 			} else {
-				reply = solReplies.poll();
+				synchronized (solReplies) {
+					reply = solReplies.poll();
+					Integer replyStatus = solReplyStatuses.poll();
+					if (replyStatus != null && replyStatus >= 0) {
+						status = replyStatus;
+					}
+				}
 				accepted = reply == null || reply < 0 ? received.data.length : Math.min(reply, received.data.length);
 				solReceived.write(received.data, 0, accepted);
 			}
@@ -769,7 +792,7 @@ public class FakeRmcpPlusBmc implements AutoCloseable {
 				0x00,
 				(byte) received.sequenceNumber,
 				(byte) accepted,
-				(byte) ((nack ? SOL_NACK : 0x00) | solStatus) };
+				(byte) ((nack ? SOL_NACK : 0x00) | status) };
 	}
 
 	/**

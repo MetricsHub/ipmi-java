@@ -35,6 +35,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.util.Arrays;
 
 /**
  * Implementation of {@link MessageHandler} for {@link org.metricshub.ipmi.core.coding.protocol.PayloadType#Sol}.
@@ -50,13 +51,20 @@ public class SolMessageHandler extends MessageHandler {
 	private int lastTag;
 
 	/**
-	 * The sequence number of the last packet of the BMC with one, and the number of the packet it acknowledged: a packet
-	 * the BMC sends again has both.
+	 * How many packets of the BMC back a copy is recognized: fewer than the 15 sequence numbers, which a new packet uses
+	 * again.
 	 */
+	private static final int HISTORY = 7;
+
+	/**
+	 * The acknowledgements carried by the packets of the BMC seen lately, by sequence number (number, ACK or NACK,
+	 * count), and the rank of these packets: a copy of one (sent again, possibly late) carries the same acknowledgement,
+	 * applied already. Read and written on the receiving thread, and reset by the thread activating the payload.
+	 */
+	private final int[] inboundAcknowledgements = new int[SolMessage.MAX_SEQUENCE_NUMBER + 1];
+	private final long[] inboundRanks = new long[SolMessage.MAX_SEQUENCE_NUMBER + 1];
+	private long inboundPackets;
 	private int lastInboundSequenceNumber;
-	private int lastInboundAcknowledgement;
-	private int previousInboundSequenceNumber;
-	private int previousInboundAcknowledgement;
 
 	public SolMessageHandler(Connection connection, int timeout) throws IOException {
 		super(connection, timeout, SolMessage.MIN_SEQUENCE_NUMBER, SolMessage.MAX_SEQUENCE_NUMBER);
@@ -97,10 +105,10 @@ public class SolMessageHandler extends MessageHandler {
 		getMessageQueue().resetSequenceNumber();
 		lastPacket = null;
 		lastTag = 0;
+		Arrays.fill(inboundAcknowledgements, 0);
+		Arrays.fill(inboundRanks, 0);
+		inboundPackets = 0;
 		lastInboundSequenceNumber = 0;
-		lastInboundAcknowledgement = 0;
-		previousInboundSequenceNumber = 0;
-		previousInboundAcknowledgement = 0;
 	}
 
 	/**
@@ -129,9 +137,8 @@ public class SolMessageHandler extends MessageHandler {
 	}
 
 	/**
-	 * Tells whether the BMC sends its last packet again (the same non-zero sequence number and the same acknowledgement:
-	 * number, ACK or NACK, and count, IPMI 2.0 table 15-2), or a copy of the packet before arrives late, and remembers
-	 * the packet.
+	 * Tells whether a packet of the BMC is a copy of a recent one (sent again, possibly late), which carries the
+	 * acknowledgement applied with the first copy (IPMI 2.0 table 15-2), and remembers the packet.
 	 */
 	private synchronized boolean isRetry(SolInboundMessage payload) {
 		int sequenceNumber = payload.getSequenceNumber();
@@ -141,14 +148,15 @@ public class SolMessageHandler extends MessageHandler {
 		int acknowledgement = payload.getAckNackSequenceNumber() << 16
 				| (payload.getStatusField().getAckState() == SolAckState.ACK ? 0 : 1 << 8)
 				| payload.getAcceptedCharacterCount();
-		if (sequenceNumber == lastInboundSequenceNumber && acknowledgement == lastInboundAcknowledgement
-				|| sequenceNumber == previousInboundSequenceNumber && acknowledgement == previousInboundAcknowledgement) {
+		boolean recent = inboundRanks[sequenceNumber] != 0 && inboundPackets - inboundRanks[sequenceNumber] < HISTORY;
+		if (recent && inboundAcknowledgements[sequenceNumber] == acknowledgement) {
 			return true;
 		}
-		previousInboundSequenceNumber = lastInboundSequenceNumber;
-		previousInboundAcknowledgement = lastInboundAcknowledgement;
-		lastInboundSequenceNumber = sequenceNumber;
-		lastInboundAcknowledgement = acknowledgement;
+		if (!recent || sequenceNumber != lastInboundSequenceNumber) {
+			inboundRanks[sequenceNumber] = ++inboundPackets;
+			lastInboundSequenceNumber = sequenceNumber;
+		}
+		inboundAcknowledgements[sequenceNumber] = acknowledgement;
 		return false;
 	}
 

@@ -141,8 +141,9 @@ public class GetChannelPayloadSupport extends IpmiCommandCoder {
 			InvalidKeyException {
 		byte[] responseData = validateResponse(message);
 
-		// Standard payloads 0-7 and 8-15, session setup payloads 0-7 and 8-15, OEM payloads 0-7 (IPMI 2.0 table 24-10)
-		if (responseData.length < 5) {
+		// Standard payloads 0-7 and 8-15, session setup payloads 0-7 and 8-15, OEM payloads 0-7 and 8-15, reserved
+		// (IPMI 2.0 table 24-10)
+		if (responseData.length < 8) {
 			throw new IllegalArgumentException("Invalid response length");
 		}
 

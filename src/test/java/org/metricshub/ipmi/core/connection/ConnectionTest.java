@@ -366,6 +366,27 @@ class ConnectionTest {
 	}
 
 	@Test
+	void theAcknowledgementInALateCopyOfAnOlderPacketIsNotApplied() throws Exception {
+		Connection connection = connect(60000);
+		try {
+			MessageHandler sol = handler(connection, PayloadType.Sol);
+			int tag = sol.takeTag(new SolCoder(new byte[] { 'a' }, CipherSuite.getEmpty()), false);
+			connection.notify(new MessageAction(solPacket(7, tag)));
+			connection.notify(new MessageAction(solPacket(8, 0)));
+			connection.notify(new MessageAction(solPacket(9, 0)));
+			// A newer packet of the console has the same number, and a copy of packet 7 arrives after packets 8 and 9
+			assertEquals(
+					tag,
+					sol.getMessageQueue().add(new SolCoder(new byte[]
+					{ 'b' }, CipherSuite.getEmpty()), false, tag));
+			connection.notify(new MessageAction(solPacket(7, tag)));
+			assertNotNull(sol.getMessageQueue().getElement(tag), "the old ACK must not complete the newer packet");
+		} finally {
+			connection.disconnect();
+		}
+	}
+
+	@Test
 	void theSamePacketSentAgainAfterItsAcknowledgementGetsANewNumber() throws Exception {
 		Connection connection = connect(60000);
 		try {

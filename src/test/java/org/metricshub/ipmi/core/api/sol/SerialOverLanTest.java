@@ -14,10 +14,13 @@ import static org.metricshub.ipmi.core.transport.FakeRmcpPlusBmc.NETFN_APP;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.EnumSet;
+import java.util.Iterator;
 import java.util.List;
+import java.util.Random;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -542,6 +545,37 @@ class SerialOverLanTest {
 
 	@Test
 	@Timeout(30)
+	void theStatusOfANackIsReportedAlthoughTheAckThatFollowsHasNone() throws Exception {
+		try (FakeRmcpPlusBmc bmc = solBmc(null)) {
+			// The server is off for a moment: the BMC NACKs the packet, with the status, then takes it
+			bmc.replySolWithStatus(0, FakeRmcpPlusBmc.SOL_CHARACTER_TRANSFER_UNAVAILABLE);
+			try (
+					SerialOverLan sol = new SerialOverLan(
+							new IpmiConnector(0, 0),
+							host(bmc),
+							bmc.getPort(),
+							USER,
+							PASSWORD,
+							SUITE_17)) {
+				List<Set<SolStatus>> statuses = new CopyOnWriteArrayList<>();
+				sol.registerEventListener(new RecordingListener(new CopyOnWriteArrayList<>()) {
+					@Override
+					public void processResponseEvent(
+							Set<SolStatus> responseStatuses,
+							byte[] correspondingRequestData,
+							Set<SolOperation> correspondingRequestOperations) {
+						statuses.add(responseStatuses);
+					}
+				});
+				assertTrue(sol.writeByte((byte) 'a'));
+				assertEquals(Collections.singletonList(EnumSet.of(SolStatus.CharacterTransferUnavailable)), statuses);
+			}
+			assertEquals(Collections.emptyList(), bmc.getErrors());
+		}
+	}
+
+	@Test
+	@Timeout(30)
 	void lineStatesAreHeldInEveryPacketUntilReleased() throws Exception {
 		try (FakeRmcpPlusBmc bmc = solBmc(null)) {
 			try (
@@ -906,6 +940,82 @@ class SerialOverLanTest {
 				connector.tearDown();
 			}
 		}
+	}
+
+	@Test
+	@Timeout(60)
+	void retriesAndLateCopiesInAnyOrderAreReadOnce() throws Exception {
+		try (FakeRmcpPlusBmc bmc = solBmc(null)) {
+			try (
+					SerialOverLan sol = new SerialOverLan(
+							new IpmiConnector(0, 0),
+							host(bmc),
+							bmc.getPort(),
+							USER,
+							PASSWORD,
+							SUITE_17)) {
+				List<Set<SolStatus>> events = new CopyOnWriteArrayList<>();
+				sol.registerEventListener(new RecordingListener(events));
+				Random random = new Random(160);
+				StringBuilder expected = new StringBuilder();
+				int breaks = 0;
+				int copies = 0;
+				// Copies of earlier packets, delivered late: {packet index, sequence number, status, characters}
+				List<Object[]> late = new ArrayList<>();
+				for (int packet = 0; packet < 300; packet++) {
+					int sequenceNumber = packet % 15 + 1;
+					int status = random.nextInt(8) == 0 ? FakeRmcpPlusBmc.SOL_BREAK : 0;
+					String text = randomText(random, 1 + random.nextInt(20));
+					// Copies that grow up to the whole text: the BMC appends characters to a packet it sends again
+					int length = 1 + random.nextInt(text.length());
+					do {
+						// The status may only appear in a later copy; the last one, with the whole text, has it
+						int copyStatus = length == text.length() || random.nextBoolean() ? status : 0;
+						bmc.sendSol(sequenceNumber, copyStatus, utf8(text.substring(0, length)));
+						copies++;
+						if (random.nextInt(4) == 0) {
+							// This copy also arrives after 1 to 6 newer packets
+							late
+									.add(
+											new Object[]
+											{
+													packet + 1 + random.nextInt(6),
+													sequenceNumber,
+													copyStatus,
+													text.substring(0, length) });
+						}
+						length = length == text.length() ? -1 : length + 1 + random.nextInt(text.length() - length);
+					} while (length > 0);
+					expected.append(text);
+					breaks += status == 0 ? 0 : 1;
+					for (Iterator<Object[]> iterator = late.iterator(); iterator.hasNext();) {
+						Object[] copy = iterator.next();
+						if ((int) copy[0] == packet) {
+							bmc.sendSol((int) copy[1], (int) copy[2], utf8((String) copy[3]));
+							copies++;
+							iterator.remove();
+						}
+					}
+					int acknowledged = copies;
+					if (packet % 16 == 15) {
+						await(() -> acks(bmc) == acknowledged, "the console acknowledges every copy");
+					}
+				}
+				int acknowledged = copies;
+				await(() -> acks(bmc) == acknowledged, "the console acknowledges every copy");
+				assertEquals(expected.toString(), sol.readString(StandardCharsets.US_ASCII));
+				assertEquals(breaks, events.size(), "each break reported once");
+			}
+			assertEquals(Collections.emptyList(), bmc.getErrors());
+		}
+	}
+
+	private static String randomText(Random random, int length) {
+		StringBuilder text = new StringBuilder();
+		for (int i = 0; i < length; i++) {
+			text.append((char) ('a' + random.nextInt(26)));
+		}
+		return text.toString();
 	}
 
 	@Test
