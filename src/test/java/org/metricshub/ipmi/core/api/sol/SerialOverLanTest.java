@@ -920,13 +920,18 @@ class SerialOverLanTest {
 							USER,
 							PASSWORD,
 							SUITE_17)) {
-				// A retry of packet 3 overtaken by packet 4, then a retry of packet 4 with 2 more characters
+				List<Set<SolStatus>> events = new CopyOnWriteArrayList<>();
+				sol.registerEventListener(new RecordingListener(events));
+				// Retries of packets 3 and 4 overtaken by the next ones, then a retry of packet 5 with 2 more characters
 				bmc.sendSol(3, 0, utf8("abc"));
 				bmc.sendSol(4, 0, utf8("def"));
+				bmc.sendSol(5, FakeRmcpPlusBmc.SOL_BREAK, utf8("ghi"));
 				bmc.sendSol(3, 0, utf8("abc"));
-				bmc.sendSol(4, 0, utf8("defgh"));
-				await(() -> acks(bmc) == 4, "the console acknowledges each copy");
-				assertEquals("abcdefgh", sol.readString(StandardCharsets.US_ASCII));
+				bmc.sendSol(4, 0, utf8("def"));
+				bmc.sendSol(5, FakeRmcpPlusBmc.SOL_BREAK, utf8("ghijk"));
+				await(() -> acks(bmc) == 6, "the console acknowledges each copy");
+				assertEquals("abcdefghijk", sol.readString(StandardCharsets.US_ASCII));
+				assertEquals(Collections.singletonList(EnumSet.of(SolStatus.Break)), events, "reported once");
 			}
 			assertEquals(Collections.emptyList(), bmc.getErrors());
 		}

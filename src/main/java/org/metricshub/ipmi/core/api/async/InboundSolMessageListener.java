@@ -27,6 +27,7 @@ import org.metricshub.ipmi.core.api.sync.IpmiConnector;
 import org.metricshub.ipmi.core.coding.payload.IpmiPayload;
 import org.metricshub.ipmi.core.coding.payload.sol.SolAckState;
 import org.metricshub.ipmi.core.coding.payload.sol.SolInboundMessage;
+import org.metricshub.ipmi.core.coding.payload.sol.SolMessage;
 import org.metricshub.ipmi.core.coding.payload.sol.SolOperation;
 import org.metricshub.ipmi.core.coding.payload.sol.SolStatus;
 import org.metricshub.ipmi.core.coding.sol.SolCoder;
@@ -86,10 +87,18 @@ public class InboundSolMessageListener implements InboundMessageListener {
 	private int lastCharacterCount;
 
 	/**
-	 * The sequence number of the packet accepted before the last one: a copy of it that arrives late (sent before the
-	 * BMC got the acknowledgement and moved on) has nothing new.
+	 * How many packets back a late copy (sent before the BMC got the acknowledgement and moved on) is recognized: fewer
+	 * than the 15 sequence numbers, which a new packet uses again.
 	 */
-	private int previousSequenceNumber;
+	private static final int LATE_COPY_HISTORY = 7;
+
+	/**
+	 * The characters accepted of the recent packets, by sequence number, and their rank among the packets accepted: a
+	 * recent number with the same characters is a late copy, which has nothing new.
+	 */
+	private final byte[][] recentCharacters = new byte[SolMessage.MAX_SEQUENCE_NUMBER + 1][];
+	private final long[] recentRanks = new long[SolMessage.MAX_SEQUENCE_NUMBER + 1];
+	private long acceptedPackets;
 
 	/**
 	 * The sequence number of the last packet with a status, and the statuses reported for it, accepted or not: a
@@ -142,7 +151,7 @@ public class InboundSolMessageListener implements InboundMessageListener {
 		Set<SolStatus> statuses = EnumSet.noneOf(SolStatus.class);
 		synchronized (buffer) {
 			boolean retry = sequenceNumber != 0 && sequenceNumber == lastSequenceNumber;
-			boolean stale = sequenceNumber != 0 && !retry && sequenceNumber == previousSequenceNumber;
+			boolean stale = !retry && isLateCopy(packet);
 			byte[] newCharacters = stale ?
 					new byte[0] : Arrays.copyOfRange(characters, characters.length - unseen(packet), characters.length);
 			accepted = newCharacters.length <= buffer.remainingSpace();
@@ -152,10 +161,13 @@ public class InboundSolMessageListener implements InboundMessageListener {
 				buffer.write(newCharacters);
 				if (sequenceNumber != 0) {
 					if (!retry) {
-						previousSequenceNumber = lastSequenceNumber;
+						recentRanks[sequenceNumber] = ++acceptedPackets;
 					}
 					lastSequenceNumber = sequenceNumber;
 					lastCharacterCount = retry ? Math.max(lastCharacterCount, characters.length) : characters.length;
+					if (!retry || characters.length > recentCharacters[sequenceNumber].length) {
+						recentCharacters[sequenceNumber] = characters;
+					}
 					// No longer suspended once a copy with all its characters, or a newer packet, is accepted: a late,
 					// shorter copy leaves the BMC waiting for its Resume ACK
 					if (suspendedPacket != null
@@ -173,7 +185,8 @@ public class InboundSolMessageListener implements InboundMessageListener {
 			if (received != null && !stale) {
 				statuses.addAll(received);
 			}
-			if (sequenceNumber != 0) {
+			// A late copy leaves the statuses remembered for the last packet as they are
+			if (sequenceNumber != 0 && !stale) {
 				if (sequenceNumber != lastReportedSequenceNumber) {
 					lastReportedSequenceNumber = sequenceNumber;
 					lastReportedStatuses.clear();
@@ -332,6 +345,23 @@ public class InboundSolMessageListener implements InboundMessageListener {
 	 */
 	private boolean isFull() {
 		return buffer.remainingSpace() == 0 || suspendedPacket != null && unseen(suspendedPacket) > buffer.remainingSpace();
+	}
+
+	/**
+	 * Tells whether a packet is a late copy of a recent packet, other than the last one: the same sequence number,
+	 * accepted fewer than {@link #LATE_COPY_HISTORY} packets ago, and characters that were all received then. Called with
+	 * the buffer locked.
+	 */
+	private boolean isLateCopy(SolInboundMessage packet) {
+		int sequenceNumber = packet.getSequenceNumber();
+		byte[] characters = packet.getData();
+		byte[] received = recentCharacters[sequenceNumber];
+		return sequenceNumber != 0
+				&& sequenceNumber != lastSequenceNumber
+				&& received != null
+				&& acceptedPackets - recentRanks[sequenceNumber] < LATE_COPY_HISTORY
+				&& characters.length <= received.length
+				&& Arrays.equals(characters, Arrays.copyOf(received, characters.length));
 	}
 
 	/**
