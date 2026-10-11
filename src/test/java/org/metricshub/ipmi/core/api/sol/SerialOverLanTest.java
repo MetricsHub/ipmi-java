@@ -780,6 +780,61 @@ class SerialOverLanTest {
 
 	@Test
 	@Timeout(30)
+	void aStatusIsReportedAtOnceWhenTheCharactersOfItsPacketMustWait() throws Exception {
+		try (FakeRmcpPlusBmc bmc = solBmc(null)) {
+			try (
+					SerialOverLan sol = new SerialOverLan(
+							new IpmiConnector(0, 0),
+							host(bmc),
+							bmc.getPort(),
+							USER,
+							PASSWORD,
+							SUITE_17)) {
+				List<Set<SolStatus>> events = new CopyOnWriteArrayList<>();
+				sol.registerEventListener(new RecordingListener(events));
+				int packets = fillBuffer(bmc);
+				int next = packets % 15 + 1;
+				bmc.sendSol(next, FakeRmcpPlusBmc.SOL_BREAK, text(10));
+				await(() -> !events.isEmpty(), "the listener is told before the characters fit");
+				assertEquals(next + "/0 NACK", ack(bmc.getSolPackets().get(packets)), "a Suspend NACK");
+
+				// The packet sent again once resumed: its status is not reported again
+				sol.readBytes(10);
+				bmc.sendSol(next, FakeRmcpPlusBmc.SOL_BREAK, text(10));
+				await(
+						() -> bmc.getSolPackets().stream().anyMatch(packet -> (next + "/10").equals(ack(packet))),
+						"the console accepts the packet sent again");
+				assertEquals(Collections.singletonList(EnumSet.of(SolStatus.Break)), events);
+			}
+			assertEquals(Collections.emptyList(), bmc.getErrors());
+		}
+	}
+
+	@Test
+	@Timeout(30)
+	void aLateShorterCopyOfAPacketDoesNotDuplicateItsCharacters() throws Exception {
+		try (FakeRmcpPlusBmc bmc = solBmc(null)) {
+			try (
+					SerialOverLan sol = new SerialOverLan(
+							new IpmiConnector(0, 0),
+							host(bmc),
+							bmc.getPort(),
+							USER,
+							PASSWORD,
+							SUITE_17)) {
+				// A retry with 2 more characters overtakes the first copy, and the BMC sends it again
+				bmc.sendSol(3, 0, utf8("abcde"));
+				bmc.sendSol(3, 0, utf8("abc"));
+				bmc.sendSol(3, 0, utf8("abcde"));
+				await(() -> acks(bmc) == 3, "the console acknowledges each copy");
+				assertEquals("abcde", sol.readString(StandardCharsets.US_ASCII));
+			}
+			assertEquals(Collections.emptyList(), bmc.getErrors());
+		}
+	}
+
+	@Test
+	@Timeout(30)
 	void aReadReturnsOnceTheBufferIsFull() throws Exception {
 		try (FakeRmcpPlusBmc bmc = solBmc(null)) {
 			try (

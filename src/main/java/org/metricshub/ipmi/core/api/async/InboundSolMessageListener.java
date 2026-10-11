@@ -78,11 +78,17 @@ public class InboundSolMessageListener implements InboundMessageListener {
 	private long lastResumeNanos;
 
 	/**
-	 * The sequence number of the last packet accepted, and its number of characters: the BMC sends a packet again,
-	 * with the same number and possibly more characters, when it misses the acknowledgement (IPMI 2.0 section 15.9).
+	 * The sequence number of the last packet accepted, and the most characters accepted of it: the BMC sends a packet
+	 * again, with the same number and possibly more characters, when it misses the acknowledgement (IPMI 2.0 section
+	 * 15.9), and a late copy may be shorter.
 	 */
 	private int lastSequenceNumber;
 	private int lastCharacterCount;
+
+	/**
+	 * The sequence number of the last packet whose statuses were reported, accepted or not: a status is reported once.
+	 */
+	private int lastReportedSequenceNumber;
 
 	/**
 	 * The serial line states the console holds, set in every packet it sends.
@@ -124,21 +130,27 @@ public class InboundSolMessageListener implements InboundMessageListener {
 		int sequenceNumber = packet.getSequenceNumber();
 		byte[] characters = packet.getData();
 
-		boolean retry;
 		boolean accepted;
+		boolean report;
 		synchronized (buffer) {
-			retry = sequenceNumber != 0 && sequenceNumber == lastSequenceNumber;
+			boolean retry = sequenceNumber != 0 && sequenceNumber == lastSequenceNumber;
 			byte[] newCharacters = Arrays.copyOfRange(characters, characters.length - unseen(packet), characters.length);
 			accepted = newCharacters.length <= buffer.remainingSpace();
 			if (accepted) {
 				buffer.write(newCharacters);
 				if (sequenceNumber != 0) {
 					lastSequenceNumber = sequenceNumber;
-					lastCharacterCount = characters.length;
+					lastCharacterCount = retry ? Math.max(lastCharacterCount, characters.length) : characters.length;
 					suspendedPacket = null;
 				}
 			} else if (sequenceNumber == 0) {
 				LOGGER.warn("Dropping {} characters received in a SOL packet without sequence number", characters.length);
+			}
+			// The statuses of a packet are reported at its first copy, even when its characters must wait for room: the
+			// BMC may never send it again (SOL deactivated)
+			report = sequenceNumber == 0 || sequenceNumber != lastReportedSequenceNumber;
+			if (sequenceNumber != 0) {
+				lastReportedSequenceNumber = sequenceNumber;
 			}
 			// The readers waiting for characters
 			buffer.notifyAll();
@@ -166,7 +178,7 @@ public class InboundSolMessageListener implements InboundMessageListener {
 		}
 
 		Set<SolStatus> statuses = packet.getStatusField().getStatuses();
-		if (accepted && !retry && statuses != null && !statuses.isEmpty()) {
+		if (report && statuses != null && !statuses.isEmpty()) {
 			for (SolEventListener listener : eventListeners) {
 				listener.processRequestEvent(statuses);
 			}
