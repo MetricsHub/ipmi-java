@@ -86,6 +86,12 @@ public class InboundSolMessageListener implements InboundMessageListener {
 	private int lastCharacterCount;
 
 	/**
+	 * The sequence number of the packet accepted before the last one: a copy of it that arrives late (sent before the
+	 * BMC got the acknowledgement and moved on) has nothing new.
+	 */
+	private int previousSequenceNumber;
+
+	/**
 	 * The sequence number of the last packet with a status, and the statuses reported for it, accepted or not: a
 	 * status is reported once, and a copy of the packet may carry a new one.
 	 */
@@ -136,11 +142,18 @@ public class InboundSolMessageListener implements InboundMessageListener {
 		Set<SolStatus> statuses = EnumSet.noneOf(SolStatus.class);
 		synchronized (buffer) {
 			boolean retry = sequenceNumber != 0 && sequenceNumber == lastSequenceNumber;
-			byte[] newCharacters = Arrays.copyOfRange(characters, characters.length - unseen(packet), characters.length);
+			boolean stale = sequenceNumber != 0 && !retry && sequenceNumber == previousSequenceNumber;
+			byte[] newCharacters = stale ?
+					new byte[0] : Arrays.copyOfRange(characters, characters.length - unseen(packet), characters.length);
 			accepted = newCharacters.length <= buffer.remainingSpace();
-			if (accepted) {
+			if (stale) {
+				LOGGER.debug("Late copy of SOL packet {}: its characters were received already", sequenceNumber);
+			} else if (accepted) {
 				buffer.write(newCharacters);
 				if (sequenceNumber != 0) {
+					if (!retry) {
+						previousSequenceNumber = lastSequenceNumber;
+					}
 					lastSequenceNumber = sequenceNumber;
 					lastCharacterCount = retry ? Math.max(lastCharacterCount, characters.length) : characters.length;
 					// No longer suspended once a copy with all its characters, or a newer packet, is accepted: a late,
@@ -157,7 +170,7 @@ public class InboundSolMessageListener implements InboundMessageListener {
 			// The statuses of a packet are reported as they come, even when its characters must wait for room (the BMC may
 			// never send it again: SOL deactivated), and only once: a copy of the packet reports only a new status
 			Set<SolStatus> received = packet.getStatusField().getStatuses();
-			if (received != null) {
+			if (received != null && !stale) {
 				statuses.addAll(received);
 			}
 			if (sequenceNumber != 0) {

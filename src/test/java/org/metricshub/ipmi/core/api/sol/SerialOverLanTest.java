@@ -910,6 +910,30 @@ class SerialOverLanTest {
 
 	@Test
 	@Timeout(30)
+	void aLateCopyOfThePacketBeforeTheLastOneIsIgnored() throws Exception {
+		try (FakeRmcpPlusBmc bmc = solBmc(null)) {
+			try (
+					SerialOverLan sol = new SerialOverLan(
+							new IpmiConnector(0, 0),
+							host(bmc),
+							bmc.getPort(),
+							USER,
+							PASSWORD,
+							SUITE_17)) {
+				// A retry of packet 3 overtaken by packet 4, then a retry of packet 4 with 2 more characters
+				bmc.sendSol(3, 0, utf8("abc"));
+				bmc.sendSol(4, 0, utf8("def"));
+				bmc.sendSol(3, 0, utf8("abc"));
+				bmc.sendSol(4, 0, utf8("defgh"));
+				await(() -> acks(bmc) == 4, "the console acknowledges each copy");
+				assertEquals("abcdefgh", sol.readString(StandardCharsets.US_ASCII));
+			}
+			assertEquals(Collections.emptyList(), bmc.getErrors());
+		}
+	}
+
+	@Test
+	@Timeout(30)
 	void aLateShorterCopyOfAPacketDoesNotDuplicateItsCharacters() throws Exception {
 		try (FakeRmcpPlusBmc bmc = solBmc(null)) {
 			try (

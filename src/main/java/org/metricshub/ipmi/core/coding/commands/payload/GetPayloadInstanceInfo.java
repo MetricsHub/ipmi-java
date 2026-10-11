@@ -82,7 +82,8 @@ public class GetPayloadInstanceInfo extends IpmiCommandCoder {
 	@Override
 	public ResponseData getResponseData(IpmiMessage message) throws IPMIException {
 		byte[] data = validateResponse(message);
-		if (data.length < 4) {
+		// The whole response, before trusting its session ID
+		if (data.length < 12) {
 			throw new IllegalArgumentException("Invalid response length");
 		}
 		return new GetPayloadInstanceInfoResponseData(TypeConverter.littleEndianByteArrayToInt(Arrays.copyOf(data, 4)));

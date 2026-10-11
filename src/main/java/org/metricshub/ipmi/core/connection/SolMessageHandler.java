@@ -55,6 +55,8 @@ public class SolMessageHandler extends MessageHandler {
 	 */
 	private int lastInboundSequenceNumber;
 	private int lastInboundAcknowledgement;
+	private int previousInboundSequenceNumber;
+	private int previousInboundAcknowledgement;
 
 	public SolMessageHandler(Connection connection, int timeout) throws IOException {
 		super(connection, timeout, SolMessage.MIN_SEQUENCE_NUMBER, SolMessage.MAX_SEQUENCE_NUMBER);
@@ -97,6 +99,8 @@ public class SolMessageHandler extends MessageHandler {
 		lastTag = 0;
 		lastInboundSequenceNumber = 0;
 		lastInboundAcknowledgement = 0;
+		previousInboundSequenceNumber = 0;
+		previousInboundAcknowledgement = 0;
 	}
 
 	/**
@@ -126,7 +130,8 @@ public class SolMessageHandler extends MessageHandler {
 
 	/**
 	 * Tells whether the BMC sends its last packet again (the same non-zero sequence number and the same acknowledgement:
-	 * number, ACK or NACK, and count, IPMI 2.0 table 15-2), and remembers the packet.
+	 * number, ACK or NACK, and count, IPMI 2.0 table 15-2), or a copy of the packet before arrives late, and remembers
+	 * the packet.
 	 */
 	private synchronized boolean isRetry(SolInboundMessage payload) {
 		int sequenceNumber = payload.getSequenceNumber();
@@ -136,10 +141,15 @@ public class SolMessageHandler extends MessageHandler {
 		int acknowledgement = payload.getAckNackSequenceNumber() << 16
 				| (payload.getStatusField().getAckState() == SolAckState.ACK ? 0 : 1 << 8)
 				| payload.getAcceptedCharacterCount();
-		boolean retry = sequenceNumber == lastInboundSequenceNumber && acknowledgement == lastInboundAcknowledgement;
+		if (sequenceNumber == lastInboundSequenceNumber && acknowledgement == lastInboundAcknowledgement
+				|| sequenceNumber == previousInboundSequenceNumber && acknowledgement == previousInboundAcknowledgement) {
+			return true;
+		}
+		previousInboundSequenceNumber = lastInboundSequenceNumber;
+		previousInboundAcknowledgement = lastInboundAcknowledgement;
 		lastInboundSequenceNumber = sequenceNumber;
 		lastInboundAcknowledgement = acknowledgement;
-		return retry;
+		return false;
 	}
 
 	/**
