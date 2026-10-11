@@ -143,7 +143,13 @@ public class InboundSolMessageListener implements InboundMessageListener {
 				if (sequenceNumber != 0) {
 					lastSequenceNumber = sequenceNumber;
 					lastCharacterCount = retry ? Math.max(lastCharacterCount, characters.length) : characters.length;
-					suspendedPacket = null;
+					// No longer suspended once a copy with all its characters, or a newer packet, is accepted: a late,
+					// shorter copy leaves the BMC waiting for its Resume ACK
+					if (suspendedPacket != null
+							&& (suspendedPacket.getSequenceNumber() != sequenceNumber
+									|| characters.length >= suspendedPacket.getData().length)) {
+						suspendedPacket = null;
+					}
 				}
 			} else if (sequenceNumber == 0) {
 				LOGGER.warn("Dropping {} characters received in a SOL packet without sequence number", characters.length);

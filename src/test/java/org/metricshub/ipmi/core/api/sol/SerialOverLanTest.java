@@ -770,6 +770,9 @@ class SerialOverLanTest {
 				bmc.sendSol(last, 0, text(lastLength + 10));
 				await(() -> acks(bmc) == packets + 1, "the console answers the packet");
 				assertEquals(last + "/0 NACK", ack(bmc.getSolPackets().get(packets)), "a Suspend NACK");
+				// A late copy of the packet, without the new characters, does not end the suspension
+				bmc.sendSol(last, 0, text(lastLength));
+				await(() -> acks(bmc) == packets + 2, "the console acknowledges the late copy");
 				// Room for the 10 new characters: the BMC is resumed
 				assertEquals(10, sol.readBytes(10).length);
 				await(() -> resumes(bmc) == 1, "the console sends a Resume ACK");
