@@ -290,7 +290,15 @@ final class CliArguments implements AutoCloseable {
 			return nextIndex(argument, index);
 		case "--name":
 			requireSubcommand(option, Subcommand.SENSORS);
-			names.addAll(Arrays.asList(optionValue(rest, index, option).split(",")));
+			for (String glob : optionValue(rest, index, option).split(",")) {
+				if (glob.trim().isEmpty()) {
+					throw new CliUsageException(option + " requires a glob");
+				}
+				names.add(glob.trim());
+			}
+			if (names.isEmpty()) {
+				throw new CliUsageException(option + " requires a glob");
+			}
 			return nextIndex(argument, index);
 		case "--long":
 			requireSubcommand(option, Subcommand.SENSORS);

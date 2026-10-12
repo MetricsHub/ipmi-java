@@ -24,6 +24,7 @@ package org.metricshub.ipmi.cli;
 
 import java.io.ByteArrayOutputStream;
 import java.io.Console;
+import java.io.IOError;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.PrintStream;
@@ -673,15 +674,7 @@ public final class IpmiCli {
 			}
 			String saved = stty("-g").trim();
 			stty("raw -echo");
-			return new RawInput(stdin, () -> {
-				try {
-					stty(saved);
-				} catch (IOException e) {
-					// The terminal keeps the raw mode: the shell of the user has its own reset
-				} catch (InterruptedException e) {
-					Thread.currentThread().interrupt();
-				}
-			});
+			return new RawInput(stdin, () -> restoreTerminal(saved, err));
 		} catch (IOException | InterruptedException e) {
 			if (e instanceof InterruptedException) {
 				Thread.currentThread().interrupt();
@@ -716,6 +709,7 @@ public final class IpmiCli {
 			+ "    $b = $b + @(126)\n"
 			+ "  } elseif ($key -eq 'Tab' -and $shift) {\n"
 			+ "    $b = @(27, 91, 90)\n"
+			+ "  } elseif ($key -eq 'Spacebar' -and $ctrl) {\n" + "    $b = @(0)\n"
 			+ "  } elseif ([int]$k.KeyChar -ne 0) {\n"
 			+ "    $b = [Text.Encoding]::UTF8.GetBytes([string]$k.KeyChar)\n"
 			+ "    if ($alt) { $b = @(27) + $b }\n"
@@ -741,6 +735,23 @@ public final class IpmiCli {
 				.redirectError(ProcessBuilder.Redirect.INHERIT)
 				.start();
 		return new RawInput(keys.getInputStream(), keys::destroy);
+	}
+
+	/** Gives the terminal its saved settings back, or sane ones, and says when neither works. */
+	private static void restoreTerminal(String saved, PrintStream err) {
+		try {
+			stty(saved);
+		} catch (IOException e) {
+			try {
+				stty("sane");
+			} catch (IOException sane) {
+				diagnostic(err, "cannot restore the terminal (" + sane.getMessage() + "): run stty sane");
+			} catch (InterruptedException sane) {
+				Thread.currentThread().interrupt();
+			}
+		} catch (InterruptedException e) {
+			Thread.currentThread().interrupt();
+		}
 	}
 
 	private static String stty(String arguments) throws IOException, InterruptedException {
@@ -1040,7 +1051,13 @@ public final class IpmiCli {
 				if (ended) {
 					return -1;
 				}
-				char[] line = lines.get();
+				char[] line;
+				try {
+					line = lines.get();
+				} catch (IOError e) {
+					// Console.readPassword(): the terminal read failed
+					throw new IOException("Cannot read the console: " + e.getMessage(), e);
+				}
 				if (line == null) {
 					ended = true;
 					return -1;

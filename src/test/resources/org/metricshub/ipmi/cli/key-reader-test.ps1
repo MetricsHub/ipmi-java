@@ -19,6 +19,8 @@ $cases = @(
   @('Shift+Tab', (key "`t" 'Tab' $true $false $false), '1b 5b 5a'),
   @('Tab', (key "`t" 'Tab' $false $false $false), '09'),
   @('e-acute', (key ([char]0xe9) 'Oem1' $false $false $false), 'c3 a9'),
+  @('Ctrl+Space', (key ([char]0) 'Spacebar' $false $false $true), '00'),
+  @('Space', (key ' ' 'Spacebar' $false $false $false), '20'),
   @('Shift alone', (key ([char]0) 'NoName' $true $false $false), '')
 )
 $failed = 0

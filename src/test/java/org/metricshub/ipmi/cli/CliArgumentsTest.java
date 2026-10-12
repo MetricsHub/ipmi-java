@@ -174,6 +174,9 @@ class CliArgumentsTest {
 		assertEquals("--long requires the sensors subcommand", usageError(login("chassis", "--long")));
 		assertEquals("--no-escape requires the sol subcommand", usageError(login("chassis", "--no-escape")));
 		assertEquals("unknown sensor type 'Fans'", usageError(login("sensors", "--type", "Fans")));
+		assertEquals("--name requires a glob", usageError(login("sensors", "--name", ",")));
+		assertEquals("--name requires a glob", usageError(login("sensors", "--name", "")));
+		assertEquals("--name requires a glob", usageError(login("sensors", "--name", "CPU*,,Fan*")));
 		assertEquals("power requires one action: status", usageError(login("power")));
 		assertEquals("power requires one action: status", usageError(login("power", "on")));
 		assertEquals("chassis takes no argument", usageError(login("chassis", "status")));

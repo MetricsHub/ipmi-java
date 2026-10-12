@@ -372,6 +372,14 @@ class IpmiCliTest {
 			assertEquals(-1, input.read(), "null ends the input");
 			assertEquals(-1, input.read(buffer));
 		}
+		try (InputStream failing = new IpmiCli.LineInput(() -> {
+			throw new java.io.IOError(new IOException("tty gone"));
+		}, StandardCharsets.UTF_8)) {
+			IOException failure = org.junit.jupiter.api.Assertions.assertThrows(IOException.class, failing::read);
+			assertTrue(
+					failure.getMessage().contains("tty gone"),
+					"a console read failure is an IOException the pump reports");
+		}
 	}
 
 	private static Result sol(FakeRmcpPlusBmc bmc, String input, String... args) {
