@@ -130,14 +130,20 @@ public final class IpmiCli {
 		try (CliArguments arguments = CliArguments.parse(args)) {
 			if (arguments.subcommand() == CliArguments.Subcommand.HELP) {
 				out.print(usage());
-				return 0;
+				return out.checkError() ? outputFailed(err) : 0;
 			}
 			if (arguments.subcommand() == CliArguments.Subcommand.VERSION) {
 				out.println("ipmi-java " + version());
-				return 0;
+				return out.checkError() ? outputFailed(err) : 0;
 			}
 			if (arguments.subcommand() != CliArguments.Subcommand.PROBE && arguments.password() == null) {
-				char[] password = passwordReader.readPassword();
+				char[] password;
+				try {
+					password = passwordReader.readPassword();
+				} catch (IOError e) {
+					diagnostic(err, "cannot read the password from the console: " + e.getMessage());
+					return EXIT_IO;
+				}
 				if (password == null) {
 					throw new CliUsageException("no password was entered");
 				}
@@ -714,7 +720,7 @@ public final class IpmiCli {
 			+ "  } elseif ($key -eq 'Spacebar' -and $ctrl) {\n" + "    $b = @(0)\n"
 			+ "  } elseif ([int]$k.KeyChar -ne 0) {\n"
 			+ "    $b = [Text.Encoding]::UTF8.GetBytes([string]$k.KeyChar)\n"
-			+ "    if ($alt) { $b = @(27) + $b }\n"
+			+ "    if ($alt -and -not $ctrl) { $b = @(27) + $b }\n"
 			+ "  }\n"
 			+ "  return [byte[]]$b\n"
 			+ "}\n"

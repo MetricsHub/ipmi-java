@@ -20,6 +20,7 @@ $cases = @(
   @('Tab', (key "`t" 'Tab' $false $false $false), '09'),
   @('e-acute', (key ([char]0xe9) 'Oem1' $false $false $false), 'c3 a9'),
   @('Ctrl+Space', (key ([char]0) 'Spacebar' $false $false $true), '00'),
+  @('AltGr+at (Ctrl+Alt with a character)', (key '@' 'D0' $false $true $true), '40'),
   @('Space', (key ' ' 'Spacebar' $false $false $false), '20'),
   @('Shift alone', (key ([char]0) 'NoName' $true $false $false), '')
 )

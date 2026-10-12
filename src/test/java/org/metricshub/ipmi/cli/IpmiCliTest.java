@@ -99,6 +99,12 @@ class IpmiCliTest {
 		assertTrue(tooLong.err.contains("Password is too long"), tooLong.err);
 		assertFalse(tooLong.err.contains("123456789012345678901"), tooLong.err);
 
+		Result brokenConsole = run(null, () -> {
+			throw new java.io.IOError(new IOException("tty gone"));
+		}, "-h", "bmc", "-u", "admin", "chassis");
+		assertEquals(IpmiCli.EXIT_IO, brokenConsole.code, "a console read failure at the password prompt");
+		assertTrue(brokenConsole.err.contains("cannot read the password from the console"), brokenConsole.err);
+
 		Result noConsole = run(null, NO_PROMPT, "-h", "bmc", "-u", "admin", "chassis");
 		assertEquals(IpmiCli.EXIT_USAGE, noConsole.code);
 		assertTrue(noConsole.err.contains("--password-file"), noConsole.err);

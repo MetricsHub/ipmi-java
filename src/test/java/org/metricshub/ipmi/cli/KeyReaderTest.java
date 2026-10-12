@@ -2,8 +2,10 @@ package org.metricshub.ipmi.cli;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
 
 import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -11,6 +13,7 @@ import java.nio.file.Path;
 import java.util.concurrent.TimeUnit;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.condition.EnabledOnOs;
 import org.junit.jupiter.api.condition.OS;
 import org.junit.jupiter.api.io.TempDir;
@@ -23,7 +26,10 @@ import org.junit.jupiter.api.io.TempDir;
 @EnabledOnOs(OS.WINDOWS)
 class KeyReaderTest {
 
+	private static final long PROCESS_TIMEOUT_SECONDS = 60L;
+
 	@Test
+	@Timeout(120)
 	void keysAreEncodedAsATerminalSendsThem(@TempDir Path directory) throws Exception {
 		Path script = directory.resolve("key-reader.ps1");
 		Files.write(script, IpmiCli.KEY_READER.getBytes(StandardCharsets.UTF_8));
@@ -40,16 +46,27 @@ class KeyReaderTest {
 				harness.toString(),
 				script.toString()).redirectErrorStream(true).start();
 		process.getOutputStream().close();
+		// Drained on a thread while the timed wait runs: a stalled PowerShell fails the test instead of hanging it
 		ByteArrayOutputStream output = new ByteArrayOutputStream();
-		byte[] buffer = new byte[4096];
-		try (InputStream stream = process.getInputStream()) {
-			int count = stream.read(buffer);
-			while (count >= 0) {
-				output.write(buffer, 0, count);
-				count = stream.read(buffer);
+		Thread drain = new Thread(() -> {
+			byte[] buffer = new byte[4096];
+			try (InputStream stream = process.getInputStream()) {
+				int count = stream.read(buffer);
+				while (count >= 0) {
+					output.write(buffer, 0, count);
+					count = stream.read(buffer);
+				}
+			} catch (IOException e) {
+				// The process was destroyed: what was read is what there is
 			}
+		});
+		drain.setDaemon(true);
+		drain.start();
+		if (!process.waitFor(PROCESS_TIMEOUT_SECONDS, TimeUnit.SECONDS)) {
+			process.destroyForcibly();
+			fail("PowerShell did not finish");
 		}
-		assertTrue(process.waitFor(60, TimeUnit.SECONDS), "PowerShell did not finish");
+		drain.join(TimeUnit.SECONDS.toMillis(PROCESS_TIMEOUT_SECONDS));
 		String report = new String(output.toByteArray(), StandardCharsets.UTF_8);
 		assertEquals(0, process.exitValue(), report);
 		assertTrue(report.contains("failed: 0"), report);
