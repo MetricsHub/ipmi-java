@@ -475,6 +475,8 @@ class IpmiClientTest {
 		assertThrows(NullPointerException.class, () -> builder.credentials(null, new char[0]));
 		assertThrows(NullPointerException.class, () -> builder.privilege(null));
 		assertThrows(IllegalArgumentException.class, () -> builder.privilege(PrivilegeLevel.MaximumAvailable));
+		assertThrows(IllegalArgumentException.class, () -> builder.privilege(PrivilegeLevel.Callback));
+		assertThrows(IllegalArgumentException.class, () -> builder.keepAlive(Duration.ofNanos(1)));
 		assertThrows(
 				IllegalArgumentException.class,
 				() -> IpmiClient.builder("bmc").credentials("seventeen-letters", new char[0]).build());
@@ -703,6 +705,12 @@ class IpmiClientTest {
 				}
 				assertFalse(bmc.isSolActive(), "closing the console deactivates the payload");
 				assertTrue(client.chassisStatus().powerOn(), "and keeps the session");
+				// A closed console is no longer tracked: the loss of the session does not touch it
+				bmc.expireSession();
+				assertTrue(client.chassisStatus().powerOn());
+				try (SolConsole again = client.sol().open()) {
+					assertTrue(bmc.isSolActive(), "a new console after a closed one");
+				}
 			}
 			awaitClose(bmc);
 		}

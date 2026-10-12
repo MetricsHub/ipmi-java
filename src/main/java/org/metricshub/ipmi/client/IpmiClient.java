@@ -381,7 +381,7 @@ public final class IpmiClient implements AutoCloseable {
 	SolConsole openSol(Duration deadline) {
 		return run("SOL console", deadline, true, false, () -> {
 			try {
-				SolConsole console = new SolConsole(new SerialOverLan(link.connector, link.session));
+				SolConsole console = new SolConsole(new SerialOverLan(link.connector, link.session), consoles::remove);
 				consoles.add(console);
 				return console;
 			} catch (SOLException e) {
@@ -859,14 +859,15 @@ public final class IpmiClient implements AutoCloseable {
 		 * LAN on most BMCs.
 		 *
 		 * @param level the privilege level: User, Operator or Administrator ({@code MaximumAvailable} is refused, as
-		 *        the session could not be raised to it)
+		 *        the session could not be raised to it, and {@code Callback}, at which no operation works)
 		 * @return this builder
-		 * @throws IllegalArgumentException for {@code MaximumAvailable}
+		 * @throws IllegalArgumentException for {@code MaximumAvailable} and {@code Callback}
 		 */
 		public Builder privilege(PrivilegeLevel level) {
 			Objects.requireNonNull(level, "level");
-			if (level == PrivilegeLevel.MaximumAvailable) {
-				// Set Session Privilege Level needs a level: the highest one the user has is not known here
+			if (level != PrivilegeLevel.User && level != PrivilegeLevel.Operator && level != PrivilegeLevel.Administrator) {
+				// MaximumAvailable: Set Session Privilege Level needs a level, and the highest one the user has is not
+				// known here. Callback: no command of the client works at that level
 				throw new IllegalArgumentException(
 						"Choose the privilege level of the session: User, Operator or Administrator");
 			}
@@ -964,8 +965,9 @@ public final class IpmiClient implements AutoCloseable {
 		 */
 		public Builder keepAlive(Duration period) {
 			Objects.requireNonNull(period, "period");
-			if (period.isNegative()) {
-				throw new IllegalArgumentException("keepAlive must not be negative: " + period);
+			// The period is used in milliseconds, and 0 disables the keep-alive
+			if (period.isNegative() || (!period.isZero() && period.toMillis() == 0)) {
+				throw new IllegalArgumentException("keepAlive must be Duration.ZERO or at least one millisecond: " + period);
 			}
 			this.keepAlive = period;
 			return this;
