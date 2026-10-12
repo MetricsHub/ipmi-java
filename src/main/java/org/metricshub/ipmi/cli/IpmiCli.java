@@ -24,6 +24,7 @@ package org.metricshub.ipmi.cli;
 
 import java.io.ByteArrayOutputStream;
 import java.io.Console;
+import java.io.FilterOutputStream;
 import java.io.IOError;
 import java.io.IOException;
 import java.io.InputStream;
@@ -616,6 +617,8 @@ public final class IpmiCli {
 			throws InterruptedException {
 		SolConsole console = timed(arguments, err, "SOL console", () -> client.sol().open());
 		RawInput raw = terminal ? rawInput(stdin, err) : null;
+		// stty raw turns the newline translation of the terminal off: the text of the CLI itself needs CR LF there
+		PrintStream local = raw == null ? err : crlf(err);
 		// A kill (Ctrl+C in line mode) must give the terminal back and free the payload on the BMC: some BMCs keep
 		// a payload active after its session is gone, so the console is deactivated before the session is closed
 		Thread hook = new Thread(() -> {
@@ -630,7 +633,7 @@ public final class IpmiCli {
 			if (terminal) {
 				// Like ipmitool: an idle serial console prints nothing until the server does, so say the console is open
 				diagnostic(
-						err,
+						local,
 						"SOL console open"
 								+ (raw == null ?
 										", line-oriented: the input is sent when Enter is pressed and echoed by the remote console only" :
@@ -646,7 +649,7 @@ public final class IpmiCli {
 			InputStream input = lineMode ?
 					new LineInput(() -> System.console().readPassword(), Charset.defaultCharset()) :
 					raw == null ? stdin : raw.input;
-			return SolBridge.run(console, input, out, err, arguments.escape(), lineMode);
+			return SolBridge.run(console, input, out, local, arguments.escape(), lineMode);
 		} finally {
 			if (raw != null) {
 				raw.release.run();
@@ -790,6 +793,30 @@ public final class IpmiCli {
 				Thread.currentThread().interrupt();
 				return "";
 			}
+		}
+	}
+
+	/** A stream that writes CR LF for every LF: the text of the CLI on a terminal in raw mode. */
+	static PrintStream crlf(PrintStream stream) {
+		try {
+			return new PrintStream(new FilterOutputStream(stream) {
+				@Override
+				public void write(int b) throws IOException {
+					if (b == '\n') {
+						out.write('\r');
+					}
+					out.write(b);
+				}
+
+				@Override
+				public void write(byte[] buffer, int offset, int length) throws IOException {
+					for (int i = offset; i < offset + length; i++) {
+						write(buffer[i]);
+					}
+				}
+			}, true, Charset.defaultCharset().name());
+		} catch (java.io.UnsupportedEncodingException e) {
+			throw new IllegalStateException(e);
 		}
 	}
 

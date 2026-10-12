@@ -276,6 +276,15 @@ class IpmiCliTest {
 	}
 
 	@Test
+	void theTextOfTheCliUsesCrLfOnARawTerminal() throws Exception {
+		ByteArrayOutputStream bytes = new ByteArrayOutputStream();
+		PrintStream raw = IpmiCli.crlf(new PrintStream(bytes, true, "UTF-8"));
+		raw.print("a\nb\r\n");
+		raw.flush();
+		assertEquals("a\r\nb\r\r\n", bytes.toString("UTF-8"));
+	}
+
+	@Test
 	void readingsAreRoundedAndInfiniteOnesAreAbsent() {
 		assertEquals("11.748", IpmiCli.number(java.util.OptionalDouble.of(11.748000000000001)));
 		assertEquals("6600", IpmiCli.number(java.util.OptionalDouble.of(6600.0)));

@@ -162,6 +162,10 @@ final class CliArguments implements AutoCloseable {
 		case "-p":
 		case "--password": {
 			char[] value = consumePassword(args, index, option);
+			if (passwordOption != null) {
+				// Rejected: this copy is wiped too
+				Arrays.fill(value, '\0');
+			}
 			exclusive(passwordOption, "--password and --password-file");
 			passwordOption = option;
 			replacePassword(value);

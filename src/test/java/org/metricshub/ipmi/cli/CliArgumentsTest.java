@@ -262,6 +262,7 @@ class CliArgumentsTest {
 		String[] twice = { "-h", "bmc", "-u", "admin", "-p", "one", "-p", "two", "-k", "01", "--bmc-key=02", "chassis" };
 		assertEquals("--password and --password-file are mutually exclusive", usageError(twice));
 		assertEquals("", twice[7], "a rejected duplicate secret is blanked too");
+		assertEquals("", twice[5], "and the accepted one");
 		String[] keys = { "-h", "bmc", "-u", "admin", "-k", "01", "--bmc-key=02", "chassis" };
 		assertEquals("--bmc-key and --bmc-key-file are mutually exclusive", usageError(keys));
 		assertEquals("--bmc-key", keys[6]);
