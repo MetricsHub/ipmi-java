@@ -44,8 +44,6 @@ import org.metricshub.ipmi.core.coding.security.CipherSuite;
 import org.metricshub.ipmi.core.common.TypeConverter;
 import org.metricshub.ipmi.core.connection.Connection;
 import org.metricshub.ipmi.core.connection.ConnectionException;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * This abstract class implements common features required by FRUs, Sensor and Chassis Status runners.
@@ -53,8 +51,6 @@ import org.slf4j.LoggerFactory;
  * @param <T> Represent the data type managed by the runner
  */
 public abstract class AbstractIpmiRunner<T> implements AutoCloseable, Callable<T> {
-
-	private static final Logger LOGGER = LoggerFactory.getLogger(AbstractIpmiRunner.class);
 
 	private static final int DEFAULT_LOCAL_UDP_PORT = 0;
 
@@ -275,7 +271,7 @@ public abstract class AbstractIpmiRunner<T> implements AutoCloseable, Callable<T
 			try {
 				connector.closeSession(handle);
 			} catch (Exception e) {
-				LOGGER.debug("Failed to close the IPMI session", e);
+				// Best effort: the connection is released below whatever the BMC answered
 			}
 		}
 
@@ -359,13 +355,6 @@ public abstract class AbstractIpmiRunner<T> implements AutoCloseable, Callable<T
 
 		byte[] header = data.getSensorRecordData();
 		if (header == null || header.length < HEADER_SIZE) {
-			LOGGER
-					.warn(
-							"Skipping SDR record {} on {}: BMC returned {} byte(s) instead of the {}-byte header",
-							nextRecId,
-							ipmiConfiguration.getHostname(),
-							header == null ? 0 : header.length,
-							HEADER_SIZE);
 			nextRecId = data.getNextRecordId();
 			return null;
 		}
@@ -401,12 +390,6 @@ public abstract class AbstractIpmiRunner<T> implements AutoCloseable, Callable<T
 			byte[] chunk = part.getSensorRecordData();
 			int got = chunk == null ? 0 : Math.min(bytesToRead, chunk.length);
 			if (got == 0) {
-				LOGGER
-						.warn(
-								"Skipping SDR record {} on {}: BMC returned no data at offset {}",
-								nextRecId,
-								ipmiConfiguration.getHostname(),
-								read);
 				nextRecId = data.getNextRecordId();
 				return null;
 			}
@@ -434,12 +417,6 @@ public abstract class AbstractIpmiRunner<T> implements AutoCloseable, Callable<T
 		try {
 			return SensorRecord.populateSensorRecord(recordData);
 		} catch (RuntimeException e) {
-			LOGGER
-					.warn(
-							"Skipping undecodable SDR record before id {} on {}: {}",
-							nextRecId,
-							ipmiConfiguration.getHostname(),
-							e.getMessage());
 			return null;
 		}
 	}

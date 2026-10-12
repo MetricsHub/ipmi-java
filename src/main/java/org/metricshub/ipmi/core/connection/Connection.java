@@ -71,9 +71,6 @@ import org.metricshub.ipmi.core.sm.states.State;
 import org.metricshub.ipmi.core.sm.states.Uninitialized;
 import org.metricshub.ipmi.core.transport.Messenger;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import java.io.IOException;
 import java.net.InetAddress;
 import java.util.ArrayList;
@@ -90,8 +87,6 @@ import java.util.concurrent.atomic.AtomicInteger;
  * A connection with the specific remote host.
  */
 public class Connection extends TimerTask implements MachineObserver {
-	private static final Logger LOGGER = LoggerFactory.getLogger(Connection.class);
-
 	private static final int DEFAULT_CIPHER_SUITE = 3;
 
 	/**
@@ -738,13 +733,10 @@ public class Connection extends TimerTask implements MachineObserver {
 		if (action instanceof GetSikAction) {
 			sik = ((GetSikAction) action).getSik();
 		} else if (!(action instanceof MessageAction)) {
+			// An ErrorAction reaches the caller waiting in waitForResponse(), which throws its exception
 			synchronized (responseLock) {
 				lastAction = action;
 				responseLock.notifyAll();
-			}
-			if (action instanceof ErrorAction) {
-				ErrorAction errorAction = (ErrorAction) action;
-				LOGGER.error(errorAction.getException().getMessage(), errorAction.getException());
 			}
 		} else {
 			handleIncomingMessage(((MessageAction) action).getIpmiv20Message());
@@ -795,7 +787,7 @@ public class Connection extends TimerTask implements MachineObserver {
 		try {
 			sendMessage(new KeepAlive(), true);
 		} catch (Exception e) {
-			LOGGER.error("Keep-alive failed: " + e.getMessage(), e);
+			// Best effort: a keep-alive that cannot be sent is sent again at the next period
 		}
 	}
 

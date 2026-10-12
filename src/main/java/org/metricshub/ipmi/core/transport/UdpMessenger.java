@@ -22,9 +22,6 @@ package org.metricshub.ipmi.core.transport;
  * ╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱
  */
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import java.io.IOException;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
@@ -54,8 +51,6 @@ public class UdpMessenger extends Thread implements Messenger {
 	private volatile int bufferSize;
 
 	private static final int DEFAULTBUFFERSIZE = 512;
-
-	private static Logger logger = LoggerFactory.getLogger(UdpMessenger.class);
 
 	public int getPort() {
 		return port;
@@ -137,13 +132,12 @@ public class UdpMessenger extends Thread implements Messenger {
 				notifyListeners(message);
 
 			} catch (SocketException se) {
+				// A receive error on a socket that is not being closed: keep listening
 				if (closing) {
 					run = false;
-				} else {
-					logger.error(se.getMessage(), se);
 				}
 			} catch (Exception e) {
-				logger.error(e.getMessage(), e);
+				// A listener failed on this datagram: the next one is still received
 			} finally {
 				if (socket.isClosed()) {
 					run = false;

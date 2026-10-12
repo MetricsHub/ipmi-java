@@ -52,9 +52,6 @@ import org.metricshub.ipmi.core.connection.Session;
 import org.metricshub.ipmi.core.connection.SessionException;
 import org.metricshub.ipmi.core.connection.SessionManager;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import java.io.Closeable;
 import java.io.IOException;
 import java.nio.charset.Charset;
@@ -71,8 +68,6 @@ import java.util.concurrent.CopyOnWriteArrayList;
  * Entry point for the Serial Over LAN (SOL) communication. Use all SOL operations through this class.
  */
 public class SerialOverLan implements Closeable {
-
-	private static final Logger LOGGER = LoggerFactory.getLogger(SerialOverLan.class);
 
 	/**
 	 * The most characters a packet carries: the BMC acknowledges them with a count of one byte (IPMI 2.0 table 15-2).
@@ -432,7 +427,6 @@ public class SerialOverLan implements Closeable {
 			return info.getSessionId() != 0 && info.getSessionId() == payloadSession.getManagedSystemSessionId();
 		} catch (IPMIException e) {
 			// The command is optional
-			LOGGER.debug("Get Payload Instance Info failed", e);
 			return false;
 		}
 	}
@@ -851,7 +845,6 @@ public class SerialOverLan implements Closeable {
 			if (e instanceof InterruptedException) {
 				Thread.currentThread().interrupt();
 			}
-			LOGGER.error("Error while sending SOL operations", e);
 			return false;
 		}
 	}
@@ -913,7 +906,6 @@ public class SerialOverLan implements Closeable {
 			Thread.currentThread().interrupt();
 			return null;
 		} catch (Exception e) {
-			LOGGER.error("Error while sending message", e);
 			return null;
 		}
 	}
@@ -960,7 +952,7 @@ public class SerialOverLan implements Closeable {
 				deactivatePayload(activatedConnection, activatedInstance);
 			}
 		} catch (Exception e) {
-			warnDeactivationFailure(e);
+			restoreInterruptStatus(e);
 		}
 		try {
 			if (activationSession != null) {
@@ -972,15 +964,14 @@ public class SerialOverLan implements Closeable {
 				}
 			}
 		} catch (Exception e) {
-			warnDeactivationFailure(e);
+			restoreInterruptStatus(e);
 		}
 	}
 
-	private static void warnDeactivationFailure(Exception e) {
+	private static void restoreInterruptStatus(Exception e) {
 		if (e instanceof InterruptedException) {
 			Thread.currentThread().interrupt();
 		}
-		LOGGER.warn("Cannot deactivate the SOL payload after a failed activation", e);
 	}
 
 	/**
@@ -999,7 +990,6 @@ public class SerialOverLan implements Closeable {
 				if (e instanceof InterruptedException) {
 					Thread.currentThread().interrupt();
 				}
-				LOGGER.warn("Cannot close the session of the Serial over LAN console", e);
 			}
 			connector.closeConnection(connectionHandle);
 		}

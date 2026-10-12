@@ -35,9 +35,6 @@ import org.metricshub.ipmi.core.coding.protocol.PayloadType;
 import org.metricshub.ipmi.core.common.MessageComposer;
 import org.metricshub.ipmi.core.common.TypeConverter;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import java.security.InvalidKeyException;
 import java.security.NoSuchAlgorithmException;
 
@@ -45,8 +42,6 @@ import java.security.NoSuchAlgorithmException;
  * A wrapper class for Deactivate Payload Command.
  */
 public class DeactivatePayload extends IpmiCommandCoder<DeactivatePayloadResponseData> {
-
-	private static final Logger LOGGER = LoggerFactory.getLogger(DeactivatePayload.class);
 
 	private static final int REQUEST_DATA_LENGTH = 6;
 
@@ -116,9 +111,8 @@ public class DeactivatePayload extends IpmiCommandCoder<DeactivatePayloadRespons
 			DeactivatePayloadCompletionCode specificCompletionCode = DeactivatePayloadCompletionCode
 					.parseInt(response.getRawCompletionCode());
 
-			if (specificCompletionCode == DeactivatePayloadCompletionCode.PAYLOAD_ALREADY_DEACTIVATED) {
-				LOGGER.warn(specificCompletionCode.getMessage());
-			} else {
+			// A payload already deactivated is the outcome the caller wants
+			if (specificCompletionCode != DeactivatePayloadCompletionCode.PAYLOAD_ALREADY_DEACTIVATED) {
 				throw new IPMIException(response.getCompletionCode(), response.getRawCompletionCode());
 			}
 		}

@@ -29,9 +29,6 @@ import org.metricshub.ipmi.core.coding.commands.PrivilegeLevel;
 import org.metricshub.ipmi.core.coding.security.CipherSuite;
 import org.metricshub.ipmi.core.common.Randomizer;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import java.net.InetAddress;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
@@ -42,8 +39,6 @@ import java.util.concurrent.atomic.AtomicInteger;
  * Manages multiple {@link Session}s.
  */
 public class SessionManager {
-
-	private static final Logger LOGGER = LoggerFactory.getLogger(SessionManager.class);
 
 	private static final int SESSION_ID_LIMIT = Integer.MAX_VALUE / 4;
 
@@ -149,7 +144,7 @@ public class SessionManager {
 		try {
 			connector.closeSession(handle);
 		} catch (Exception e) {
-			LOGGER.error("Cannot close session after exception thrown during session establishment.", e);
+			// Best effort: the connection is closed below, and the failure of the session is what the caller gets
 		}
 		connector.closeConnection(handle);
 	}

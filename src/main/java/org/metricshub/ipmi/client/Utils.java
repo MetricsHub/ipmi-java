@@ -31,12 +31,8 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
 import org.metricshub.ipmi.client.runner.AbstractIpmiRunner;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 public final class Utils {
-
-	private static final Logger LOGGER = LoggerFactory.getLogger(Utils.class);
 
 	private Utils() {}
 
@@ -127,11 +123,9 @@ public final class Utils {
 		future.cancel(true);
 		executorService.shutdownNow();
 		try {
-			if (!executorService.awaitTermination(CLEANUP_GRACE_MS, TimeUnit.MILLISECONDS)) {
-				// A call that cannot be interrupted (name resolution, a blocking send): the worker closes the
-				// connection and releases the port by itself when that call returns
-				LOGGER.warn("The IPMI worker is still busy after the call was abandoned; the port is released when it returns");
-			}
+			// A call that cannot be interrupted (name resolution, a blocking send): the worker closes the connection and
+			// releases the port by itself when that call returns
+			executorService.awaitTermination(CLEANUP_GRACE_MS, TimeUnit.MILLISECONDS);
 		} catch (InterruptedException e) {
 			Thread.currentThread().interrupt();
 		}

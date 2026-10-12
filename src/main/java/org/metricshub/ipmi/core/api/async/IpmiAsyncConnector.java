@@ -47,9 +47,6 @@ import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.TimeUnit;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 /**
  * <p>
  * Asynchronous API for connecting to BMC via IPMI.
@@ -93,8 +90,6 @@ public class IpmiAsyncConnector implements ConnectionListener {
 	private volatile int retries = DEFAULT_RETRIES;
 	private final List<IpmiResponseListener> responseListeners = new CopyOnWriteArrayList<IpmiResponseListener>();
 	private final List<InboundMessageListener> inboundMessageListeners = new CopyOnWriteArrayList<InboundMessageListener>();
-
-	private static Logger logger = LoggerFactory.getLogger(IpmiAsyncConnector.class);
 
 	/**
 	 * Starts {@link IpmiAsyncConnector} and initiates the
@@ -242,7 +237,6 @@ public class IpmiAsyncConnector implements ConnectionListener {
 				if (tries > retries || !isRetriable(e)) {
 					throw e;
 				}
-				logger.warn(FAILED_TO_RECEIVE_ANSWER_CAUSE_MESSAGE, e);
 			}
 		}
 		return result;
@@ -286,7 +280,6 @@ public class IpmiAsyncConnector implements ConnectionListener {
 				if (tries > retries || !isRetriable(e)) {
 					throw e;
 				}
-				logger.warn(FAILED_TO_RECEIVE_ANSWER_CAUSE_MESSAGE, e);
 			}
 		}
 		return result;
@@ -382,7 +375,6 @@ public class IpmiAsyncConnector implements ConnectionListener {
 				if (tries > retries || !isRetriable(e)) {
 					throw e;
 				}
-				logger.warn(FAILED_TO_RECEIVE_ANSWER_CAUSE_MESSAGE, e);
 			}
 		}
 
@@ -434,7 +426,6 @@ public class IpmiAsyncConnector implements ConnectionListener {
 				sessionManager.unregisterSession(connectionHandle);
 				succeded = true;
 			} catch (Exception e) {
-				logger.warn(FAILED_TO_RECEIVE_ANSWER_CAUSE_MESSAGE, e);
 				if (tries > retries) {
 					throw e;
 				}
@@ -483,14 +474,9 @@ public class IpmiAsyncConnector implements ConnectionListener {
 						Thread.sleep(10);
 					}
 				}
-				logger
-						.debug(
-								"Sending message with tag " + tag + ", try "
-										+ tries);
 			} catch (IllegalArgumentException | InterruptedException e) {
 				throw e;
 			} catch (Exception e) {
-				logger.warn("Failed to send message, cause:", e);
 				if (tries > retries) {
 					throw e;
 				}

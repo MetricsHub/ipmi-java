@@ -22,9 +22,6 @@ package org.metricshub.ipmi.core.coding.commands.fru.record;
  * ╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱
  */
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 /**
  * Identifies type of the information stored in FRU's MultiRecord Area entry.
  */
@@ -60,8 +57,6 @@ public enum FruMultiRecordType {
 
 	private int code;
 
-	private static Logger logger = LoggerFactory.getLogger(FruMultiRecordType.class);
-
 	FruMultiRecordType(int code) {
 		this.code = code;
 	}
@@ -88,7 +83,6 @@ public enum FruMultiRecordType {
 		case EXTENDEDCOMPATIBILITYRECORD:
 			return ExtendedCompatibilityRecord;
 		default:
-			logger.debug("Invalid value: {}", value);
 			return Unspecified;
 		}
 	}

@@ -22,9 +22,6 @@ package org.metricshub.ipmi.core.coding.commands.sdr.record;
  * ╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱
  */
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 /**
  * Type of the reading of the discrete sensor.
  */
@@ -1106,8 +1103,6 @@ public enum ReadingType {
 
 	private static final int UNKNOWN = 0;
 
-	private static Logger logger = LoggerFactory.getLogger(ReadingType.class);
-
 	private int code;
 
 	ReadingType(int code) {
@@ -1683,7 +1678,6 @@ public enum ReadingType {
 			return MonitorAsicIc;
 		default:
 			// BMCs assert states the reading type does not define (HP iLO sets bits 6 and 7 of generic types)
-			logger.debug("Invalid value: {} ({}) for sensor {}", value, Integer.toHexString(value), sensorType);
 			return Unknown;
 		}
 	}

@@ -49,15 +49,11 @@ import org.metricshub.ipmi.core.coding.commands.sdr.record.FruDeviceLocatorRecor
 import org.metricshub.ipmi.core.coding.commands.sdr.record.SensorRecord;
 import org.metricshub.ipmi.core.coding.payload.CompletionCode;
 import org.metricshub.ipmi.core.coding.payload.lan.IPMIException;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * Get FRU information
  */
 public class GetFrusRunner extends AbstractIpmiRunner<List<Fru>> {
-
-	private static final Logger LOGGER = LoggerFactory.getLogger(GetFrusRunner.class);
 
 	/**
 	 * Id of the built-in, default FRU
@@ -219,7 +215,6 @@ public class GetFrusRunner extends AbstractIpmiRunner<List<Fru>> {
 		} catch (InterruptedException e) {
 			throw e;
 		} catch (Exception e) {
-			LOGGER.warn("Failed to read FRU {}: {}", fruId, e.getMessage());
 			return new ArrayList<>();
 		}
 	}
@@ -259,8 +254,6 @@ public class GetFrusRunner extends AbstractIpmiRunner<List<Fru>> {
 				throw e;
 			} catch (Exception e) {
 				// Stop here: the chunks after a gap would shift into its place and decode into wrong fields
-				LOGGER
-						.warn("Failed to read FRU {} at offset {}, the FRU data is truncated there: {}", fruId, i, e.getMessage());
 				break;
 			}
 		}

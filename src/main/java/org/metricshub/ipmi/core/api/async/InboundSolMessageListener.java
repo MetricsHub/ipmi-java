@@ -40,16 +40,11 @@ import java.util.List;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 /**
  * Listener for inbound SOL messages sent by remote system to this application: it buffers their characters and
  * acknowledges them (IPMI 2.0 sections 15.9 and 15.11).
  */
 public class InboundSolMessageListener implements InboundMessageListener {
-
-	private static final Logger LOGGER = LoggerFactory.getLogger(InboundSolMessageListener.class);
 
 	/**
 	 * Room for 64 KiB of console output between two reads: the console suspends the BMC when it is full, and some BMCs
@@ -178,9 +173,8 @@ public class InboundSolMessageListener implements InboundMessageListener {
 						suspendedPacket = null;
 					}
 				}
-			} else if (sequenceNumber == 0) {
-				LOGGER.warn("Dropping {} characters received in a SOL packet without sequence number", characters.length);
 			}
+			// Characters in a packet without sequence number (an ACK-only packet, IPMI 2.0 table 15-2) are dropped
 			// The statuses of a packet are reported as they come, even when its characters must wait for room (the BMC may
 			// never send it again: SOL deactivated), and only once: a copy of the packet reports only a new status
 			Set<SolStatus> received = packet.getStatusField().getStatuses();
@@ -239,7 +233,10 @@ public class InboundSolMessageListener implements InboundMessageListener {
 					lineOperations);
 			connector.sendOneWayMessage(connectionHandle, acknowledgement);
 		} catch (Exception e) {
-			LOGGER.error("Could not send " + ackState + " for packet " + sequenceNumber, e);
+			// An acknowledgement that could not be sent: the BMC sends its packet again (IPMI 2.0 section 15.9)
+			if (e instanceof InterruptedException) {
+				Thread.currentThread().interrupt();
+			}
 		}
 	}
 

@@ -43,15 +43,11 @@ import org.metricshub.ipmi.core.coding.commands.sdr.record.SensorRecord;
 import org.metricshub.ipmi.core.coding.payload.CompletionCode;
 import org.metricshub.ipmi.core.coding.payload.lan.IPMIException;
 import org.metricshub.ipmi.core.common.TypeConverter;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * Get Full And Compact Sensor records
  */
 public class GetSensorsRunner extends AbstractIpmiRunner<List<Sensor>> {
-
-	private static final Logger LOGGER = LoggerFactory.getLogger(GetSensorsRunner.class);
 
 	public GetSensorsRunner(IpmiClientConfiguration ipmiConfiguration) {
 		super(ipmiConfiguration);
@@ -225,15 +221,7 @@ public class GetSensorsRunner extends AbstractIpmiRunner<List<Sensor>> {
 							new GetSensorReading(
 									sensorNumber));
 		} catch (IPMIException e) {
-			if (e.getCompletionCode() != CompletionCode.DataNotPresent) {
-				LOGGER
-						.warn(
-								"Failed to read sensor {} ({}) on {}: {}",
-								sensorNumber,
-								sensorRecord.getName(),
-								getIpmiConfiguration().getHostname(),
-								e.getMessage());
-			}
+			// A reading the BMC refuses costs that sensor its reading, not the whole walk
 			return null;
 		}
 	}

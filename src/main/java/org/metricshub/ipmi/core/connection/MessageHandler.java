@@ -29,15 +29,10 @@ import org.metricshub.ipmi.core.sm.StateMachine;
 import org.metricshub.ipmi.core.sm.events.Sendv20Message;
 import org.metricshub.ipmi.core.sm.states.SessionValid;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 /**
  * Class used for handling outgoing and incoming messages for a {@link Connection}.
  */
 public abstract class MessageHandler {
-
-	private static final Logger LOGGER = LoggerFactory.getLogger(MessageHandler.class);
 
 	/**
 	 * How far below the highest session sequence number received a message may be (IPMI 2.0 section 6.12.14).
@@ -168,7 +163,6 @@ public abstract class MessageHandler {
 		int seq = message.getSessionSequenceNumber();
 
 		if (seq != 0 && !acceptSequenceNumber(seq)) {
-			LOGGER.debug("Dropping message {}", seq);
 			return;
 		}
 

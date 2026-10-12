@@ -26,9 +26,6 @@ import org.metricshub.ipmi.core.coding.PayloadCoder;
 import org.metricshub.ipmi.core.connection.Connection;
 import org.metricshub.ipmi.core.connection.ConnectionException;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
@@ -48,8 +45,6 @@ public class MessageQueue extends TimerTask {
 	private Object lastSequenceNumberLock = new Object();
 	private int minSequenceNumber = 1;
 	private int sequenceNumberUpperBound = 64;
-
-	private static Logger logger = LoggerFactory.getLogger(MessageQueue.class);
 
 	/**
 	 * Frequency of checking messages for timeouts in ms.
@@ -488,7 +483,6 @@ public class MessageQueue extends TimerTask {
 		releaseTag(tag);
 
 		if (!done && !message.isOneWay()) {
-			logger.debug("{}, tag: {}", failure, tag);
 			try {
 				connection
 						.notifyResponseListeners(
@@ -498,7 +492,6 @@ public class MessageQueue extends TimerTask {
 								new ConnectionException(failure));
 			} catch (RuntimeException e) {
 				// A failing listener must not kill the timer thread that expires the other messages
-				logger.warn("Response listener failed while handling the timeout of tag {}", tag, e);
 			}
 		}
 	}

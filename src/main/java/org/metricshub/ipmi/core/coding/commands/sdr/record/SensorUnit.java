@@ -22,9 +22,6 @@ package org.metricshub.ipmi.core.coding.commands.sdr.record;
  * ╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱
  */
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 /**
  * Specifies available units for sensors' measurements.
  */
@@ -333,8 +330,6 @@ public enum SensorUnit {
 
 	private static final int OTHER = 0;
 
-	private static Logger logger = LoggerFactory.getLogger(SensorUnit.class);
-
 	private int code;
 
 	SensorUnit(int code) {
@@ -532,7 +527,6 @@ public enum SensorUnit {
 		case CORRECTABLEERROR:
 			return CorrectableError;
 		default:
-			logger.debug("Invalid value: {}", value);
 			return Other;
 		}
 	}

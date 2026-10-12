@@ -40,9 +40,6 @@ import org.metricshub.ipmi.core.connection.ConnectionException;
 import org.metricshub.ipmi.core.connection.ConnectionManager;
 import org.metricshub.ipmi.core.connection.Session;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import java.io.IOException;
 import java.net.InetAddress;
 import java.util.List;
@@ -83,8 +80,6 @@ import java.util.Random;
  * <br>
  */
 public class IpmiConnector {
-
-	private static Logger logger = LoggerFactory.getLogger(IpmiConnector.class);
 
 	private IpmiAsyncConnector asyncConnector;
 
@@ -437,8 +432,6 @@ public class IpmiConnector {
 				// to, and a reply to the same tag would then be dropped as an orphan
 				int tag = asyncConnector.sendMessage(connectionHandle, request, !waitForResponse);
 
-				logger.debug("Sending message with tag {}, try {}", tag, tries);
-
 				if (waitForResponse) {
 					responseData = listener.waitForAnswer(tag);
 				}
@@ -470,7 +463,6 @@ public class IpmiConnector {
 			long sleepTime = (random.nextLong() % (IDLE_TIME / 2)) + (IDLE_TIME / 2);
 			Thread.sleep(sleepTime);
 		}
-		logger.warn("Receiving message failed, retrying: {}: {}", e.getClass().getSimpleName(), e.getMessage());
 	}
 
 	/**

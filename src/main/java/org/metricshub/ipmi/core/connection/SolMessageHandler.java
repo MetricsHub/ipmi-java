@@ -31,9 +31,6 @@ import org.metricshub.ipmi.core.coding.protocol.Ipmiv20Message;
 import org.metricshub.ipmi.core.coding.sol.SolCoder;
 import org.metricshub.ipmi.core.connection.queue.QueueElement;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import java.io.IOException;
 import java.util.Arrays;
 
@@ -41,8 +38,6 @@ import java.util.Arrays;
  * Implementation of {@link MessageHandler} for {@link org.metricshub.ipmi.core.coding.protocol.PayloadType#Sol}.
  */
 public class SolMessageHandler extends MessageHandler {
-
-	private static final Logger LOGGER = LoggerFactory.getLogger(SolMessageHandler.class);
 
 	/**
 	 * The last packet queued, and its tag, which is its packet sequence number.
@@ -171,10 +166,7 @@ public class SolMessageHandler extends MessageHandler {
 		QueueElement element = getMessageQueue().getElement(tag);
 		PayloadCoder coder = element == null ? null : element.getRequest();
 
-		LOGGER.debug("Received message with tag " + tag);
-
 		if (coder == null) {
-			LOGGER.debug("No message tagged with " + tag + " in queue. Dropping orphan message.");
 			return false;
 		}
 
