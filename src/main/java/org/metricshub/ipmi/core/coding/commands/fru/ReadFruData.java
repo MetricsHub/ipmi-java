@@ -217,7 +217,12 @@ public class ReadFruData extends IpmiCommandCoder<ReadFruDataResponseData> {
 		// Offsets in multiples of 8 bytes (FRU spec section 8). The internal use area is vendor-private data without a
 		// length: it ends where the next area starts
 		int internalUseOffset = TypeConverter.byteToInt(data[1]) * 8;
-		if (internalUseOffset != 0 && internalUseOffset < data.length) {
+		if (internalUseOffset >= data.length) {
+			problems
+					.add(
+							"The internal use area at offset " + internalUseOffset + " is beyond the " + data.length
+									+ " byte(s) read");
+		} else if (internalUseOffset != 0) {
 			int end = data.length;
 			for (int area = 2; area <= 5; area++) {
 				int areaOffset = TypeConverter.byteToInt(data[area]) * 8;

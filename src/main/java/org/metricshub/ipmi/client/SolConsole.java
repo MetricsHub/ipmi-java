@@ -26,6 +26,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.Set;
+import java.util.function.Consumer;
 
 import org.metricshub.ipmi.core.api.async.ConnectionHandle;
 import org.metricshub.ipmi.core.api.sol.SerialOverLan;
@@ -47,6 +48,7 @@ public final class SolConsole implements AutoCloseable {
 	private static final int READ_POLL_MS = 200;
 
 	private final SerialOverLan sol;
+	private final Consumer<SolConsole> onClose;
 	private final InputStream input;
 	private final OutputStream output;
 	private volatile boolean deactivated;
@@ -56,9 +58,11 @@ public final class SolConsole implements AutoCloseable {
 	 * Wraps an activated console.
 	 *
 	 * @param sol the console of the protocol core
+	 * @param onClose told when the console is closed, so that the client stops tracking it
 	 */
-	SolConsole(SerialOverLan sol) {
+	SolConsole(SerialOverLan sol, Consumer<SolConsole> onClose) {
 		this.sol = sol;
+		this.onClose = onClose;
 		this.input = new ConsoleInput();
 		this.output = new ConsoleOutput();
 		sol.registerEventListener(new SolEventListener() {
@@ -167,6 +171,7 @@ public final class SolConsole implements AutoCloseable {
 			return;
 		}
 		closed = true;
+		onClose.accept(this);
 		try {
 			sol.close();
 		} catch (IOException e) {

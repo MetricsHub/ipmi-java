@@ -23,6 +23,7 @@ package org.metricshub.ipmi.core.sm.states;
  */
 
 import org.metricshub.ipmi.core.coding.Encoder;
+import org.metricshub.ipmi.core.coding.PayloadCoder;
 import org.metricshub.ipmi.core.coding.commands.IpmiVersion;
 import org.metricshub.ipmi.core.coding.commands.PrivilegeLevel;
 import org.metricshub.ipmi.core.coding.commands.session.CloseSession;
@@ -85,17 +86,7 @@ public class SessionValid extends State {
 		if (machineEvent instanceof Sendv20Message) {
 			Sendv20Message event = (Sendv20Message) machineEvent;
 			try {
-				// The session signs and encrypts the message: the command carries no session parameters of its own
-				event.getPayloadCoder().setSessionParameters(IpmiVersion.V20, cipherSuite, AuthenticationType.RMCPPlus);
-				stateMachine
-						.sendMessage(
-								Encoder
-										.encode(
-												new Protocolv20Encoder(),
-												event.getPayloadCoder(),
-												event.getMessageSequenceNumber(),
-												event.getSessionSequenceNumber(),
-												event.getSessionId()));
+				stateMachine.sendMessage(encode(event));
 			} catch (Exception e) {
 				stateMachine.doExternalAction(new ErrorAction(e));
 			}
@@ -146,6 +137,25 @@ public class SessionValid extends State {
 									new IllegalArgumentException("Invalid transition")));
 		}
 
+	}
+
+	/**
+	 * Encodes the command of the event with the parameters of this session. The session signs and encrypts the
+	 * message, so the command carries no session parameters of its own: they are set on it and the message encoded
+	 * under the lock of the coder, as one command instance may be sent on several connections at once.
+	 */
+	private byte[] encode(Sendv20Message event) throws Exception {
+		PayloadCoder coder = event.getPayloadCoder();
+		synchronized (coder) {
+			coder.setSessionParameters(IpmiVersion.V20, cipherSuite, AuthenticationType.RMCPPlus);
+			return Encoder
+					.encode(
+							new Protocolv20Encoder(),
+							coder,
+							event.getMessageSequenceNumber(),
+							event.getSessionSequenceNumber(),
+							event.getSessionId());
+		}
 	}
 
 	private CloseSession closeSession(int closedSessionId) {

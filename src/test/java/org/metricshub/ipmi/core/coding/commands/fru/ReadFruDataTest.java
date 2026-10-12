@@ -175,6 +175,23 @@ class ReadFruDataTest {
 	}
 
 	@Test
+	void anInternalUseAreaBeyondTheDataIsReported() {
+		byte[] board = boardArea();
+		// Internal use area declared at offset 64, past the data read
+		byte[] header = bytes(1, 8, 0, 1, 0, 0, 0, 0);
+		header[7] = checksum(header, 0, 7);
+		ReadFruDataResponseData chunk = new ReadFruDataResponseData();
+		chunk.setFruData(concat(header, board));
+		List<String> problems = new java.util.ArrayList<>();
+
+		List<FruRecord> records = ReadFruData.decodeFruData(Collections.singletonList(chunk), problems);
+
+		assertEquals(1, records.size(), "the board area");
+		assertEquals(1, problems.size(), problems.toString());
+		assertTrue(problems.get(0).contains("internal use area"), problems.get(0));
+	}
+
+	@Test
 	void unspecifiedManufacturingDateIsNull() {
 		byte[] board = area(concat(bytes(0, 0, 0, 0), text("IBM"), bytes(0xc1)));
 		byte[] header = bytes(1, 0, 0, 1, 0, 0, 0, 0);
