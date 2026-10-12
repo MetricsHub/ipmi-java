@@ -146,8 +146,8 @@ With `ipmitool`, add `-I lanplus -H <bmc> -U <user> -P <password> -L USER -C <su
 | `send(new GetSelInfo())`, `send(new GetSelEntry(...))` | `sel info`, `sel elist` | `sel` |
 | `sol().open()` | `sol activate` | `sol -a` |
 
-The device types and state descriptions of the [text output](sensors.html#text-output-format)
-follow the wording of `ipmiutil`.
+The state descriptions of [`Sensor.states()`](sensors.html#states) follow the wording of
+`ipmiutil`.
 
 > [!NOTE]
 > `ipmiutil sensor` reads the sensors with Get Device SDR, which some BMCs refuse (`D4h`) at any

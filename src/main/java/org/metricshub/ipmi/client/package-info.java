@@ -1,7 +1,6 @@
 /**
  * The client of a BMC: {@link org.metricshub.ipmi.client.IpmiClient} and its builder, the operations, their typed
- * results and the {@link org.metricshub.ipmi.client.IpmiClientException}s, and the text output of
- * {@link org.metricshub.ipmi.client.IpmiResultConverter}.
+ * results and the {@link org.metricshub.ipmi.client.IpmiClientException}s.
  */
 package org.metricshub.ipmi.client;
 /*-

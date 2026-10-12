@@ -8,9 +8,10 @@ description: What changes when upgrading the IPMI Java Client — from 1.x to 2.
 ## Upgrading from 1.x to 2.0.00
 
 Version 2.0.00 replaces the client API of 1.x with a fluent client, removes the SLF4J
-dependency, and simplifies the low-level commands. The protocol core, the decoders and the text
-output are the same: the text that `IpmiResultConverter` produces is byte-identical to 1.2.x for
-the same BMC data.
+dependency, and simplifies the low-level commands. The protocol core and the decoders are the
+same. The semicolon-separated text output of 1.x (`IpmiResultConverter`) is MetricsHub's format,
+and moves to the [MetricsHub IPMI extension](https://github.com/MetricsHub/metricshub-community/issues/1391),
+where it stays byte-identical to 1.2.x for the same BMC data.
 
 ### The client
 
@@ -29,21 +30,23 @@ methods and `IpmiClientConfiguration` are gone.
 | `IpmiClient.getChassisStatus(config)` | `bmc.chassisStatus()`, a [`ChassisStatus`](chassis-status.html) (`data()` gives the `GetChassisStatusResponseData`) |
 | `IpmiClient.getSensors(config)` | `bmc.sensors().execute()`, a [`SensorList`](sensors.html) of typed [`Sensor`](apidocs/org/metricshub/ipmi/client/Sensor.html)s; `types()` and `names()` select sensors before their readings are requested |
 | `IpmiClient.getFrus(config)` | `bmc.frus().execute()`, a [`FruList`](fru-inventory.html) of typed [`Fru`](apidocs/org/metricshub/ipmi/client/Fru.html)s; `ids()` selects FRUs |
-| `IpmiClient.getChassisStatusAsStringResult(config)` | `IpmiResultConverter.convertResult(bmc.chassisStatus())` |
-| `IpmiClient.getFrusAndSensorsAsStringResult(config)` | `IpmiResultConverter.convertResult(bmc.frus().execute(), bmc.sensors().execute())`: one session and one SDR walk instead of two |
+| `IpmiClient.getChassisStatusAsStringResult(config)` | `bmc.chassisStatus().powerOn()`; the `System power state is up` text is produced by the MetricsHub IPMI extension |
+| `IpmiClient.getFrusAndSensorsAsStringResult(config)` | `bmc.frus().execute()` and `bmc.sensors().execute()`, one session and one SDR walk instead of two; the text lines are produced by the MetricsHub IPMI extension, which took `IpmiResultConverter` over |
 | A new session per call | One session per client, serialized operations, [reopened](timeouts-and-errors.html#session-recovery) when the BMC loses it |
 | `Sensor.getRecord()`, `getData()`, `getStates()`, `getEntityId()`, `getDeviceId()` | `record()`, `readingData()`, `states()` (a list), `entity()`, `entityInstance()`, plus `reading()`, `rawReading()`, the thresholds, `status()`, `problem()` |
 | `Fru.getFruLocator()`, `getFruRecords()` | `locator()`, `records()`, plus `board()`, `product()`, `chassis()`, `multiRecords()`, the summary (`manufacturer()`, `model()`, `serialNumber()`, `partNumber()`), `complete()` and `problems()` |
-| `org.metricshub.ipmi.client.model` | Removed; `DeviceDescription` and `ReadingTypeDescription` move to `org.metricshub.ipmi.client` |
+| `org.metricshub.ipmi.client.model`, `IpmiResultConverter`, `DeviceDescription` | Removed: the typed results replace the model classes, and the text converter with its `ipmiutil` entity names moves to the MetricsHub IPMI extension; `ReadingTypeDescription` moves to `org.metricshub.ipmi.client` |
 | `org.metricshub.ipmi.client.runner` | Removed (implementation details of the client) |
 | `ExecutionException` wrapping the cause, `TimeoutException`, `InterruptedException` | The unchecked [`IpmiClientException`](timeouts-and-errors.html#exceptions) hierarchy: `IpmiAuthenticationException`, `IpmiConnectionException`, `IpmiTimeoutException`, `IpmiCompletionCodeException`; the core exception is the `getCause()` |
 | The `WARN` and `DEBUG` logs | Nothing is logged: `SensorList.skippedRecords()`, `FruList.skippedRecords()`, `Sensor.problem()` and `Fru.problems()` carry what the library logged ([Problems that do not fail the operation](timeouts-and-errors.html#problems-that-do-not-fail-the-operation)) |
 
-The migration of a 1.x text collection is a few lines:
+The migration of a 1.x collection is a few lines:
 
 ```java
 // 1.x
-String text = IpmiClient.getFrusAndSensorsAsStringResult(
+List<Fru> frus = IpmiClient.getFrus(
+		new IpmiClientConfiguration(host, user, password, bmcKey, skipAuth, timeoutSeconds));
+List<Sensor> sensors = IpmiClient.getSensors(
 		new IpmiClientConfiguration(host, user, password, bmcKey, skipAuth, timeoutSeconds));
 
 // 2.0.00
@@ -52,7 +55,8 @@ try (IpmiClient bmc = IpmiClient.builder(host)
 		.bmcKey(bmcKey)
 		.timeout(Duration.ofSeconds(timeoutSeconds))
 		.build()) {
-	String text = IpmiResultConverter.convertResult(bmc.frus().execute(), bmc.sensors().execute());
+	FruList frus = bmc.frus().execute();
+	SensorList sensors = bmc.sensors().execute();
 }
 ```
 
@@ -330,7 +334,7 @@ with the new `protected` accessors:
 | `ConfidentialityAlgorithm` | `sik` | `getSik()` |
 | `IntegrityAlgorithm` | `sik` | `getSik()`, `setSik(byte[])` |
 
-`IpmiClient`, `IpmiResultConverter`, `Utils`, `DeviceDescription`, `ReadingTypeDescription` and
+`IpmiClient`, `IpmiResultConverter`, `Utils`, `DeviceDescription`, `ReadingTypeDescription` (the last four removed or moved in 2.0.00) and
 `MessageComposer` are now `final` (they only had private constructors, so they could not be
 subclassed anyway).
 

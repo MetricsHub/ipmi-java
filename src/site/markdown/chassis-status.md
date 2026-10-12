@@ -44,15 +44,6 @@ try (IpmiClient bmc = IpmiClient.builder(host).credentials(user, password).build
 Not every BMC fills every flag: the intrusion, drive and cooling bits in particular are optional
 in the specification, and a BMC that does not implement them reports `false`.
 
-## As text
-
-```java
-String text = IpmiResultConverter.convertResult(bmc.chassisStatus());
-// "System power state is up" or "System power state is down"
-```
-
-The text reports the power state only.
-
 ## Controlling the power
 
 `chassisStatus()` only reads. To power the server on or off or reset it, send the

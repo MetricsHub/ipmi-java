@@ -8,7 +8,7 @@ This project is a fork of the excellent [IPMI Library for Java by Verax Systems]
 
 See **[Project Documentation](https://metricshub.org/ipmi-java)** and the [Javadoc](https://metricshub.org/ipmi-java/apidocs) for more information on how to use this library in your code.
 
-The IPMI Java Client talks to the Baseboard Management Controller (BMC) of a server over IPMI 2.0 over LAN (RMCP+): it reads the chassis status, the Field Replaceable Units (FRUs) and the sensors of the SDR repository as typed Java objects (or as the text output that MetricsHub parses), opens Serial over LAN consoles, and sends any IPMI command (System Event Log, chassis control) in the same session. It requires Java 8 or later and has no dependency.
+The IPMI Java Client talks to the Baseboard Management Controller (BMC) of a server over IPMI 2.0 over LAN (RMCP+): it reads the chassis status, the Field Replaceable Units (FRUs) and the sensors of the SDR repository as typed Java objects, opens Serial over LAN consoles, and sends any IPMI command (System Event Log, chassis control) in the same session. It requires Java 8 or later and has no dependency.
 
 ```java
 try (IpmiClient bmc = IpmiClient.builder("bmc.example.com").credentials("monitor", password).build()) {
@@ -22,9 +22,6 @@ try (IpmiClient bmc = IpmiClient.builder("bmc.example.com").credentials("monitor
     for (Fru fru : bmc.frus().execute()) {
         System.out.println(fru.name() + ": " + fru.manufacturer() + " " + fru.model() + " S/N " + fru.serialNumber());
     }
-
-    // The text that MetricsHub parses, from the same results
-    System.out.println(IpmiResultConverter.convertResult(bmc.frus().execute(), bmc.sensors().execute()));
 }
 ```
 
@@ -35,7 +32,7 @@ A client owns one RMCP+ session, opened by the first operation and closed by `cl
 Version 2.0.00 replaces the client API of 1.x and removes the SLF4J dependency; see [Upgrading from 1.x](https://metricshub.org/ipmi-java/upgrading.html#upgrading-from-1-x-to-2-0-00) for the migration table.
 
 * `IpmiClientConfiguration` and the static methods of `IpmiClient` are replaced by the builder above: `IpmiClient.builder(host).credentials(user, password).build()` returns a reusable, thread-safe, `AutoCloseable` client that keeps one session open across its operations (`chassisStatus()`, `sensors()`, `frus()`, `send(command)`, `sol().open()`, `capabilities()`), walks the SDR repository once for `frus()` and `sensors()`, and reopens the session when the BMC loses it. The cipher suite preference, the privilege level, the message timeout, the retries and the keep-alive period are settings of the builder; `PropertiesManager` and the `connection.properties` and `vxipmi.properties` files are removed.
-* The results are typed and immutable (`ChassisStatus`, `Sensor` with its converted reading, thresholds, status and states, `Fru` with its decoded areas, `SensorList` and `FruList` with the SDR records the walk skipped), and replace the `org.metricshub.ipmi.client.model` classes; `IpmiResultConverter` produces the same text output from them, byte for byte.
+* The results are typed and immutable (`ChassisStatus`, `Sensor` with its converted reading, thresholds, status and states, `Fru` with its decoded areas, `SensorList` and `FruList` with the SDR records the walk skipped), and replace the `org.metricshub.ipmi.client.model` classes. The semicolon-separated text output (`IpmiResultConverter`, `DeviceDescription`) is MetricsHub's format and moves to the MetricsHub IPMI extension, where it stays byte for byte the same.
 * The checked `ExecutionException`, `TimeoutException` and `InterruptedException` are replaced by the unchecked `IpmiClientException` hierarchy: `IpmiAuthenticationException`, `IpmiConnectionException`, `IpmiTimeoutException`, `IpmiCompletionCodeException`.
 * The library no longer logs: the problems that do not fail an operation are reported in its result (`Sensor.problem()`, `Fru.problems()`, `skippedRecords()`, `ReadFruData.decodeFruData(data, problems)`), and `org.slf4j:slf4j-api` is no longer a dependency.
 * In the low-level API, the commands no longer take `IpmiVersion`, `CipherSuite` and `AuthenticationType` in their constructors (the session sets them when it sends the command), `IpmiCommandCoder<R>` declares the response type so that `IpmiConnector.sendMessage()` returns it without a cast, `IpmiConnector.setTimeout(int)` and `setRetries(int)` replace the properties files, `CipherSuite.forId(id)` builds a standard suite, and a wrong password fails the handshake with `AuthenticationException`.
