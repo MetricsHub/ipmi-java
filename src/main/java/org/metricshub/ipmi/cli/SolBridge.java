@@ -133,6 +133,8 @@ final class SolBridge {
 		boolean atLineStart = true;
 		boolean escapePending = false;
 		boolean afterCr = false;
+		// In line mode, a local sequence (~? ~B) is typed with Enter, which must not reach the BMC as a command
+		boolean swallowEnter = false;
 		try {
 			while (true) {
 				int count;
@@ -162,6 +164,11 @@ final class SolBridge {
 						if (b == '\n') {
 							b = '\r';
 						}
+						boolean swallowed = swallowEnter && b == '\r';
+						swallowEnter = false;
+						if (swallowed) {
+							continue;
+						}
 					}
 					if (escapePending) {
 						escapePending = false;
@@ -175,11 +182,13 @@ final class SolBridge {
 								return INPUT_FAILED;
 							}
 							atLineStart = false;
+							swallowEnter = cooked;
 							continue;
 						}
 						if (b == '?') {
 							err.print(ESCAPE_HELP.replace('~', (char) escape));
 							err.flush();
+							swallowEnter = cooked;
 							continue;
 						}
 						if (b != escape) {

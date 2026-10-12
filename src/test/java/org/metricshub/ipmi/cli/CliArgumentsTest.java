@@ -190,6 +190,7 @@ class CliArgumentsTest {
 		assertEquals("-L must be user, operator or administrator", usageError("-L", "ADMIN"));
 		assertEquals("-C must be between 0 and 19", usageError("-C", "17,20"));
 		assertEquals("-C must be a number", usageError("-C", ""));
+		assertEquals("-C must be a number", usageError("-C", "17,"));
 		assertEquals("--json takes no value", usageError(login("chassis", "--json=false")));
 		assertEquals("--no-escape takes no value", usageError(login("sol", "--no-escape=false")));
 		assertEquals("--verbose takes no value", usageError("--verbose=true"));

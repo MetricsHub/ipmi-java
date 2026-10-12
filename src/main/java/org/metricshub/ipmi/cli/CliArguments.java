@@ -429,7 +429,7 @@ final class CliArguments implements AutoCloseable {
 	}
 
 	private static int[] parseCipherSuites(String value, String option) throws CliUsageException {
-		String[] ids = value.split(",");
+		String[] ids = value.split(",", -1);
 		int[] suites = new int[ids.length];
 		for (int i = 0; i < ids.length; i++) {
 			suites[i] = (int) parseNumber(ids[i], option, 0, LAST_STANDARD_SUITE);
