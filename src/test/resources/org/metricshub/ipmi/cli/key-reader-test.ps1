@@ -19,6 +19,8 @@ $cases = @(
   @('Shift+Tab', (key "`t" 'Tab' $true $false $false), '1b 5b 5a'),
   @('Tab', (key "`t" 'Tab' $false $false $false), '09'),
   @('e-acute', (key ([char]0xe9) 'Oem1' $false $false $false), 'c3 a9'),
+  @('emoji, high surrogate (waits)', (key ([char]0xd83d) 'Packet' $false $false $false), ''),
+  @('emoji, low surrogate (the pair)', (key ([char]0xde00) 'Packet' $false $false $false), 'f0 9f 98 80'),
   @('Ctrl+Space', (key ([char]0) 'Spacebar' $false $false $true), '00'),
   @('Ctrl+at (Ctrl+Shift+2)', (key ([char]0) 'D2' $true $false $true), '00'),
   @('AltGr dead key (tilde on AZERTY: Ctrl+Alt, no character yet)', (key ([char]0) 'D2' $false $true $true), ''),

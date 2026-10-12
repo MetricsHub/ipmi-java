@@ -424,7 +424,8 @@ public final class IpmiClient implements AutoCloseable {
 	}
 
 	/**
-	 * @return whether a SOL instance held by a session the BMC does not have any more was deactivated
+	 * @return whether the activation is worth trying again: an instance held by a session the BMC does not have any
+	 *         more was deactivated, or one was freed since the failed activation
 	 * @throws SOLException when every instance is held by a session the BMC still has
 	 */
 	private boolean reclaimStaleSol(SOLException failure) throws SOLException {
@@ -451,6 +452,11 @@ public final class IpmiClient implements AutoCloseable {
 				session = null;
 			}
 			if (holder == 0 || session == null || !session.isSessionFound()) {
+				// Another client may have reclaimed the instance meanwhile: deactivate it only while the dead session
+				// still holds it (one round trip of window: IPMI has no atomic form of this)
+				if (link.send(new GetPayloadInstanceInfo(PayloadType.Sol, instance)).getSessionId() != holder) {
+					return true;
+				}
 				link.send(new DeactivatePayload(PayloadType.Sol, instance));
 				return true;
 			}
@@ -464,7 +470,8 @@ public final class IpmiClient implements AutoCloseable {
 					.append(')');
 		}
 		if (holders.length() == 0) {
-			return false;
+			// Every instance is free now: a console released its instance since the failed activation
+			return !free.isEmpty();
 		}
 		throw new SOLException("The SOL payload is in use by another session: " + holders, failure);
 	}

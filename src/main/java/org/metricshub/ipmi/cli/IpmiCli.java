@@ -625,8 +625,9 @@ public final class IpmiCli {
 			throws InterruptedException {
 		SolConsole console = timed(arguments, err, "SOL console", () -> client.sol().open());
 		RawInput raw = terminal ? rawInput(stdin, err) : null;
-		// stty raw turns the newline translation of the terminal off: the text of the CLI itself needs CR LF there
-		PrintStream local = raw == null ? err : crlf(err);
+		// stty raw turns the newline translation of the terminal off: the text of the CLI itself needs CR LF there (the
+		// key reader of Windows leaves the console output as it is)
+		PrintStream local = raw == null || isWindows() ? err : crlf(err);
 		// A kill (Ctrl+C in line mode) must give the terminal back and free the payload on the BMC: some BMCs keep
 		// a payload active after its session is gone, so the console is deactivated before the session is closed
 		Thread hook = new Thread(() -> {
@@ -691,7 +692,7 @@ public final class IpmiCli {
 	 */
 	private static RawInput rawInput(InputStream stdin, PrintStream err) {
 		try {
-			if (System.getProperty("os.name", "").toLowerCase(Locale.ROOT).contains("win")) {
+			if (isWindows()) {
 				return windowsKeys();
 			}
 			String saved = stty("-g").trim();
@@ -733,7 +734,10 @@ public final class IpmiCli {
 			+ "    $b = @(27, 91, 90)\n"
 			+ "  } elseif ($ctrl -and -not $alt -and [int]$k.KeyChar -eq 0) {\n" + "    $b = @(0)\n"
 			+ "  } elseif ([int]$k.KeyChar -ne 0) {\n"
-			+ "    $b = [Text.Encoding]::UTF8.GetBytes([string]$k.KeyChar)\n"
+			+ "    if ([char]::IsHighSurrogate($k.KeyChar)) { $script:high = $k.KeyChar; return [byte[]]@() }\n"
+			+ "    $text = if ($script:high -and [char]::IsLowSurrogate($k.KeyChar)) { [string]$script:high + [string]$k.KeyChar }"
+			+ " else { [string]$k.KeyChar }\n" + "    $script:high = $null\n"
+			+ "    $b = [Text.Encoding]::UTF8.GetBytes($text)\n"
 			+ "    if ($alt -and -not $ctrl) { $b = @(27) + $b }\n"
 			+ "  }\n"
 			+ "  return [byte[]]$b\n"
@@ -744,6 +748,10 @@ public final class IpmiCli {
 			+ "  $b = Encode([Console]::ReadKey($true))\n"
 			+ "  if ($b.Count -gt 0) { $out.Write($b, 0, $b.Count); $out.Flush() }\n"
 			+ "}\n";
+
+	private static boolean isWindows() {
+		return System.getProperty("os.name", "").toLowerCase(Locale.ROOT).contains("win");
+	}
 
 	private static RawInput windowsKeys() throws IOException {
 		// The child inherits the console, so ReadKey reads the keys of the terminal of the user
