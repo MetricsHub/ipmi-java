@@ -46,6 +46,8 @@ public final class FakeSdrRepository {
 	private final List<byte[]> records = new ArrayList<>();
 	private final Map<Integer, byte[]> readings = new ConcurrentHashMap<>();
 	private final Map<Integer, byte[]> frus = new ConcurrentHashMap<>();
+	private final java.util.Set<Integer> chunkedOnly = ConcurrentHashMap.newKeySet();
+	private final Map<Integer, Integer> cancelOnce = new ConcurrentHashMap<>();
 	private volatile int addTimestamp = 1;
 	private volatile int deleteTimestamp = 1;
 	private volatile boolean infoSupported = true;
@@ -107,6 +109,31 @@ public final class FakeSdrRepository {
 	}
 
 	/**
+	 * Makes the BMC refuse to return the given record whole ("Cannot return number of requested data bytes"), so
+	 * that the walk reads it in chunks.
+	 *
+	 * @param recordId the record ID
+	 * @return this repository
+	 */
+	public FakeSdrRepository chunkedOnly(int recordId) {
+		chunkedOnly.add(recordId);
+		return this;
+	}
+
+	/**
+	 * Makes the BMC answer "Reservation canceled" once, to the chunk of the given record at the given offset, as a BMC
+	 * does when another session appears during the walk.
+	 *
+	 * @param recordId the record ID
+	 * @param offset the offset of the chunk
+	 * @return this repository
+	 */
+	public FakeSdrRepository cancelReservationOnce(int recordId, int offset) {
+		cancelOnce.put(recordId, offset);
+		return this;
+	}
+
+	/**
 	 * Changes the repository: a new most-recent-addition timestamp, as after an SDR update.
 	 */
 	public void touch() {
@@ -147,6 +174,12 @@ public final class FakeSdrRepository {
 			return new byte[] { (byte) 0xcb }; // requested record not present
 		}
 		byte[] record = records.get(index);
+		if (count == 0xff && chunkedOnly.contains(id(record))) {
+			return new byte[] { (byte) 0xca }; // cannot return number of requested data bytes
+		}
+		if (count != 0xff && cancelOnce.remove(id(record), offset)) {
+			return new byte[] { (byte) 0xc5 }; // reservation canceled
+		}
 		int next = index + 1 < records.size() ? id(records.get(index + 1)) : LAST_RECORD_ID;
 		int end = count == 0xff ? record.length : Math.min(record.length, offset + count);
 		byte[] chunk = Arrays.copyOfRange(record, Math.min(offset, record.length), end);

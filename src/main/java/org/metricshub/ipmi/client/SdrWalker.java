@@ -127,11 +127,15 @@ final class SdrWalker {
 		return decode(recordId, reply.getSensorRecordData());
 	}
 
+	/**
+	 * Reads a record in chunks. The walk advances to the next record only once every chunk is read: a reservation
+	 * canceled by the BMC in the middle of the record makes the walk read the whole record again, rather than skip it.
+	 */
 	private SensorRecord readInChunks(int recordId) {
 		GetSdrResponseData first = exchange.send(new GetSdr(reservationId, recordId, 0, INITIAL_CHUNK_SIZE));
-		nextRecordId = first.getNextRecordId();
 		byte[] header = first.getSensorRecordData();
 		if (header == null || header.length < HEADER_SIZE) {
+			nextRecordId = first.getNextRecordId();
 			skipped
 					.add(
 							new SkippedRecord(
@@ -150,6 +154,7 @@ final class SdrWalker {
 			byte[] chunk = exchange.send(new GetSdr(reservationId, recordId, read, toRead)).getSensorRecordData();
 			int got = chunk == null ? 0 : Math.min(toRead, chunk.length);
 			if (got == 0) {
+				nextRecordId = first.getNextRecordId();
 				skipped
 						.add(
 								new SkippedRecord(
@@ -161,6 +166,7 @@ final class SdrWalker {
 			System.arraycopy(chunk, 0, bytes, read, got);
 			read += got;
 		}
+		nextRecordId = first.getNextRecordId();
 		return decode(recordId, bytes);
 	}
 

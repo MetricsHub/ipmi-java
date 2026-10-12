@@ -225,6 +225,32 @@ class IpmiClientTest {
 
 	@Test
 	@Timeout(30)
+	void aReservationCanceledInTheMiddleOfAChunkedRecordDoesNotLoseIt() throws Exception {
+		try (FakeRmcpPlusBmc bmc = new FakeRmcpPlusBmc(SUITES, USER, utf8(PASSWORD), null)) {
+			// A Cisco IMC returns the large records in chunks only, and cancels the reservation during the walk
+			new FakeSdrRepository()
+					.add(compactSensorRecord(1, 0x10, EntityId.Fan.getCode(), 1, SensorType.Fan.getCode(), 0x08, "Fan 1"))
+					.add(FakeSdrRepository.withId(IpmiResultConverterTest.FRONT_PANEL_FULL_RECORD, 2))
+					.add(compactSensorRecord(3, 0x11, EntityId.Fan.getCode(), 2, SensorType.Fan.getCode(), 0x08, "Fan 2"))
+					.chunkedOnly(1)
+					.cancelReservationOnce(1, 8)
+					.reading(0x10, 0x00, 0x40, 0x02)
+					.reading(TEMPERATURE_SENSOR, 0x9a, 0x40, 0x00)
+					.reading(0x11, 0x00, 0x40, 0x02)
+					.install(bmc);
+			try (IpmiClient client = client(bmc).build()) {
+				SensorList sensors = client.sensors().execute();
+				assertEquals(
+						java.util.Arrays.asList("Fan 1", "Ambient Temp", "Fan 2"),
+						sensors.stream().map(Sensor::name).collect(Collectors.toList()));
+				assertTrue(sensors.skippedRecords().isEmpty(), sensors.skippedRecords().toString());
+				assertEquals(1, bmc.getCount(NETFN_STORAGE, FakeSdrRepository.RESERVE_SDR_REPOSITORY));
+			}
+		}
+	}
+
+	@Test
+	@Timeout(30)
 	void sensorsAreSelectedBeforeTheirReadingsAreRequested() throws Exception {
 		try (FakeRmcpPlusBmc bmc = bmc(); IpmiClient client = client(bmc).build()) {
 			SensorList temperatures = client.sensors().types(SensorType.Temperature).execute();
