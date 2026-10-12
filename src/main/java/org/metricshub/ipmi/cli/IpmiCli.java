@@ -93,7 +93,6 @@ public final class IpmiCli {
 	private static final String FRU_INDENT = "  ";
 	private static final long NANOS_PER_MILLI = 1_000_000L;
 	private static final double THOUSAND = 1000.0;
-	private static final char DELETE = 0x7f;
 
 	private IpmiCli() {}
 
@@ -264,14 +263,26 @@ public final class IpmiCli {
 
 	private static void probe(CliArguments arguments, BmcCapabilities capabilities, PrintStream out) {
 		int[] preference = arguments.cipherSuites() == null ? CliArguments.DEFAULT_CIPHER_SUITES : arguments.cipherSuites();
+		// The choice the client makes with the same -C: a single ID is used as is, without discovery; several are a
+		// preference among the suites the BMC offers, implemented by the library or not
 		CipherSuite chosen = null;
+		boolean offered = false;
+		if (arguments.cipherSuites() != null && preference.length == 1) {
+			chosen = CipherSuite.forId(preference[0]);
+		}
 		for (int id : preference) {
 			for (CipherSuite suite : capabilities.cipherSuites()) {
-				if (chosen == null && suite.getId() == id && suite.isSupported()) {
-					chosen = suite;
+				if (suite.getId() == id && (chosen == null || chosen.getId() == id)) {
+					chosen = chosen == null ? suite : chosen;
+					offered = true;
 				}
 			}
 		}
+		String problem = chosen == null ?
+				null :
+				!offered ?
+						"not offered by the BMC: the login would fail" :
+						!chosen.isSupported() ? "not implemented by the library: the login would fail" : null;
 		if (arguments.json()) {
 			Map<String, Object> fields = new LinkedHashMap<String, Object>();
 			fields.put("ipmi20", capabilities.ipmi20());
@@ -294,6 +305,9 @@ public final class IpmiCli {
 			fields.put("cipherSuites", suites);
 			if (chosen != null) {
 				fields.put("chosenCipherSuite", (int) chosen.getId());
+				if (problem != null) {
+					fields.put("chosenCipherSuiteProblem", problem);
+				}
 			}
 			JsonLinesWriter.write(fields, out);
 			return;
@@ -325,7 +339,9 @@ public final class IpmiCli {
 				"",
 				LABEL_WIDTH,
 				"Chosen cipher suite",
-				chosen == null ? "none (preference " + join(preference) + ")" : String.valueOf(chosen.getId()));
+				chosen == null ?
+						"none (preference " + join(preference) + ")" :
+						chosen.getId() + (problem == null ? "" : " (" + problem + ")"));
 	}
 
 	private static void chassis(CliArguments arguments, ChassisStatus status, PrintStream out) {
@@ -444,16 +460,16 @@ public final class IpmiCli {
 		if (sensor.unit() != SensorUnit.Unspecified) {
 			fields.put("unit", sensor.unit().name());
 		}
-		sensor.reading().ifPresent(value -> fields.put("reading", round(value)));
+		round(sensor.reading()).ifPresent(value -> fields.put("reading", value));
 		sensor.rawReading().ifPresent(value -> fields.put("rawReading", value));
 		fields.put("status", sensor.status().name());
 		fields.put("states", sensor.states());
-		sensor.lowerNonRecoverable().ifPresent(value -> fields.put("lowerNonRecoverable", round(value)));
-		sensor.lowerCritical().ifPresent(value -> fields.put("lowerCritical", round(value)));
-		sensor.lowerNonCritical().ifPresent(value -> fields.put("lowerNonCritical", round(value)));
-		sensor.upperNonCritical().ifPresent(value -> fields.put("upperNonCritical", round(value)));
-		sensor.upperCritical().ifPresent(value -> fields.put("upperCritical", round(value)));
-		sensor.upperNonRecoverable().ifPresent(value -> fields.put("upperNonRecoverable", round(value)));
+		round(sensor.lowerNonRecoverable()).ifPresent(value -> fields.put("lowerNonRecoverable", value));
+		round(sensor.lowerCritical()).ifPresent(value -> fields.put("lowerCritical", value));
+		round(sensor.lowerNonCritical()).ifPresent(value -> fields.put("lowerNonCritical", value));
+		round(sensor.upperNonCritical()).ifPresent(value -> fields.put("upperNonCritical", value));
+		round(sensor.upperCritical()).ifPresent(value -> fields.put("upperCritical", value));
+		round(sensor.upperNonRecoverable()).ifPresent(value -> fields.put("upperNonRecoverable", value));
 		sensor.problem().ifPresent(problem -> fields.put("problem", problem));
 		return fields;
 	}
@@ -764,12 +780,19 @@ public final class IpmiCli {
 
 	/** A reading rounded to three decimals, without trailing zeros: {@code 22}, {@code 3.38}, {@code 6600}. */
 	static String number(OptionalDouble value) {
-		return value.isPresent() ? BigDecimal.valueOf(round(value.getAsDouble())).stripTrailingZeros().toPlainString() : "";
+		OptionalDouble rounded = round(value);
+		return rounded.isPresent() ? BigDecimal.valueOf(rounded.getAsDouble()).stripTrailingZeros().toPlainString() : "";
 	}
 
-	/** Rounds a reading to three decimals: the conversion formula of the SDR leaves binary noise in the double. */
-	static double round(double value) {
-		return Math.round(value * THOUSAND) / THOUSAND;
+	/**
+	 * Rounds a reading to three decimals (the conversion formula of the SDR leaves binary noise in the double); an
+	 * infinite value, which the exponential or reciprocal linearization of a record can give, is no reading.
+	 */
+	static OptionalDouble round(OptionalDouble value) {
+		if (!value.isPresent() || Double.isInfinite(value.getAsDouble()) || Double.isNaN(value.getAsDouble())) {
+			return OptionalDouble.empty();
+		}
+		return OptionalDouble.of(Math.round(value.getAsDouble() * THOUSAND) / THOUSAND);
 	}
 
 	/** Replaces the control characters of a BMC string, which would drive the terminal, with {@code ?}. */
@@ -777,7 +800,7 @@ public final class IpmiCli {
 		StringBuilder clean = new StringBuilder(text.length());
 		for (int i = 0; i < text.length(); i++) {
 			char c = text.charAt(i);
-			clean.append(c < ' ' || c == DELETE ? '?' : c);
+			clean.append(Character.isISOControl(c) ? '?' : c);
 		}
 		return clean.toString();
 	}

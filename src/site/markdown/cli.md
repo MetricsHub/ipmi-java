@@ -152,8 +152,10 @@ Cipher suites
 Chosen cipher suite         17
 ```
 
-The last line is the suite the CLI would use for a login with the same `-C` option, among those
-the BMC offers and the library implements; `none` means a login would fail with
+The last line is the suite a login with the same `-C` option would use: the first suite of the
+preference that the BMC offers, or the single suite of a one-ID `-C`, which is used without
+discovery. When that suite is one the library does not implement, or one the BMC does not offer,
+the line says so and that the login would fail; `none` means a login would fail with
 *offers none of the cipher suites* ([Troubleshooting](troubleshooting.html#ipmiclientexception-the-bmc-offers-none-of-the-cipher-suites)).
 `--json` prints one object with the same fields and the suites as an array:
 

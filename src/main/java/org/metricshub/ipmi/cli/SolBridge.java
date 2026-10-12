@@ -80,7 +80,7 @@ final class SolBridge {
 			IpmiCli.diagnostic(err, "cannot write to standard output");
 			return IpmiCli.EXIT_IO;
 		case INPUT_FAILED:
-			IpmiCli.diagnostic(err, "the BMC did not accept the characters");
+			IpmiCli.diagnostic(err, "the BMC did not accept the input");
 			return IpmiCli.EXIT_PROTOCOL;
 		default:
 			return 0;
@@ -131,6 +131,11 @@ final class SolBridge {
 					count = -1;
 				}
 				if (count < 0) {
+					if (escapePending) {
+						// A lone escape character at the end of the input is no sequence: it is data
+						pending.write(escape);
+						flush(pending, toBmc);
+					}
 					return CLOSED;
 				}
 				for (int i = 0; i < count; i++) {
@@ -153,7 +158,9 @@ final class SolBridge {
 						}
 						if (b == 'B') {
 							flush(pending, toBmc);
-							console.invokeOperations(SolOperation.Break);
+							if (!console.invokeOperations(SolOperation.Break)) {
+								return INPUT_FAILED;
+							}
 							atLineStart = false;
 							continue;
 						}

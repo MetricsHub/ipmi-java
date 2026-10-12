@@ -111,7 +111,17 @@ class IpmiCliTest {
 			assertEquals(0, bmc.getCount(OPEN_SESSION_REQUEST), "no session");
 
 			Result fixed = run(bmc, NO_PROMPT, "-C", "4", "probe");
-			assertTrue(fixed.out.endsWith("Chosen cipher suite         none (preference 4)\n"), fixed.out);
+			assertTrue(
+					fixed.out.endsWith("Chosen cipher suite         4 (not implemented by the library: the login would fail)\n"),
+					fixed.out);
+			Result preference = run(bmc, NO_PROMPT, "-C", "4,3", "probe", "--json");
+			assertTrue(
+					preference.out
+							.endsWith(
+									"\"chosenCipherSuite\":4,\"chosenCipherSuiteProblem\":\"not implemented by the "
+											+ "library: the login would fail\"}\n"),
+					"the client takes the first offered suite, implemented or not");
+			assertTrue(run(bmc, NO_PROMPT, "-C", "3", "probe").out.endsWith("Chosen cipher suite         3\n"));
 		}
 	}
 
@@ -247,7 +257,21 @@ class IpmiCliTest {
 			Result third = sol(bmc, "~.\r", "sol", "--no-escape");
 			assertEquals(0, third.code, "the end of the input closes");
 			assertEquals("root\r~\r\r~.\r~.\r", ascii(bmc.getSolReceived()));
+			awaitClose(bmc);
+
+			assertEquals(0, sol(bmc, "data\r~", "sol").code, "a lone escape character at the end of the input is data");
+			assertEquals("root\r~\r\r~.\r~.\rdata\r~", ascii(bmc.getSolReceived()));
 		}
+	}
+
+	@Test
+	void readingsAreRoundedAndInfiniteOnesAreAbsent() {
+		assertEquals("11.748", IpmiCli.number(java.util.OptionalDouble.of(11.748000000000001)));
+		assertEquals("6600", IpmiCli.number(java.util.OptionalDouble.of(6600.0)));
+		assertEquals("", IpmiCli.number(java.util.OptionalDouble.of(Double.POSITIVE_INFINITY)));
+		assertEquals("", IpmiCli.number(java.util.OptionalDouble.of(Double.NaN)));
+		assertEquals("", IpmiCli.number(java.util.OptionalDouble.empty()));
+		assertEquals("a?b?c?", IpmiCli.printable("a\u0000b\u009bc\u007f"), "C0, C1 and DEL controls");
 	}
 
 	@Test

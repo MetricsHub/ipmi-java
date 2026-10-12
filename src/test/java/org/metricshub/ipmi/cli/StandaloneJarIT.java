@@ -71,24 +71,39 @@ class StandaloneJarIT {
 		String java = Paths.get(System.getProperty("java.home"), "bin", isWindows() ? "java.exe" : "java").toString();
 		Process process = new ProcessBuilder(java, "-jar", jar.toString(), argument).start();
 		process.getOutputStream().close();
-		String stdout = read(process.getInputStream());
-		String stderr = read(process.getErrorStream());
+		// Both pipes are drained while the timed wait runs: a hung CLI fails the test instead of hanging the build
+		ByteArrayOutputStream stdout = new ByteArrayOutputStream();
+		ByteArrayOutputStream stderr = new ByteArrayOutputStream();
+		Thread out = drain(process.getInputStream(), stdout);
+		Thread err = drain(process.getErrorStream(), stderr);
 		if (!process.waitFor(PROCESS_TIMEOUT_SECONDS, TimeUnit.SECONDS)) {
 			process.destroyForcibly();
 			throw new IOException("The CLI process did not finish");
 		}
-		return new ProcessResult(process.exitValue(), stdout, stderr);
+		out.join(TimeUnit.SECONDS.toMillis(PROCESS_TIMEOUT_SECONDS));
+		err.join(TimeUnit.SECONDS.toMillis(PROCESS_TIMEOUT_SECONDS));
+		return new ProcessResult(
+				process.exitValue(),
+				new String(stdout.toByteArray(), StandardCharsets.UTF_8),
+				new String(stderr.toByteArray(), StandardCharsets.UTF_8));
 	}
 
-	private static String read(InputStream stream) throws IOException {
-		ByteArrayOutputStream bytes = new ByteArrayOutputStream();
-		byte[] buffer = new byte[4096];
-		int count = stream.read(buffer);
-		while (count >= 0) {
-			bytes.write(buffer, 0, count);
-			count = stream.read(buffer);
-		}
-		return new String(bytes.toByteArray(), StandardCharsets.UTF_8);
+	private static Thread drain(InputStream stream, ByteArrayOutputStream into) {
+		Thread thread = new Thread(() -> {
+			byte[] buffer = new byte[4096];
+			try {
+				int count = stream.read(buffer);
+				while (count >= 0) {
+					into.write(buffer, 0, count);
+					count = stream.read(buffer);
+				}
+			} catch (IOException e) {
+				// The process was destroyed: what was read is what there is
+			}
+		});
+		thread.setDaemon(true);
+		thread.start();
+		return thread;
 	}
 
 	private static boolean isWindows() {

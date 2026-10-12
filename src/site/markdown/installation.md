@@ -61,8 +61,9 @@ command-line client as its entry point, which runs on Java 8 or later with no ot
 java -jar ${project.artifactId}-${project.version}-standalone.jar -h bmc.example.com -u monitor -pf pw.txt chassis
 ```
 
-See [Command-Line Client](cli.html). The standalone jar is not published on Maven Central: use the
-regular artifact above in a build.
+See [Command-Line Client](cli.html). The same jar is published on Maven Central with the
+`standalone` classifier; a build uses the regular artifact above, which has the same classes
+without the entry point.
 
 ## Building from source
 

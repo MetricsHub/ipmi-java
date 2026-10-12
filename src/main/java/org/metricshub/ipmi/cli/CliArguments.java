@@ -146,10 +146,10 @@ final class CliArguments implements AutoCloseable {
 		switch (option) {
 		case "--help":
 			subcommand = Subcommand.HELP;
-			return index + 1;
+			return flag(argument, option, index);
 		case "--version":
 			subcommand = Subcommand.VERSION;
-			return index + 1;
+			return flag(argument, option, index);
 		case "-h":
 		case "--hostname":
 			hostname = optionValue(args, index, option);
@@ -174,7 +174,7 @@ final class CliArguments implements AutoCloseable {
 		case "--bmc-key":
 			exclusive(keyOption, "--bmc-key and --bmc-key-file");
 			keyOption = option;
-			bmcKey = parseHex(optionValue(args, index, option).getBytes(StandardCharsets.US_ASCII), option);
+			bmcKey = parseHex(consumeSecret(args, index, option).getBytes(StandardCharsets.US_ASCII), option);
 			return nextIndex(argument, index);
 		case "-kf":
 		case "--bmc-key-file":
@@ -207,7 +207,7 @@ final class CliArguments implements AutoCloseable {
 		case "-v":
 		case "--verbose":
 			verbose = true;
-			return index + 1;
+			return flag(argument, option, index);
 		default:
 			throw new CliUsageException("unknown option '" + option + "'");
 		}
@@ -273,11 +273,11 @@ final class CliArguments implements AutoCloseable {
 		switch (option) {
 		case "--help":
 			subcommand = Subcommand.HELP;
-			return index + 1;
+			return flag(argument, option, index);
 		case "--json":
 			requireSubcommand(option, Subcommand.PROBE, Subcommand.CHASSIS, Subcommand.SENSORS, Subcommand.FRU);
 			json = true;
-			return index + 1;
+			return flag(argument, option, index);
 		case "--type":
 			requireSubcommand(option, Subcommand.SENSORS);
 			if (types == null) {
@@ -294,7 +294,7 @@ final class CliArguments implements AutoCloseable {
 		case "--long":
 			requireSubcommand(option, Subcommand.SENSORS);
 			longFormat = true;
-			return index + 1;
+			return flag(argument, option, index);
 		case "--escape": {
 			requireSubcommand(option, Subcommand.SOL);
 			String value = optionValue(rest, index, option);
@@ -308,7 +308,7 @@ final class CliArguments implements AutoCloseable {
 		case "--no-escape":
 			requireSubcommand(option, Subcommand.SOL);
 			noEscape = true;
-			return index + 1;
+			return flag(argument, option, index);
 		default:
 			throw new CliUsageException("unknown option '" + option + "'");
 		}
@@ -365,9 +365,21 @@ final class CliArguments implements AutoCloseable {
 		return argument.indexOf('=') >= 0 ? index + 1 : index + 2;
 	}
 
+	/** A flag takes no value: {@code --json=false} would do the opposite of what it says. */
+	private static int flag(String argument, String option, int index) throws CliUsageException {
+		if (argument.indexOf('=') >= 0) {
+			throw new CliUsageException(option + " takes no value");
+		}
+		return index + 1;
+	}
+
 	private static char[] consumePassword(String[] args, int index, String option) throws CliUsageException {
-		char[] value = optionValue(args, index, option).toCharArray();
-		// The argument array is the only other copy of the password this process holds
+		return consumeSecret(args, index, option).toCharArray();
+	}
+
+	/** The value of a secret option, blanked in the argument array, the only other copy this process holds. */
+	private static String consumeSecret(String[] args, int index, String option) throws CliUsageException {
+		String value = optionValue(args, index, option);
 		if (args[index].indexOf('=') >= 0) {
 			args[index] = option;
 		} else {
