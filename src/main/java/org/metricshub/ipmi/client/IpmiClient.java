@@ -510,15 +510,20 @@ public final class IpmiClient implements AutoCloseable {
 	}
 
 	private void dropSession() {
-		if (link != null) {
-			connector.closeConnection(link.handle);
-			link = null;
+		if (link == null) {
+			return;
 		}
-		// The consoles of the session can receive nothing any more: their reads end
+		ConnectionHandle dropped = link.handle;
+		connector.closeConnection(dropped);
+		link = null;
+		// The consoles of the dropped connection can receive nothing any more: their reads end. A console that the
+		// BMC serves on another port has a session of its own, which stays
 		for (SolConsole console : consoles) {
-			console.invalidate();
+			if (console.usesConnection(dropped)) {
+				console.invalidate();
+				consoles.remove(console);
+			}
 		}
-		consoles.clear();
 	}
 
 	private IpmiConnector connector() throws IOException {
@@ -627,8 +632,9 @@ public final class IpmiClient implements AutoCloseable {
 
 	static Duration checkTimeout(Duration duration, String name) {
 		Objects.requireNonNull(duration, name);
-		if (duration.isNegative() || duration.isZero()) {
-			throw new IllegalArgumentException(name + " must be positive: " + duration);
+		// The timeouts are used in milliseconds
+		if (duration.isNegative() || duration.toMillis() == 0) {
+			throw new IllegalArgumentException(name + " must be at least one millisecond: " + duration);
 		}
 		if (duration.toMillis() > Integer.MAX_VALUE) {
 			throw new IllegalArgumentException(name + " is too long: " + duration);

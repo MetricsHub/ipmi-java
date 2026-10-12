@@ -110,6 +110,7 @@ decodes the FRU information (Platform Management FRU Information Storage Definit
 
 | Area | Class |
 | --- | --- |
+| Internal Use | `InternalUseInfo`, the vendor-private bytes as they are |
 | Chassis Info | `ChassisInfo` |
 | Board Info | `BoardInfo` |
 | Product Info | `ProductInfo` |

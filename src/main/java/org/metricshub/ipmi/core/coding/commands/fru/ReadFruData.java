@@ -27,6 +27,7 @@ import org.metricshub.ipmi.core.coding.commands.IpmiCommandCoder;
 import org.metricshub.ipmi.core.coding.commands.fru.record.BoardInfo;
 import org.metricshub.ipmi.core.coding.commands.fru.record.ChassisInfo;
 import org.metricshub.ipmi.core.coding.commands.fru.record.FruRecord;
+import org.metricshub.ipmi.core.coding.commands.fru.record.InternalUseInfo;
 import org.metricshub.ipmi.core.coding.commands.fru.record.MultiRecordInfo;
 import org.metricshub.ipmi.core.coding.commands.fru.record.ProductInfo;
 import org.metricshub.ipmi.core.coding.commands.sdr.GetSdr;
@@ -213,7 +214,19 @@ public class ReadFruData extends IpmiCommandCoder<ReadFruDataResponseData> {
 			throw new IllegalArgumentException("Invalid common header checksum");
 		}
 
-		// Offsets in multiples of 8 bytes (FRU spec section 8)
+		// Offsets in multiples of 8 bytes (FRU spec section 8). The internal use area is vendor-private data without a
+		// length: it ends where the next area starts
+		int internalUseOffset = TypeConverter.byteToInt(data[1]) * 8;
+		if (internalUseOffset != 0 && internalUseOffset < data.length) {
+			int end = data.length;
+			for (int area = 2; area <= 5; area++) {
+				int areaOffset = TypeConverter.byteToInt(data[area]) * 8;
+				if (areaOffset > internalUseOffset && areaOffset < end) {
+					end = areaOffset;
+				}
+			}
+			list.add(new InternalUseInfo(data, internalUseOffset, end));
+		}
 		addArea(list, data, TypeConverter.byteToInt(data[2]) * 8, "chassis", ChassisInfo::new, problems);
 		addArea(list, data, TypeConverter.byteToInt(data[3]) * 8, "board", BoardInfo::new, problems);
 		addArea(list, data, TypeConverter.byteToInt(data[4]) * 8, "product", ProductInfo::new, problems);

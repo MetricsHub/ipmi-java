@@ -17,6 +17,7 @@ import org.junit.jupiter.api.Test;
 import org.metricshub.ipmi.core.coding.commands.fru.record.BaseCompatibilityInfo;
 import org.metricshub.ipmi.core.coding.commands.fru.record.BoardInfo;
 import org.metricshub.ipmi.core.coding.commands.fru.record.FruRecord;
+import org.metricshub.ipmi.core.coding.commands.fru.record.InternalUseInfo;
 import org.metricshub.ipmi.core.coding.commands.fru.record.PowerSupplyInfo;
 import org.metricshub.ipmi.core.coding.commands.fru.record.RawMultiRecordInfo;
 import org.metricshub.ipmi.core.coding.commands.fru.record.ProductInfo;
@@ -156,6 +157,21 @@ class ReadFruDataTest {
 
 		PowerSupplyInfo powerSupply = assertInstanceOf(PowerSupplyInfo.class, records.get(3));
 		assertEquals(750, powerSupply.getCapacity());
+	}
+
+	@Test
+	void theInternalUseAreaIsKeptRaw() {
+		byte[] internal = bytes(0x01, 0xaa, 0xbb, 0xcc, 0xdd, 0xee, 0xff, 0x00);
+		byte[] board = boardArea();
+		// Internal use area at 8 (one 8-byte block), board area right after it
+		byte[] header = bytes(1, 1, 0, 2, 0, 0, 0, 0);
+		header[7] = checksum(header, 0, 7);
+
+		List<FruRecord> records = decode(concat(header, internal, board));
+
+		assertEquals(2, records.size(), "the internal use area and the board area");
+		assertArrayEquals(internal, assertInstanceOf(InternalUseInfo.class, records.get(0)).getData());
+		assertInstanceOf(BoardInfo.class, records.get(1));
 	}
 
 	@Test
