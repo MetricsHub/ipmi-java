@@ -413,6 +413,29 @@ class IpmiClientTest {
 
 	@Test
 	@Timeout(30)
+	void aSolConsoleOnAnotherPortSurvivesTheLossOfTheSessionOfTheClient() throws Exception {
+		try (
+				FakeRmcpPlusBmc bmc = bmc();
+				FakeRmcpPlusBmc solPort = new FakeRmcpPlusBmc(SUITES, USER, utf8(PASSWORD), null)) {
+			// The BMC serves SOL on another UDP port: the console has a session of its own there
+			solPort.enableSol(solPort.getPort(), 255, ADMINISTRATOR);
+			bmc.enableSol(solPort.getPort(), 255, ADMINISTRATOR);
+			try (
+					IpmiClient client = client(bmc).privilege(PrivilegeLevel.Administrator).build();
+					SolConsole console = client.sol().open()) {
+				assertTrue(solPort.isSolActive());
+				bmc.expireSession();
+				assertTrue(client.chassisStatus().powerOn(), "reopened on a new session");
+				assertFalse(console.deactivated(), "the console on its own port is not touched");
+				console.output().write("ls\r".getBytes(StandardCharsets.US_ASCII));
+				await(() -> solPort.getSolReceived().length == 3, "the console still works");
+			}
+			assertFalse(solPort.isSolActive(), "closing the console deactivates the payload");
+		}
+	}
+
+	@Test
+	@Timeout(30)
 	void aLostSessionIsReopenedAndAReadIsRetriedButNotASend() throws Exception {
 		try (FakeRmcpPlusBmc bmc = bmc(); IpmiClient client = client(bmc).build()) {
 			client.chassisStatus();
@@ -444,6 +467,8 @@ class IpmiClientTest {
 		assertThrows(IllegalArgumentException.class, () -> builder.cipherSuite(20));
 		assertThrows(IllegalArgumentException.class, () -> builder.cipherSuites());
 		assertThrows(IllegalArgumentException.class, () -> builder.timeout(Duration.ZERO));
+		assertThrows(IllegalArgumentException.class, () -> builder.timeout(Duration.ofNanos(1)));
+		assertThrows(IllegalArgumentException.class, () -> builder.messageTimeout(Duration.ofNanos(999999)));
 		assertThrows(IllegalArgumentException.class, () -> builder.messageTimeout(Duration.ofSeconds(-1)));
 		assertThrows(IllegalArgumentException.class, () -> builder.keepAlive(Duration.ofSeconds(-1)));
 		assertThrows(IllegalArgumentException.class, () -> builder.retries(-1));

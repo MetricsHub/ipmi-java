@@ -27,6 +27,7 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.Set;
 
+import org.metricshub.ipmi.core.api.async.ConnectionHandle;
 import org.metricshub.ipmi.core.api.sol.SerialOverLan;
 import org.metricshub.ipmi.core.api.sol.SolEventListener;
 import org.metricshub.ipmi.core.coding.payload.sol.SolOperation;
@@ -137,6 +138,17 @@ public final class SolConsole implements AutoCloseable {
 	 */
 	public void unregisterEventListener(SolEventListener listener) {
 		sol.unregisterEventListener(listener);
+	}
+
+	/**
+	 * Tells whether the console exchanges its packets on the given connection, rather than on a session of its own
+	 * on the port of the payload.
+	 *
+	 * @param handle the handle of a connection
+	 * @return whether the console uses it
+	 */
+	boolean usesConnection(ConnectionHandle handle) {
+		return sol.getConnectionHandle().getHandle() == handle.getHandle();
 	}
 
 	/**

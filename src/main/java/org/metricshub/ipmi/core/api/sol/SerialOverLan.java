@@ -487,6 +487,16 @@ public class SerialOverLan implements Closeable {
 	 *        a byte to write
 	 * @return true if byte was successfully sent and acknowledged by remote server, false otherwise.
 	 */
+	/**
+	 * Returns the connection the console exchanges its packets on: the one of the session it was given, or the one
+	 * of the session it opened on the port of the payload when the BMC serves SOL on another port.
+	 *
+	 * @return the connection handle of the payload session
+	 */
+	public ConnectionHandle getConnectionHandle() {
+		return session.getConnectionHandle();
+	}
+
 	public boolean writeByte(byte singleByte) {
 		return writeBytes(new byte[] { singleByte });
 	}
