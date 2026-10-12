@@ -650,7 +650,7 @@ public final class IpmiCli {
 			InputStream input = lineMode ?
 					new LineInput(() -> System.console().readPassword(), Charset.defaultCharset()) :
 					raw == null ? stdin : raw.input;
-			return SolBridge.run(console, input, out, local, arguments.escape(), lineMode);
+			return SolBridge.run(console, input, out, local, arguments.escape(), lineMode, arguments.verbose());
 		} finally {
 			if (raw != null) {
 				raw.release.run();

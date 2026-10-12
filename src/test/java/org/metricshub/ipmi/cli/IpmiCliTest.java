@@ -346,7 +346,8 @@ class IpmiCliTest {
 								new PrintStream(out, true, "UTF-8"),
 								new PrintStream(err, true, "UTF-8"),
 								'~',
-								true);
+								true,
+								false);
 				assertEquals(0, code);
 				assertEquals("ls\rid\r", ascii(bmc.getSolReceived()), "the Enters that end ~? and ~B are not sent");
 				assertTrue(err.toString("UTF-8").contains("~.  close the console"));

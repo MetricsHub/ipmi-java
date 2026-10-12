@@ -29,6 +29,7 @@ import java.io.OutputStream;
 import java.io.PrintStream;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.atomic.AtomicLong;
 
 import org.metricshub.ipmi.client.SolConsole;
 import org.metricshub.ipmi.core.coding.payload.sol.SolOperation;
@@ -50,6 +51,7 @@ final class SolBridge {
 	private static final int INPUT_FAILED = 3;
 	private static final int INPUT_READ_FAILED = 4;
 	private static final int BUFFER_SIZE = 4096;
+	private static final long NANOS_PER_MILLI = 1_000_000L;
 
 	private SolBridge() {}
 
@@ -63,18 +65,38 @@ final class SolBridge {
 	 * @param err where the escape help and the diagnostics go
 	 * @param escape the escape character, {@code -1} for none
 	 * @param cooked whether the input is a line-oriented terminal, whose Enter (CR LF, or a lone LF) is sent as CR
+	 * @param verbose whether to print, at the end, the packets and bytes exchanged and the mean acknowledgement time
 	 * @return the exit code of the CLI
 	 * @throws InterruptedException when interrupted while waiting for the end
 	 */
-	static int run(SolConsole console, InputStream stdin, PrintStream out, PrintStream err, int escape, boolean cooked)
+	static int run(
+			SolConsole console,
+			InputStream stdin,
+			PrintStream out,
+			PrintStream err,
+			int escape,
+			boolean cooked,
+			boolean verbose)
 			throws InterruptedException {
 		BlockingQueue<Integer> outcome = new LinkedBlockingQueue<Integer>();
 		IOException[] failure = new IOException[1];
-		daemon("ipmicli-sol-output", () -> outcome.add(pumpOutput(console, out)));
-		daemon("ipmicli-sol-input", () -> outcome.add(pumpInput(console, stdin, err, escape, cooked, failure)));
+		Stats stats = new Stats();
+		daemon("ipmicli-sol-output", () -> outcome.add(pumpOutput(console, out, stats)));
+		daemon("ipmicli-sol-input", () -> outcome.add(pumpInput(console, stdin, err, escape, cooked, failure, stats)));
 		int first = outcome.take();
 		IOException readFailure = failure[0];
+		long closing = System.nanoTime();
 		console.close();
+		if (verbose) {
+			long packets = stats.packets.get();
+			IpmiCli
+					.diagnostic(
+							err,
+							"SOL console closed in " + (System.nanoTime() - closing) / NANOS_PER_MILLI + " ms: " + packets
+									+ " packet(s) and " + stats.bytesSent.get() + " byte(s) sent, acknowledged in "
+									+ (packets == 0 ? 0 : stats.ackNanos.get() / packets / NANOS_PER_MILLI) + " ms on average, "
+									+ stats.bytesReceived.get() + " byte(s) received");
+		}
 		switch (first) {
 		case DEACTIVATED:
 			IpmiCli.diagnostic(err, "the console was deactivated by the BMC");
@@ -99,7 +121,7 @@ final class SolBridge {
 		thread.start();
 	}
 
-	private static int pumpOutput(SolConsole console, PrintStream out) {
+	private static int pumpOutput(SolConsole console, PrintStream out, Stats stats) {
 		byte[] buffer = new byte[BUFFER_SIZE];
 		try {
 			InputStream input = console.input();
@@ -108,6 +130,7 @@ final class SolBridge {
 				if (count < 0) {
 					break;
 				}
+				stats.bytesReceived.addAndGet(count);
 				out.write(buffer, 0, count);
 				out.flush();
 				if (out.checkError()) {
@@ -126,7 +149,8 @@ final class SolBridge {
 			PrintStream err,
 			int escape,
 			boolean cooked,
-			IOException[] failure) {
+			IOException[] failure,
+			Stats stats) {
 		OutputStream toBmc = console.output();
 		ByteArrayOutputStream pending = new ByteArrayOutputStream();
 		byte[] buffer = new byte[BUFFER_SIZE];
@@ -149,7 +173,7 @@ final class SolBridge {
 					if (escapePending) {
 						// A lone escape character at the end of the input is no sequence: it is data
 						pending.write(escape);
-						flush(pending, toBmc);
+						flush(pending, toBmc, stats);
 					}
 					return CLOSED;
 				}
@@ -173,11 +197,11 @@ final class SolBridge {
 					if (escapePending) {
 						escapePending = false;
 						if (b == '.') {
-							flush(pending, toBmc);
+							flush(pending, toBmc, stats);
 							return CLOSED;
 						}
 						if (b == 'B') {
-							flush(pending, toBmc);
+							flush(pending, toBmc, stats);
 							if (!console.invokeOperations(SolOperation.Break)) {
 								return INPUT_FAILED;
 							}
@@ -202,17 +226,29 @@ final class SolBridge {
 					atLineStart = b == '\r' || b == '\n';
 				}
 				// One packet per read: a keystroke in raw mode, a line or a block from a pipe
-				flush(pending, toBmc);
+				flush(pending, toBmc, stats);
 			}
 		} catch (IOException e) {
 			return INPUT_FAILED;
 		}
 	}
 
-	private static void flush(ByteArrayOutputStream pending, OutputStream toBmc) throws IOException {
+	private static void flush(ByteArrayOutputStream pending, OutputStream toBmc, Stats stats) throws IOException {
 		if (pending.size() > 0) {
+			long start = System.nanoTime();
 			toBmc.write(pending.toByteArray());
+			stats.ackNanos.addAndGet(System.nanoTime() - start);
+			stats.packets.incrementAndGet();
+			stats.bytesSent.addAndGet(pending.size());
 			pending.reset();
 		}
+	}
+
+	/** What the console exchanged, for the verbose summary. */
+	private static final class Stats {
+		private final AtomicLong packets = new AtomicLong();
+		private final AtomicLong bytesSent = new AtomicLong();
+		private final AtomicLong ackNanos = new AtomicLong();
+		private final AtomicLong bytesReceived = new AtomicLong();
 	}
 }
