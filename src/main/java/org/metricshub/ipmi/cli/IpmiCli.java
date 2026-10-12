@@ -664,6 +664,8 @@ public final class IpmiCli {
 			if (raw != null) {
 				raw.release.run();
 			}
+			// Already closed by the bridge, unless the hook could not be registered: the payload must not stay active
+			console.close();
 			try {
 				Runtime.getRuntime().removeShutdownHook(hook);
 			} catch (IllegalStateException e) {
