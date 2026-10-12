@@ -834,8 +834,13 @@ public class FakeRmcpPlusBmc implements AutoCloseable {
 		if (solActive) {
 			return new byte[] { (byte) 0x80 }; // payload already active
 		}
-		// The payload is only activated in a session on its port (section 24.1)
+		// The payload is only activated in a session on its port (section 24.1); the SOL sequence numbers start over
+		// with it (section 15.9), so a packet numbered like one of a previous activation is not a resend
 		solActive = solPort == getPort();
+		synchronized (solReceived) {
+			lastSolSequenceNumber = 0;
+			lastSolAccepted = false;
+		}
 		return ByteBuffer
 				.allocate(13)
 				.order(ByteOrder.LITTLE_ENDIAN)

@@ -1,0 +1,11 @@
+Power                       on
+Power restore policy        PoweredOff
+Last power events           none
+Power fault                 no
+Power overload              no
+Interlock                   no
+Power control fault         no
+Cooling fault               no
+Drive fault                 no
+Intrusion                   no
+Front panel lockout         no

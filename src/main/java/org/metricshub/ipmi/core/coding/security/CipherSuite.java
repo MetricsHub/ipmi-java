@@ -89,6 +89,30 @@ public class CipherSuite {
 	}
 
 	/**
+	 * @return the code of the authentication algorithm (IPMI 2.0 table 13-17: {@code SecurityConstants.AA_*}), whether
+	 *         the library implements it or not
+	 */
+	public byte getAuthenticationAlgorithmCode() {
+		return authenticationAlgorithm;
+	}
+
+	/**
+	 * @return the code of the integrity algorithm (IPMI 2.0 table 13-18: {@code SecurityConstants.IA_*}), whether the
+	 *         library implements it or not
+	 */
+	public byte getIntegrityAlgorithmCode() {
+		return integrityAlgorithm;
+	}
+
+	/**
+	 * @return the code of the confidentiality algorithm (IPMI 2.0 table 13-19: {@code SecurityConstants.CA_*}), whether
+	 *         the library implements it or not
+	 */
+	public byte getConfidentialityAlgorithmCode() {
+		return confidentialityAlgorithm;
+	}
+
+	/**
 	 * Creates a cipher suite.
 	 *
 	 * @param id the ID of the cipher suite

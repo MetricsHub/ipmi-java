@@ -1,0 +1,29 @@
+IPMI 2.0                    supported
+BMC key (Kg)                not required
+Anonymous login             disabled
+Null user names             disabled
+Non-null user names         enabled
+Per-message authentication  enabled
+User-level authentication   enabled
+Cipher suites
+  ID  Authentication    Integrity        Confidentiality  Library
+  1   RAKP-HMAC-SHA1    none             none             supported
+  2   RAKP-HMAC-SHA1    HMAC-SHA1-96     none             supported
+  3   RAKP-HMAC-SHA1    HMAC-SHA1-96     AES-CBC-128      supported
+  4   RAKP-HMAC-SHA1    HMAC-SHA1-96     xRC4-128         not implemented
+  5   RAKP-HMAC-SHA1    HMAC-SHA1-96     xRC4-40          not implemented
+  6   RAKP-HMAC-MD5     none             none             supported
+  7   RAKP-HMAC-MD5     HMAC-MD5-128     none             supported
+  8   RAKP-HMAC-MD5     HMAC-MD5-128     AES-CBC-128      supported
+  9   RAKP-HMAC-MD5     HMAC-MD5-128     xRC4-128         not implemented
+  10  RAKP-HMAC-MD5     HMAC-MD5-128     xRC4-40          not implemented
+  11  RAKP-HMAC-MD5     MD5-128          none             not implemented
+  12  RAKP-HMAC-MD5     MD5-128          AES-CBC-128      not implemented
+  13  RAKP-HMAC-MD5     MD5-128          xRC4-128         not implemented
+  14  RAKP-HMAC-MD5     MD5-128          xRC4-40          not implemented
+  15  RAKP-HMAC-SHA256  none             none             supported
+  16  RAKP-HMAC-SHA256  HMAC-SHA256-128  none             supported
+  17  RAKP-HMAC-SHA256  HMAC-SHA256-128  AES-CBC-128      supported
+  18  RAKP-HMAC-SHA256  HMAC-SHA256-128  xRC4-128         not implemented
+  19  RAKP-HMAC-SHA256  HMAC-SHA256-128  xRC4-40          not implemented
+Chosen cipher suite         17

@@ -1,4 +1,4 @@
-keywords: troubleshooting, timeout, no reply, login, authentication, unauthorized name, insufficient privilege, 0xd4, serial over lan, ipmitool, ipmiutil
+keywords: troubleshooting, timeout, no reply, login, authentication, unauthorized name, insufficient privilege, 0xd4, serial over lan, ipmitool, ipmiutil, ipmicli, probe
 description: Diagnose the usual failures of the IPMI Java Client — no reply, authentication errors, insufficient privilege, missing sensors or FRUs — and compare with ipmitool and ipmiutil.
 
 # Troubleshooting
@@ -7,13 +7,17 @@ description: Diagnose the usual failures of the IPMI Java Client — no reply, a
 
 ## First steps
 
-1. **Check the BMC from the same machine with another tool**, with the same account, privilege
+1. **Run `ipmicli probe`** from the same machine, with the standalone jar
+   ([Command-Line Client](cli.html)): it needs no credentials and no session, and says whether
+   the BMC answers, whether it requires a BMC key, and which cipher suites it offers that the
+   library implements. Then **`ipmicli -v chassis`** with the account: a single command, so it
+   tests the credentials, the privilege level and the cipher suite in a few hundred milliseconds,
+   and its exit code (77 authentication, 69 unreachable, 124 timeout) and message name the cause.
+   In code, the same two steps are `capabilities()` and `chassisStatus()`.
+2. **Check the BMC from the same machine with another tool**, with the same account, privilege
    level and cipher suite (see [below](#equivalent-ipmitool-and-ipmiutil-commands)). If
    `ipmitool` or `ipmiutil` fails too, the problem is in the BMC configuration or the network:
    see [Preparing the BMC](preparing-the-bmc.html).
-2. **Start with `capabilities()`**, which needs no credentials and no session, then
-   **`chassisStatus()`**: a single command, so it tests the network, the credentials and the
-   cipher suite in a few hundred milliseconds.
 3. **Act on the exception type**: the library never logs; every failure is an
    [`IpmiClientException`](timeouts-and-errors.html#exceptions) whose subclass and message say
    what went wrong, and every problem that did not fail the operation is in its result

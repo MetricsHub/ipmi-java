@@ -1,0 +1,1 @@
+{"powerOn":true,"powerRestorePolicy":"PoweredOff","lastPowerEvents":[],"powerFault":false,"powerOverload":false,"interlock":false,"powerControlFault":false,"coolingFault":false,"driveFault":false,"intrusion":false,"frontPanelLockout":false}

@@ -1,12 +1,93 @@
 package org.metricshub.ipmi.client;
 
+import static org.metricshub.ipmi.core.transport.FakeSdrRepository.compactSensorRecord;
+import static org.metricshub.ipmi.core.transport.FakeSdrRepository.fruDeviceLocatorRecord;
+import static org.metricshub.ipmi.core.transport.FakeSdrRepository.record;
+
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+
+import org.metricshub.ipmi.core.coding.commands.sdr.record.EntityId;
+import org.metricshub.ipmi.core.coding.commands.sdr.record.SensorType;
+import org.metricshub.ipmi.core.transport.FakeRmcpPlusBmc;
+import org.metricshub.ipmi.core.transport.FakeSdrRepository;
+
 /**
  * Real SDR and FRU bytes: the Full Sensor record of the "Ambient Temp" sensor of a front panel board (record ID 1,
- * sensor number 50) and the FRU inventory of an IBM System x3650 M2 system board (chassis, board and product areas).
+ * sensor number 50) and the FRU inventory of an IBM System x3650 M2 system board (chassis, board and product areas);
+ * and {@link #bmc()}, a fake BMC built from them for the client and CLI tests.
  */
-final class Fixtures {
+public final class Fixtures {
+
+	/** Cipher suites 1 to 19 as a Lenovo XCC lists them: 17 is preferred, then 3. */
+	public static final byte[] SUITES = bytes(
+			"c0 01 01 40 80 c0 02 01 41 80 c0 03 01 41 81 c0 04 01 41 82 c0 05 01 41 83 c0 06 02 40 80 c0 07 02 42 80"
+					+ " c0 08 02 42 81 c0 09 02 42 82 c0 0a 02 42 83 c0 0b 02 43 80 c0 0c 02 43 81 c0 0d 02 43 82 c0 0e 02 43 83"
+					+ " c0 0f 03 40 80 c0 10 03 44 80 c0 11 03 44 81 c0 12 03 44 82 c0 13 03 44 83");
+	public static final String USER = "admin";
+	public static final String PASSWORD = "secret";
+	public static final int TEMPERATURE_SENSOR = 50;
+	public static final int FAN_SENSOR = 0x10;
+	public static final int BOARD_SENSOR = 0x11;
+	public static final int PSU_FRU = 1;
 
 	private Fixtures() {}
+
+	/**
+	 * A BMC with a repository of 6 records: a temperature (Full), a fan presence and a system board presence
+	 * (Compact), the locator of FRU 1 (a power supply), an OEM record and a record of a reserved type.
+	 *
+	 * @return the fake BMC, to close
+	 * @throws IOException when no UDP port can be bound
+	 */
+	public static FakeRmcpPlusBmc bmc() throws IOException {
+		FakeRmcpPlusBmc bmc = new FakeRmcpPlusBmc(SUITES, USER, utf8(PASSWORD), null);
+		new FakeSdrRepository()
+				.add(FRONT_PANEL_FULL_RECORD)
+				.add(compactSensorRecord(2, FAN_SENSOR, EntityId.Fan.getCode(), 1, SensorType.Fan.getCode(), 0x08, "Fan 1"))
+				.add(
+						compactSensorRecord(
+								3,
+								BOARD_SENSOR,
+								EntityId.SystemBoard.getCode(),
+								1,
+								SensorType.EntityPresence.getCode(),
+								0x08,
+								"Board"))
+				.add(fruDeviceLocatorRecord(4, PSU_FRU, EntityId.PowerSupply.getCode(), 1, "PSU 1"))
+				.add(record(5, 0xc0, new byte[]
+				{ 1, 2, 3 }))
+				.add(record(6, 0x0b, new byte[]
+				{ 1, 2 }))
+				.reading(TEMPERATURE_SENSOR, 0x9a, 0x40, 0x00)
+				.reading(FAN_SENSOR, 0x00, 0x40, 0x02)
+				.reading(BOARD_SENSOR, 0x00, 0x40, 0x02)
+				.fru(0, BASE_BOARD_PRODUCT_INFO)
+				.fru(PSU_FRU, BASE_BOARD_PRODUCT_INFO)
+				.install(bmc);
+		return bmc;
+	}
+
+	/**
+	 * @param text a string
+	 * @return its UTF-8 bytes
+	 */
+	public static byte[] utf8(String text) {
+		return text.getBytes(StandardCharsets.UTF_8);
+	}
+
+	/**
+	 * @param hex bytes in hexadecimal, separated by spaces
+	 * @return the bytes
+	 */
+	public static byte[] bytes(String hex) {
+		String[] parts = hex.trim().split("\\s+");
+		byte[] result = new byte[parts.length];
+		for (int i = 0; i < parts.length; i++) {
+			result[i] = (byte) Integer.parseInt(parts[i], 16);
+		}
+		return result;
+	}
 
 	public static final byte[] BASE_BOARD_PRODUCT_INFO = {
 			1,

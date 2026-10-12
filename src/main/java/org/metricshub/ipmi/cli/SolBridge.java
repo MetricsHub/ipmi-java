@@ -1,0 +1,189 @@
+package org.metricshub.ipmi.cli;
+
+/*-
+ * ╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲
+ * IPMI Java Client
+ * ჻჻჻჻჻჻
+ * Copyright 2023 MetricsHub
+ * ჻჻჻჻჻჻
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Lesser General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Lesser Public License for more details.
+ *
+ * You should have received a copy of the GNU General Lesser Public
+ * License along with this program.  If not, see
+ * <http://www.gnu.org/licenses/lgpl-3.0.html>.
+ * ╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱
+ */
+
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.io.PrintStream;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.LinkedBlockingQueue;
+
+import org.metricshub.ipmi.client.SolConsole;
+import org.metricshub.ipmi.core.coding.payload.sol.SolOperation;
+
+/**
+ * Bridges a {@link SolConsole} with the standard streams: the bytes of the BMC go to stdout unmodified, the bytes of
+ * stdin go to the BMC, with the escape sequences of {@code ssh} recognized after a newline ({@code ~.} closes the
+ * console, {@code ~B} sends a break, {@code ~?} lists the sequences, {@code ~~} sends the escape character).
+ */
+final class SolBridge {
+
+	/** The help printed by {@code ~?}, with the escape character substituted. */
+	static final String ESCAPE_HELP = "Supported escape sequences (after a newline):\n" + "  ~.  close the console\n"
+			+ "  ~B  send a serial break\n" + "  ~?  print this help\n" + "  ~~  send the escape character itself\n";
+
+	private static final int CLOSED = 0;
+	private static final int DEACTIVATED = 1;
+	private static final int OUTPUT_FAILED = 2;
+	private static final int INPUT_FAILED = 3;
+	private static final int BUFFER_SIZE = 4096;
+
+	private SolBridge() {}
+
+	/**
+	 * Runs the console until the user closes it ({@code ~.}), the input ends, the BMC deactivates it, or a stream fails.
+	 * The console is closed before returning.
+	 *
+	 * @param console the open console
+	 * @param stdin the local input
+	 * @param out the local output
+	 * @param err where the escape help and the diagnostics go
+	 * @param escape the escape character, {@code -1} for none
+	 * @param cooked whether the input is a line-oriented terminal, whose Enter (CR LF, or a lone LF) is sent as CR
+	 * @return the exit code of the CLI
+	 * @throws InterruptedException when interrupted while waiting for the end
+	 */
+	static int run(SolConsole console, InputStream stdin, PrintStream out, PrintStream err, int escape, boolean cooked)
+			throws InterruptedException {
+		BlockingQueue<Integer> outcome = new LinkedBlockingQueue<Integer>();
+		daemon("ipmicli-sol-output", () -> outcome.add(pumpOutput(console, out)));
+		daemon("ipmicli-sol-input", () -> outcome.add(pumpInput(console, stdin, err, escape, cooked)));
+		int first = outcome.take();
+		console.close();
+		switch (first) {
+		case DEACTIVATED:
+			IpmiCli.diagnostic(err, "the console was deactivated by the BMC");
+			return IpmiCli.EXIT_PROTOCOL;
+		case OUTPUT_FAILED:
+			IpmiCli.diagnostic(err, "cannot write to standard output");
+			return IpmiCli.EXIT_IO;
+		case INPUT_FAILED:
+			IpmiCli.diagnostic(err, "the BMC did not accept the characters");
+			return IpmiCli.EXIT_PROTOCOL;
+		default:
+			return 0;
+		}
+	}
+
+	private static void daemon(String name, Runnable task) {
+		Thread thread = new Thread(task, name);
+		thread.setDaemon(true);
+		thread.start();
+	}
+
+	private static int pumpOutput(SolConsole console, PrintStream out) {
+		byte[] buffer = new byte[BUFFER_SIZE];
+		try {
+			InputStream input = console.input();
+			while (true) {
+				int count = input.read(buffer);
+				if (count < 0) {
+					break;
+				}
+				out.write(buffer, 0, count);
+				out.flush();
+				if (out.checkError()) {
+					return OUTPUT_FAILED;
+				}
+			}
+		} catch (IOException e) {
+			// The read was interrupted: the console is over either way
+		}
+		return console.deactivated() ? DEACTIVATED : CLOSED;
+	}
+
+	private static int pumpInput(SolConsole console, InputStream stdin, PrintStream err, int escape, boolean cooked) {
+		OutputStream toBmc = console.output();
+		ByteArrayOutputStream pending = new ByteArrayOutputStream();
+		byte[] buffer = new byte[BUFFER_SIZE];
+		boolean atLineStart = true;
+		boolean escapePending = false;
+		boolean afterCr = false;
+		try {
+			while (true) {
+				int count;
+				try {
+					count = stdin.read(buffer);
+				} catch (IOException e) {
+					// The local input is gone: the same as its end
+					count = -1;
+				}
+				if (count < 0) {
+					return CLOSED;
+				}
+				for (int i = 0; i < count; i++) {
+					int b = buffer[i] & 0xff;
+					if (cooked) {
+						boolean lfOfCrLf = b == '\n' && afterCr;
+						afterCr = b == '\r';
+						if (lfOfCrLf) {
+							continue;
+						}
+						if (b == '\n') {
+							b = '\r';
+						}
+					}
+					if (escapePending) {
+						escapePending = false;
+						if (b == '.') {
+							flush(pending, toBmc);
+							return CLOSED;
+						}
+						if (b == 'B') {
+							flush(pending, toBmc);
+							console.invokeOperations(SolOperation.Break);
+							atLineStart = false;
+							continue;
+						}
+						if (b == '?') {
+							err.print(ESCAPE_HELP.replace('~', (char) escape));
+							err.flush();
+							continue;
+						}
+						if (b != escape) {
+							pending.write(escape);
+						}
+					} else if (atLineStart && b == escape) {
+						escapePending = true;
+						continue;
+					}
+					pending.write(b);
+					atLineStart = b == '\r' || b == '\n';
+				}
+				// One packet per read: a keystroke in raw mode, a line or a block from a pipe
+				flush(pending, toBmc);
+			}
+		} catch (IOException e) {
+			return INPUT_FAILED;
+		}
+	}
+
+	private static void flush(ByteArrayOutputStream pending, OutputStream toBmc) throws IOException {
+		if (pending.size() > 0) {
+			toBmc.write(pending.toByteArray());
+			pending.reset();
+		}
+	}
+}
