@@ -20,7 +20,11 @@ is the layer below, on top of the [low-level API](low-level-api.html).
 * The account has the **Administrator** privilege on the LAN channel, and the SOL payload is
   enabled for it (`ipmitool sol payload enable 1 <user id>`).
 * No other SOL session is active: a BMC usually supports a single SOL session at a time. The
-  console never deactivates a payload that another session activated: activating it then fails.
+  console never deactivates a payload that a session the BMC still has activated: activating it then
+fails with `The SOL payload is in use by another session: instance 1 by session ...` (the user ID
+and privilege of that session). A payload held by a session the BMC does not have any more, that
+of a console that was killed without closing, is deactivated and activated again: some BMCs
+(Supermicro) keep such a payload active for good, and forget the dead session within a minute.
 
 ## With `IpmiClient`
 

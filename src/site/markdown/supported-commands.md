@@ -23,6 +23,7 @@ sent with [`IpmiClient.send()`](low-level-api.html#sending-a-command-through-the
 | RMCP+ Open Session | `OpenSession` | (payload) | every session |
 | RAKP Message 1 / 3 | `Rakp1`, `Rakp3` | (payload) | every session |
 | Set Session Privilege Level | `SetSessionPrivilegeLevel` | App / `3Bh` | `privilege(Operator)`, `privilege(Administrator)` |
+| Get Session Info | `GetSessionInfo` | App / `3Dh` | `sol()`: is the session that holds a SOL payload still there? |
 | Close Session | `CloseSession` | App / `3Ch` | `close()` |
 | **Chassis** | | | |
 | Get Chassis Status | `GetChassisStatus` | Chassis / `01h` | `chassisStatus()` |

@@ -130,6 +130,11 @@ public final class CommandCodes {
 	public static final byte GET_PAYLOAD_INSTANCE_INFO = 0x4B;
 
 	/**
+	 * An IPMI code for Get Session Info command
+	 */
+	public static final byte GET_SESSION_INFO = 0x3D;
+
+	/**
 	 * An IPMI code for Get Channel Cipher Suites command
 	 */
 	public static final byte GET_CHANNEL_CIPHER_SUITES = 0x54;

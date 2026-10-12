@@ -678,6 +678,52 @@ class IpmiClientTest {
 	}
 
 	@Test
+	@Timeout(30)
+	void aSolPayloadHeldByADeadSessionIsReclaimed() throws Exception {
+		try (FakeRmcpPlusBmc bmc = bmc()) {
+			bmc.enableSol(bmc.getPort(), 255, ADMINISTRATOR);
+			try (IpmiClient first = client(bmc).privilege(PrivilegeLevel.Administrator).build()) {
+				first.sol().open();
+				// The console is killed: no deactivation, and the BMC keeps the payload active after it expires the session
+				bmc.expireSession();
+			}
+			try (
+					IpmiClient second = client(bmc).privilege(PrivilegeLevel.Administrator).build();
+					SolConsole console = second.sol().open()) {
+				assertEquals(
+						1,
+						bmc.getCount(NETFN_APP, FakeRmcpPlusBmc.DEACTIVATE_PAYLOAD),
+						"the stale instance is deactivated");
+				assertTrue(bmc.isSolActive());
+				console.output().write("x".getBytes(StandardCharsets.US_ASCII));
+				await(() -> bmc.getSolReceived().length == 1, "the reclaimed console works");
+			}
+		}
+	}
+
+	@Test
+	@Timeout(30)
+	void aSolPayloadHeldByALiveSessionIsNotTouched() throws Exception {
+		try (FakeRmcpPlusBmc bmc = bmc()) {
+			bmc.enableSol(bmc.getPort(), 255, ADMINISTRATOR);
+			try (IpmiClient first = client(bmc).privilege(PrivilegeLevel.Administrator).build()) {
+				first.sol().open();
+				bmc.expireSession();
+			}
+			// The BMC still has the session that holds the payload
+			bmc
+					.handle(NETFN_APP, FakeRmcpPlusBmc.GET_SESSION_INFO, data -> new byte[]
+					{ 0x00, 0x02, 0x10, 0x02, 0x02, 0x04, 0x01 });
+			try (IpmiClient second = client(bmc).privilege(PrivilegeLevel.Administrator).build()) {
+				IpmiClientException failure = assertThrows(IpmiClientException.class, () -> second.sol().open());
+				assertTrue(failure.getMessage().contains("in use by another session"), failure.getMessage());
+				assertTrue(failure.getMessage().contains("user ID 2, privilege 4"), failure.getMessage());
+				assertEquals(0, bmc.getCount(NETFN_APP, FakeRmcpPlusBmc.DEACTIVATE_PAYLOAD), "never deactivated");
+			}
+		}
+	}
+
+	@Test
 	void oemRecordsAreDecodedNotSkipped() throws Exception {
 		try (FakeRmcpPlusBmc bmc = bmc(); IpmiClient client = client(bmc).build()) {
 			SensorList sensors = client.sensors().execute();

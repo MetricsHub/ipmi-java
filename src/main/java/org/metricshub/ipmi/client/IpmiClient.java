@@ -53,6 +53,10 @@ import org.metricshub.ipmi.core.coding.commands.IpmiCommandCoder;
 import org.metricshub.ipmi.core.coding.commands.PrivilegeLevel;
 import org.metricshub.ipmi.core.coding.commands.ResponseData;
 import org.metricshub.ipmi.core.coding.commands.chassis.GetChassisStatus;
+import org.metricshub.ipmi.core.coding.commands.payload.DeactivatePayload;
+import org.metricshub.ipmi.core.coding.commands.payload.GetPayloadActivationStatus;
+import org.metricshub.ipmi.core.coding.commands.payload.GetPayloadActivationStatusResponseData;
+import org.metricshub.ipmi.core.coding.commands.payload.GetPayloadInstanceInfo;
 import org.metricshub.ipmi.core.coding.commands.sdr.GetSdrRepositoryInfo;
 import org.metricshub.ipmi.core.coding.commands.sdr.GetSdrRepositoryInfoResponseData;
 import org.metricshub.ipmi.core.coding.commands.sdr.GetSensorReading;
@@ -62,10 +66,13 @@ import org.metricshub.ipmi.core.coding.commands.sdr.record.FullSensorRecord;
 import org.metricshub.ipmi.core.coding.commands.sdr.record.SensorRecord;
 import org.metricshub.ipmi.core.coding.commands.session.AuthenticationException;
 import org.metricshub.ipmi.core.coding.commands.session.GetChannelAuthenticationCapabilitiesResponseData;
+import org.metricshub.ipmi.core.coding.commands.session.GetSessionInfo;
+import org.metricshub.ipmi.core.coding.commands.session.GetSessionInfoResponseData;
 import org.metricshub.ipmi.core.coding.commands.session.Rakp1;
 import org.metricshub.ipmi.core.coding.commands.session.SetSessionPrivilegeLevel;
 import org.metricshub.ipmi.core.coding.payload.CompletionCode;
 import org.metricshub.ipmi.core.coding.payload.lan.IPMIException;
+import org.metricshub.ipmi.core.coding.protocol.PayloadType;
 import org.metricshub.ipmi.core.coding.security.CipherSuite;
 import org.metricshub.ipmi.core.common.Constants;
 import org.metricshub.ipmi.core.common.TypeConverter;
@@ -381,7 +388,7 @@ public final class IpmiClient implements AutoCloseable {
 	SolConsole openSol(Duration deadline) {
 		return run("SOL console", deadline, true, false, () -> {
 			try {
-				SolConsole console = new SolConsole(new SerialOverLan(link.connector, link.session), consoles::remove);
+				SolConsole console = new SolConsole(activateSol(), consoles::remove);
 				consoles.add(console);
 				return console;
 			} catch (SOLException e) {
@@ -401,6 +408,63 @@ public final class IpmiClient implements AutoCloseable {
 	 * Returns the SDR repository: the cached one when the BMC reports it unchanged (same record count and timestamps
 	 * of the most recent addition and erase, IPMI 2.0 section 33.9), a new walk otherwise.
 	 */
+	/**
+	 * Activates the SOL payload; when the BMC has no free instance, one whose session the BMC no longer knows (a
+	 * console that was killed, which some BMCs keep active for good) is deactivated and the activation tried again.
+	 */
+	private SerialOverLan activateSol() throws SOLException, SessionException {
+		try {
+			return new SerialOverLan(link.connector, link.session);
+		} catch (SOLException e) {
+			if (e.getCause() != null || !reclaimStaleSol(e)) {
+				throw e;
+			}
+			return new SerialOverLan(link.connector, link.session);
+		}
+	}
+
+	/**
+	 * @return whether a SOL instance held by a session the BMC does not have any more was deactivated
+	 * @throws SOLException when every instance is held by a session the BMC still has
+	 */
+	private boolean reclaimStaleSol(SOLException failure) throws SOLException {
+		GetPayloadActivationStatusResponseData status = link.send(new GetPayloadActivationStatus(PayloadType.Sol));
+		Set<Integer> free = new java.util.HashSet<Integer>();
+		for (Byte instance : status.getAvailableInstances()) {
+			free.add(TypeConverter.byteToInt(instance));
+		}
+		StringBuilder holders = new StringBuilder();
+		for (int instance = 1; instance <= status.getInstanceCapacity(); instance++) {
+			if (free.contains(instance)) {
+				continue;
+			}
+			int holder = link.send(new GetPayloadInstanceInfo(PayloadType.Sol, instance)).getSessionId();
+			GetSessionInfoResponseData session;
+			try {
+				session = link.send(new GetSessionInfo(holder));
+			} catch (IpmiCompletionCodeException e) {
+				// A BMC that refuses the lookup of a session it does not have
+				session = null;
+			}
+			if (holder == 0 || session == null || !session.isSessionFound()) {
+				link.send(new DeactivatePayload(PayloadType.Sol, instance));
+				return true;
+			}
+			holders
+					.append(holders.length() == 0 ? "" : ", ")
+					.append(String.format("instance %d by session %08Xh", instance, holder))
+					.append(" (user ID ")
+					.append(session.getUserId())
+					.append(", privilege ")
+					.append(session.getPrivilegeLevel())
+					.append(')');
+		}
+		if (holders.length() == 0) {
+			return false;
+		}
+		throw new SOLException("The SOL payload is in use by another session: " + holders, failure);
+	}
+
 	private SdrRepository repository() {
 		GetSdrRepositoryInfoResponseData info;
 		try {
