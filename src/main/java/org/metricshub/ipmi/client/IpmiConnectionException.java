@@ -1,4 +1,4 @@
-package org.metricshub.ipmi.client.runner;
+package org.metricshub.ipmi.client;
 
 /*-
  * ╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲
@@ -22,29 +22,21 @@ package org.metricshub.ipmi.client.runner;
  * ╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱
  */
 
-import org.metricshub.ipmi.client.IpmiClientConfiguration;
-import org.metricshub.ipmi.core.coding.commands.chassis.GetChassisStatus;
-import org.metricshub.ipmi.core.coding.commands.chassis.GetChassisStatusResponseData;
-
 /**
- * Get the Chassis Status runner
+ * The session could not be established for a network reason: unknown host, socket error, or no reply to the session
+ * setup after all the tries (wrong host, UDP port 623 filtered, IPMI over LAN disabled).
  */
-public class GetChassisStatusRunner extends AbstractIpmiRunner<GetChassisStatusResponseData> {
+public class IpmiConnectionException extends IpmiClientException {
 
-	public GetChassisStatusRunner(IpmiClientConfiguration ipmiConfiguration) {
-		super(ipmiConfiguration);
+	private static final long serialVersionUID = 1L;
+
+	/**
+	 * Creates the exception.
+	 *
+	 * @param message what failed
+	 * @param cause the failure of the protocol core
+	 */
+	public IpmiConnectionException(String message, Throwable cause) {
+		super(message, cause);
 	}
-
-	@Override
-	public GetChassisStatusResponseData call() throws Exception {
-		super.startSession();
-
-		// Send the UDP message and read the response
-		return (GetChassisStatusResponseData) getConnector()
-				.sendMessage(
-						getHandle(),
-						new GetChassisStatus());
-
-	}
-
 }

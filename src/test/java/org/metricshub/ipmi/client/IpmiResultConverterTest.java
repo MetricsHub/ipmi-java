@@ -9,16 +9,16 @@ import java.util.List;
 
 import org.junit.jupiter.api.Test;
 
-import org.metricshub.ipmi.client.model.Fru;
-import org.metricshub.ipmi.client.model.Sensor;
 import org.metricshub.ipmi.core.coding.commands.chassis.GetChassisStatusResponseData;
 import org.metricshub.ipmi.core.coding.commands.fru.record.FruRecord;
 import org.metricshub.ipmi.core.coding.commands.fru.record.ProductInfo;
 import org.metricshub.ipmi.core.coding.commands.sdr.GetSensorReadingResponseData;
+import org.metricshub.ipmi.core.coding.commands.sdr.record.AbstractSensorRecord;
 import org.metricshub.ipmi.core.coding.commands.sdr.record.CompactSensorRecord;
 import org.metricshub.ipmi.core.coding.commands.sdr.record.EntityId;
 import org.metricshub.ipmi.core.coding.commands.sdr.record.FruDeviceLocatorRecord;
 import org.metricshub.ipmi.core.coding.commands.sdr.record.SensorRecord;
+import org.metricshub.ipmi.core.coding.commands.sdr.record.SensorType;
 
 public class IpmiResultConverterTest {
 
@@ -638,32 +638,48 @@ public class IpmiResultConverterTest {
 		fruLocator.setFruEntityId(EntityId.Baseboard.getCode());
 		fruLocator.setFruEntityInstance(1);
 		List<FruRecord> fruRecords = Collections.singletonList(new ProductInfo(BASE_BOARD_PRODUCT_INFO, 360));
-		return Collections.singletonList(new Fru(fruLocator, fruRecords));
+		return Collections.singletonList(new Fru(fruLocator, fruRecords, Collections.emptyList()));
 	}
 
 	/**
 	 * @return List of Sensor records
 	 */
 	public static List<Sensor> buildSensors() {
-		// Build the base board compact record
+		// Build the base board compact record: a presence sensor (generic event/reading type 08h)
 		CompactSensorRecord compact1 = new CompactSensorRecord();
 		compact1.setId(1);
 		compact1.setEntityId(EntityId.SystemBoard);
 		compact1.setEntityInstanceNumber((byte) 1);
-		compact1.setName("System Board 1");
+		compact1.setName("Base board");
+		compact1.setSensorType(SensorType.EntityPresence);
+		compact1.setEventReadingType(0x08);
 
-		// Battery
+		// Battery: a severity sensor (generic event/reading type 07h)
 		CompactSensorRecord compact2 = new CompactSensorRecord();
 		compact2.setId(1);
 		compact2.setEntityId(EntityId.Battery);
 		compact2.setEntityInstanceNumber((byte) 1);
+		compact2.setName("Battery 1");
+		compact2.setSensorType(SensorType.Battery);
+		compact2.setEventReadingType(0x07);
 
-		// Video USB on system board
+		// Video USB on system board: a cable sensor (sensor-specific event/reading type)
 		CompactSensorRecord compact3 = new CompactSensorRecord();
 		compact3.setId(1);
 		compact3.setEntityId(EntityId.SystemBoard);
 		compact3.setEntityInstanceNumber((byte) 1);
 		compact3.setName("Video USB");
+		compact3.setSensorType(SensorType.CableInterconnect);
+		compact3.setEventReadingType(0x6f);
+
+		// Front panel presence
+		CompactSensorRecord compact4 = new CompactSensorRecord();
+		compact4.setId(1);
+		compact4.setEntityId(EntityId.FrontPanelBoard);
+		compact4.setEntityInstanceNumber((byte) 1);
+		compact4.setName("Front Panel");
+		compact4.setSensorType(SensorType.EntityPresence);
+		compact4.setEventReadingType(0x08);
 
 		// Sorry...
 		SensorRecord full = SensorRecord.populateSensorRecord(FRONT_PANEL_FULL_RECORD);
@@ -676,23 +692,39 @@ public class IpmiResultConverterTest {
 
 		return Arrays
 				.asList(
-						new Sensor(compact1, new GetSensorReadingResponseData(), "Base board=Device Present"),
-						new Sensor(compact2, new GetSensorReadingResponseData(), "Battery 1=Transition to OK"),
-						new Sensor(compact3, new GetSensorReadingResponseData(), "Video USB=Connected"),
-						new Sensor(full, data, "Front Panel=Device Present"));
+						Sensor.of(compact1, states(1), null),
+						Sensor.of(compact2, states(0), null),
+						Sensor.of(compact3, states(0), null),
+						Sensor.of(compact4, states(1), null),
+						Sensor.of((AbstractSensorRecord) full, data, null));
+	}
+
+	/**
+	 * @return a valid reading with the given state offsets asserted
+	 */
+	private static GetSensorReadingResponseData states(int... offsets) {
+		GetSensorReadingResponseData data = new GetSensorReadingResponseData();
+		data.setSensorStateValid(true);
+		data.setScanningEnabled(true);
+		boolean[] asserted = new boolean[16];
+		for (int offset : offsets) {
+			asserted[offset] = true;
+		}
+		data.setStatesAsserted(asserted);
+		return data;
 	}
 
 	@Test
 	void testConvertResultGetChassisStatusResponseData() {
 		GetChassisStatusResponseData chassisStatus = buildChassisStatusResponseData(1);
-		assertEquals("System power state is up", IpmiResultConverter.convertResult(chassisStatus));
+		assertEquals("System power state is up", IpmiResultConverter.convertResult(new ChassisStatus(chassisStatus)));
 		chassisStatus.setCurrentPowerState((byte) 0);
-		assertEquals("System power state is down", IpmiResultConverter.convertResult(chassisStatus));
+		assertEquals("System power state is down", IpmiResultConverter.convertResult(new ChassisStatus(chassisStatus)));
 	}
 
 	@Test
 	void testConvertResultGetChassisStatusNullResponseData() {
-		assertNull(IpmiResultConverter.convertResult(null));
+		assertNull(IpmiResultConverter.convertResult((ChassisStatus) null));
 	}
 
 	/**

@@ -1,6 +1,7 @@
 /**
- * IPMI client with components such as runners (requesters), data model, and the client entry point.<br>
- * See {@link org.metricshub.ipmi.client.IpmiClient}.
+ * The client of a BMC: {@link org.metricshub.ipmi.client.IpmiClient} and its builder, the operations, their typed
+ * results and the {@link org.metricshub.ipmi.client.IpmiClientException}s, and the text output of
+ * {@link org.metricshub.ipmi.client.IpmiResultConverter}.
  */
 package org.metricshub.ipmi.client;
 /*-

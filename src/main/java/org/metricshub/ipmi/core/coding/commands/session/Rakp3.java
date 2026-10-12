@@ -327,7 +327,7 @@ public class Rakp3 extends IpmiCommandCoder {
 						prepareIntegrityCheckBase(rakp1, rakp1ResponseData),
 						integrityCheck,
 						rakp1.calculateSik(rakp1ResponseData))) {
-			throw new IllegalArgumentException("Integrity check failed");
+			throw new AuthenticationException("Integrity check failed");
 		}
 
 		return data;

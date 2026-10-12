@@ -1,7 +1,5 @@
-/**
- * Includes IPMI runners for fetching Field Replaceable Units (FRUs), Sensors, and Chassis information.<br>
- */
-package org.metricshub.ipmi.client.runner;
+package org.metricshub.ipmi.client;
+
 /*-
  * ╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲
  * IPMI Java Client
@@ -23,3 +21,25 @@ package org.metricshub.ipmi.client.runner;
  * <http://www.gnu.org/licenses/lgpl-3.0.html>.
  * ╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱
  */
+
+import org.metricshub.ipmi.core.coding.commands.IpmiCommandCoder;
+import org.metricshub.ipmi.core.coding.commands.ResponseData;
+
+/**
+ * Sends a command in the session of the client and returns its typed reply: what the SDR and FRU readers need from
+ * the session, so that they can be exercised without one.
+ */
+interface Exchange {
+
+	/**
+	 * Sends the command and waits for its reply.
+	 *
+	 * @param <R> the type of the reply
+	 * @param command the command
+	 * @return the reply
+	 * @throws IpmiCompletionCodeException when the BMC answers with an error completion code
+	 * @throws IpmiTimeoutException when the BMC does not answer after all the tries
+	 * @throws IpmiClientException when the command cannot be sent
+	 */
+	<R extends ResponseData> R send(IpmiCommandCoder<R> command);
+}

@@ -8,6 +8,7 @@ import static org.metricshub.ipmi.core.transport.FakeRmcpPlusBmc.GET_CHASSIS_STA
 import static org.metricshub.ipmi.core.transport.FakeRmcpPlusBmc.NETFN_CHASSIS;
 
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.concurrent.TimeUnit;
@@ -15,7 +16,6 @@ import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.metricshub.ipmi.client.IpmiClient;
-import org.metricshub.ipmi.client.IpmiClientConfiguration;
 import org.metricshub.ipmi.core.api.async.ConnectionHandle;
 import org.metricshub.ipmi.core.coding.commands.PrivilegeLevel;
 import org.metricshub.ipmi.core.coding.commands.chassis.GetChassisStatus;
@@ -77,16 +77,16 @@ class RmcpPlusSessionTest {
 	 */
 	private static void assertIpmiClientSession(byte[] suites, int[] algorithms) throws Exception {
 		try (FakeRmcpPlusBmc bmc = new FakeRmcpPlusBmc(suites, USER, utf8(PASSWORD), null)) {
-			IpmiClientConfiguration configuration = new IpmiClientConfiguration(
-					bmc.getAddress().getHostAddress(),
-					bmc.getPort(),
-					USER,
-					PASSWORD.toCharArray(),
-					null,
-					false,
-					20);
-			assertChassisStatus(IpmiClient.getChassisStatus(configuration));
-			assertArrayEquals(algorithms, bmc.getAlgorithms());
+			try (
+					IpmiClient client = IpmiClient
+							.builder(bmc.getAddress().getHostAddress())
+							.port(bmc.getPort())
+							.credentials(USER, PASSWORD.toCharArray())
+							.timeout(Duration.ofSeconds(20))
+							.build()) {
+				assertChassisStatus(client.chassisStatus().data());
+				assertArrayEquals(algorithms, bmc.getAlgorithms());
+			}
 			awaitClose(bmc);
 			assertEquals(Collections.emptyList(), bmc.getErrors());
 		}

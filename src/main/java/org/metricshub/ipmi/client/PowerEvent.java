@@ -1,4 +1,4 @@
-package org.metricshub.ipmi.client.model;
+package org.metricshub.ipmi.client;
 
 /*-
  * ╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲
@@ -23,40 +23,17 @@ package org.metricshub.ipmi.client.model;
  */
 
 /**
- * Wraps FRU device vendor, model and serial number
+ * What caused the last power-down or power-up of the system (Get Chassis Status, IPMI 2.0 table 28-3).
  */
-public class FruDevice {
-	private String vendor;
-	private String model;
-	private String serialNumber;
-
-	public FruDevice(String vendor, String model, String serialNumber) {
-		this.vendor = vendor;
-		this.model = model;
-		this.serialNumber = serialNumber;
-	}
-
-	public String getVendor() {
-		return vendor;
-	}
-
-	public String getModel() {
-		return model;
-	}
-
-	public String getSerialNumber() {
-		return serialNumber;
-	}
-
-	@Override
-	public String toString() {
-		return new StringBuilder("FRU;")
-				.append(vendor)
-				.append(";")
-				.append(model)
-				.append(";")
-				.append(serialNumber)
-				.toString();
-	}
-
+public enum PowerEvent {
+	/** The system lost its AC supply. */
+	AC_FAILED,
+	/** The system was powered down by a power overload. */
+	POWER_OVERLOAD,
+	/** The system was powered down by a chassis interlock, such as an open panel. */
+	INTERLOCK,
+	/** The system was powered down by a power fault. */
+	POWER_FAULT,
+	/** The system was powered on or off by an IPMI command. */
+	IPMI_COMMAND
 }

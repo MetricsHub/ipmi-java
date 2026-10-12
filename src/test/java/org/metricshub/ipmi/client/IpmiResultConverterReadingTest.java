@@ -5,7 +5,6 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import java.util.Collections;
 
 import org.junit.jupiter.api.Test;
-import org.metricshub.ipmi.client.model.Sensor;
 import org.metricshub.ipmi.core.coding.commands.sdr.GetSensorReadingResponseData;
 import org.metricshub.ipmi.core.coding.commands.sdr.record.EntityId;
 import org.metricshub.ipmi.core.coding.commands.sdr.record.FullSensorRecord;
@@ -39,7 +38,7 @@ class IpmiResultConverterReadingTest {
 
 	private static String convert(FullSensorRecord record, GetSensorReadingResponseData data) {
 		return IpmiResultConverter
-				.convertResult(Collections.emptyList(), Collections.singletonList(new Sensor(record, data, Utils.EMPTY)));
+				.convertResult(Collections.emptyList(), Collections.singletonList(Sensor.of(record, data, null)));
 	}
 
 	@Test
@@ -54,7 +53,7 @@ class IpmiResultConverterReadingTest {
 
 	@Test
 	void unavailableOrUnscannedReadingIsNotReported() {
-		assertEquals(Utils.EMPTY, convert(fan(0.0, 0.0), reading(false, true)));
-		assertEquals(Utils.EMPTY, convert(fan(0.0, 0.0), reading(true, false)));
+		assertEquals("", convert(fan(0.0, 0.0), reading(false, true)));
+		assertEquals("", convert(fan(0.0, 0.0), reading(true, false)));
 	}
 }

@@ -353,7 +353,7 @@ public class Rakp1 extends IpmiCommandCoder {
 						prepareKeyExchangeAuthenticationCodeBase(data),
 						key,
 						getPasswordBytes())) {
-			throw new IllegalArgumentException("Authentication check failed");
+			throw new AuthenticationException("Authentication check failed");
 		}
 
 		return data;

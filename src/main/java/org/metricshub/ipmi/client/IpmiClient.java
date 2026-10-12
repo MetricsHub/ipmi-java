@@ -22,103 +22,909 @@ package org.metricshub.ipmi.client;
  * ╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱
  */
 
-import static org.metricshub.ipmi.client.Utils.execute;
-
+import java.io.IOException;
+import java.net.InetAddress;
+import java.net.UnknownHostException;
+import java.nio.ByteBuffer;
+import java.nio.CharBuffer;
+import java.nio.charset.StandardCharsets;
+import java.time.Duration;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
+import java.util.Objects;
+import java.util.Set;
+import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.RejectedExecutionException;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.Predicate;
 
-import org.metricshub.ipmi.client.model.Fru;
-import org.metricshub.ipmi.client.model.Sensor;
-import org.metricshub.ipmi.client.runner.GetChassisStatusRunner;
-import org.metricshub.ipmi.client.runner.GetFrusRunner;
-import org.metricshub.ipmi.client.runner.GetSensorsRunner;
-import org.metricshub.ipmi.core.coding.commands.chassis.GetChassisStatusResponseData;
+import org.metricshub.ipmi.core.api.async.ConnectionHandle;
+import org.metricshub.ipmi.core.api.sol.SOLException;
+import org.metricshub.ipmi.core.api.sol.SerialOverLan;
+import org.metricshub.ipmi.core.api.sync.IpmiConnector;
+import org.metricshub.ipmi.core.coding.commands.IpmiCommandCoder;
+import org.metricshub.ipmi.core.coding.commands.PrivilegeLevel;
+import org.metricshub.ipmi.core.coding.commands.ResponseData;
+import org.metricshub.ipmi.core.coding.commands.chassis.GetChassisStatus;
+import org.metricshub.ipmi.core.coding.commands.sdr.GetSdrRepositoryInfo;
+import org.metricshub.ipmi.core.coding.commands.sdr.GetSdrRepositoryInfoResponseData;
+import org.metricshub.ipmi.core.coding.commands.sdr.GetSensorReading;
+import org.metricshub.ipmi.core.coding.commands.sdr.record.AbstractSensorRecord;
+import org.metricshub.ipmi.core.coding.commands.sdr.record.CompactSensorRecord;
+import org.metricshub.ipmi.core.coding.commands.sdr.record.FullSensorRecord;
+import org.metricshub.ipmi.core.coding.commands.sdr.record.SensorRecord;
+import org.metricshub.ipmi.core.coding.commands.session.AuthenticationException;
+import org.metricshub.ipmi.core.coding.commands.session.GetChannelAuthenticationCapabilitiesResponseData;
+import org.metricshub.ipmi.core.coding.commands.session.Rakp1;
+import org.metricshub.ipmi.core.coding.commands.session.SetSessionPrivilegeLevel;
+import org.metricshub.ipmi.core.coding.payload.CompletionCode;
+import org.metricshub.ipmi.core.coding.payload.lan.IPMIException;
+import org.metricshub.ipmi.core.coding.security.CipherSuite;
+import org.metricshub.ipmi.core.common.Constants;
+import org.metricshub.ipmi.core.common.TypeConverter;
+import org.metricshub.ipmi.core.connection.ConnectionException;
+import org.metricshub.ipmi.core.connection.Session;
+import org.metricshub.ipmi.core.connection.SessionException;
+
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 
 /**
- * This class is the entry point of the IPMI Client library
+ * A client of one BMC over IPMI 2.0 (RMCP+). It is built with {@link #builder(String)}, owns <b>one session</b>,
+ * opened by the first operation that needs one and kept alive until {@link #close()}, and runs its operations one
+ * at a time on that session.
+ *
+ * <pre>
+ * try (IpmiClient bmc = IpmiClient.builder("bmc.example.com").credentials("monitor", password).build()) {
+ * 	ChassisStatus chassis = bmc.chassisStatus();
+ * 	for (Sensor sensor : bmc.sensors().types(SensorType.Temperature).execute()) {
+ * 		sensor.reading().ifPresent(value -&gt; System.out.println(sensor.name() + " = " + value + " " + sensor.unit()));
+ * 	}
+ * 	for (Fru fru : bmc.frus().execute()) {
+ * 		System.out.println(fru.name() + ": " + fru.manufacturer() + " " + fru.model() + " S/N " + fru.serialNumber());
+ * 	}
+ * }
+ * </pre>
+ * <p>
+ * <b>Close the client</b>: an open client holds one of the few session slots of the BMC (typically 4 to 8) with its
+ * keep-alive messages for as long as the JVM runs. Use try-with-resources.
+ * </p>
+ * <p>
+ * <b>Session recovery</b>: when the session is lost (the BMC rebooted or expired it), the next operation opens a new
+ * one. A read operation that fails because the session was lost while it ran is retried once on a new session;
+ * {@link #send(IpmiCommandCoder)} and the control operations are never replayed.
+ * </p>
+ * <p>
+ * <b>Threads</b>: a client can be shared between threads; its operations are serialized. A BMC drops replies under
+ * concurrent sessions, so the client never opens two. Clients of different BMCs run in parallel.
+ * </p>
+ * <p>
+ * <b>Failures</b> are reported as {@link IpmiClientException}s, whose subclasses say what to act on.
+ * </p>
  */
-public final class IpmiClient {
+// EI_EXPOSE_REP also matches EI_EXPOSE_REP2
+@SuppressFBWarnings(value = "EI_EXPOSE_REP", justification = "The password char[] and BMC key byte[] are "
+		+ "deliberately shared, not copied, so that the caller can wipe the only copy of the credentials")
+public final class IpmiClient implements AutoCloseable {
 
-	private IpmiClient() {}
+	/** Deadline of each operation when the builder sets none: 2 minutes. */
+	public static final Duration DEFAULT_TIMEOUT = Duration.ofMinutes(2);
+
+	/** Timeout of each message when the builder sets none: 5 seconds. */
+	public static final Duration DEFAULT_MESSAGE_TIMEOUT = Duration.ofSeconds(5);
+
+	/** Resends of a message without reply when the builder sets none: 3. */
+	public static final int DEFAULT_RETRIES = 3;
+
+	/** Period of the keep-alive messages when the builder sets none: 30 seconds. */
+	public static final Duration DEFAULT_KEEP_ALIVE = Duration.ofSeconds(30);
 
 	/**
-	 * Run the get Chassis status IPMI request
-	 *
-	 * @param ipmiConfiguration Wraps the IPMI device hostname and the credentials
-	 * @return {@link GetChassisStatusResponseData} instance
-	 * @throws InterruptedException
-	 * @throws ExecutionException
-	 * @throws TimeoutException
+	 * The cipher suites the client may choose when the builder sets none, by order of preference (IPMI 2.0 table
+	 * 22-20): those that sign every message, and encrypt it when possible (17: RAKP-HMAC-SHA256, HMAC-SHA256-128,
+	 * AES-CBC-128; 3: RAKP-HMAC-SHA1, HMAC-SHA1-96, AES-CBC-128; 8: RAKP-HMAC-MD5, HMAC-MD5-128, AES-CBC-128; then
+	 * 16, 2 and 7, the same without encryption).
 	 */
-	public static GetChassisStatusResponseData getChassisStatus(final IpmiClientConfiguration ipmiConfiguration)
-			throws InterruptedException,
-			ExecutionException,
-			TimeoutException {
-		return execute(new GetChassisStatusRunner(ipmiConfiguration), ipmiConfiguration.getTimeout() * 1000);
+	private static final int[] DEFAULT_CIPHER_SUITES = { 17, 3, 8, 16, 2, 7 };
+
+	/**
+	 * The suites without integrity (0, 1, 6, 15), which the builder refuses: the list of suites comes unauthenticated,
+	 * so falling back to them would let an attacker downgrade the session to one whose replies can be forged.
+	 */
+	private static final Set<Integer> SUITES_WITHOUT_INTEGRITY = new java.util.HashSet<Integer>(
+			Arrays.asList(0, 1, 6, 15));
+
+	private static final int LAST_STANDARD_SUITE = 19;
+	private static final int MAX_PORT = 65535;
+
+	/** How long {@link #close()} waits for the Close Session exchange, beyond the message timeout. */
+	private static final long CLOSE_GRACE_MS = 1000;
+
+	private final String host;
+	private final int port;
+	private final String user;
+	private final char[] password;
+	private final byte[] bmcKey;
+	private final PrivilegeLevel privilege;
+	private final int[] cipherSuites;
+	private final boolean discoverCipherSuite;
+	private final Duration timeout;
+	private final int messageTimeoutMs;
+	private final int retries;
+	private final long keepAliveMs;
+	private final boolean sdrCache;
+
+	private final ExecutorService worker;
+	private final AtomicBoolean closed = new AtomicBoolean();
+
+	// Touched by the worker thread only
+	private IpmiConnector connector;
+	private Link link;
+	private SdrRepository repository;
+
+	private IpmiClient(Builder builder) {
+		this.host = builder.host;
+		this.port = builder.port;
+		this.user = builder.user;
+		this.password = builder.password;
+		this.bmcKey = builder.bmcKey;
+		this.privilege = builder.privilege;
+		this.cipherSuites = builder.cipherSuites;
+		this.discoverCipherSuite = builder.discoverCipherSuite;
+		this.timeout = builder.timeout;
+		this.messageTimeoutMs = (int) builder.messageTimeout.toMillis();
+		this.retries = builder.retries;
+		this.keepAliveMs = builder.keepAlive.toMillis();
+		this.sdrCache = builder.sdrCache;
+		this.worker = Executors.newSingleThreadExecutor(runnable -> {
+			Thread thread = new Thread(runnable, "ipmi-client-" + host);
+			thread.setDaemon(true);
+			return thread;
+		});
 	}
 
 	/**
-	 * Get the sensors
+	 * Starts building a client of the BMC at the given host.
 	 *
-	 * @param ipmiConfiguration Wraps the IPMI device hostname and the credentials
-	 * @return List of {@link Sensor} instances
-	 * @throws InterruptedException
-	 * @throws ExecutionException
-	 * @throws TimeoutException
+	 * @param host the host name or IP address of the BMC
+	 * @return the builder
 	 */
-	public static List<Sensor> getSensors(final IpmiClientConfiguration ipmiConfiguration)
-			throws InterruptedException,
-			ExecutionException,
-			TimeoutException {
-		return execute(new GetSensorsRunner(ipmiConfiguration), ipmiConfiguration.getTimeout() * 1000);
+	public static Builder builder(String host) {
+		return new Builder(host);
 	}
 
 	/**
-	 * Get FRU information
+	 * Returns the host name or IP address of the BMC.
 	 *
-	 * @param ipmiConfiguration Wraps the IPMI device hostname and the credentials
-	 * @return List of {@link Fru} instances
-	 * @throws InterruptedException
-	 * @throws ExecutionException
-	 * @throws TimeoutException
+	 * @return the host
 	 */
-	public static List<Fru> getFrus(final IpmiClientConfiguration ipmiConfiguration)
-			throws InterruptedException,
-			ExecutionException,
-			TimeoutException {
-		return execute(new GetFrusRunner(ipmiConfiguration), ipmiConfiguration.getTimeout() * 1000);
+	public String host() {
+		return host;
 	}
 
 	/**
-	 * Run the get Chassis status IPMI request then convert the result to String
+	 * Reads what the BMC supports before any login: the cipher suites it offers and its authentication options
+	 * (Get Channel Cipher Suites and Get Channel Authentication Capabilities). Needs no credentials and opens no
+	 * session.
 	 *
-	 * @param ipmiConfiguration Wraps the IPMI device hostname and the credentials
-	 * @return Chassis status as String value
-	 * @throws TimeoutException
-	 * @throws ExecutionException
-	 * @throws InterruptedException
+	 * @return the capabilities
+	 * @throws IpmiConnectionException when the BMC does not answer
+	 * @throws IpmiClientException when the replies cannot be decoded
 	 */
-	public static String getChassisStatusAsStringResult(final IpmiClientConfiguration ipmiConfiguration)
-			throws InterruptedException,
-			ExecutionException,
-			TimeoutException {
-		return IpmiResultConverter.convertResult(getChassisStatus(ipmiConfiguration));
+	public BmcCapabilities capabilities() {
+		return run("capabilities", timeout, false, false, this::readCapabilities);
 	}
 
 	/**
-	 * Run the FRUs and Sensors request then convert the result to a String value
+	 * Reads the state of the chassis: power, faults, intrusion, identify LED (Get Chassis Status).
 	 *
-	 * @param ipmiConfiguration Wraps the IPMI device hostname and the credentials
-	 * @return All sensors (FRUs, Sensors readings and Sensors states) as String value
-	 * @throws TimeoutException
-	 * @throws ExecutionException
-	 * @throws InterruptedException
+	 * @return the chassis status
+	 * @throws IpmiClientException when the session cannot be opened or the BMC does not answer
 	 */
-	public static String getFrusAndSensorsAsStringResult(final IpmiClientConfiguration ipmiConfiguration)
-			throws InterruptedException,
-			ExecutionException,
-			TimeoutException {
-		return IpmiResultConverter.convertResult(getFrus(ipmiConfiguration), getSensors(ipmiConfiguration));
+	public ChassisStatus chassisStatus() {
+		return run("chassis status", timeout, true, true, () -> new ChassisStatus(link.send(new GetChassisStatus())));
+	}
+
+	/**
+	 * Reads the sensors of the BMC: {@code sensors().execute()} for all of them, with {@link SensorsRequest#types}
+	 * and {@link SensorsRequest#names} to select some before their readings are requested.
+	 *
+	 * @return the request to complete
+	 */
+	public SensorsRequest sensors() {
+		return new SensorsRequest(this);
+	}
+
+	/**
+	 * Reads the FRU inventories of the system: {@code frus().execute()} for all of them, with
+	 * {@link FrusRequest#ids} to select some. The SDR repository is walked once per client: {@link #sensors()} and
+	 * {@link #frus()} share it until the BMC reports a change.
+	 *
+	 * @return the request to complete
+	 */
+	public FrusRequest frus() {
+		return new FrusRequest(this);
+	}
+
+	/**
+	 * Sends any command of the protocol core in the session and returns its typed reply, for the commands the client
+	 * does not wrap: {@code bmc.send(new GetSelInfo())}. A command is never replayed on a new session.
+	 *
+	 * @param <R> the type of the reply
+	 * @param command the command
+	 * @return the reply
+	 * @throws IpmiCompletionCodeException when the BMC answers with an error completion code
+	 * @throws IpmiClientException when the session cannot be opened or the BMC does not answer
+	 */
+	public <R extends ResponseData> R send(IpmiCommandCoder<R> command) {
+		Objects.requireNonNull(command, "command");
+		return run(command.getClass().getSimpleName(), timeout, true, false, () -> link.send(command));
+	}
+
+	/**
+	 * Opens a Serial over LAN console in the session: {@code sol().open()}.
+	 *
+	 * @return the request to complete
+	 */
+	public SolRequest sol() {
+		return new SolRequest(this);
+	}
+
+	/**
+	 * Closes the session (Close Session, within the message timeout), releases the UDP port and the threads. Closing
+	 * a closed client does nothing, and a BMC that does not answer the logout does not fail the caller.
+	 */
+	@Override
+	public void close() {
+		if (!closed.compareAndSet(false, true)) {
+			return;
+		}
+		Future<?> logout = worker.submit(this::logout);
+		try {
+			logout.get(messageTimeoutMs + CLOSE_GRACE_MS, TimeUnit.MILLISECONDS);
+		} catch (TimeoutException e) {
+			// The worker releases the port by itself once its current wait ends
+			logout.cancel(true);
+		} catch (InterruptedException e) {
+			logout.cancel(true);
+			Thread.currentThread().interrupt();
+		} catch (ExecutionException e) {
+			// Best effort: the port and the threads are released anyway
+		} finally {
+			worker.shutdownNow();
+		}
+	}
+
+	SensorList readSensors(Predicate<AbstractSensorRecord> selection, Duration deadline) {
+		return run("sensors", deadline, true, true, () -> {
+			SdrRepository sdr = repository();
+			List<Sensor> sensors = new ArrayList<Sensor>();
+			for (SensorRecord record : sdr.records()) {
+				// Only the Full and Compact sensor records have a reading (IPMI 2.0 section 43)
+				if ((record instanceof FullSensorRecord || record instanceof CompactSensorRecord)
+						&& selection.test((AbstractSensorRecord) record)) {
+					sensors.add(readSensor((AbstractSensorRecord) record));
+				}
+			}
+			return new SensorList(sensors, sdr.skippedRecords());
+		});
+	}
+
+	private Sensor readSensor(AbstractSensorRecord record) {
+		int number = TypeConverter.byteToInt(record.getSensorNumber());
+		try {
+			return Sensor.of(record, link.send(new GetSensorReading(number)), null);
+		} catch (IpmiCompletionCodeException e) {
+			// A reading the BMC refuses (not present, insufficient privilege...) costs that sensor, not the whole walk
+			return Sensor
+					.of(
+							record,
+							null,
+							"Get Sensor Reading failed: " + e.completionCode().getMessage()
+									+ String.format(" (completion code %02Xh)", e.rawCompletionCode()));
+		}
+	}
+
+	FruList readFrus(Set<Integer> ids, Duration deadline) {
+		return run("FRUs", deadline, true, true, () -> {
+			SdrRepository sdr = repository();
+			return new FruList(FruReader.read(link, sdr.records(), ids), sdr.skippedRecords());
+		});
+	}
+
+	SolConsole openSol(Duration deadline) {
+		return run("SOL console", deadline, true, false, () -> {
+			try {
+				return new SolConsole(new SerialOverLan(link.connector, link.session));
+			} catch (SOLException e) {
+				if (e.getCause() instanceof IPMIException) {
+					throw new IpmiCompletionCodeException("Activating the SOL payload", (IPMIException) e.getCause());
+				}
+				throw new IpmiClientException("Cannot open the SOL console of " + host + ": " + e.getMessage(), e);
+			} catch (SessionException e) {
+				throw new IpmiConnectionException(
+						"Cannot open the session of the SOL payload port of " + host + ": " + e.getMessage(),
+						e);
+			}
+		});
+	}
+
+	/**
+	 * Returns the SDR repository: the cached one when the BMC reports it unchanged (same record count and timestamps
+	 * of the most recent addition and erase, IPMI 2.0 section 33.9), a new walk otherwise.
+	 */
+	private SdrRepository repository() {
+		GetSdrRepositoryInfoResponseData info;
+		try {
+			info = link.send(new GetSdrRepositoryInfo());
+		} catch (IpmiCompletionCodeException e) {
+			// A BMC that refuses Get SDR Repository Info gets walked every time
+			info = null;
+		}
+		if (sdrCache && repository != null && repository.isCurrent(info)) {
+			return repository;
+		}
+		SdrRepository walked = SdrWalker.walk(link, info);
+		repository = sdrCache ? walked : null;
+		return walked;
+	}
+
+	private BmcCapabilities readCapabilities() throws Exception {
+		IpmiConnector ipmiConnector = connector();
+		ConnectionHandle handle = ipmiConnector.createConnection(resolve(), port);
+		try {
+			List<CipherSuite> suites = ipmiConnector.getAvailableCipherSuites(handle);
+			GetChannelAuthenticationCapabilitiesResponseData data = ipmiConnector
+					.getChannelAuthenticationCapabilities(handle, CipherSuite.getEmpty(), privilege);
+			return new BmcCapabilities(data, suites);
+		} catch (Exception e) {
+			throw translateHandshake(e);
+		} finally {
+			ipmiConnector.closeConnection(handle);
+		}
+	}
+
+	/**
+	 * Runs a task on the worker thread, under the given deadline. The task gets the session when it needs one, and
+	 * runs again on a new session when it is replayable and the session was lost while it ran.
+	 */
+	private <T> T run(String operation, Duration deadline, boolean needsSession, boolean replayable, Callable<T> task) {
+		Duration limit = deadline == null ? timeout : deadline;
+		Future<T> future;
+		try {
+			future = worker.submit(() -> perform(needsSession, replayable, task));
+		} catch (RejectedExecutionException e) {
+			throw new IllegalStateException("The client of " + host + " is closed", e);
+		}
+		try {
+			return future.get(limit.toMillis(), TimeUnit.MILLISECONDS);
+		} catch (TimeoutException e) {
+			future.cancel(true);
+			throw new IpmiTimeoutException(
+					"The " + operation + " operation on " + host + " did not complete within " + limit);
+		} catch (InterruptedException e) {
+			future.cancel(true);
+			Thread.currentThread().interrupt();
+			throw new IpmiClientException("Interrupted while waiting for the " + operation + " operation on " + host, e);
+		} catch (ExecutionException e) {
+			throw unwrap(e.getCause());
+		}
+	}
+
+	private static RuntimeException unwrap(Throwable cause) {
+		if (cause instanceof RuntimeException) {
+			return (RuntimeException) cause;
+		}
+		if (cause instanceof Error) {
+			throw (Error) cause;
+		}
+		return new IpmiClientException(cause.getMessage(), cause);
+	}
+
+	private <T> T perform(boolean needsSession, boolean replayable, Callable<T> task) throws Exception {
+		if (!needsSession) {
+			return task.call();
+		}
+		try {
+			session();
+			return task.call();
+		} catch (Exception e) {
+			if (Thread.currentThread().isInterrupted() || e instanceof InterruptedException) {
+				// The caller gave up at its deadline: the state of the session is unknown
+				dropSession();
+				throw e;
+			}
+			if (replayable && link != null && link.lost) {
+				dropSession();
+				session();
+				return task.call();
+			}
+			throw e;
+		}
+	}
+
+	private void session() throws Exception {
+		if (link != null && link.lost) {
+			dropSession();
+		}
+		if (link == null) {
+			if (user == null) {
+				throw new IllegalStateException(
+						"The operation needs a session: give credentials(user, password) to the builder of the client");
+			}
+			link = Link.open(this, connector(), resolve());
+		}
+	}
+
+	private void dropSession() {
+		if (link != null) {
+			connector.closeConnection(link.handle);
+			link = null;
+		}
+	}
+
+	private IpmiConnector connector() throws IOException {
+		if (connector == null) {
+			// Port 0: any free UDP port
+			connector = new IpmiConnector(0, keepAliveMs);
+			connector.setTimeout(messageTimeoutMs);
+			connector.setRetries(retries);
+		}
+		return connector;
+	}
+
+	private InetAddress resolve() {
+		try {
+			return InetAddress.getByName(host);
+		} catch (UnknownHostException e) {
+			throw new IpmiConnectionException("Unknown host " + host, e);
+		}
+	}
+
+	private void logout() {
+		try {
+			if (link != null && !link.lost) {
+				// One try: a BMC that does not answer the logout must not hold the caller
+				connector.setRetries(0);
+				connector.closeSession(link.handle);
+			}
+		} catch (Exception e) {
+			// Best effort: the BMC expires a session it was not told to close
+			if (e instanceof InterruptedException) {
+				Thread.currentThread().interrupt();
+			}
+		} finally {
+			link = null;
+			if (connector != null) {
+				connector.tearDown();
+				connector = null;
+			}
+		}
+	}
+
+	/**
+	 * Translates a failure of the session setup: the BMC refused the login, did not answer, or answered something
+	 * else than what the handshake expects.
+	 */
+	private IpmiClientException translateHandshake(Exception e) {
+		if (e instanceof IpmiClientException) {
+			return (IpmiClientException) e;
+		}
+		if (e instanceof AuthenticationException) {
+			return new IpmiAuthenticationException(
+					"The BMC " + host + " refused the login of " + user + ": wrong password or BMC key (" + e.getMessage() + ")",
+					e);
+		}
+		if (e instanceof IPMIException) {
+			CompletionCode code = ((IPMIException) e).getCompletionCode();
+			if (isAuthenticationCode(code)) {
+				return new IpmiAuthenticationException(
+						"The BMC " + host + " refused the login of " + user + ": " + code.getMessage(),
+						code,
+						e);
+			}
+			return new IpmiClientException("The BMC " + host + " refused the session: " + code.getMessage(), e);
+		}
+		if (e instanceof ConnectionException) {
+			return new IpmiConnectionException(
+					"No reply from " + host + ":" + port + " to the session setup after " + (retries + 1)
+							+ " tries: wrong host, UDP port " + port + " filtered, or IPMI over LAN disabled (" + e.getMessage()
+							+ ")",
+					e);
+		}
+		if (e instanceof IOException) {
+			return new IpmiConnectionException("Cannot connect to " + host + ":" + port + ": " + e.getMessage(), e);
+		}
+		if (e instanceof InterruptedException) {
+			Thread.currentThread().interrupt();
+			return new IpmiClientException("Interrupted while opening the session with " + host, e);
+		}
+		return new IpmiClientException("Cannot open the session with " + host + ": " + e.getMessage(), e);
+	}
+
+	private static boolean isAuthenticationCode(CompletionCode code) {
+		switch (code) {
+		case UnauthorizedName:
+		case UnauthorizedRole:
+		case InvalidRole:
+		case InsufficientResourcesForRole:
+		case UnauthorizedGuid:
+		case InvalidIntegrityCheckValue:
+		case InvalidNameLength:
+		case InsufficentPrivilege:
+			return true;
+		default:
+			return false;
+		}
+	}
+
+	/**
+	 * Encodes the password in UTF-8 without going through an immutable {@link String}.
+	 */
+	static byte[] encode(char[] password) {
+		if (password == null) {
+			return null;
+		}
+		ByteBuffer buffer = StandardCharsets.UTF_8.encode(CharBuffer.wrap(password));
+		byte[] bytes = Arrays.copyOf(buffer.array(), buffer.limit());
+		Arrays.fill(buffer.array(), (byte) 0);
+		return bytes;
+	}
+
+	static Duration checkTimeout(Duration duration, String name) {
+		Objects.requireNonNull(duration, name);
+		if (duration.isNegative() || duration.isZero()) {
+			throw new IllegalArgumentException(name + " must be positive: " + duration);
+		}
+		if (duration.toMillis() > Integer.MAX_VALUE) {
+			throw new IllegalArgumentException(name + " is too long: " + duration);
+		}
+		return duration;
+	}
+
+	/**
+	 * Picks the first suite of the preference list that the BMC offers.
+	 */
+	static CipherSuite chooseCipherSuite(List<CipherSuite> offered, int[] preference, String host) {
+		if (offered != null) {
+			for (int id : preference) {
+				for (CipherSuite suite : offered) {
+					if (suite.getId() == id) {
+						return suite;
+					}
+				}
+			}
+		}
+		StringBuilder ids = new StringBuilder();
+		if (offered != null) {
+			for (CipherSuite suite : offered) {
+				ids.append(ids.length() == 0 ? "" : ", ").append(suite.getId());
+			}
+		}
+		throw new IpmiClientException(
+				"The BMC " + host + " offers none of the cipher suites " + Arrays.toString(preference) + " (offered: "
+						+ (ids.length() == 0 ? "none" : ids) + ")");
+	}
+
+	/**
+	 * The session of the client: its connector, its connection and the session opened on it. A send that gets no
+	 * reply marks it lost.
+	 */
+	private static final class Link implements Exchange {
+
+		private final IpmiConnector connector;
+		private final ConnectionHandle handle;
+		private final Session session;
+		private final String host;
+		private final int tries;
+		private boolean lost;
+
+		private Link(IpmiConnector connector, ConnectionHandle handle, Session session, String host, int tries) {
+			this.connector = connector;
+			this.handle = handle;
+			this.session = session;
+			this.host = host;
+			this.tries = tries;
+		}
+
+		/**
+		 * Opens the session: cipher suite discovery unless the builder fixed the suite, Get Channel Authentication
+		 * Capabilities, Open Session, RAKP 1 to 4, then Set Session Privilege Level when the builder asked for more
+		 * than User (IPMI 2.0 section 22.18: every session starts at User).
+		 */
+		static Link open(IpmiClient client, IpmiConnector connector, InetAddress address) {
+			ConnectionHandle handle = null;
+			Session session = null;
+			try {
+				if (client.discoverCipherSuite) {
+					handle = connector.createConnection(address, client.port);
+					CipherSuite suite = chooseCipherSuite(
+							connector.getAvailableCipherSuites(handle),
+							client.cipherSuites,
+							client.host);
+					connector.getChannelAuthenticationCapabilities(handle, suite, client.privilege);
+				} else {
+					handle = connector
+							.createConnection(address, client.port, CipherSuite.forId(client.cipherSuites[0]), client.privilege);
+				}
+				session = connector.openSession(handle, client.user, encode(client.password), client.bmcKey);
+				Link link = new Link(connector, handle, session, client.host, client.retries + 1);
+				if (client.privilege == PrivilegeLevel.Operator || client.privilege == PrivilegeLevel.Administrator) {
+					link.raisePrivilege(client.privilege);
+				}
+				return link;
+			} catch (Exception e) {
+				if (handle != null) {
+					if (session != null) {
+						closeQuietly(connector, handle);
+					}
+					connector.closeConnection(handle);
+				}
+				throw client.translateHandshake(e);
+			}
+		}
+
+		private void raisePrivilege(PrivilegeLevel privilege) {
+			try {
+				send(new SetSessionPrivilegeLevel(privilege));
+			} catch (IpmiCompletionCodeException e) {
+				throw new IpmiAuthenticationException(
+						"The BMC " + host + " refused the " + privilege + " privilege: " + e.completionCode().getMessage(),
+						e.completionCode(),
+						e);
+			}
+		}
+
+		private static void closeQuietly(IpmiConnector connector, ConnectionHandle handle) {
+			try {
+				connector.closeSession(handle);
+			} catch (Exception e) {
+				// Best effort: the session that could not be used is left to expire
+				if (e instanceof InterruptedException) {
+					Thread.currentThread().interrupt();
+				}
+			}
+		}
+
+		@Override
+		public <R extends ResponseData> R send(IpmiCommandCoder<R> command) {
+			String name = command.getClass().getSimpleName();
+			try {
+				return connector.sendMessage(handle, command);
+			} catch (IPMIException e) {
+				throw new IpmiCompletionCodeException(command, e);
+			} catch (ConnectionException e) {
+				lost = true;
+				throw new IpmiTimeoutException(
+						"No reply from " + host + " to " + name + " after " + tries + " tries: the session is lost",
+						e);
+			} catch (IllegalStateException e) {
+				lost = true;
+				throw new IpmiConnectionException("The connection to " + host + " is closed", e);
+			} catch (InterruptedException e) {
+				lost = true;
+				Thread.currentThread().interrupt();
+				throw new IpmiClientException("Interrupted while waiting for the reply of " + host + " to " + name, e);
+			} catch (IpmiClientException e) {
+				throw e;
+			} catch (Exception e) {
+				throw new IpmiClientException(name + " failed on " + host + ": " + e.getMessage(), e);
+			}
+		}
+	}
+
+	/**
+	 * Builds an {@link IpmiClient}: the BMC, the credentials and the session settings. {@link #build()} validates
+	 * them and touches no network.
+	 */
+	public static final class Builder {
+
+		private final String host;
+		private int port = Constants.IPMI_PORT;
+		private String user;
+		private char[] password;
+		private byte[] bmcKey;
+		private PrivilegeLevel privilege = PrivilegeLevel.User;
+		private int[] cipherSuites = DEFAULT_CIPHER_SUITES.clone();
+		private boolean discoverCipherSuite = true;
+		private Duration timeout = DEFAULT_TIMEOUT;
+		private Duration messageTimeout = DEFAULT_MESSAGE_TIMEOUT;
+		private int retries = DEFAULT_RETRIES;
+		private Duration keepAlive = DEFAULT_KEEP_ALIVE;
+		private boolean sdrCache = true;
+
+		private Builder(String host) {
+			if (host == null || host.trim().isEmpty()) {
+				throw new IllegalArgumentException("The host of the BMC is required");
+			}
+			this.host = host.trim();
+		}
+
+		/**
+		 * Sets the UDP port of the BMC; 623 by default.
+		 *
+		 * @param udpPort the port, 1 to 65535
+		 * @return this builder
+		 */
+		public Builder port(int udpPort) {
+			if (udpPort < 1 || udpPort > MAX_PORT) {
+				throw new IllegalArgumentException("Invalid port: " + udpPort);
+			}
+			this.port = udpPort;
+			return this;
+		}
+
+		/**
+		 * Sets the user name and password of the session. The password is not copied: the caller can wipe it once
+		 * the client is closed. Required by every operation but {@link IpmiClient#capabilities()}.
+		 *
+		 * @param userName the user name, at most 16 bytes in UTF-8
+		 * @param userPassword the password, at most 20 bytes in UTF-8
+		 * @return this builder
+		 */
+		public Builder credentials(String userName, char[] userPassword) {
+			this.user = Objects.requireNonNull(userName, "userName");
+			this.password = Objects.requireNonNull(userPassword, "userPassword");
+			return this;
+		}
+
+		/**
+		 * Sets the BMC key (Kg) of the two-key login, as raw bytes, for a BMC whose key is set.
+		 *
+		 * @param key the key, at most 20 bytes, or null for the usual single-key login
+		 * @return this builder
+		 */
+		public Builder bmcKey(byte[] key) {
+			this.bmcKey = key;
+			return this;
+		}
+
+		/**
+		 * Sets the maximum privilege of the session, requested at Open Session and RAKP 1 and set with Set Session
+		 * Privilege Level right after the handshake (every session starts at User, IPMI 2.0 section 22.18). User by
+		 * default, enough for every read operation; Operator for the power control; Administrator for Serial over
+		 * LAN on most BMCs.
+		 *
+		 * @param level the privilege level
+		 * @return this builder
+		 */
+		public Builder privilege(PrivilegeLevel level) {
+			this.privilege = Objects.requireNonNull(level, "level");
+			return this;
+		}
+
+		/**
+		 * Sets the cipher suites the client may use, by order of preference: the first one the BMC offers is used.
+		 * Default: 17, 3, 8, 16, 2, 7. The suites without integrity (0, 1, 6, 15) are refused.
+		 *
+		 * @param ids the suite IDs (IPMI 2.0 table 22-20)
+		 * @return this builder
+		 */
+		public Builder cipherSuites(int... ids) {
+			this.cipherSuites = checkSuites(ids);
+			this.discoverCipherSuite = true;
+			return this;
+		}
+
+		/**
+		 * Uses exactly the given cipher suite, without asking the BMC which ones it offers: saves the Get Channel
+		 * Cipher Suites round trips with a BMC known to support it.
+		 *
+		 * @param id the suite ID (IPMI 2.0 table 22-20), one with integrity
+		 * @return this builder
+		 */
+		public Builder cipherSuite(int id) {
+			this.cipherSuites = checkSuites(new int[] { id });
+			this.discoverCipherSuite = false;
+			return this;
+		}
+
+		private static int[] checkSuites(int[] ids) {
+			Objects.requireNonNull(ids, "ids");
+			if (ids.length == 0) {
+				throw new IllegalArgumentException("At least one cipher suite is required");
+			}
+			for (int id : ids) {
+				if (id < 0 || id > LAST_STANDARD_SUITE) {
+					throw new IllegalArgumentException("Cipher suite " + id + " is not a standard suite (0 to 19)");
+				}
+				if (SUITES_WITHOUT_INTEGRITY.contains(id)) {
+					throw new IllegalArgumentException(
+							"Cipher suite " + id + " has no integrity algorithm: its replies could be forged");
+				}
+			}
+			return ids.clone();
+		}
+
+		/**
+		 * Sets the overall deadline of each operation, session setup included; 2 minutes by default. Each operation
+		 * builder can override it.
+		 *
+		 * @param deadline the deadline
+		 * @return this builder
+		 */
+		public Builder timeout(Duration deadline) {
+			this.timeout = checkTimeout(deadline, "timeout");
+			return this;
+		}
+
+		/**
+		 * Sets how long a message waits for its reply before it is sent again; 5 seconds by default.
+		 *
+		 * @param duration the timeout of a message
+		 * @return this builder
+		 */
+		public Builder messageTimeout(Duration duration) {
+			this.messageTimeout = checkTimeout(duration, "messageTimeout");
+			return this;
+		}
+
+		/**
+		 * Sets how many times a message without reply is sent again; 3 by default.
+		 *
+		 * @param count the number of resends, 0 to send every message once
+		 * @return this builder
+		 */
+		public Builder retries(int count) {
+			if (count < 0) {
+				throw new IllegalArgumentException("retries must not be negative: " + count);
+			}
+			this.retries = count;
+			return this;
+		}
+
+		/**
+		 * Sets the period of the keep-alive messages that keep the session open between operations; 30 seconds by
+		 * default. {@link Duration#ZERO} disables them: the BMC then expires an idle session after its own timeout
+		 * (60 seconds by default), and the next operation opens a new one.
+		 *
+		 * @param period the period, or {@link Duration#ZERO}
+		 * @return this builder
+		 */
+		public Builder keepAlive(Duration period) {
+			Objects.requireNonNull(period, "period");
+			if (period.isNegative()) {
+				throw new IllegalArgumentException("keepAlive must not be negative: " + period);
+			}
+			this.keepAlive = period;
+			return this;
+		}
+
+		/**
+		 * Tells whether the client caches the SDR repository it reads, so that {@link IpmiClient#sensors()} and
+		 * {@link IpmiClient#frus()} walk it once; enabled by default. Before using the cache, each operation checks
+		 * with Get SDR Repository Info that the record count and the timestamps of the most recent addition and
+		 * erase did not change. Disable it for a BMC whose timestamps cannot be trusted.
+		 *
+		 * @param enabled whether to cache the repository
+		 * @return this builder
+		 */
+		public Builder sdrCache(boolean enabled) {
+			this.sdrCache = enabled;
+			return this;
+		}
+
+		/**
+		 * Validates the settings and creates the client. No session is opened: the first operation that needs one
+		 * opens it.
+		 *
+		 * @return the client, to close when done
+		 * @throws IllegalArgumentException when the user name is longer than 16 bytes, or the password or the BMC key
+		 *         longer than 20 bytes
+		 */
+		public IpmiClient build() {
+			if (user != null) {
+				Rakp1.checkCredentials(user, encode(password), bmcKey);
+			} else if (bmcKey != null) {
+				Rakp1.checkCredentials("", null, bmcKey);
+			}
+			return new IpmiClient(this);
+		}
 	}
 }

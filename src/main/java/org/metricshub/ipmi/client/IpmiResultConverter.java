@@ -35,23 +35,17 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-import org.metricshub.ipmi.client.model.DeviceDescription;
-import org.metricshub.ipmi.client.model.Fru;
-import org.metricshub.ipmi.client.model.FruDevice;
-import org.metricshub.ipmi.client.model.Sensor;
-import org.metricshub.ipmi.core.coding.commands.chassis.GetChassisStatusResponseData;
 import org.metricshub.ipmi.core.coding.commands.fru.record.BoardInfo;
-import org.metricshub.ipmi.core.coding.commands.fru.record.FruRecord;
 import org.metricshub.ipmi.core.coding.commands.fru.record.ProductInfo;
-import org.metricshub.ipmi.core.coding.commands.sdr.GetSensorReadingResponseData;
 import org.metricshub.ipmi.core.coding.commands.sdr.record.EntityId;
-import org.metricshub.ipmi.core.coding.commands.sdr.record.FruDeviceLocatorRecord;
 import org.metricshub.ipmi.core.coding.commands.sdr.record.FullSensorRecord;
 import org.metricshub.ipmi.core.coding.commands.sdr.record.SensorUnit;
 
 public final class IpmiResultConverter {
 
-	private static final double NO_READING = 255d;
+	private static final int NO_READING = 255;
+
+	private static final String EMPTY = "";
 
 	private static final DoubleFunction<Double> IDENTITY_FUNCTION = v -> v;
 	private static final DoubleFunction<Double> VOLTAGE_CONVERSION_FUNCTION = v -> v * 1000;
@@ -115,8 +109,7 @@ public final class IpmiResultConverter {
 		// Parse each full sensor as it should define the reading value and
 		return sensors
 				.stream()
-				.filter(Sensor::isFull)
-				.filter(sensor -> sensor.getData() != null && sensor.getRecord() != null)
+				.filter(sensor -> sensor.record() instanceof FullSensorRecord && sensor.rawReading().isPresent())
 				.map(IpmiResultConverter::extractFullSensorReadingValue)
 				.filter(Objects::nonNull);
 	}
@@ -131,9 +124,7 @@ public final class IpmiResultConverter {
 	 */
 	private static String extractFullSensorReadingValue(final Sensor fullSensor) {
 
-		// Get data and record, never null
-		GetSensorReadingResponseData data = fullSensor.getData();
-		FullSensorRecord fullRecord = (FullSensorRecord) fullSensor.getRecord();
+		FullSensorRecord fullRecord = (FullSensorRecord) fullSensor.record();
 
 		// Read the various fields of the returned table
 		String sensorId = String.format("%04x", fullRecord.getId());
@@ -152,10 +143,8 @@ public final class IpmiResultConverter {
 
 		// No reading? Skip: the BMC says so (reading unavailable, scanning disabled, no analog reading: IPMI 2.0
 		// Table 35-15 and Table 43-1), or the record cannot be described
-		if (data.getPlainSensorReading() == NO_READING
-				|| !data.isSensorStateValid()
-				|| !data.isScanningEnabled()
-				|| !fullRecord.hasAnalogReading()
+		if (fullSensor.rawReading().getAsInt() == NO_READING
+				|| !fullSensor.reading().isPresent()
 				|| deviceType == null
 				|| unit == null
 				|| sensorName == null) {
@@ -163,7 +152,7 @@ public final class IpmiResultConverter {
 		}
 
 		// Sensor reading value. E.g temperature, power consumption, ...
-		double value = data.getSensorReading(fullRecord);
+		double value = fullSensor.reading().getAsDouble();
 
 		// unique id
 		String sensorUniqueId = buildDeviceUniqueId(deviceType, deviceId);
@@ -400,19 +389,16 @@ public final class IpmiResultConverter {
 			final Map<String, FruDevice> frusLookup,
 			final Map<String, String> sensorEntries) {
 		// Get the sensor states
-		String states = sensor.getStates();
+		String states = buildStates(sensor);
 
 		// Get the type of device as expected by the AWK script in the MS_HW_IpmiTool.hdfs
-		String deviceType = DeviceDescription.getDeviceType(sensor.getEntityId());
+		String deviceType = DeviceDescription.getDeviceType(sensor.entity());
 
-		// The entity instance number
-		Byte deviceId = sensor.getDeviceId();
+		// The entity instance number, as the signed byte of the record
+		Byte deviceId = (byte) sensor.entityInstance();
 
 		// Bypass sensors with no state asserted
-		if (Utils.isBlank(states)
-				|| states.toLowerCase().contains("=device absent")
-				|| deviceId == null
-				|| Utils.isBlank(deviceType)) {
+		if (isBlank(states) || states.toLowerCase().contains("=device absent") || isBlank(deviceType)) {
 			return;
 		}
 
@@ -427,15 +413,15 @@ public final class IpmiResultConverter {
 		} else {
 			// So, it's the first time we meet this sensor entry, look up its FRU entry
 			FruDevice fru = frusLookup.get(deviceUniqueId);
-			String vendor = Utils.EMPTY;
-			String model = Utils.EMPTY;
-			String serialNumber = Utils.EMPTY;
+			String vendor = EMPTY;
+			String model = EMPTY;
+			String serialNumber = EMPTY;
 
 			// Ok we have the corresponding FRU, let's extract the vendor, model, and serialNumber
 			if (fru != null) {
-				vendor = Utils.getValueOrEmpty(fru.getVendor());
-				model = Utils.getValueOrEmpty(fru.getModel());
-				serialNumber = Utils.getValueOrEmpty(fru.getSerialNumber());
+				vendor = getValueOrEmpty(fru.vendor);
+				model = getValueOrEmpty(fru.model);
+				serialNumber = getValueOrEmpty(fru.serialNumber);
 			}
 
 			// Add all of this to the device list
@@ -469,22 +455,15 @@ public final class IpmiResultConverter {
 
 		// Loop over each collected FRU and try to extract the model, vendor and serial number
 		for (Fru fru : frus) {
-			FruDeviceLocatorRecord fruLocator = fru.getFruLocator();
-			if (fruLocator == null) {
-				continue;
-			}
-
 			// Get the entityId value. It is the type of the device
-			EntityId entityId = EntityId.parseInt(fruLocator.getFruEntityId());
+			EntityId entityId = fru.entity();
 
 			// Build the FRU unique id
-			String deviceUniqueId = buildDeviceUniqueId(
-					DeviceDescription.getDeviceType(entityId),
-					fruLocator.getFruEntityInstance());
+			String deviceUniqueId = buildDeviceUniqueId(DeviceDescription.getDeviceType(entityId), fru.entityInstance());
 
 			FruDevice fruDevice;
 
-			ProductInfo productInfo = getInfo(fru.getFruRecords(), ProductInfo.class);
+			ProductInfo productInfo = fru.product().orElse(null);
 
 			// Product information, usually very good if attached to a system entity
 			if (hasValidProductInfo(productInfo)) {
@@ -531,24 +510,24 @@ public final class IpmiResultConverter {
 	 */
 	private static FruDevice createFruDeviceFromBoardInfo(final LinkedList<FruDevice> poorFruList, final Fru fru) {
 
-		BoardInfo boardInfo = getInfo(fru.getFruRecords(), BoardInfo.class);
+		BoardInfo boardInfo = fru.board().orElse(null);
 
 		// Strange but make sure the board information is here
 		if (boardInfo == null) {
 			return null;
 		}
 
-		String vendor = Utils.getValueOrEmpty(boardInfo.getBoardManufacturer());
-		String model = Utils.getValueOrEmpty(boardInfo.getBoardProductName());
-		String serialNumber = Utils.getValueOrEmpty(boardInfo.getBoardSerialNumber());
-		String partNumber = Utils.getValueOrEmpty(boardInfo.getBoardPartNumber());
+		String vendor = getValueOrEmpty(boardInfo.getBoardManufacturer());
+		String model = getValueOrEmpty(boardInfo.getBoardProductName());
+		String serialNumber = getValueOrEmpty(boardInfo.getBoardSerialNumber());
+		String partNumber = getValueOrEmpty(boardInfo.getBoardPartNumber());
 
 		// Combine serialNumber and partNumber
 		serialNumber = combineSerialNumberAndPartNumber(serialNumber, partNumber);
 
 		FruDevice fruDevice = null;
 		// vendor or model ?
-		if (!Utils.isEmpty(vendor) || !Utils.isEmpty(model)) {
+		if (!isEmpty(vendor) || !isEmpty(model)) {
 			fruDevice = new FruDevice(vendor, model, serialNumber);
 			poorFruList.addLast(fruDevice);
 		}
@@ -573,10 +552,10 @@ public final class IpmiResultConverter {
 			EntityId entityId,
 			ProductInfo productInfo) {
 
-		String vendor = Utils.getValueOrEmpty(productInfo.getManufacturerName());
-		String model = Utils.getValueOrEmpty(productInfo.getProductName());
-		String serialNumber = Utils.getValueOrEmpty(productInfo.getProductSerialNumber());
-		String partNumber = Utils.getValueOrEmpty(productInfo.getProductModelNumber());
+		String vendor = getValueOrEmpty(productInfo.getManufacturerName());
+		String model = getValueOrEmpty(productInfo.getProductName());
+		String serialNumber = getValueOrEmpty(productInfo.getProductSerialNumber());
+		String partNumber = getValueOrEmpty(productInfo.getProductModelNumber());
 
 		// Combine serialNumber and partNumber
 		serialNumber = combineSerialNumberAndPartNumber(serialNumber, partNumber);
@@ -584,7 +563,7 @@ public final class IpmiResultConverter {
 		FruDevice fruDevice = new FruDevice(vendor, model, serialNumber);
 
 		// How good and precise is this FRU entry?
-		if (!Utils.isEmpty(model) && !Utils.isEmpty(serialNumber)) {
+		if (!isEmpty(model) && !isEmpty(serialNumber)) {
 			if (isSystemFru(entityId)) {
 				veryGoodFruList.addLast(fruDevice);
 			} else if (isFruPanel(entityId)) {
@@ -608,9 +587,9 @@ public final class IpmiResultConverter {
 	 * @return {@link String} value
 	 */
 	private static String combineSerialNumberAndPartNumber(String serialNumber, final String partNumber) {
-		if (Utils.isEmpty(serialNumber) && !Utils.isEmpty(partNumber)) {
+		if (isEmpty(serialNumber) && !isEmpty(partNumber)) {
 			serialNumber = partNumber;
-		} else if (!Utils.isEmpty(serialNumber) && !Utils.isEmpty(partNumber)) {
+		} else if (!isEmpty(serialNumber) && !isEmpty(partNumber)) {
 			serialNumber = String.format("%s - %s", serialNumber, partNumber);
 		}
 		return serialNumber;
@@ -639,28 +618,7 @@ public final class IpmiResultConverter {
 	 * @return <code>true</code> if <code>pruductInfo</code> is not null and the manufacturer name is not null or empty
 	 */
 	private static boolean hasValidProductInfo(final ProductInfo productInfo) {
-		return productInfo != null && !Utils.isBlank(productInfo.getManufacturerName());
-	}
-
-	/**
-	 * @param <T>
-	 * @param fruRecords List of {@link FruRecord} instances containing {@link BoardInfo} and {@link ProductInfo}
-	 *        instances
-	 * @param clazz
-	 * @return The first matching instance
-	 */
-	private static <T extends FruRecord> T getInfo(final List<FruRecord> fruRecords, final Class<T> clazz) {
-		if (fruRecords == null) {
-			return null;
-		}
-
-		return fruRecords
-				.stream()
-				.filter(clazz::isInstance)
-				.map(clazz::cast)
-				.findFirst()
-				.orElse(null);
-
+		return productInfo != null && !isBlank(productInfo.getManufacturerName());
 	}
 
 	/**
@@ -672,7 +630,7 @@ public final class IpmiResultConverter {
 	 */
 	private static String getThresholdValue(final DoubleFunction<Double> conversionFunction, double threshold) {
 		// A threshold the SDR does not define is NaN; 0 is a legitimate threshold (0 RPM, 0 degrees)
-		return Double.isNaN(threshold) ? Utils.EMPTY : String.valueOf(Math.round(conversionFunction.apply(threshold)));
+		return Double.isNaN(threshold) ? EMPTY : String.valueOf(Math.round(conversionFunction.apply(threshold)));
 	}
 
 	/**
@@ -687,21 +645,70 @@ public final class IpmiResultConverter {
 				.filter(threshold -> !Double.isNaN(threshold))
 				.mapToObj(threshold -> getThresholdValue(conversionFunction, threshold))
 				.findFirst()
-				.orElse(Utils.EMPTY);
+				.orElse(EMPTY);
 	}
 
 	/**
-	 * Convert the given {@link GetChassisStatusResponseData} to a string value
+	 * Convert the given {@link ChassisStatus} to a string value
 	 *
-	 * @param chassisStatus Wrapper for Get Chassis Status response.
+	 * @param chassisStatus The chassis status read by {@link IpmiClient#chassisStatus()}
 	 * @return String value
 	 */
-	public static String convertResult(final GetChassisStatusResponseData chassisStatus) {
+	public static String convertResult(final ChassisStatus chassisStatus) {
 		if (chassisStatus == null) {
 			return null;
 		}
 
-		return "System power state is " + (chassisStatus.isPowerOn() ? "up" : "down");
+		return "System power state is " + (chassisStatus.powerOn() ? "up" : "down");
 	}
 
+	/**
+	 * Build the states representation formatted as the following deviceName=state1|deviceName=state2|...
+	 *
+	 * @param sensor The sensor
+	 * @return String value, empty when no state is asserted
+	 */
+	static String buildStates(final Sensor sensor) {
+		final String deviceName = sensor.name();
+		return sensor
+				.states()
+				.stream()
+				.map(state -> deviceName + "=" + state)
+				.collect(Collectors.toSet()) // Remove duplicates
+				.stream()
+				.collect(Collectors.joining("|"));
+	}
+
+	private static boolean isBlank(final String value) {
+		return value == null || isEmpty(value);
+	}
+
+	private static boolean isEmpty(final String value) {
+		return value.trim().isEmpty();
+	}
+
+	private static String getValueOrEmpty(final String value) {
+		return isBlank(value) ? EMPTY : value;
+	}
+
+	/**
+	 * A FRU as the text output describes it: vendor, model and serial number.
+	 */
+	private static final class FruDevice {
+
+		private final String vendor;
+		private final String model;
+		private final String serialNumber;
+
+		private FruDevice(String vendor, String model, String serialNumber) {
+			this.vendor = vendor;
+			this.model = model;
+			this.serialNumber = serialNumber;
+		}
+
+		@Override
+		public String toString() {
+			return "FRU;" + vendor + ";" + model + ";" + serialNumber;
+		}
+	}
 }
