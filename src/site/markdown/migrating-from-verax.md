@@ -36,15 +36,20 @@ Code written for the Verax library keeps working after a package rename.
 
    A search and replace of `com.veraxsystems.vxipmi.` with `org.metricshub.ipmi.core.` does it.
 
-3. Configure the logging of the `org.metricshub.ipmi` loggers: the library logs through the SLF4J
-   API, so add the SLF4J provider of your logging framework
-   ([Logging](installation.html#logging)).
+3. Remove the logging configuration of the Verax library: this one does not log. Every failure
+   is an exception, and every other problem is part of the result
+   ([Timeouts and Errors](timeouts-and-errors.html)).
 
 4. If you edited the `connection.properties` or `vxipmi.properties` files of the Verax jar to
-   change the timeouts, set the same values with `PropertiesManager.setProperty()` at startup
-   instead ([Library-wide defaults](timeouts-and-errors.html#library-wide-defaults)).
+   change the timeouts, set the same values on the connector instead: `setTimeout(ms)`,
+   `setRetries(n)` and the `pingPeriod` constructor argument
+   ([Connections and connectors](low-level-api.html#connections-and-connectors)).
 
-5. If you subclassed protocol classes and accessed their `protected` fields, use the accessors
+5. Drop the `IpmiVersion`, `CipherSuite` and `AuthenticationType` arguments of the command
+   constructors: the session sets them when it sends the command, and `sendMessage()` returns
+   the response type the command declares ([Sending commands](low-level-api.html#sending-commands)).
+
+6. If you subclassed protocol classes and accessed their `protected` fields, use the accessors
    that replaced them ([Upgrading from 1.2.02](upgrading.html#protected-fields)).
 
 ## What changed in the fork
@@ -55,10 +60,10 @@ Code written for the Verax library keeps working after a package rename.
 | Keep-alive | `IpmiConnector(int port, long pingPeriod)` sets the keep-alive period of the connector, or disables it (`0`). |
 | SDR repository | Every OEM record type (`C0h` – `FFh`, not only `C0h`) is decoded as `OemRecord`, and a record that cannot be decoded is skipped instead of aborting the walk. Truncated Get SDR replies are read again in chunks. |
 | Sensor records | Full, Compact and Event-Only records share `AbstractSensorRecord` ([Upgrading](upgrading.html#sensor-records)). |
-| Commands | `IpmiCommandCoder.validateResponse()` checks the response of every command ([Upgrading](upgrading.html#command-responses)). |
+| Commands | `IpmiCommandCoder<R>` declares the response type of each command, the session sets the version, cipher suite and authentication type, and `validateResponse()` checks the response of every command ([Upgrading](upgrading.html#command-responses)). |
 | Connection thread | The busy loop of `Connection.run()` that used a full CPU core is fixed. |
-| High-level API | `IpmiClient` reads the chassis status, the FRUs and the sensors in one call each ([Overview](index.html)). |
-| Logging | Through the SLF4J 2 API. |
+| High-level API | `IpmiClient` keeps one session open and reads the chassis status, the FRUs and the sensors as typed results ([Overview](index.html)). |
+| Logging | None: every failure is an exception, every other problem is in the result. |
 | Java | Java 8 or later. |
 
 ## License

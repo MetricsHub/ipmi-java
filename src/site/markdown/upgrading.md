@@ -1,9 +1,105 @@
-keywords: upgrade, migration, release notes, breaking changes, protected fields, accessors, abstractsensorrecord, validateresponse, utf-8, bmc key, cipher suite, integrity, org.sentrysoftware
-description: What changes when upgrading the IPMI Java Client — from 1.2.02, from 1.2.01, and from the org.sentrysoftware:ipmi artifact of 1.2.00 and earlier.
+keywords: upgrade, migration, release notes, breaking changes, 2.0, fluent client, builder, ipmiclientexception, slf4j, protected fields, accessors, abstractsensorrecord, validateresponse, utf-8, bmc key, cipher suite, integrity, org.sentrysoftware
+description: What changes when upgrading the IPMI Java Client — from 1.x to 2.0.00 (the fluent client), from 1.2.02, from 1.2.01, and from the org.sentrysoftware:ipmi artifact of 1.2.00 and earlier.
 
 # Upgrading
 
 <!-- MACRO{toc|fromDepth=2|toDepth=3|id=toc} -->
+
+## Upgrading from 1.x to 2.0.00
+
+Version 2.0.00 replaces the client API of 1.x with a fluent client, removes the SLF4J
+dependency, and simplifies the low-level commands. The protocol core, the decoders and the text
+output are the same: the text that `IpmiResultConverter` produces is byte-identical to 1.2.x for
+the same BMC data.
+
+### The client
+
+[`IpmiClient`](apidocs/org/metricshub/ipmi/client/IpmiClient.html) is built with
+[`IpmiClient.builder(host)`](apidocs/org/metricshub/ipmi/client/IpmiClient.Builder.html) and
+owns **one session**, opened by the first operation and kept alive until `close()`; the static
+methods and `IpmiClientConfiguration` are gone.
+
+| 1.x | 2.0.00 |
+| --- | --- |
+| `new IpmiClientConfiguration(host, user, password, bmcKey, skipAuth, timeout)` | `IpmiClient.builder(host).credentials(user, password).bmcKey(bmcKey).timeout(Duration.ofSeconds(timeout)).build()`, in a try-with-resources block ([Configuration](configuration.html)) |
+| `new IpmiClientConfiguration(host, port, ...)` | `.port(port)` |
+| `new IpmiClientConfiguration(..., pingPeriod)` | `.keepAlive(Duration.ofMillis(pingPeriod))`; `Duration.ZERO` disables the keep-alive |
+| `skipAuth = true` | `.cipherSuite(3)`: the suite is fixed without discovery; `.cipherSuites(17, 3)` lists a preference |
+| `connection.properties`, `vxipmi.properties`, `PropertiesManager` | `.messageTimeout(Duration)`, `.retries(int)` and `.keepAlive(Duration)` on the builder; `IpmiConnector.setTimeout(int)`, `setRetries(int)` and the `pingPeriod` constructor argument on the low-level API. The properties files and `PropertiesManager` are removed. |
+| `IpmiClient.getChassisStatus(config)` | `bmc.chassisStatus()`, a [`ChassisStatus`](chassis-status.html) (`data()` gives the `GetChassisStatusResponseData`) |
+| `IpmiClient.getSensors(config)` | `bmc.sensors().execute()`, a [`SensorList`](sensors.html) of typed [`Sensor`](apidocs/org/metricshub/ipmi/client/Sensor.html)s; `types()` and `names()` select sensors before their readings are requested |
+| `IpmiClient.getFrus(config)` | `bmc.frus().execute()`, a [`FruList`](fru-inventory.html) of typed [`Fru`](apidocs/org/metricshub/ipmi/client/Fru.html)s; `ids()` selects FRUs |
+| `IpmiClient.getChassisStatusAsStringResult(config)` | `IpmiResultConverter.convertResult(bmc.chassisStatus())` |
+| `IpmiClient.getFrusAndSensorsAsStringResult(config)` | `IpmiResultConverter.convertResult(bmc.frus().execute(), bmc.sensors().execute())`: one session and one SDR walk instead of two |
+| A new session per call | One session per client, serialized operations, [reopened](timeouts-and-errors.html#session-recovery) when the BMC loses it |
+| `Sensor.getRecord()`, `getData()`, `getStates()`, `getEntityId()`, `getDeviceId()` | `record()`, `readingData()`, `states()` (a list), `entity()`, `entityInstance()`, plus `reading()`, `rawReading()`, the thresholds, `status()`, `problem()` |
+| `Fru.getFruLocator()`, `getFruRecords()` | `locator()`, `records()`, plus `board()`, `product()`, `chassis()`, `multiRecords()`, the summary (`manufacturer()`, `model()`, `serialNumber()`, `partNumber()`), `complete()` and `problems()` |
+| `org.metricshub.ipmi.client.model` | Removed; `DeviceDescription` and `ReadingTypeDescription` move to `org.metricshub.ipmi.client` |
+| `org.metricshub.ipmi.client.runner` | Removed (implementation details of the client) |
+| `ExecutionException` wrapping the cause, `TimeoutException`, `InterruptedException` | The unchecked [`IpmiClientException`](timeouts-and-errors.html#exceptions) hierarchy: `IpmiAuthenticationException`, `IpmiConnectionException`, `IpmiTimeoutException`, `IpmiCompletionCodeException`; the core exception is the `getCause()` |
+| The `WARN` and `DEBUG` logs | Nothing is logged: `SensorList.skippedRecords()`, `FruList.skippedRecords()`, `Sensor.problem()` and `Fru.problems()` carry what the library logged ([Problems that do not fail the operation](timeouts-and-errors.html#problems-that-do-not-fail-the-operation)) |
+
+The migration of a 1.x text collection is a few lines:
+
+```java
+// 1.x
+String text = IpmiClient.getFrusAndSensorsAsStringResult(
+		new IpmiClientConfiguration(host, user, password, bmcKey, skipAuth, timeoutSeconds));
+
+// 2.0.00
+try (IpmiClient bmc = IpmiClient.builder(host)
+		.credentials(user, password)
+		.bmcKey(bmcKey)
+		.timeout(Duration.ofSeconds(timeoutSeconds))
+		.build()) {
+	String text = IpmiResultConverter.convertResult(bmc.frus().execute(), bmc.sensors().execute());
+}
+```
+
+New in the client: [`capabilities()`](apidocs/org/metricshub/ipmi/client/BmcCapabilities.html)
+reads the cipher suites and authentication options of a BMC without credentials,
+[`send(command)`](low-level-api.html#sending-a-command-through-the-client) sends any command of
+the core in the session, [`sol().open()`](serial-over-lan.html#with-ipmiclient) opens a Serial
+over LAN console as streams, `privilege(PrivilegeLevel)` opens the session at the Operator or
+Administrator level (raised with Set Session Privilege Level after the handshake, as every session
+starts at User), and the [SDR cache](configuration.html#sdr-cache) makes `frus()` and
+`sensors()` share one repository walk.
+
+### Logging
+
+The library no longer depends on `org.slf4j:slf4j-api` and never logs. The failures reach the
+caller as exceptions; the problems that do not fail an operation are reported in its result (see
+the table above); the failures nobody can act on (a lost keep-alive, a Close Session without
+reply) are ignored.
+
+### The low-level API
+
+* The command constructors no longer take `IpmiVersion`, `CipherSuite` and `AuthenticationType`:
+  `new GetChassisStatus()`, `new GetSdr(reservationId, recordId)`, `new ChassisControl(PowerCommand.PowerUp)`,
+  `new SolCoder(message)` are complete commands, and the session sets the parameters when it
+  encodes the request (`PayloadCoder.setSessionParameters()` still exists for code that encodes
+  a command itself). The payload command constructors deprecated in 1.2.03 for building requests
+  for cipher suite 0 are removed, and the remaining ones (`new DeactivatePayload(PayloadType, int)`,
+  `new GetPayloadActivationStatus(PayloadType)`, `new GetChannelPayloadSupport(byte)`) are now
+  the way to build them.
+* `IpmiCommandCoder<R extends ResponseData>` is generic: `getResponseData()` returns `R`, and
+  `IpmiConnector.sendMessage(handle, command)` returns `R` without a cast. A command of your own
+  declares its response type: `class GetDeviceId extends IpmiCommandCoder<GetDeviceIdResponseData>`.
+  `ActivatePayload<R extends ActivatePayloadResponseData>` is generic too.
+* `IpmiConnector.setTimeout(int)` sets the message timeout of the connections created
+  afterwards (5 000 ms by default), `setRetries(int)` the retries (3), and the `pingPeriod`
+  constructor argument the keep-alive period (30 000 ms); `IpmiAsyncConnector` has the same
+  setters, and `ConnectionManager.setTimeout(int)` too. The busy pause (`idleTime`) is a
+  constant of 4 000 ms.
+* `CipherSuite.forId(int)` builds one of the standard suites 0 to 19 with the algorithms of the
+  specification, for `createConnection()` without discovery.
+* A wrong password or BMC key fails the handshake with
+  `AuthenticationException` (`org.metricshub.ipmi.core.coding.commands.session`), a subclass of
+  the `IllegalArgumentException` that 1.2.x threw with the same messages.
+* `ReadFruData.decodeFruData(data, problems)` reports the areas and multirecords it skipped; the
+  one-argument form keeps decoding what it can, silently.
+* The decoders no longer log the values they do not model: they return the same defaults as
+  before (`Other`, `Unknown`, `Unspecified`, `Oem`).
 
 ## Upgrading from 1.2.02
 

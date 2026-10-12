@@ -36,7 +36,7 @@ The site is built with maven-site-plugin 4 and the Sentry Maven Skin (https://se
 
 ## IPMI specifics
 
-- The protocol implementation lives in `org.metricshub.ipmi.core` (RMCP+, RAKP, SDR/FRU/SEL coders, connection state machine); the MetricsHub-facing API is `org.metricshub.ipmi.client` (`IpmiClient`, `IpmiClientConfiguration`, the runners and `IpmiResultConverter`).
+- The protocol implementation lives in `org.metricshub.ipmi.core` (RMCP+, RAKP, SDR/FRU/SEL coders, connection state machine); the MetricsHub-facing API is `org.metricshub.ipmi.client` (`IpmiClient` and its builder, the operation builders, the typed results and exceptions, and `IpmiResultConverter`, whose text output must stay byte-identical for the same BMC data).
 - Decoders must never abort a whole SDR repository walk or FRU decode on a record they do not model: skip, record the problem in the result and continue (IPMI 2.0 reserves SDR record types 0xC0-0xFF for OEM use and vendors do emit them).
 - The library never logs: it has no logging dependency. A failure a caller can act on reaches the caller as an exception or as part of the returned object (`SensorList.skippedRecords()`, `Fru.problems()`, `ReadFruData.decodeFruData(data, problems)`); a failure nobody can act on (a lost keep-alive, a best-effort Close Session) is ignored with a comment saying why.
 - Byte-level parsing must follow the IPMI 2.0 specification (section numbers are cited in the code and in the issues); when a finding is "by the spec" but not reproduced on real hardware, say so in the commit or PR.
