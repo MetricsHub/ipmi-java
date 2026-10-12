@@ -34,14 +34,12 @@ import java.util.stream.Collectors;
 import org.metricshub.ipmi.client.IpmiClientConfiguration;
 import org.metricshub.ipmi.core.api.async.ConnectionHandle;
 import org.metricshub.ipmi.core.api.sync.IpmiConnector;
-import org.metricshub.ipmi.core.coding.commands.IpmiVersion;
 import org.metricshub.ipmi.core.coding.commands.PrivilegeLevel;
 import org.metricshub.ipmi.core.coding.commands.sdr.GetSdr;
 import org.metricshub.ipmi.core.coding.commands.sdr.GetSdrResponseData;
 import org.metricshub.ipmi.core.coding.commands.sdr.record.SensorRecord;
 import org.metricshub.ipmi.core.coding.payload.CompletionCode;
 import org.metricshub.ipmi.core.coding.payload.lan.IPMIException;
-import org.metricshub.ipmi.core.coding.protocol.AuthenticationType;
 import org.metricshub.ipmi.core.coding.security.CipherSuite;
 import org.metricshub.ipmi.core.common.TypeConverter;
 import org.metricshub.ipmi.core.connection.Connection;
@@ -305,9 +303,6 @@ public abstract class AbstractIpmiRunner<T> implements AutoCloseable, Callable<T
 					.sendMessage(
 							handle,
 							new GetSdr(
-									IpmiVersion.V20,
-									handle.getCipherSuite(),
-									AuthenticationType.RMCPPlus,
 									reservationId,
 									nextRecId));
 
@@ -357,9 +352,6 @@ public abstract class AbstractIpmiRunner<T> implements AutoCloseable, Callable<T
 				.sendMessage(
 						handle,
 						new GetSdr(
-								IpmiVersion.V20,
-								handle.getCipherSuite(),
-								AuthenticationType.RMCPPlus,
 								reservationId,
 								nextRecId,
 								0,
@@ -401,9 +393,6 @@ public abstract class AbstractIpmiRunner<T> implements AutoCloseable, Callable<T
 					.sendMessage(
 							handle,
 							new GetSdr(
-									IpmiVersion.V20,
-									handle.getCipherSuite(),
-									AuthenticationType.RMCPPlus,
 									reservationId,
 									nextRecId,
 									read,

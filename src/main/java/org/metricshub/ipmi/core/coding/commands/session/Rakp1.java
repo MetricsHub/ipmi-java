@@ -216,7 +216,7 @@ public class Rakp1 extends IpmiCommandCoder {
 	public Rakp1(int managedSystemSessionId, PrivilegeLevel privilegeLevel,
 			String username, byte[] password, byte[] bmcKey,
 			CipherSuite cipherSuite) {
-		super(IpmiVersion.V20, cipherSuite, AuthenticationType.RMCPPlus);
+		setSessionParameters(IpmiVersion.V20, cipherSuite, AuthenticationType.RMCPPlus);
 		setManagedSystemSessionId(managedSystemSessionId);
 		setRequestedMaximumPrivilegeLevel(privilegeLevel);
 		setUsername(username);

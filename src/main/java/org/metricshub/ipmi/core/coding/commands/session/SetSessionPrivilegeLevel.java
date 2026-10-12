@@ -24,16 +24,12 @@ package org.metricshub.ipmi.core.coding.commands.session;
 
 import org.metricshub.ipmi.core.coding.commands.CommandCodes;
 import org.metricshub.ipmi.core.coding.commands.IpmiCommandCoder;
-import org.metricshub.ipmi.core.coding.commands.IpmiVersion;
 import org.metricshub.ipmi.core.coding.commands.PrivilegeLevel;
-import org.metricshub.ipmi.core.coding.commands.ResponseData;
 import org.metricshub.ipmi.core.coding.payload.IpmiPayload;
 import org.metricshub.ipmi.core.coding.payload.lan.IPMIException;
 import org.metricshub.ipmi.core.coding.payload.lan.IpmiLanRequest;
 import org.metricshub.ipmi.core.coding.payload.lan.NetworkFunction;
-import org.metricshub.ipmi.core.coding.protocol.AuthenticationType;
 import org.metricshub.ipmi.core.coding.protocol.IpmiMessage;
-import org.metricshub.ipmi.core.coding.security.CipherSuite;
 import org.metricshub.ipmi.core.common.TypeConverter;
 
 import java.security.InvalidKeyException;
@@ -42,26 +38,18 @@ import java.security.NoSuchAlgorithmException;
 /**
  * Wrapper class for Set Session Privilege Level command
  */
-public class SetSessionPrivilegeLevel extends IpmiCommandCoder {
+public class SetSessionPrivilegeLevel extends IpmiCommandCoder<SetSessionPrivilegeLevelResponseData> {
 
 	private PrivilegeLevel privilegeLevel;
 
 	/**
 	 * Initiates {@link SetSessionPrivilegeLevel} for encoding and decoding
 	 *
-	 * @param version
-	 *        - IPMI version of the command.
-	 * @param cipherSuite
-	 *        - {@link CipherSuite} containing authentication, confidentiality and integrity algorithms for this session.
-	 * @param authenticationType
-	 *        - Type of authentication used. Must be RMCPPlus for IPMI v2.0.
 	 * @param privilegeLevel
 	 *        - Requested {@link PrivilegeLevel} to acquire. Can not be higher than level declared during starting
 	 *        session.
 	 */
-	public SetSessionPrivilegeLevel(IpmiVersion version, CipherSuite cipherSuite,
-			AuthenticationType authenticationType, PrivilegeLevel privilegeLevel) {
-		super(version, cipherSuite, authenticationType);
+	public SetSessionPrivilegeLevel(PrivilegeLevel privilegeLevel) {
 		this.privilegeLevel = privilegeLevel;
 	}
 
@@ -89,7 +77,7 @@ public class SetSessionPrivilegeLevel extends IpmiCommandCoder {
 	}
 
 	@Override
-	public ResponseData getResponseData(IpmiMessage message)
+	public SetSessionPrivilegeLevelResponseData getResponseData(IpmiMessage message)
 			throws IPMIException,
 			NoSuchAlgorithmException,
 			InvalidKeyException {

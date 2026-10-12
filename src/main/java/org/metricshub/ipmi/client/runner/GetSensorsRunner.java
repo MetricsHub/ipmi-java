@@ -31,7 +31,6 @@ import org.metricshub.ipmi.client.IpmiClientConfiguration;
 import org.metricshub.ipmi.client.Utils;
 import org.metricshub.ipmi.client.model.ReadingTypeDescription;
 import org.metricshub.ipmi.client.model.Sensor;
-import org.metricshub.ipmi.core.coding.commands.IpmiVersion;
 import org.metricshub.ipmi.core.coding.commands.sdr.GetSensorReading;
 import org.metricshub.ipmi.core.coding.commands.sdr.GetSensorReadingResponseData;
 import org.metricshub.ipmi.core.coding.commands.sdr.ReserveSdrRepository;
@@ -43,7 +42,6 @@ import org.metricshub.ipmi.core.coding.commands.sdr.record.ReadingType;
 import org.metricshub.ipmi.core.coding.commands.sdr.record.SensorRecord;
 import org.metricshub.ipmi.core.coding.payload.CompletionCode;
 import org.metricshub.ipmi.core.coding.payload.lan.IPMIException;
-import org.metricshub.ipmi.core.coding.protocol.AuthenticationType;
 import org.metricshub.ipmi.core.common.TypeConverter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -119,7 +117,7 @@ public class GetSensorsRunner extends AbstractIpmiRunner<List<Sensor>> {
 				reservationId = ((ReserveSdrRepositoryResponseData) getConnector()
 						.sendMessage(
 								getHandle(),
-								new ReserveSdrRepository(IpmiVersion.V20, getHandle().getCipherSuite(), AuthenticationType.RMCPPlus)))
+								new ReserveSdrRepository()))
 						.getReservationId();
 			}
 
@@ -225,9 +223,6 @@ public class GetSensorsRunner extends AbstractIpmiRunner<List<Sensor>> {
 					.sendMessage(
 							getHandle(),
 							new GetSensorReading(
-									IpmiVersion.V20,
-									getHandle().getCipherSuite(),
-									AuthenticationType.RMCPPlus,
 									sensorNumber));
 		} catch (IPMIException e) {
 			if (e.getCompletionCode() != CompletionCode.DataNotPresent) {

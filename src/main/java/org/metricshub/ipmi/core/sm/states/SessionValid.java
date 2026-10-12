@@ -89,6 +89,8 @@ public class SessionValid extends State {
 		if (machineEvent instanceof Sendv20Message) {
 			Sendv20Message event = (Sendv20Message) machineEvent;
 			try {
+				// The session signs and encrypts the message: the command carries no session parameters of its own
+				event.getPayloadCoder().setSessionParameters(IpmiVersion.V20, cipherSuite, AuthenticationType.RMCPPlus);
 				stateMachine
 						.sendMessage(
 								Encoder
@@ -133,11 +135,7 @@ public class SessionValid extends State {
 								Encoder
 										.encode(
 												new Protocolv20Encoder(),
-												new CloseSession(
-														IpmiVersion.V20,
-														cipherSuite,
-														AuthenticationType.RMCPPlus,
-														event.getSessionId()),
+												closeSession(event.getSessionId()),
 												event.getMessageSequenceNumber(),
 												event.getSessionSequenceNumber(),
 												event.getSessionId()));
@@ -152,6 +150,12 @@ public class SessionValid extends State {
 									new IllegalArgumentException("Invalid transition")));
 		}
 
+	}
+
+	private CloseSession closeSession(int closedSessionId) {
+		CloseSession closeSession = new CloseSession(closedSessionId);
+		closeSession.setSessionParameters(IpmiVersion.V20, cipherSuite, AuthenticationType.RMCPPlus);
+		return closeSession;
 	}
 
 	@Override

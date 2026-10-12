@@ -27,43 +27,22 @@ import java.security.NoSuchAlgorithmException;
 
 import org.metricshub.ipmi.core.coding.commands.CommandCodes;
 import org.metricshub.ipmi.core.coding.commands.IpmiCommandCoder;
-import org.metricshub.ipmi.core.coding.commands.IpmiVersion;
-import org.metricshub.ipmi.core.coding.commands.ResponseData;
 import org.metricshub.ipmi.core.coding.payload.lan.IPMIException;
 import org.metricshub.ipmi.core.coding.payload.lan.IpmiLanMessage;
 import org.metricshub.ipmi.core.coding.payload.lan.IpmiLanRequest;
 import org.metricshub.ipmi.core.coding.payload.lan.NetworkFunction;
-import org.metricshub.ipmi.core.coding.protocol.AuthenticationType;
 import org.metricshub.ipmi.core.coding.protocol.IpmiMessage;
-import org.metricshub.ipmi.core.coding.security.CipherSuite;
 import org.metricshub.ipmi.core.common.TypeConverter;
 
 /**
  * Wrapper class for Get Chassis Status request.
  */
-public class GetChassisStatus extends IpmiCommandCoder {
+public class GetChassisStatus extends IpmiCommandCoder<GetChassisStatusResponseData> {
 
 	/**
 	 * Initiates GetChassisStatus for encoding and decoding.
-	 *
-	 * @param version
-	 *        - IPMI version of the command.
-	 * @param cipherSuite
-	 *        - {@link CipherSuite} containing authentication,
-	 *        confidentiality and integrity algorithms for this session.
-	 * @param authenticationType
-	 *        - Type of authentication used. Must be RMCPPlus for IPMI v2.0.
 	 */
-	public GetChassisStatus(IpmiVersion version, CipherSuite cipherSuite,
-			AuthenticationType authenticationType) {
-		super(version, cipherSuite, authenticationType);
-
-		if (version == IpmiVersion.V20
-				&& authenticationType != AuthenticationType.RMCPPlus) {
-			throw new IllegalArgumentException(
-					"Authentication Type must be RMCPPlus for IPMI v2.0 messages");
-		}
-	}
+	public GetChassisStatus() {}
 
 	@Override
 	protected IpmiLanMessage preparePayload(int sequenceNumber) {
@@ -85,7 +64,7 @@ public class GetChassisStatus extends IpmiCommandCoder {
 	}
 
 	@Override
-	public ResponseData getResponseData(IpmiMessage message)
+	public GetChassisStatusResponseData getResponseData(IpmiMessage message)
 			throws IPMIException,
 			NoSuchAlgorithmException,
 			InvalidKeyException {

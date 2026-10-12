@@ -284,7 +284,7 @@ class ConnectionTest {
 			MessageHandler sol = handler(connection, PayloadType.Sol);
 			for (int i = 0; i < 32; i++) {
 				int solTag = sol
-						.takeTag(new SolCoder((byte) (i % 15 + 1), (byte) 1, SolAckState.ACK, CipherSuite.getEmpty()), true);
+						.takeTag(new SolCoder((byte) (i % 15 + 1), (byte) 1, SolAckState.ACK), true);
 				assertTrue(solTag > 0, "ACK " + i + " got no tag");
 				assertNull(sol.getMessageQueue().getElement(solTag), "ACK " + i + " was queued");
 			}
@@ -298,7 +298,7 @@ class ConnectionTest {
 		Connection connection = connect(60000);
 		try {
 			MessageHandler sol = handler(connection, PayloadType.Sol);
-			int tag = sol.takeTag(new SolCoder(new byte[] { 'a' }, CipherSuite.getEmpty()), false);
+			int tag = sol.takeTag(new SolCoder(new byte[] { 'a' }), false);
 			connection.notify(new MessageAction(solPacket(7, tag)));
 			assertNull(sol.getMessageQueue().getElement(tag), "packet 7 of the BMC acknowledges the packet");
 
@@ -306,7 +306,7 @@ class ConnectionTest {
 			assertEquals(
 					tag,
 					sol.getMessageQueue().add(new SolCoder(new byte[]
-					{ 'b' }, CipherSuite.getEmpty()), false, tag));
+					{ 'b' }), false, tag));
 			connection.notify(new MessageAction(solPacket(7, tag)));
 			assertNotNull(sol.getMessageQueue().getElement(tag), "the old ACK must not complete the newer packet");
 		} finally {
@@ -370,7 +370,7 @@ class ConnectionTest {
 		Connection connection = connect(60000);
 		try {
 			MessageHandler sol = handler(connection, PayloadType.Sol);
-			int tag = sol.takeTag(new SolCoder(new byte[] { 'a' }, CipherSuite.getEmpty()), false);
+			int tag = sol.takeTag(new SolCoder(new byte[] { 'a' }), false);
 			connection.notify(new MessageAction(solPacket(7, tag)));
 			connection.notify(new MessageAction(solPacket(8, 0)));
 			connection.notify(new MessageAction(solPacket(9, 0)));
@@ -378,7 +378,7 @@ class ConnectionTest {
 			assertEquals(
 					tag,
 					sol.getMessageQueue().add(new SolCoder(new byte[]
-					{ 'b' }, CipherSuite.getEmpty()), false, tag));
+					{ 'b' }), false, tag));
 			connection.notify(new MessageAction(solPacket(7, tag)));
 			assertNotNull(sol.getMessageQueue().getElement(tag), "the old ACK must not complete the newer packet");
 		} finally {
@@ -391,7 +391,7 @@ class ConnectionTest {
 		Connection connection = connect(60000);
 		try {
 			MessageHandler sol = handler(connection, PayloadType.Sol);
-			SolCoder packet = new SolCoder(new byte[] { 'a' }, CipherSuite.getEmpty());
+			SolCoder packet = new SolCoder(new byte[] { 'a' });
 			int first = sol.takeTag(packet, false);
 			connection.notify(new MessageAction(solPacket(7, first)));
 			// Not a retry: the BMC would take it for one and drop it
@@ -406,13 +406,13 @@ class ConnectionTest {
 		Connection connection = connect(60000);
 		try {
 			MessageHandler sol = handler(connection, PayloadType.Sol);
-			int first = sol.takeTag(new SolCoder(new byte[] { 'a' }, CipherSuite.getEmpty()), false);
+			int first = sol.takeTag(new SolCoder(new byte[] { 'a' }), false);
 			connection.notify(new MessageAction(solPacket(7, first)));
 			// 14 packets of output, which acknowledge nothing: the numbers of the BMC wrap around to 7
 			for (int i = 8; i <= 21; i++) {
 				connection.notify(new MessageAction(solPacket((i - 1) % 15 + 1, 0)));
 			}
-			int second = sol.takeTag(new SolCoder(new byte[] { 'b' }, CipherSuite.getEmpty()), false);
+			int second = sol.takeTag(new SolCoder(new byte[] { 'b' }), false);
 			connection.notify(new MessageAction(solPacket(7, second)));
 			assertNull(sol.getMessageQueue().getElement(second), "the new packet 7 acknowledges the second packet");
 		} finally {

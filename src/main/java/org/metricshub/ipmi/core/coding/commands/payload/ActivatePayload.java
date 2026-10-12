@@ -24,16 +24,13 @@ package org.metricshub.ipmi.core.coding.commands.payload;
 
 import org.metricshub.ipmi.core.coding.commands.CommandCodes;
 import org.metricshub.ipmi.core.coding.commands.IpmiCommandCoder;
-import org.metricshub.ipmi.core.coding.commands.IpmiVersion;
 import org.metricshub.ipmi.core.coding.commands.ResponseData;
 import org.metricshub.ipmi.core.coding.payload.IpmiPayload;
 import org.metricshub.ipmi.core.coding.payload.lan.IPMIException;
 import org.metricshub.ipmi.core.coding.payload.lan.IpmiLanRequest;
 import org.metricshub.ipmi.core.coding.payload.lan.NetworkFunction;
-import org.metricshub.ipmi.core.coding.protocol.AuthenticationType;
 import org.metricshub.ipmi.core.coding.protocol.IpmiMessage;
 import org.metricshub.ipmi.core.coding.protocol.PayloadType;
-import org.metricshub.ipmi.core.coding.security.CipherSuite;
 import org.metricshub.ipmi.core.common.MessageComposer;
 import org.metricshub.ipmi.core.common.MessageReader;
 import org.metricshub.ipmi.core.common.TypeConverter;
@@ -45,7 +42,7 @@ import java.security.NoSuchAlgorithmException;
  * An abstract wrapper class for Activate Payload Command. Every {@link PayloadType} should have it's own concrete
  * implementation.
  */
-public abstract class ActivatePayload extends IpmiCommandCoder {
+public abstract class ActivatePayload<R extends ActivatePayloadResponseData> extends IpmiCommandCoder<R> {
 
 	/**
 	 * Length (in bytes) of request data payload.
@@ -87,10 +84,7 @@ public abstract class ActivatePayload extends IpmiCommandCoder {
 	 */
 	public abstract PayloadType getPayloadType();
 
-	protected ActivatePayload(IpmiVersion ipmiVersion, CipherSuite cipherSuite, AuthenticationType authenticationType,
-			int payloadInstance) {
-		super(ipmiVersion, cipherSuite, authenticationType);
-
+	protected ActivatePayload(int payloadInstance) {
 		this.payloadInstance = payloadInstance;
 	}
 
@@ -124,13 +118,13 @@ public abstract class ActivatePayload extends IpmiCommandCoder {
 	protected abstract byte[] prepareAuxilaryRequestData();
 
 	@Override
-	public ResponseData getResponseData(IpmiMessage message)
+	public R getResponseData(IpmiMessage message)
 			throws IPMIException,
 			NoSuchAlgorithmException,
 			InvalidKeyException {
 		MessageReader messageReader = new MessageReader(validateResponse(message));
 
-		ActivatePayloadResponseData responseData = createEmptyResponse();
+		R responseData = createEmptyResponse();
 
 		responseData.setAuxilaryInformationData(messageReader.readNextField(AUXILARY_DATA_LENGTH));
 		responseData.setInboundPayloadSize(messageReader.readNextField(INBOUND_PAYLOAD_SIZE_LENGTH));
@@ -146,7 +140,7 @@ public abstract class ActivatePayload extends IpmiCommandCoder {
 	 *
 	 * @return created {@link ActivatePayloadResponseData} instance.
 	 */
-	protected abstract ActivatePayloadResponseData createEmptyResponse();
+	protected abstract R createEmptyResponse();
 
 	@Override
 	public boolean equals(Object o) {
@@ -157,24 +151,19 @@ public abstract class ActivatePayload extends IpmiCommandCoder {
 			return false;
 		}
 
-		ActivatePayload that = (ActivatePayload) o;
+		ActivatePayload<?> that = (ActivatePayload<?>) o;
 
 		if (payloadInstance != that.payloadInstance) {
 			return false;
 		}
 
-		if (getPayloadType() != that.getPayloadType()) {
-			return false;
-		}
-
-		return getCipherSuite().equals(that.getCipherSuite());
+		return getPayloadType() == that.getPayloadType();
 	}
 
 	@Override
 	public int hashCode() {
 		int result = payloadInstance;
 		result = 31 * result + getPayloadType().getCode();
-		result = 31 * result + (getCipherSuite() != null ? getCipherSuite().hashCode() : 0);
 		return result;
 	}
 }

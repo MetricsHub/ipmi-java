@@ -23,10 +23,8 @@ package org.metricshub.ipmi.client.runner;
  */
 
 import org.metricshub.ipmi.client.IpmiClientConfiguration;
-import org.metricshub.ipmi.core.coding.commands.IpmiVersion;
 import org.metricshub.ipmi.core.coding.commands.chassis.GetChassisStatus;
 import org.metricshub.ipmi.core.coding.commands.chassis.GetChassisStatusResponseData;
-import org.metricshub.ipmi.core.coding.protocol.AuthenticationType;
 
 /**
  * Get the Chassis Status runner
@@ -45,7 +43,7 @@ public class GetChassisStatusRunner extends AbstractIpmiRunner<GetChassisStatusR
 		return (GetChassisStatusResponseData) getConnector()
 				.sendMessage(
 						getHandle(),
-						new GetChassisStatus(IpmiVersion.V20, getHandle().getCipherSuite(), AuthenticationType.RMCPPlus));
+						new GetChassisStatus());
 
 	}
 

@@ -54,13 +54,9 @@ class Protocolv20DecoderTest {
 	 * out like an IPMI LAN response, so that the decoder can parse it back.
 	 */
 	private static byte[] signedDatagram(CipherSuite suite) throws Exception {
-		return Encoder
-				.encode(
-						new Protocolv20Encoder(),
-						new GetSensorReading(IpmiVersion.V20, suite, AuthenticationType.RMCPPlus, 0x42),
-						5,
-						7,
-						SESSION_ID);
+		GetSensorReading request = new GetSensorReading(0x42);
+		request.setSessionParameters(IpmiVersion.V20, suite, AuthenticationType.RMCPPlus);
+		return Encoder.encode(new Protocolv20Encoder(), request, 5, 7, SESSION_ID);
 	}
 
 	private static Ipmiv20Message decode(CipherSuite suite, byte[] datagram) throws Exception {

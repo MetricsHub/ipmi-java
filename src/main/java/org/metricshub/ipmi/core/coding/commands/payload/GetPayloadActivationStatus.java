@@ -24,16 +24,12 @@ package org.metricshub.ipmi.core.coding.commands.payload;
 
 import org.metricshub.ipmi.core.coding.commands.CommandCodes;
 import org.metricshub.ipmi.core.coding.commands.IpmiCommandCoder;
-import org.metricshub.ipmi.core.coding.commands.IpmiVersion;
-import org.metricshub.ipmi.core.coding.commands.ResponseData;
 import org.metricshub.ipmi.core.coding.payload.IpmiPayload;
 import org.metricshub.ipmi.core.coding.payload.lan.IPMIException;
 import org.metricshub.ipmi.core.coding.payload.lan.IpmiLanRequest;
 import org.metricshub.ipmi.core.coding.payload.lan.NetworkFunction;
-import org.metricshub.ipmi.core.coding.protocol.AuthenticationType;
 import org.metricshub.ipmi.core.coding.protocol.IpmiMessage;
 import org.metricshub.ipmi.core.coding.protocol.PayloadType;
-import org.metricshub.ipmi.core.coding.security.CipherSuite;
 import org.metricshub.ipmi.core.common.MessageComposer;
 import org.metricshub.ipmi.core.common.MessageReader;
 import org.metricshub.ipmi.core.common.TypeConverter;
@@ -44,7 +40,7 @@ import java.security.NoSuchAlgorithmException;
 /**
  * Wrapper for Get Payload Activation Status Command.
  */
-public class GetPayloadActivationStatus extends IpmiCommandCoder {
+public class GetPayloadActivationStatus extends IpmiCommandCoder<GetPayloadActivationStatusResponseData> {
 
 	private static final int REQUEST_DATA_LENGTH = 1;
 	private static final int INSTANCE_CAPACITY_FIELD_LENGTH = 1;
@@ -52,20 +48,11 @@ public class GetPayloadActivationStatus extends IpmiCommandCoder {
 
 	private final PayloadType payloadType;
 
-	public GetPayloadActivationStatus(CipherSuite cipherSuite, PayloadType payloadType) {
-		super(IpmiVersion.V20, cipherSuite, AuthenticationType.RMCPPlus);
-		this.payloadType = payloadType;
-	}
-
 	/**
-	 * Creates the command for a session of cipher suite 0.
+	 * Creates the command.
 	 *
 	 * @param payloadType the payload type
-	 * @deprecated the request goes out without integrity and confidentiality, which a session of another cipher suite
-	 *             discards: use {@link #GetPayloadActivationStatus(CipherSuite, PayloadType)} with the cipher suite of
-	 *             the session
 	 */
-	@Deprecated
 	public GetPayloadActivationStatus(PayloadType payloadType) {
 		this.payloadType = payloadType;
 	}
@@ -91,7 +78,7 @@ public class GetPayloadActivationStatus extends IpmiCommandCoder {
 	}
 
 	@Override
-	public ResponseData getResponseData(IpmiMessage message)
+	public GetPayloadActivationStatusResponseData getResponseData(IpmiMessage message)
 			throws IPMIException,
 			NoSuchAlgorithmException,
 			InvalidKeyException {
@@ -120,17 +107,12 @@ public class GetPayloadActivationStatus extends IpmiCommandCoder {
 
 		GetPayloadActivationStatus that = (GetPayloadActivationStatus) o;
 
-		if (payloadType != that.payloadType) {
-			return false;
-		}
-
-		return getCipherSuite().equals(that.getCipherSuite());
+		return payloadType == that.payloadType;
 	}
 
 	@Override
 	public int hashCode() {
 		int result = payloadType.getCode();
-		result = 31 * result + (getCipherSuite() != null ? getCipherSuite().hashCode() : 0);
 		return result;
 	}
 }

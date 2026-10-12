@@ -24,8 +24,6 @@ package org.metricshub.ipmi.core.coding.commands.fru;
 
 import org.metricshub.ipmi.core.coding.commands.CommandCodes;
 import org.metricshub.ipmi.core.coding.commands.IpmiCommandCoder;
-import org.metricshub.ipmi.core.coding.commands.IpmiVersion;
-import org.metricshub.ipmi.core.coding.commands.ResponseData;
 import org.metricshub.ipmi.core.coding.commands.fru.record.BoardInfo;
 import org.metricshub.ipmi.core.coding.commands.fru.record.ChassisInfo;
 import org.metricshub.ipmi.core.coding.commands.fru.record.FruRecord;
@@ -37,9 +35,7 @@ import org.metricshub.ipmi.core.coding.payload.IpmiPayload;
 import org.metricshub.ipmi.core.coding.payload.lan.IPMIException;
 import org.metricshub.ipmi.core.coding.payload.lan.IpmiLanRequest;
 import org.metricshub.ipmi.core.coding.payload.lan.NetworkFunction;
-import org.metricshub.ipmi.core.coding.protocol.AuthenticationType;
 import org.metricshub.ipmi.core.coding.protocol.IpmiMessage;
-import org.metricshub.ipmi.core.coding.security.CipherSuite;
 import org.metricshub.ipmi.core.coding.payload.CompletionCode;
 import org.metricshub.ipmi.core.common.TypeConverter;
 
@@ -57,7 +53,7 @@ import java.util.List;
  * A wrapper class for Read FRU Data Command request. <br>
  * The command returns the specified data from the FRU Inventory Info area.
  */
-public class ReadFruData extends IpmiCommandCoder {
+public class ReadFruData extends IpmiCommandCoder<ReadFruDataResponseData> {
 
 	private static final Logger LOGGER = LoggerFactory.getLogger(ReadFruData.class);
 
@@ -79,8 +75,6 @@ public class ReadFruData extends IpmiCommandCoder {
 	 * Initiates ReadFruData for both encoding and decoding. Sets session
 	 * parameters to default.
 	 *
-	 * @see IpmiCommandCoder#setSessionParameters(IpmiVersion, CipherSuite,
-	 *      AuthenticationType)
 	 * @param fruId
 	 *        - ID of the FRU to get info from. Must be less than 256. To
 	 *        get FRU ID use {@link GetSdr} to retrieve
@@ -95,48 +89,6 @@ public class ReadFruData extends IpmiCommandCoder {
 	 */
 	public ReadFruData(int fruId, BaseUnit unit, int offset, int countToRead) {
 		super();
-
-		if (countToRead > 255) {
-			throw new IllegalArgumentException(
-					"Count to read cannot exceed 255");
-		}
-
-		if (fruId > 255) {
-			throw new IllegalArgumentException("FRU ID cannot exceed 255");
-		}
-
-		// Table 34-3: the offset goes on the wire in the unit of the device, the count in bytes (as ipmitool sends it)
-		this.offset = offset / unit.getSize();
-		size = countToRead;
-		this.fruId = fruId;
-	}
-
-	/**
-	 * Initiates ReadFruData for both encoding and decoding.
-	 *
-	 * @param version
-	 *        - IPMI version of the command.
-	 * @param cipherSuite
-	 *        - {@link CipherSuite} containing authentication,
-	 *        confidentiality and integrity algorithms for this session.
-	 * @param authenticationType
-	 *        - Type of authentication used. Must be RMCPPlus for IPMI v2.0.
-	 * @param fruId
-	 *        - ID of the FRU to get info from. Must be less than 256. To
-	 *        get FRU ID use {@link GetSdr} to retrieve
-	 *        {@link FruDeviceLocatorRecord}.
-	 * @param unit
-	 *        - {@link BaseUnit} indicating if the FRU device is accessed in
-	 *        {@link BaseUnit#Bytes} or {@link BaseUnit#Words}
-	 * @param offset
-	 *        - offset to read, in bytes (sent in words when the device is word-addressed, so it must be even then)
-	 * @param countToRead
-	 *        - number of bytes to read. Cannot exceed 255;
-	 */
-	public ReadFruData(IpmiVersion version, CipherSuite cipherSuite,
-			AuthenticationType authenticationType, int fruId, BaseUnit unit,
-			int offset, int countToRead) {
-		super(version, cipherSuite, authenticationType);
 
 		if (countToRead > 255) {
 			throw new IllegalArgumentException(
@@ -188,7 +140,7 @@ public class ReadFruData extends IpmiCommandCoder {
 	}
 
 	@Override
-	public ResponseData getResponseData(IpmiMessage message)
+	public ReadFruDataResponseData getResponseData(IpmiMessage message)
 			throws IPMIException,
 			NoSuchAlgorithmException,
 			InvalidKeyException {

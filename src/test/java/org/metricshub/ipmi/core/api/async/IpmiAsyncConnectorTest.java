@@ -16,12 +16,10 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.metricshub.ipmi.core.api.async.messages.IpmiResponse;
 import org.metricshub.ipmi.core.api.async.messages.IpmiResponseData;
-import org.metricshub.ipmi.core.coding.commands.IpmiVersion;
 import org.metricshub.ipmi.core.coding.commands.PrivilegeLevel;
 import org.metricshub.ipmi.core.coding.commands.chassis.GetChassisStatus;
 import org.metricshub.ipmi.core.coding.payload.IpmiPayload;
 import org.metricshub.ipmi.core.coding.payload.PlainMessage;
-import org.metricshub.ipmi.core.coding.protocol.AuthenticationType;
 import org.metricshub.ipmi.core.coding.security.CipherSuite;
 import org.metricshub.ipmi.core.transport.FakeRmcpPlusBmc;
 
@@ -66,7 +64,7 @@ class IpmiAsyncConnectorTest {
 					}
 				});
 				int tag = connector
-						.sendMessage(handle, new GetChassisStatus(IpmiVersion.V20, suite, AuthenticationType.RMCPPlus), false);
+						.sendMessage(handle, new GetChassisStatus(), false);
 				assertTrue(replied.await(5, TimeUnit.SECONDS));
 				Thread.sleep(200);
 				// The request answered must not be reported again as failed by the closing connection

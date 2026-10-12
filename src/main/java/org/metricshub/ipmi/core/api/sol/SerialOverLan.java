@@ -26,7 +26,6 @@ import org.metricshub.ipmi.core.api.async.ConnectionHandle;
 import org.metricshub.ipmi.core.api.async.InboundSolMessageListener;
 import org.metricshub.ipmi.core.api.sync.IpmiConnector;
 import org.metricshub.ipmi.core.coding.PayloadCoder;
-import org.metricshub.ipmi.core.coding.commands.IpmiVersion;
 import org.metricshub.ipmi.core.coding.commands.PrivilegeLevel;
 import org.metricshub.ipmi.core.coding.commands.payload.ActivateSolPayload;
 import org.metricshub.ipmi.core.coding.commands.payload.ActivateSolPayloadResponseData;
@@ -42,7 +41,6 @@ import org.metricshub.ipmi.core.coding.payload.sol.SolAckState;
 import org.metricshub.ipmi.core.coding.payload.sol.SolMessage;
 import org.metricshub.ipmi.core.coding.payload.sol.SolOperation;
 import org.metricshub.ipmi.core.coding.payload.sol.SolStatus;
-import org.metricshub.ipmi.core.coding.protocol.AuthenticationType;
 import org.metricshub.ipmi.core.coding.protocol.PayloadType;
 import org.metricshub.ipmi.core.coding.security.CipherSuite;
 import org.metricshub.ipmi.core.coding.sol.SolCoder;
@@ -361,7 +359,7 @@ public class SerialOverLan implements Closeable {
 			this.payloadInstance = getFirstAvailablePayloadInstance(ipmiConnector, connectionHandle);
 			this.activationSession = payloadSession;
 
-			ActivateSolPayload activatePayload = new ActivateSolPayload(connectionHandle.getCipherSuite(), payloadInstance);
+			ActivateSolPayload activatePayload = new ActivateSolPayload(payloadInstance);
 			ActivateSolPayloadResponseData activatePayloadResponseData = getActivatePayloadResponse(
 					ipmiConnector,
 					payloadSession,
@@ -430,7 +428,7 @@ public class SerialOverLan implements Closeable {
 			GetPayloadInstanceInfoResponseData info = (GetPayloadInstanceInfoResponseData) ipmiConnector
 					.sendMessage(
 							connectionHandle,
-							new GetPayloadInstanceInfo(connectionHandle.getCipherSuite(), PayloadType.Sol, payloadInstance));
+							new GetPayloadInstanceInfo(PayloadType.Sol, payloadInstance));
 			return info.getSessionId() != 0 && info.getSessionId() == payloadSession.getManagedSystemSessionId();
 		} catch (IPMIException e) {
 			// The command is optional
@@ -452,9 +450,7 @@ public class SerialOverLan implements Closeable {
 	 */
 	private int getFirstAvailablePayloadInstance(IpmiConnector ipmiConnector, ConnectionHandle connectionHandle)
 			throws Exception {
-		GetPayloadActivationStatus getPayloadActivationStatus = new GetPayloadActivationStatus(
-				connectionHandle.getCipherSuite(),
-				PayloadType.Sol);
+		GetPayloadActivationStatus getPayloadActivationStatus = new GetPayloadActivationStatus(PayloadType.Sol);
 		GetPayloadActivationStatusResponseData getActivationResponseData = (GetPayloadActivationStatusResponseData) ipmiConnector
 				.sendMessage(
 						connectionHandle,
@@ -485,9 +481,6 @@ public class SerialOverLan implements Closeable {
 			privilegeLevel = PrivilegeLevel.Administrator;
 		}
 		SetSessionPrivilegeLevel setSessionPrivilegeLevel = new SetSessionPrivilegeLevel(
-				IpmiVersion.V20,
-				connectionHandle.getCipherSuite(),
-				AuthenticationType.RMCPPlus,
 				privilegeLevel);
 		ipmiConnector.sendMessage(connectionHandle, setSessionPrivilegeLevel);
 	}
@@ -839,8 +832,7 @@ public class SerialOverLan implements Closeable {
 				(byte) 0,
 				(byte) 0,
 				SolAckState.ACK,
-				lineOperations,
-				session.getConnectionHandle().getCipherSuite());
+				lineOperations);
 	}
 
 	/**
@@ -853,7 +845,7 @@ public class SerialOverLan implements Closeable {
 			connector
 					.sendOneWayMessage(
 							session.getConnectionHandle(),
-							new SolCoder(operations, session.getConnectionHandle().getCipherSuite()));
+							new SolCoder(operations));
 			return true;
 		} catch (Exception e) {
 			if (e instanceof InterruptedException) {
@@ -954,7 +946,7 @@ public class SerialOverLan implements Closeable {
 		connector
 				.sendMessage(
 						connectionHandle,
-						new DeactivatePayload(connectionHandle.getCipherSuite(), PayloadType.Sol, instance));
+						new DeactivatePayload(PayloadType.Sol, instance));
 	}
 
 	/**

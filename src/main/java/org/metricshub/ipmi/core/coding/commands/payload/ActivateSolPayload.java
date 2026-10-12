@@ -22,27 +22,22 @@ package org.metricshub.ipmi.core.coding.commands.payload;
  * ╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱
  */
 
-import org.metricshub.ipmi.core.coding.commands.IpmiVersion;
-import org.metricshub.ipmi.core.coding.protocol.AuthenticationType;
 import org.metricshub.ipmi.core.coding.protocol.PayloadType;
-import org.metricshub.ipmi.core.coding.security.CipherSuite;
 import org.metricshub.ipmi.core.coding.security.SecurityConstants;
 import org.metricshub.ipmi.core.common.TypeConverter;
 
 /**
  * Concrete implementation of {@link ActivatePayload} command for {@link PayloadType#SOL}.
  */
-public class ActivateSolPayload extends ActivatePayload {
+public class ActivateSolPayload extends ActivatePayload<ActivateSolPayloadResponseData> {
 
 	/**
 	 * Instantiate a new {@link ActivateSolPayload}
 	 *
-	 * @param cipherSuite Provides cipher suite (authentication, confidentiality
-	 *        and integrity algorithms used during the session).
 	 * @param payloadInstance Paylaod instance as int
 	 */
-	public ActivateSolPayload(CipherSuite cipherSuite, int payloadInstance) {
-		super(IpmiVersion.V20, cipherSuite, AuthenticationType.RMCPPlus, payloadInstance);
+	public ActivateSolPayload(int payloadInstance) {
+		super(payloadInstance);
 	}
 
 	@Override
@@ -80,7 +75,7 @@ public class ActivateSolPayload extends ActivatePayload {
 	}
 
 	@Override
-	protected ActivatePayloadResponseData createEmptyResponse() {
+	protected ActivateSolPayloadResponseData createEmptyResponse() {
 		return new ActivateSolPayloadResponseData();
 	}
 }

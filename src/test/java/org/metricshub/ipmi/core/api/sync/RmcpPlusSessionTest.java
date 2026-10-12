@@ -17,11 +17,9 @@ import org.junit.jupiter.api.Timeout;
 import org.metricshub.ipmi.client.IpmiClient;
 import org.metricshub.ipmi.client.IpmiClientConfiguration;
 import org.metricshub.ipmi.core.api.async.ConnectionHandle;
-import org.metricshub.ipmi.core.coding.commands.IpmiVersion;
 import org.metricshub.ipmi.core.coding.commands.PrivilegeLevel;
 import org.metricshub.ipmi.core.coding.commands.chassis.GetChassisStatus;
 import org.metricshub.ipmi.core.coding.commands.chassis.GetChassisStatusResponseData;
-import org.metricshub.ipmi.core.coding.protocol.AuthenticationType;
 import org.metricshub.ipmi.core.coding.security.CipherSuite;
 import org.metricshub.ipmi.core.transport.FakeRmcpPlusBmc;
 import org.metricshub.ipmi.core.transport.FakeRmcpPlusBmc.Fault;
@@ -353,7 +351,7 @@ class RmcpPlusSessionTest {
 		return (GetChassisStatusResponseData) connector
 				.sendMessage(
 						handle,
-						new GetChassisStatus(IpmiVersion.V20, handle.getCipherSuite(), AuthenticationType.RMCPPlus));
+						new GetChassisStatus());
 	}
 
 	private static void assertChassisStatus(GetChassisStatusResponseData status) {

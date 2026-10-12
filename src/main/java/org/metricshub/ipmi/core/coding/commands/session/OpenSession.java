@@ -101,7 +101,7 @@ public class OpenSession extends IpmiCommandCoder {
 	 * @see IpmiVersion
 	 */
 	public OpenSession(CipherSuite cipherSuite) {
-		super(IpmiVersion.V20, cipherSuite, AuthenticationType.RMCPPlus);
+		setSessionParameters(IpmiVersion.V20, cipherSuite, AuthenticationType.RMCPPlus);
 		setCipherSuite(cipherSuite);
 	}
 
@@ -129,7 +129,7 @@ public class OpenSession extends IpmiCommandCoder {
 	 */
 	public OpenSession(int sessionID, PrivilegeLevel privilegeLevel,
 			CipherSuite cipherSuite) {
-		super(IpmiVersion.V20, cipherSuite, AuthenticationType.RMCPPlus);
+		setSessionParameters(IpmiVersion.V20, cipherSuite, AuthenticationType.RMCPPlus);
 
 		setSessionID(sessionID);
 		setRequestedPrivilegeLevel(privilegeLevel);

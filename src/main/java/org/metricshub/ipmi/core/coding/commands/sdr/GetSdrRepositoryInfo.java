@@ -24,15 +24,11 @@ package org.metricshub.ipmi.core.coding.commands.sdr;
 
 import org.metricshub.ipmi.core.coding.commands.CommandCodes;
 import org.metricshub.ipmi.core.coding.commands.IpmiCommandCoder;
-import org.metricshub.ipmi.core.coding.commands.IpmiVersion;
-import org.metricshub.ipmi.core.coding.commands.ResponseData;
 import org.metricshub.ipmi.core.coding.payload.IpmiPayload;
 import org.metricshub.ipmi.core.coding.payload.lan.IPMIException;
 import org.metricshub.ipmi.core.coding.payload.lan.IpmiLanRequest;
 import org.metricshub.ipmi.core.coding.payload.lan.NetworkFunction;
-import org.metricshub.ipmi.core.coding.protocol.AuthenticationType;
 import org.metricshub.ipmi.core.coding.protocol.IpmiMessage;
-import org.metricshub.ipmi.core.coding.security.CipherSuite;
 import org.metricshub.ipmi.core.common.TypeConverter;
 
 import java.security.InvalidKeyException;
@@ -43,23 +39,12 @@ import java.security.NoSuchAlgorithmException;
  * This command returns the SDR command version for the SDR Repository. It also
  * returns a timestamp for when the last ADD, DELETE, or CLEAR occurred.
  */
-public class GetSdrRepositoryInfo extends IpmiCommandCoder {
+public class GetSdrRepositoryInfo extends IpmiCommandCoder<GetSdrRepositoryInfoResponseData> {
 
 	/**
 	 * Initiates GetSdrRepositoryInfo for both encoding and decoding.
-	 *
-	 * @param version
-	 *        - IPMI version of the command.
-	 * @param cipherSuite
-	 *        - {@link CipherSuite} containing authentication,
-	 *        confidentiality and integrity algorithms for this session.
-	 * @param authenticationType
-	 *        - Type of authentication used. Must be RMCPPlus for IPMI v2.0.
 	 */
-	public GetSdrRepositoryInfo(IpmiVersion version, CipherSuite cipherSuite,
-			AuthenticationType authenticationType) {
-		super(version, cipherSuite, authenticationType);
-	}
+	public GetSdrRepositoryInfo() {}
 
 	@Override
 	public byte getCommandCode() {
@@ -83,7 +68,7 @@ public class GetSdrRepositoryInfo extends IpmiCommandCoder {
 	}
 
 	@Override
-	public ResponseData getResponseData(IpmiMessage message)
+	public GetSdrRepositoryInfoResponseData getResponseData(IpmiMessage message)
 			throws IPMIException,
 			NoSuchAlgorithmException,
 			InvalidKeyException {

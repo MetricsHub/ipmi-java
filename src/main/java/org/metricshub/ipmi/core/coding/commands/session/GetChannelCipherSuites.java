@@ -24,17 +24,14 @@ package org.metricshub.ipmi.core.coding.commands.session;
 
 import org.metricshub.ipmi.core.coding.commands.CommandCodes;
 import org.metricshub.ipmi.core.coding.commands.IpmiCommandCoder;
-import org.metricshub.ipmi.core.coding.commands.IpmiVersion;
 import org.metricshub.ipmi.core.coding.commands.ResponseData;
 import org.metricshub.ipmi.core.coding.payload.lan.IPMIException;
 import org.metricshub.ipmi.core.coding.payload.lan.IpmiLanMessage;
 import org.metricshub.ipmi.core.coding.payload.lan.IpmiLanRequest;
 import org.metricshub.ipmi.core.coding.payload.lan.NetworkFunction;
-import org.metricshub.ipmi.core.coding.protocol.AuthenticationType;
 import org.metricshub.ipmi.core.coding.protocol.IpmiMessage;
 import org.metricshub.ipmi.core.coding.protocol.Ipmiv20Message;
 import org.metricshub.ipmi.core.coding.protocol.PayloadType;
-import org.metricshub.ipmi.core.coding.security.CipherSuite;
 import org.metricshub.ipmi.core.coding.security.ConfidentialityNone;
 import org.metricshub.ipmi.core.common.TypeConverter;
 
@@ -88,16 +85,7 @@ public class GetChannelCipherSuites extends IpmiCommandCoder {
 	/**
 	 * Initiates class for decoding.
 	 */
-	public GetChannelCipherSuites() {
-		super(
-				IpmiVersion.V20,
-				new CipherSuite(
-						(byte) 0,
-						(byte) 0,
-						(byte) 0,
-						(byte) 0),
-				AuthenticationType.RMCPPlus);
-	}
+	public GetChannelCipherSuites() {}
 
 	/**
 	 * Initiates class for both encoding and decoding.
@@ -111,14 +99,6 @@ public class GetChannelCipherSuites extends IpmiCommandCoder {
 	 *        selects the next set of 16, and so on
 	 */
 	public GetChannelCipherSuites(byte channelNumber, byte index) {
-		super(
-				IpmiVersion.V20,
-				new CipherSuite(
-						(byte) 0,
-						(byte) 0,
-						(byte) 0,
-						(byte) 0),
-				AuthenticationType.RMCPPlus);
 		setChannelNumber(channelNumber);
 		setIndex(index);
 	}

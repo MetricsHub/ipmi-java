@@ -26,40 +26,27 @@ import java.security.InvalidKeyException;
 import java.security.NoSuchAlgorithmException;
 
 import org.metricshub.ipmi.core.coding.commands.IpmiCommandCoder;
-import org.metricshub.ipmi.core.coding.commands.IpmiVersion;
-import org.metricshub.ipmi.core.coding.commands.ResponseData;
 import org.metricshub.ipmi.core.coding.payload.IpmiPayload;
 import org.metricshub.ipmi.core.coding.payload.lan.IPMIException;
 import org.metricshub.ipmi.core.coding.payload.lan.IpmiLanRequest;
 import org.metricshub.ipmi.core.coding.payload.lan.NetworkFunction;
-import org.metricshub.ipmi.core.coding.protocol.AuthenticationType;
 import org.metricshub.ipmi.core.coding.protocol.IpmiMessage;
-import org.metricshub.ipmi.core.coding.security.CipherSuite;
 import org.metricshub.ipmi.core.common.TypeConverter;
 
 /**
  * Wrapper for Get Sensor Reading request.
  */
-public class GetSensorReading extends IpmiCommandCoder {
+public class GetSensorReading extends IpmiCommandCoder<GetSensorReadingResponseData> {
 
 	private byte sensorId;
 
 	/**
 	 * Initiates class for both encoding and decoding.
 	 *
-	 * @param version
-	 *        - IPMI version of the command.
-	 * @param cipherSuite
-	 *        - {@link CipherSuite} containing authentication,
-	 *        confidentiality and integrity algorithms for this session.
-	 * @param authenticationType
-	 *        - Type of authentication used. Must be RMCPPlus for IPMI v2.0.
 	 * @param sensorId
 	 *        - ID of the sensor which reading is to be retrieved
 	 */
-	public GetSensorReading(IpmiVersion version, CipherSuite cipherSuite,
-			AuthenticationType authenticationType, int sensorId) {
-		super(version, cipherSuite, authenticationType);
+	public GetSensorReading(int sensorId) {
 		this.sensorId = TypeConverter.intToByte(sensorId);
 	}
 
@@ -86,7 +73,7 @@ public class GetSensorReading extends IpmiCommandCoder {
 	}
 
 	@Override
-	public ResponseData getResponseData(IpmiMessage message)
+	public GetSensorReadingResponseData getResponseData(IpmiMessage message)
 			throws IPMIException,
 			NoSuchAlgorithmException,
 			InvalidKeyException {

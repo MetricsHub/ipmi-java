@@ -12,7 +12,7 @@ import org.metricshub.ipmi.client.IpmiClientConfiguration;
 import org.metricshub.ipmi.client.Utils;
 import org.metricshub.ipmi.core.api.async.ConnectionHandle;
 import org.metricshub.ipmi.core.api.sync.IpmiConnector;
-import org.metricshub.ipmi.core.coding.PayloadCoder;
+import org.metricshub.ipmi.core.coding.commands.IpmiCommandCoder;
 import org.metricshub.ipmi.core.coding.commands.ResponseData;
 import org.metricshub.ipmi.core.coding.commands.sdr.GetSensorReadingResponseData;
 import org.metricshub.ipmi.core.coding.commands.sdr.record.CompactSensorRecord;
@@ -124,7 +124,8 @@ class GetSensorsRunnerTest {
 		final AtomicReference<Exception> failure = new AtomicReference<>();
 		final IpmiConnector connector = new IpmiConnector(0, 0) {
 			@Override
-			public ResponseData sendMessage(ConnectionHandle handle, PayloadCoder request) throws Exception {
+			public <R extends ResponseData> R sendMessage(ConnectionHandle handle, IpmiCommandCoder<R> request)
+					throws Exception {
 				throw failure.get();
 			}
 		};

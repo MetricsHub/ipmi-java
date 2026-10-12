@@ -96,7 +96,7 @@ public class Rakp3 extends IpmiCommandCoder {
 	 */
 	public Rakp3(CipherSuite cipherSuite, Rakp1 rakp1,
 			Rakp1ResponseData rakp1ResponseData) {
-		super(IpmiVersion.V20, cipherSuite, AuthenticationType.RMCPPlus);
+		setSessionParameters(IpmiVersion.V20, cipherSuite, AuthenticationType.RMCPPlus);
 		this.rakp1 = rakp1;
 		this.rakp1ResponseData = rakp1ResponseData;
 		setCipherSuite(
@@ -134,7 +134,7 @@ public class Rakp3 extends IpmiCommandCoder {
 	public Rakp3(byte statusCode, int managedSystemSessionId,
 			CipherSuite cipherSuite, Rakp1 rakp1,
 			Rakp1ResponseData rakp1ResponseData) {
-		super(IpmiVersion.V20, cipherSuite, AuthenticationType.RMCPPlus);
+		setSessionParameters(IpmiVersion.V20, cipherSuite, AuthenticationType.RMCPPlus);
 		setStatusCode(statusCode);
 		setManagedSystemSessionId(managedSystemSessionId);
 		this.rakp1 = rakp1;

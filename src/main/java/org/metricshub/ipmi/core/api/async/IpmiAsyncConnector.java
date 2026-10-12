@@ -33,7 +33,6 @@ import org.metricshub.ipmi.core.coding.payload.IpmiPayload;
 import org.metricshub.ipmi.core.coding.payload.lan.IPMIException;
 import org.metricshub.ipmi.core.coding.protocol.PayloadType;
 import org.metricshub.ipmi.core.coding.security.CipherSuite;
-import org.metricshub.ipmi.core.common.PropertiesManager;
 import org.metricshub.ipmi.core.connection.Connection;
 import org.metricshub.ipmi.core.connection.ConnectionException;
 import org.metricshub.ipmi.core.connection.ConnectionListener;
@@ -41,7 +40,6 @@ import org.metricshub.ipmi.core.connection.ConnectionManager;
 import org.metricshub.ipmi.core.connection.Session;
 import org.metricshub.ipmi.core.connection.SessionManager;
 
-import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.nio.charset.StandardCharsets;
@@ -87,7 +85,12 @@ public class IpmiAsyncConnector implements ConnectionListener {
 	public static final String FAILED_TO_RECEIVE_ANSWER_CAUSE_MESSAGE = "Failed to receive answer, cause:";
 	private ConnectionManager connectionManager;
 	private SessionManager sessionManager;
-	private int retries;
+	/**
+	 * Number of times a message without a reply is sent again, until {@link #setRetries(int)} changes it.
+	 */
+	public static final int DEFAULT_RETRIES = 3;
+
+	private volatile int retries = DEFAULT_RETRIES;
 	private final List<IpmiResponseListener> responseListeners = new CopyOnWriteArrayList<IpmiResponseListener>();
 	private final List<InboundMessageListener> inboundMessageListeners = new CopyOnWriteArrayList<InboundMessageListener>();
 
@@ -102,12 +105,11 @@ public class IpmiAsyncConnector implements ConnectionListener {
 	 *        - the port that will be used by {@link IpmiAsyncConnector} to
 	 *        communicate with the remote hosts.
 	 * @throws IOException
-	 *         when properties file was not found
+	 *         when the port cannot be bound
 	 */
 	public IpmiAsyncConnector(int port) throws IOException {
 		connectionManager = new ConnectionManager(port);
 		sessionManager = new SessionManager();
-		loadProperties();
 	}
 
 	/**
@@ -122,12 +124,11 @@ public class IpmiAsyncConnector implements ConnectionListener {
 	 *        {@link IpmiAsyncConnector} to communicate with the remote
 	 *        hosts.
 	 * @throws IOException
-	 *         when properties file was not found
+	 *         when the port cannot be bound
 	 */
 	public IpmiAsyncConnector(int port, InetAddress address) throws IOException {
 		connectionManager = new ConnectionManager(port, address);
 		sessionManager = new SessionManager();
-		loadProperties();
 	}
 
 	/**
@@ -144,14 +145,33 @@ public class IpmiAsyncConnector implements ConnectionListener {
 	public IpmiAsyncConnector(int port, long pingPeriod) throws IOException {
 		connectionManager = new ConnectionManager(port, pingPeriod);
 		sessionManager = new SessionManager();
-		loadProperties();
 	}
 
 	/**
-	 * Loads properties from the properties file.
+	 * Sets how many times a message without a reply, or a handshake step without a reply, is sent again.
+	 *
+	 * @param retries the number of resends, 0 to send every message once
 	 */
-	private void loadProperties() {
-		retries = Integer.parseInt(PropertiesManager.getInstance().getProperty("retries"));
+	public void setRetries(int retries) {
+		this.retries = retries;
+	}
+
+	/**
+	 * Returns how many times a message without a reply is sent again.
+	 *
+	 * @return the number of resends
+	 */
+	public int getRetries() {
+		return retries;
+	}
+
+	/**
+	 * Sets the timeout of the messages of the connections created from now on.
+	 *
+	 * @param timeout the time in milliseconds after which a message without a reply is reported as timed out
+	 */
+	public void setTimeout(int timeout) {
+		connectionManager.setTimeout(timeout);
 	}
 
 	/**
@@ -161,9 +181,7 @@ public class IpmiAsyncConnector implements ConnectionListener {
 	 *        - {@link InetAddress} of the remote host
 	 * @return handle to the connection to the remote host
 	 * @throws IOException
-	 *         when properties file was not found
-	 * @throws FileNotFoundException
-	 *         when properties file was not found
+	 *         when the connection cannot be created
 	 */
 	public ConnectionHandle createConnection(InetAddress address, int port)
 			throws IOException {
@@ -180,9 +198,7 @@ public class IpmiAsyncConnector implements ConnectionListener {
 	 *        - {@link InetAddress} of the remote host
 	 * @return handle to the connection to the remote host
 	 * @throws IOException
-	 *         when properties file was not found
-	 * @throws FileNotFoundException
-	 *         when properties file was not found
+	 *         when the connection cannot be created
 	 */
 	public ConnectionHandle createConnection(
 			InetAddress address,

@@ -27,40 +27,27 @@ import java.security.NoSuchAlgorithmException;
 
 import org.metricshub.ipmi.core.coding.commands.CommandCodes;
 import org.metricshub.ipmi.core.coding.commands.IpmiCommandCoder;
-import org.metricshub.ipmi.core.coding.commands.IpmiVersion;
-import org.metricshub.ipmi.core.coding.commands.ResponseData;
 import org.metricshub.ipmi.core.coding.payload.IpmiPayload;
 import org.metricshub.ipmi.core.coding.payload.lan.IPMIException;
 import org.metricshub.ipmi.core.coding.payload.lan.IpmiLanRequest;
 import org.metricshub.ipmi.core.coding.payload.lan.NetworkFunction;
-import org.metricshub.ipmi.core.coding.protocol.AuthenticationType;
 import org.metricshub.ipmi.core.coding.protocol.IpmiMessage;
-import org.metricshub.ipmi.core.coding.security.CipherSuite;
 import org.metricshub.ipmi.core.common.TypeConverter;
 
 /**
  * Wrapper class for Chassis Control request.
  */
-public class ChassisControl extends IpmiCommandCoder {
+public class ChassisControl extends IpmiCommandCoder<ChassisControlResponseData> {
 
 	private PowerCommand powerCommand;
 
 	/**
 	 * Initiates ChassisControl for encoding and decoding.
 	 *
-	 * @param version
-	 *        - IPMI version of the command.
-	 * @param cipherSuite
-	 *        - {@link CipherSuite} containing authentication,
-	 *        confidentiality and integrity algorithms for this session.
-	 * @param authenticationType
-	 *        - Type of authentication used. Must be RMCPPlus for IPMI v2.0.
 	 * @param powerCommand
 	 *        - {@link PowerCommand} that is to be performed
 	 */
-	public ChassisControl(IpmiVersion version, CipherSuite cipherSuite,
-			AuthenticationType authenticationType, PowerCommand powerCommand) {
-		super(version, cipherSuite, authenticationType);
+	public ChassisControl(PowerCommand powerCommand) {
 		this.powerCommand = powerCommand;
 	}
 
@@ -90,7 +77,7 @@ public class ChassisControl extends IpmiCommandCoder {
 	}
 
 	@Override
-	public ResponseData getResponseData(IpmiMessage message)
+	public ChassisControlResponseData getResponseData(IpmiMessage message)
 			throws IPMIException,
 			NoSuchAlgorithmException,
 			InvalidKeyException {

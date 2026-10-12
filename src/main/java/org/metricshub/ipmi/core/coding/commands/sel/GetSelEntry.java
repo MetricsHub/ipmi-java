@@ -24,15 +24,11 @@ package org.metricshub.ipmi.core.coding.commands.sel;
 
 import org.metricshub.ipmi.core.coding.commands.CommandCodes;
 import org.metricshub.ipmi.core.coding.commands.IpmiCommandCoder;
-import org.metricshub.ipmi.core.coding.commands.IpmiVersion;
-import org.metricshub.ipmi.core.coding.commands.ResponseData;
 import org.metricshub.ipmi.core.coding.payload.IpmiPayload;
 import org.metricshub.ipmi.core.coding.payload.lan.IPMIException;
 import org.metricshub.ipmi.core.coding.payload.lan.IpmiLanRequest;
 import org.metricshub.ipmi.core.coding.payload.lan.NetworkFunction;
-import org.metricshub.ipmi.core.coding.protocol.AuthenticationType;
 import org.metricshub.ipmi.core.coding.protocol.IpmiMessage;
-import org.metricshub.ipmi.core.coding.security.CipherSuite;
 import org.metricshub.ipmi.core.common.TypeConverter;
 
 import java.security.InvalidKeyException;
@@ -41,7 +37,7 @@ import java.security.NoSuchAlgorithmException;
 /**
  * Wrapper for Get Sel Entry request
  */
-public class GetSelEntry extends IpmiCommandCoder {
+public class GetSelEntry extends IpmiCommandCoder<GetSelEntryResponseData> {
 
 	private int reservationId;
 
@@ -50,23 +46,14 @@ public class GetSelEntry extends IpmiCommandCoder {
 	/**
 	 * Initiates GetSelEntry for both encoding and decoding.
 	 *
-	 * @param version
-	 *        - IPMI version of the command.
-	 * @param cipherSuite
-	 *        - {@link CipherSuite} containing authentication,
-	 *        confidentiality and integrity algorithms for this session.
-	 * @param authenticationType
-	 *        - Type of authentication used. Must be RMCPPlus for IPMI v2.0.
 	 * @param reservationId
 	 *        - SEL reservation ID received via {@link ReserveSel} command
 	 *        or 0 if requesting for whole record
 	 * @param recordId
 	 *        - ID of the record to get
 	 */
-	public GetSelEntry(IpmiVersion version, CipherSuite cipherSuite,
-			AuthenticationType authenticationType, int reservationId,
+	public GetSelEntry(int reservationId,
 			int recordId) {
-		super(version, cipherSuite, authenticationType);
 		this.recordId = recordId;
 		this.reservationId = reservationId;
 	}
@@ -108,7 +95,7 @@ public class GetSelEntry extends IpmiCommandCoder {
 	}
 
 	@Override
-	public ResponseData getResponseData(IpmiMessage message)
+	public GetSelEntryResponseData getResponseData(IpmiMessage message)
 			throws IPMIException,
 			NoSuchAlgorithmException,
 			InvalidKeyException {

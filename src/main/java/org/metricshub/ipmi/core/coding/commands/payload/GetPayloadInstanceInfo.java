@@ -24,16 +24,13 @@ package org.metricshub.ipmi.core.coding.commands.payload;
 
 import org.metricshub.ipmi.core.coding.commands.CommandCodes;
 import org.metricshub.ipmi.core.coding.commands.IpmiCommandCoder;
-import org.metricshub.ipmi.core.coding.commands.IpmiVersion;
 import org.metricshub.ipmi.core.coding.commands.ResponseData;
 import org.metricshub.ipmi.core.coding.payload.IpmiPayload;
 import org.metricshub.ipmi.core.coding.payload.lan.IPMIException;
 import org.metricshub.ipmi.core.coding.payload.lan.IpmiLanRequest;
 import org.metricshub.ipmi.core.coding.payload.lan.NetworkFunction;
-import org.metricshub.ipmi.core.coding.protocol.AuthenticationType;
 import org.metricshub.ipmi.core.coding.protocol.IpmiMessage;
 import org.metricshub.ipmi.core.coding.protocol.PayloadType;
-import org.metricshub.ipmi.core.coding.security.CipherSuite;
 import org.metricshub.ipmi.core.common.TypeConverter;
 
 import java.util.Arrays;
@@ -50,12 +47,10 @@ public class GetPayloadInstanceInfo extends IpmiCommandCoder {
 	/**
 	 * Creates the command.
 	 *
-	 * @param cipherSuite the cipher suite of the session
 	 * @param payloadType the payload type, not {@link PayloadType#Ipmi}
 	 * @param payloadInstance the instance of the payload, from 1
 	 */
-	public GetPayloadInstanceInfo(CipherSuite cipherSuite, PayloadType payloadType, int payloadInstance) {
-		super(IpmiVersion.V20, cipherSuite, AuthenticationType.RMCPPlus);
+	public GetPayloadInstanceInfo(PayloadType payloadType, int payloadInstance) {
 		this.payloadType = payloadType;
 		this.payloadInstance = payloadInstance;
 	}

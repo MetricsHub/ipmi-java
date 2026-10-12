@@ -236,8 +236,7 @@ public class InboundSolMessageListener implements InboundMessageListener {
 					sequenceNumber,
 					(byte) characterCount,
 					ackState,
-					lineOperations,
-					connectionHandle.getCipherSuite());
+					lineOperations);
 			connector.sendOneWayMessage(connectionHandle, acknowledgement);
 		} catch (Exception e) {
 			LOGGER.error("Could not send " + ackState + " for packet " + sequenceNumber, e);

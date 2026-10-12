@@ -126,7 +126,7 @@ public class GetChannelAuthenticationCapabilities extends IpmiCommandCoder {
 	 */
 	public GetChannelAuthenticationCapabilities(IpmiVersion version,
 			IpmiVersion requestVersion, CipherSuite cipherSuite) {
-		super(version, cipherSuite, AuthenticationType.None);
+		setSessionParameters(version, cipherSuite, AuthenticationType.None);
 		this.setRequestVersion(requestVersion);
 		setRequestedPrivilegeLevel(PrivilegeLevel.User);
 		setChannelNumber(14);
@@ -158,7 +158,7 @@ public class GetChannelAuthenticationCapabilities extends IpmiCommandCoder {
 	public GetChannelAuthenticationCapabilities(IpmiVersion version,
 			IpmiVersion requestVersion, CipherSuite cipherSuite,
 			PrivilegeLevel privilegeLevel, byte channelNumber) {
-		super(version, cipherSuite, AuthenticationType.None);
+		setSessionParameters(version, cipherSuite, AuthenticationType.None);
 		this.setRequestVersion(requestVersion);
 		setRequestedPrivilegeLevel(privilegeLevel);
 		setChannelNumber(channelNumber);

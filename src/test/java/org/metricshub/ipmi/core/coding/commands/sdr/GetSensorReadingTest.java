@@ -8,18 +8,12 @@ import static org.metricshub.ipmi.core.coding.commands.IpmiResponses.response;
 import java.util.Arrays;
 
 import org.junit.jupiter.api.Test;
-import org.metricshub.ipmi.core.coding.commands.IpmiVersion;
 import org.metricshub.ipmi.core.coding.commands.sdr.record.ReadingType;
 import org.metricshub.ipmi.core.coding.commands.sdr.record.SensorType;
-import org.metricshub.ipmi.core.coding.protocol.AuthenticationType;
-import org.metricshub.ipmi.core.coding.security.CipherSuite;
 
 class GetSensorReadingTest {
 
 	private static final GetSensorReading COMMAND = new GetSensorReading(
-			IpmiVersion.V20,
-			CipherSuite.getEmpty(),
-			AuthenticationType.RMCPPlus,
 			5);
 
 	private static final int THRESHOLD_TYPE = 1;

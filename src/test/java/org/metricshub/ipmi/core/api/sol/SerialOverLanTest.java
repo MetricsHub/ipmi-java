@@ -33,13 +33,11 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.metricshub.ipmi.core.api.async.ConnectionHandle;
 import org.metricshub.ipmi.core.api.sync.IpmiConnector;
-import org.metricshub.ipmi.core.coding.commands.IpmiVersion;
 import org.metricshub.ipmi.core.coding.commands.PrivilegeLevel;
 import org.metricshub.ipmi.core.coding.commands.chassis.GetChassisStatus;
 import org.metricshub.ipmi.core.coding.commands.chassis.GetChassisStatusResponseData;
 import org.metricshub.ipmi.core.coding.payload.sol.SolOperation;
 import org.metricshub.ipmi.core.coding.payload.sol.SolStatus;
-import org.metricshub.ipmi.core.coding.protocol.AuthenticationType;
 import org.metricshub.ipmi.core.coding.security.CipherSuite;
 import org.metricshub.ipmi.core.connection.Session;
 import org.metricshub.ipmi.core.connection.SessionException;
@@ -1352,7 +1350,7 @@ class SerialOverLanTest {
 		GetChassisStatusResponseData status = (GetChassisStatusResponseData) connector
 				.sendMessage(
 						handle,
-						new GetChassisStatus(IpmiVersion.V20, handle.getCipherSuite(), AuthenticationType.RMCPPlus));
+						new GetChassisStatus());
 		assertEquals(FakeRmcpPlusBmc.CHASSIS_STATUS[0], status.getCurrentPowerState());
 	}
 

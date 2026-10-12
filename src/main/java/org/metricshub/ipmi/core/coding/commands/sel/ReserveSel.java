@@ -24,15 +24,11 @@ package org.metricshub.ipmi.core.coding.commands.sel;
 
 import org.metricshub.ipmi.core.coding.commands.CommandCodes;
 import org.metricshub.ipmi.core.coding.commands.IpmiCommandCoder;
-import org.metricshub.ipmi.core.coding.commands.IpmiVersion;
-import org.metricshub.ipmi.core.coding.commands.ResponseData;
 import org.metricshub.ipmi.core.coding.payload.IpmiPayload;
 import org.metricshub.ipmi.core.coding.payload.lan.IPMIException;
 import org.metricshub.ipmi.core.coding.payload.lan.IpmiLanRequest;
 import org.metricshub.ipmi.core.coding.payload.lan.NetworkFunction;
-import org.metricshub.ipmi.core.coding.protocol.AuthenticationType;
 import org.metricshub.ipmi.core.coding.protocol.IpmiMessage;
-import org.metricshub.ipmi.core.coding.security.CipherSuite;
 import org.metricshub.ipmi.core.common.TypeConverter;
 
 import java.security.InvalidKeyException;
@@ -41,23 +37,12 @@ import java.security.NoSuchAlgorithmException;
 /**
  * Wrapper for Reserve SEL command.
  */
-public class ReserveSel extends IpmiCommandCoder {
+public class ReserveSel extends IpmiCommandCoder<ReserveSelResponseData> {
 
 	/**
 	 * Initiates ReserveSel for both encoding and decoding.
-	 *
-	 * @param version
-	 *        - IPMI version of the command.
-	 * @param cipherSuite
-	 *        - {@link CipherSuite} containing authentication,
-	 *        confidentiality and integrity algorithms for this session.
-	 * @param authenticationType
-	 *        - Type of authentication used. Must be RMCPPlus for IPMI v2.0.
 	 */
-	public ReserveSel(IpmiVersion version, CipherSuite cipherSuite,
-			AuthenticationType authenticationType) {
-		super(version, cipherSuite, authenticationType);
-	}
+	public ReserveSel() {}
 
 	@Override
 	public byte getCommandCode() {
@@ -81,7 +66,7 @@ public class ReserveSel extends IpmiCommandCoder {
 	}
 
 	@Override
-	public ResponseData getResponseData(IpmiMessage message)
+	public ReserveSelResponseData getResponseData(IpmiMessage message)
 			throws IPMIException,
 			NoSuchAlgorithmException,
 			InvalidKeyException {

@@ -32,7 +32,6 @@ import java.util.stream.Collectors;
 import org.metricshub.ipmi.client.IpmiClientConfiguration;
 import org.metricshub.ipmi.client.Utils;
 import org.metricshub.ipmi.client.model.Fru;
-import org.metricshub.ipmi.core.coding.commands.IpmiVersion;
 import org.metricshub.ipmi.core.coding.commands.fru.BaseUnit;
 import org.metricshub.ipmi.core.coding.commands.fru.GetFruInventoryAreaInfo;
 import org.metricshub.ipmi.core.coding.commands.fru.GetFruInventoryAreaInfoResponseData;
@@ -50,7 +49,6 @@ import org.metricshub.ipmi.core.coding.commands.sdr.record.FruDeviceLocatorRecor
 import org.metricshub.ipmi.core.coding.commands.sdr.record.SensorRecord;
 import org.metricshub.ipmi.core.coding.payload.CompletionCode;
 import org.metricshub.ipmi.core.coding.payload.lan.IPMIException;
-import org.metricshub.ipmi.core.coding.protocol.AuthenticationType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -131,7 +129,7 @@ public class GetFrusRunner extends AbstractIpmiRunner<List<Fru>> {
 				reservationId = ((ReserveSdrRepositoryResponseData) getConnector()
 						.sendMessage(
 								getHandle(),
-								new ReserveSdrRepository(IpmiVersion.V20, getHandle().getCipherSuite(), AuthenticationType.RMCPPlus)))
+								new ReserveSdrRepository()))
 						.getReservationId();
 			}
 		}
@@ -234,9 +232,6 @@ public class GetFrusRunner extends AbstractIpmiRunner<List<Fru>> {
 				.sendMessage(
 						getHandle(),
 						new GetFruInventoryAreaInfo(
-								IpmiVersion.V20,
-								getHandle().getCipherSuite(),
-								AuthenticationType.RMCPPlus,
 								fruId));
 
 		int size = info.getFruInventoryAreaSize();
@@ -255,9 +250,6 @@ public class GetFrusRunner extends AbstractIpmiRunner<List<Fru>> {
 						.sendMessage(
 								getHandle(),
 								new ReadFruData(
-										IpmiVersion.V20,
-										getHandle().getCipherSuite(),
-										AuthenticationType.RMCPPlus,
 										fruId,
 										unit,
 										i,
