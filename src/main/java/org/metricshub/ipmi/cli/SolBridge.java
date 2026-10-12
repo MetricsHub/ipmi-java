@@ -65,7 +65,7 @@ final class SolBridge {
 	 * @param err where the escape help and the diagnostics go
 	 * @param escape the escape character, {@code -1} for none
 	 * @param cooked whether the input is a line-oriented terminal, whose Enter (CR LF, or a lone LF) is sent as CR
-	 * @param verbose whether to print, at the end, the packets and bytes exchanged and the mean acknowledgement time
+	 * @param verbose whether to print, at the end, the writes and bytes exchanged and the mean acknowledgement time
 	 * @return the exit code of the CLI
 	 * @throws InterruptedException when interrupted while waiting for the end
 	 */
@@ -88,13 +88,15 @@ final class SolBridge {
 		long closing = System.nanoTime();
 		console.close();
 		if (verbose) {
-			long packets = stats.packets.get();
+			// A write is one read of the input: a keystroke, a line or a block, which the library sends in one SOL packet
+			// or several when it exceeds the payload size of the BMC
+			long writes = stats.writes.get();
 			IpmiCli
 					.diagnostic(
 							err,
-							"SOL console closed in " + (System.nanoTime() - closing) / NANOS_PER_MILLI + " ms: " + packets
-									+ " packet(s) and " + stats.bytesSent.get() + " byte(s) sent, acknowledged in "
-									+ (packets == 0 ? 0 : stats.ackNanos.get() / packets / NANOS_PER_MILLI) + " ms on average, "
+							"SOL console closed in " + (System.nanoTime() - closing) / NANOS_PER_MILLI + " ms: " + writes
+									+ " write(s) and " + stats.bytesSent.get() + " byte(s) sent, acknowledged in "
+									+ (writes == 0 ? 0 : stats.ackNanos.get() / writes / NANOS_PER_MILLI) + " ms per write on average, "
 									+ stats.bytesReceived.get() + " byte(s) received");
 		}
 		switch (first) {
@@ -238,7 +240,7 @@ final class SolBridge {
 			long start = System.nanoTime();
 			toBmc.write(pending.toByteArray());
 			stats.ackNanos.addAndGet(System.nanoTime() - start);
-			stats.packets.incrementAndGet();
+			stats.writes.incrementAndGet();
 			stats.bytesSent.addAndGet(pending.size());
 			pending.reset();
 		}
@@ -246,7 +248,7 @@ final class SolBridge {
 
 	/** What the console exchanged, for the verbose summary. */
 	private static final class Stats {
-		private final AtomicLong packets = new AtomicLong();
+		private final AtomicLong writes = new AtomicLong();
 		private final AtomicLong bytesSent = new AtomicLong();
 		private final AtomicLong ackNanos = new AtomicLong();
 		private final AtomicLong bytesReceived = new AtomicLong();

@@ -226,9 +226,10 @@ class IpmiCliTest {
 			assertEquals(0, prompted.code, prompted.err);
 			assertEquals("on\n", prompted.out);
 
-			Result deadline = run(bmc, NO_PROMPT, "-u", "admin", "-p", "secret", "-t", "1", "chassis");
+			Result deadline = run(bmc, NO_PROMPT, "-u", "admin", "-p", "secret", "-t", "1", "-v", "chassis");
 			assertEquals(IpmiCli.EXIT_TIMEOUT, deadline.code);
 			assertTrue(deadline.err.contains("did not complete within"), deadline.err);
+			assertTrue(deadline.err.contains("ipmicli: chassis status failed after "), "the time of a failed operation");
 
 			bmc.enableSol(bmc.getPort(), 255, ADMINISTRATOR);
 			Result privilege = run(bmc, NO_PROMPT, "-u", "admin", "-p", "secret", "-L", "user", "sol");

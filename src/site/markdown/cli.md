@@ -315,13 +315,18 @@ sequences of the remote console; the typed bytes go to the BMC.
   falls back to line mode: the input is sent when Enter is pressed, without local echo.
 * When stdin is not a terminal, its bytes are forwarded as they come and the end of the input
   closes the console, so `printf 'root\r' | ipmicli ... sol` works in scripts. Each read of the
-  input is one SOL packet: a keystroke in raw mode, a line or a block from a pipe.
+  input is one write to the BMC: a keystroke in raw mode, a line or a block from a pipe, sent as
+  one SOL packet or several when it exceeds the payload size of the BMC. With `-v`, the CLI sums
+  the console up when it closes: writes and bytes sent, the mean acknowledgement time per write,
+  bytes received.
 * When the BMC deactivates the console (another user activated SOL, or the session was lost),
-  the CLI says so on stderr and exits with 70. When SOL is already active in another session,
-  the activation fails with the completion code of the BMC (80h, *payload already active*); the
-  CLI never deactivates the console of another session. A console ended by a kill is deactivated
-  by the shutdown hook; one ended by a hard kill is not, and some BMCs (Supermicro) keep the
-  payload active after its session is gone until it is deactivated (`ipmitool sol deactivate`).
+  the CLI says so on stderr and exits with 70. When SOL is active in another session the BMC
+  still has, the activation fails with `The SOL payload is in use by another session: instance 1
+  by session ... (user ID 2, privilege 4)`, exit 70: the CLI never deactivates the console of a
+  live session. A console ended by a kill is deactivated by the shutdown hook; one ended by a
+  hard kill is not, and some BMCs (Supermicro) keep its payload active for good: once the BMC has
+  forgotten that dead session, within a minute, the next `sol` deactivates the stale payload
+  itself and goes on.
 
 The default privilege of `sol` is Administrator, which most BMCs require to activate the SOL
 payload; `-L user` or `-L operator` is enough on the BMCs that allow it. The SOL console shares

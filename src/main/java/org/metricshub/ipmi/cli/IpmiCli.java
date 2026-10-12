@@ -268,11 +268,19 @@ public final class IpmiCli {
 
 	private static <T> T timed(CliArguments arguments, PrintStream err, String step, Supplier<T> operation) {
 		long start = System.nanoTime();
-		T result = operation.get();
-		if (arguments.verbose()) {
-			diagnostic(err, step + ": " + (System.nanoTime() - start) / NANOS_PER_MILLI + " ms");
+		boolean done = false;
+		try {
+			T result = operation.get();
+			done = true;
+			return result;
+		} finally {
+			// The time of a failed operation (a deadline, a refused command) is worth as much as that of a successful one
+			if (arguments.verbose()) {
+				diagnostic(
+						err,
+						step + (done ? ": " : " failed after ") + (System.nanoTime() - start) / NANOS_PER_MILLI + " ms");
+			}
 		}
-		return result;
 	}
 
 	private static void probe(CliArguments arguments, BmcCapabilities capabilities, PrintStream out) {
