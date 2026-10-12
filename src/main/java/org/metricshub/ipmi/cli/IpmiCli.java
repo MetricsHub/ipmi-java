@@ -44,6 +44,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.TimeUnit;
 import java.util.OptionalDouble;
 import java.util.function.Supplier;
 
@@ -96,6 +97,7 @@ public final class IpmiCli {
 	private static final int FRU_LABEL_WIDTH = 27;
 	private static final String FRU_INDENT = "  ";
 	private static final long NANOS_PER_MILLI = 1_000_000L;
+	private static final long KEY_READER_START_MS = 500L;
 	private static final int DECIMALS = 3;
 
 	private IpmiCli() {}
@@ -742,7 +744,53 @@ public final class IpmiCli {
 				.redirectInput(ProcessBuilder.Redirect.INHERIT)
 				.redirectError(ProcessBuilder.Redirect.INHERIT)
 				.start();
-		return new RawInput(keys.getInputStream(), keys::destroy);
+		// A reader that cannot read the keys (no console, a restricted PowerShell) says so and exits at once
+		try {
+			if (keys.waitFor(KEY_READER_START_MS, TimeUnit.MILLISECONDS)) {
+				throw new IOException("the PowerShell key reader ended with exit code " + keys.exitValue());
+			}
+		} catch (InterruptedException e) {
+			Thread.currentThread().interrupt();
+			keys.destroy();
+			throw new IOException("interrupted while starting the PowerShell key reader", e);
+		}
+		return new RawInput(new KeyReaderInput(keys), keys::destroy);
+	}
+
+	/** The keys of the PowerShell reader; its end is a failure of the reader, not the end of the input of the user. */
+	private static final class KeyReaderInput extends InputStream {
+		private final Process reader;
+
+		private KeyReaderInput(Process reader) {
+			this.reader = reader;
+		}
+
+		@Override
+		public int read() throws IOException {
+			return ended(reader.getInputStream().read());
+		}
+
+		@Override
+		public int read(byte[] buffer, int offset, int length) throws IOException {
+			return ended(reader.getInputStream().read(buffer, offset, length));
+		}
+
+		private int ended(int result) throws IOException {
+			if (result < 0) {
+				throw new IOException("the PowerShell key reader ended" + exitCode());
+			}
+			return result;
+		}
+
+		private String exitCode() {
+			try {
+				return reader.waitFor(KEY_READER_START_MS, TimeUnit.MILLISECONDS) ?
+						" with exit code " + reader.exitValue() : "";
+			} catch (InterruptedException e) {
+				Thread.currentThread().interrupt();
+				return "";
+			}
+		}
 	}
 
 	/** Gives the terminal its saved settings back, or sane ones, and says when neither works. */

@@ -177,6 +177,7 @@ class CliArgumentsTest {
 		assertEquals("--name requires a glob", usageError(login("sensors", "--name", ",")));
 		assertEquals("--name requires a glob", usageError(login("sensors", "--name", "")));
 		assertEquals("--name requires a glob", usageError(login("sensors", "--name", "CPU*,,Fan*")));
+		assertEquals("--name requires a glob", usageError(login("sensors", "--name", "CPU*,")));
 		assertEquals("power requires one action: status", usageError(login("power")));
 		assertEquals("power requires one action: status", usageError(login("power", "on")));
 		assertEquals("chassis takes no argument", usageError(login("chassis", "status")));
@@ -253,6 +254,13 @@ class CliArgumentsTest {
 		String[] joined = { "-h", "bmc", "-u", "admin", "-p=secret", "-x" };
 		assertThrows(CliUsageException.class, () -> CliArguments.parse(joined));
 		assertEquals("-p", joined[4], "blanked even when the parsing fails later");
+
+		String[] twice = { "-h", "bmc", "-u", "admin", "-p", "one", "-p", "two", "-k", "01", "--bmc-key=02", "chassis" };
+		assertEquals("--password and --password-file are mutually exclusive", usageError(twice));
+		assertEquals("", twice[7], "a rejected duplicate secret is blanked too");
+		String[] keys = { "-h", "bmc", "-u", "admin", "-k", "01", "--bmc-key=02", "chassis" };
+		assertEquals("--bmc-key and --bmc-key-file are mutually exclusive", usageError(keys));
+		assertEquals("--bmc-key", keys[6]);
 	}
 
 	private static CliArguments parse(String... args) throws CliUsageException {

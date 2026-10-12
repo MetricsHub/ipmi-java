@@ -69,9 +69,11 @@ final class SolBridge {
 	static int run(SolConsole console, InputStream stdin, PrintStream out, PrintStream err, int escape, boolean cooked)
 			throws InterruptedException {
 		BlockingQueue<Integer> outcome = new LinkedBlockingQueue<Integer>();
+		IOException[] failure = new IOException[1];
 		daemon("ipmicli-sol-output", () -> outcome.add(pumpOutput(console, out)));
-		daemon("ipmicli-sol-input", () -> outcome.add(pumpInput(console, stdin, err, escape, cooked)));
+		daemon("ipmicli-sol-input", () -> outcome.add(pumpInput(console, stdin, err, escape, cooked, failure)));
 		int first = outcome.take();
+		IOException readFailure = failure[0];
 		console.close();
 		switch (first) {
 		case DEACTIVATED:
@@ -84,7 +86,7 @@ final class SolBridge {
 			IpmiCli.diagnostic(err, "the BMC did not accept the input");
 			return IpmiCli.EXIT_PROTOCOL;
 		case INPUT_READ_FAILED:
-			IpmiCli.diagnostic(err, "cannot read the standard input");
+			IpmiCli.diagnostic(err, "cannot read the input" + (readFailure == null ? "" : ": " + readFailure.getMessage()));
 			return IpmiCli.EXIT_IO;
 		default:
 			return 0;
@@ -118,7 +120,13 @@ final class SolBridge {
 		return console.deactivated() ? DEACTIVATED : CLOSED;
 	}
 
-	private static int pumpInput(SolConsole console, InputStream stdin, PrintStream err, int escape, boolean cooked) {
+	private static int pumpInput(
+			SolConsole console,
+			InputStream stdin,
+			PrintStream err,
+			int escape,
+			boolean cooked,
+			IOException[] failure) {
 		OutputStream toBmc = console.output();
 		ByteArrayOutputStream pending = new ByteArrayOutputStream();
 		byte[] buffer = new byte[BUFFER_SIZE];
@@ -131,7 +139,8 @@ final class SolBridge {
 				try {
 					count = stdin.read(buffer);
 				} catch (IOException e) {
-					// A redirected input that fails after some bytes: a truncated transfer, not a clean end
+					// A redirected input that fails after some bytes, or the key reader of the console gone: not a clean end
+					failure[0] = e;
 					return INPUT_READ_FAILED;
 				}
 				if (count < 0) {

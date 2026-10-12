@@ -160,11 +160,13 @@ final class CliArguments implements AutoCloseable {
 			username = optionValue(args, index, option);
 			return nextIndex(argument, index);
 		case "-p":
-		case "--password":
+		case "--password": {
+			char[] value = consumePassword(args, index, option);
 			exclusive(passwordOption, "--password and --password-file");
 			passwordOption = option;
-			replacePassword(consumePassword(args, index, option));
+			replacePassword(value);
 			return nextIndex(argument, index);
+		}
 		case "-pf":
 		case "--password-file":
 			exclusive(passwordOption, "--password and --password-file");
@@ -172,11 +174,13 @@ final class CliArguments implements AutoCloseable {
 			replacePassword(decodeUtf8(readSecretFile(optionValue(args, index, option), option), option));
 			return nextIndex(argument, index);
 		case "-k":
-		case "--bmc-key":
+		case "--bmc-key": {
+			String value = consumeSecret(args, index, option);
 			exclusive(keyOption, "--bmc-key and --bmc-key-file");
 			keyOption = option;
-			bmcKey = parseHex(consumeSecret(args, index, option).getBytes(StandardCharsets.US_ASCII), option);
+			bmcKey = parseHex(value.getBytes(StandardCharsets.US_ASCII), option);
 			return nextIndex(argument, index);
+		}
 		case "-kf":
 		case "--bmc-key-file":
 			exclusive(keyOption, "--bmc-key and --bmc-key-file");
@@ -290,7 +294,7 @@ final class CliArguments implements AutoCloseable {
 			return nextIndex(argument, index);
 		case "--name":
 			requireSubcommand(option, Subcommand.SENSORS);
-			for (String glob : optionValue(rest, index, option).split(",")) {
+			for (String glob : optionValue(rest, index, option).split(",", -1)) {
 				if (glob.trim().isEmpty()) {
 					throw new CliUsageException(option + " requires a glob");
 				}

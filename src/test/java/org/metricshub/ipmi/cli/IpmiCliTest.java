@@ -297,6 +297,9 @@ class IpmiCliTest {
 			try {
 				Future<Result> result = executor.submit(() -> run(bmc, NO_PROMPT, stdin, "-u", "admin", "-p", "secret", "sol"));
 				await(bmc::isSolActive, "the console is open");
+				// The fake flags the payload active before its reply reaches the client: a packet sent at once could get
+				// there before the console listens, and be dropped
+				Thread.sleep(500);
 				bmc.sendSol(1, 0, "login: ".getBytes(StandardCharsets.US_ASCII));
 				bmc.sendSol(2, SOL_DEACTIVATED, new byte[0]);
 				Result sol = result.get(20, TimeUnit.SECONDS);
@@ -359,7 +362,7 @@ class IpmiCliTest {
 			};
 			Result sol = run(bmc, NO_PROMPT, failing, "-u", "admin", "-p", "secret", "sol");
 			assertEquals(IpmiCli.EXIT_IO, sol.code);
-			assertEquals("ipmicli: cannot read the standard input\n", sol.err);
+			assertEquals("ipmicli: cannot read the input: disk error\n", sol.err);
 			assertEquals("x", ascii(bmc.getSolReceived()), "what was read before the failure was sent");
 		}
 	}
