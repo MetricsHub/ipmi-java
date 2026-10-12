@@ -168,9 +168,17 @@ public class IpmiAsyncConnector implements ConnectionListener {
 	 * Sets the timeout of the messages of the connections created from now on.
 	 *
 	 * @param timeout the time in milliseconds after which a message without a reply is reported as timed out
+	 * @throws IllegalArgumentException when the timeout is less than one millisecond
 	 */
 	public void setTimeout(int timeout) {
+		checkTimeout(timeout);
 		connectionManager.setTimeout(timeout);
+	}
+
+	private static void checkTimeout(int timeout) {
+		if (timeout < 1) {
+			throw new IllegalArgumentException("The timeout must be at least one millisecond: " + timeout);
+		}
 	}
 
 	/**
@@ -631,6 +639,7 @@ public class IpmiAsyncConnector implements ConnectionListener {
 	 *        - new timeout value in ms
 	 */
 	public void setTimeout(ConnectionHandle handle, int timeout) {
+		checkTimeout(timeout);
 		connectionManager.getConnection(handle.getHandle()).setTimeout(timeout);
 	}
 

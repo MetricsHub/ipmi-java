@@ -563,6 +563,7 @@ public class IpmiConnector {
 	 * changes it for an existing connection.
 	 *
 	 * @param timeout the time in milliseconds after which a message without a reply is reported as timed out
+	 * @throws IllegalArgumentException when the timeout is less than one millisecond
 	 */
 	public void setTimeout(int timeout) {
 		asyncConnector.setTimeout(timeout);
