@@ -28,6 +28,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.PrintStream;
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.nio.ByteBuffer;
 import java.nio.CharBuffer;
 import java.nio.charset.Charset;
@@ -92,7 +93,7 @@ public final class IpmiCli {
 	private static final int FRU_LABEL_WIDTH = 27;
 	private static final String FRU_INDENT = "  ";
 	private static final long NANOS_PER_MILLI = 1_000_000L;
-	private static final double THOUSAND = 1000.0;
+	private static final int DECIMALS = 3;
 
 	private IpmiCli() {}
 
@@ -139,14 +140,15 @@ public final class IpmiCli {
 				}
 				arguments.replacePassword(password);
 			}
-			IpmiClient.Builder builder;
+			IpmiClient client;
 			try {
-				builder = builder(arguments, err);
+				// The builder and build() refuse a setting (a suite without integrity, credentials too long for a BMC)
+				client = builder(arguments, err).build();
 			} catch (IllegalArgumentException e) {
 				throw new CliUsageException(e.getMessage(), e);
 			}
-			try (IpmiClient client = builder.build()) {
-				int code = execute(arguments, client, out, err, stdin, terminal);
+			try (IpmiClient open = client) {
+				int code = execute(arguments, open, out, err, stdin, terminal);
 				return out.checkError() ? outputFailed(err) : code;
 			}
 		} catch (CliUsageException e) {
@@ -792,7 +794,9 @@ public final class IpmiCli {
 		if (!value.isPresent() || Double.isInfinite(value.getAsDouble()) || Double.isNaN(value.getAsDouble())) {
 			return OptionalDouble.empty();
 		}
-		return OptionalDouble.of(Math.round(value.getAsDouble() * THOUSAND) / THOUSAND);
+		// BigDecimal: a scaled long would saturate on a large reading
+		return OptionalDouble
+				.of(BigDecimal.valueOf(value.getAsDouble()).setScale(DECIMALS, RoundingMode.HALF_UP).doubleValue());
 	}
 
 	/** Replaces the control characters of a BMC string, which would drive the terminal, with {@code ?}. */

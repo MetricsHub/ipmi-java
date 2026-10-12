@@ -94,6 +94,11 @@ class IpmiCliTest {
 		assertEquals(IpmiCli.EXIT_USAGE, builder.code, "the validation of the client builder is a usage error");
 		assertTrue(builder.err.contains("no integrity algorithm"), builder.err);
 
+		Result tooLong = run(null, NO_PROMPT, "-h", "bmc", "-u", "admin", "-p", "123456789012345678901", "chassis");
+		assertEquals(IpmiCli.EXIT_USAGE, tooLong.code, "a password a BMC cannot hold is refused by build()");
+		assertTrue(tooLong.err.contains("Password is too long"), tooLong.err);
+		assertFalse(tooLong.err.contains("123456789012345678901"), tooLong.err);
+
 		Result noConsole = run(null, NO_PROMPT, "-h", "bmc", "-u", "admin", "chassis");
 		assertEquals(IpmiCli.EXIT_USAGE, noConsole.code);
 		assertTrue(noConsole.err.contains("--password-file"), noConsole.err);
@@ -268,6 +273,8 @@ class IpmiCliTest {
 	void readingsAreRoundedAndInfiniteOnesAreAbsent() {
 		assertEquals("11.748", IpmiCli.number(java.util.OptionalDouble.of(11.748000000000001)));
 		assertEquals("6600", IpmiCli.number(java.util.OptionalDouble.of(6600.0)));
+		assertEquals("10000000000000000", IpmiCli.number(java.util.OptionalDouble.of(1.0e16)), "no saturation");
+		assertEquals("-0.001", IpmiCli.number(java.util.OptionalDouble.of(-0.0005)));
 		assertEquals("", IpmiCli.number(java.util.OptionalDouble.of(Double.POSITIVE_INFINITY)));
 		assertEquals("", IpmiCli.number(java.util.OptionalDouble.of(Double.NaN)));
 		assertEquals("", IpmiCli.number(java.util.OptionalDouble.empty()));
