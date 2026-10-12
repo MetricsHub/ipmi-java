@@ -1,0 +1,4 @@
+Name          Type            Reading  Unit      Status
+Ambient Temp  Temperature     22       DegreesC  ok
+Fan 1         Fan                                Device Present
+Board         EntityPresence                     Device Present

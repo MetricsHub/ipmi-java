@@ -27,6 +27,35 @@ try (IpmiClient bmc = IpmiClient.builder("bmc.example.com").credentials("monitor
 
 A client owns one RMCP+ session, opened by the first operation and closed by `close()`: always use it in a try-with-resources block. The BMC must have IPMI over LAN enabled and an account with the User privilege: see [Preparing the BMC](https://metricshub.org/ipmi-java/preparing-the-bmc.html).
 
+## Command-line client
+
+Every build also produces a self-contained executable jar with a command-line client, `ipmicli`, that exposes the same operations ([download the latest](https://github.com/metricshub/ipmi-java/releases/latest), Java 8 or later, no other file needed):
+
+```text
+target/ipmi-java-<version>.jar
+target/ipmi-java-<version>-standalone.jar
+```
+
+What the BMC offers, before any login:
+
+```bash
+java -jar ipmi-java-<version>-standalone.jar -h bmc.example.com probe
+```
+
+The sensors, with the password read from a file:
+
+```bash
+java -jar ipmi-java-<version>-standalone.jar -h bmc.example.com -u monitor -pf password.txt sensors
+```
+
+The FRU inventory as JSON Lines:
+
+```bash
+java -jar ipmi-java-<version>-standalone.jar -h bmc.example.com -u monitor -pf password.txt fru --json
+```
+
+Subcommands: `probe`, `chassis`, `power status`, `sensors`, `fru` and `sol` (an interactive Serial over LAN console). Diagnostics go to stderr, the exit code says what failed (77 authentication, 69 unreachable, 124 timeout...). See the [Command-Line Client](https://metricshub.org/ipmi-java/cli.html) page for the options, the output formats and the `ipmitool` equivalents.
+
 ## Upgrading
 
 Version 2.0.00 replaces the client API of 1.x and removes the SLF4J dependency; see [Upgrading from 1.x](https://metricshub.org/ipmi-java/upgrading.html#upgrading-from-1-x-to-2-0-00) for the migration table.

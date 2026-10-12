@@ -6,6 +6,15 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.metricshub.ipmi.client.Fixtures.BOARD_SENSOR;
+import static org.metricshub.ipmi.client.Fixtures.FAN_SENSOR;
+import static org.metricshub.ipmi.client.Fixtures.PASSWORD;
+import static org.metricshub.ipmi.client.Fixtures.PSU_FRU;
+import static org.metricshub.ipmi.client.Fixtures.SUITES;
+import static org.metricshub.ipmi.client.Fixtures.TEMPERATURE_SENSOR;
+import static org.metricshub.ipmi.client.Fixtures.USER;
+import static org.metricshub.ipmi.client.Fixtures.bmc;
+import static org.metricshub.ipmi.client.Fixtures.utf8;
 import static org.metricshub.ipmi.core.transport.FakeRmcpPlusBmc.ADMINISTRATOR;
 import static org.metricshub.ipmi.core.transport.FakeRmcpPlusBmc.GET_CHANNEL_CIPHER_SUITES;
 import static org.metricshub.ipmi.core.transport.FakeRmcpPlusBmc.GET_CHASSIS_STATUS;
@@ -54,51 +63,8 @@ import org.metricshub.ipmi.core.transport.FakeSdrRepository;
 
 class IpmiClientTest {
 
-	/** Cipher suites 1 to 19 as a Lenovo XCC lists them: 17 is preferred, then 3. */
-	private static final byte[] SUITES = bytes(
-			"c0 01 01 40 80 c0 02 01 41 80 c0 03 01 41 81 c0 04 01 41 82 c0 05 01 41 83 c0 06 02 40 80 c0 07 02 42 80"
-					+ " c0 08 02 42 81 c0 09 02 42 82 c0 0a 02 42 83 c0 0b 02 43 80 c0 0c 02 43 81 c0 0d 02 43 82 c0 0e 02 43 83"
-					+ " c0 0f 03 40 80 c0 10 03 44 80 c0 11 03 44 81 c0 12 03 44 82 c0 13 03 44 83");
-	private static final String USER = "admin";
-	private static final String PASSWORD = "secret";
 	private static final Duration MESSAGE_TIMEOUT = Duration.ofMillis(300);
-	private static final int TEMPERATURE_SENSOR = 50;
-	private static final int FAN_SENSOR = 0x10;
-	private static final int BOARD_SENSOR = 0x11;
-	private static final int PSU_FRU = 1;
 	private static final int RECORDS = 6;
-
-	/**
-	 * A BMC with a repository of 6 records: a temperature (Full), a fan presence and a system board presence
-	 * (Compact), the locator of FRU 1 (a power supply), an OEM record and a record of a reserved type.
-	 */
-	private static FakeRmcpPlusBmc bmc() throws IOException {
-		FakeRmcpPlusBmc bmc = new FakeRmcpPlusBmc(SUITES, USER, utf8(PASSWORD), null);
-		new FakeSdrRepository()
-				.add(Fixtures.FRONT_PANEL_FULL_RECORD)
-				.add(compactSensorRecord(2, FAN_SENSOR, EntityId.Fan.getCode(), 1, SensorType.Fan.getCode(), 0x08, "Fan 1"))
-				.add(
-						compactSensorRecord(
-								3,
-								BOARD_SENSOR,
-								EntityId.SystemBoard.getCode(),
-								1,
-								SensorType.EntityPresence.getCode(),
-								0x08,
-								"Board"))
-				.add(fruDeviceLocatorRecord(4, PSU_FRU, EntityId.PowerSupply.getCode(), 1, "PSU 1"))
-				.add(record(5, 0xc0, new byte[]
-				{ 1, 2, 3 }))
-				.add(record(6, 0x0b, new byte[]
-				{ 1, 2 }))
-				.reading(TEMPERATURE_SENSOR, 0x9a, 0x40, 0x00)
-				.reading(FAN_SENSOR, 0x00, 0x40, 0x02)
-				.reading(BOARD_SENSOR, 0x00, 0x40, 0x02)
-				.fru(0, Fixtures.BASE_BOARD_PRODUCT_INFO)
-				.fru(PSU_FRU, Fixtures.BASE_BOARD_PRODUCT_INFO)
-				.install(bmc);
-		return bmc;
-	}
 
 	private static IpmiClient.Builder client(FakeRmcpPlusBmc bmc) {
 		return IpmiClient
@@ -712,6 +678,68 @@ class IpmiClientTest {
 	}
 
 	@Test
+	@Timeout(30)
+	void aSolPayloadHeldByADeadSessionIsReclaimed() throws Exception {
+		try (FakeRmcpPlusBmc bmc = bmc()) {
+			bmc.enableSol(bmc.getPort(), 255, ADMINISTRATOR);
+			try (IpmiClient first = client(bmc).privilege(PrivilegeLevel.Administrator).build()) {
+				first.sol().open();
+				// The console is killed: no deactivation, and the BMC keeps the payload active after it expires the session
+				bmc.expireSession();
+			}
+			try (
+					IpmiClient second = client(bmc).privilege(PrivilegeLevel.Administrator).build();
+					SolConsole console = second.sol().open()) {
+				assertEquals(
+						1,
+						bmc.getCount(NETFN_APP, FakeRmcpPlusBmc.DEACTIVATE_PAYLOAD),
+						"the stale instance is deactivated");
+				assertTrue(bmc.isSolActive());
+				console.output().write("x".getBytes(StandardCharsets.US_ASCII));
+				await(() -> bmc.getSolReceived().length == 1, "the reclaimed console works");
+			}
+		}
+	}
+
+	@Test
+	@Timeout(30)
+	void aSolPayloadHeldByALiveSessionIsNotTouched() throws Exception {
+		try (FakeRmcpPlusBmc bmc = bmc()) {
+			bmc.enableSol(bmc.getPort(), 255, ADMINISTRATOR);
+			try (IpmiClient first = client(bmc).privilege(PrivilegeLevel.Administrator).build()) {
+				first.sol().open();
+				bmc.expireSession();
+			}
+			// The BMC still has the session that holds the payload
+			bmc
+					.handle(NETFN_APP, FakeRmcpPlusBmc.GET_SESSION_INFO, data -> new byte[]
+					{ 0x00, 0x02, 0x10, 0x02, 0x02, 0x04, 0x01 });
+			try (IpmiClient second = client(bmc).privilege(PrivilegeLevel.Administrator).build()) {
+				IpmiClientException failure = assertThrows(IpmiClientException.class, () -> second.sol().open());
+				assertTrue(failure.getMessage().contains("in use by another session"), failure.getMessage());
+				assertTrue(failure.getMessage().contains("user ID 2, privilege 4"), failure.getMessage());
+				assertEquals(0, bmc.getCount(NETFN_APP, FakeRmcpPlusBmc.DEACTIVATE_PAYLOAD), "never deactivated");
+			}
+			// A BMC that refuses the lookup: the refusal reaches the caller, the holder keeps its console
+			bmc.handle(NETFN_APP, FakeRmcpPlusBmc.GET_SESSION_INFO, data -> new byte[] { (byte) 0xd4 });
+			try (IpmiClient third = client(bmc).privilege(PrivilegeLevel.Administrator).build()) {
+				IpmiCompletionCodeException refused = assertThrows(
+						IpmiCompletionCodeException.class,
+						() -> third.sol().open());
+				assertEquals(CompletionCode.InsufficentPrivilege, refused.completionCode());
+				assertEquals(0, bmc.getCount(NETFN_APP, FakeRmcpPlusBmc.DEACTIVATE_PAYLOAD), "still never deactivated");
+			}
+			// A malformed reply (five bytes) is neither a found nor an absent session
+			bmc.handle(NETFN_APP, FakeRmcpPlusBmc.GET_SESSION_INFO, data -> new byte[] { 0x00, 0x02, 0x10, 0x02, 0x02 });
+			try (IpmiClient fourth = client(bmc).privilege(PrivilegeLevel.Administrator).build()) {
+				IpmiClientException malformed = assertThrows(IpmiClientException.class, () -> fourth.sol().open());
+				assertTrue(malformed.getMessage().contains("Invalid response length"), malformed.getMessage());
+				assertEquals(0, bmc.getCount(NETFN_APP, FakeRmcpPlusBmc.DEACTIVATE_PAYLOAD), "and never deactivated");
+			}
+		}
+	}
+
+	@Test
 	void oemRecordsAreDecodedNotSkipped() throws Exception {
 		try (FakeRmcpPlusBmc bmc = bmc(); IpmiClient client = client(bmc).build()) {
 			SensorList sensors = client.sensors().execute();
@@ -749,18 +777,5 @@ class IpmiClientTest {
 			Thread.sleep(10);
 		}
 		assertTrue(condition.getAsBoolean(), message);
-	}
-
-	private static byte[] utf8(String text) {
-		return text.getBytes(StandardCharsets.UTF_8);
-	}
-
-	private static byte[] bytes(String hex) {
-		String[] parts = hex.trim().split("\\s+");
-		byte[] result = new byte[parts.length];
-		for (int i = 0; i < parts.length; i++) {
-			result[i] = (byte) Integer.parseInt(parts[i], 16);
-		}
-		return result;
 	}
 }

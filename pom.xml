@@ -138,6 +138,54 @@
 				</configuration>
 			</plugin>
 
+			<!-- standalone executable jar: the library with the CLI as Main-Class, attached with the "standalone" classifier
+				next to the unchanged library jar. The library has no dependency, so nothing else is shaded in -->
+			<plugin>
+				<artifactId>maven-shade-plugin</artifactId>
+				<executions>
+					<execution>
+						<phase>package</phase>
+						<goals>
+							<goal>shade</goal>
+						</goals>
+						<configuration>
+							<shadedArtifactAttached>true</shadedArtifactAttached>
+							<shadedClassifierName>standalone</shadedClassifierName>
+							<createDependencyReducedPom>false</createDependencyReducedPom>
+							<transformers>
+								<transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
+									<mainClass>org.metricshub.ipmi.cli.IpmiCli</mainClass>
+									<manifestEntries>
+										<Implementation-Title>${project.name}</Implementation-Title>
+										<Implementation-Version>${project.version}</Implementation-Version>
+									</manifestEntries>
+								</transformer>
+							</transformers>
+						</configuration>
+					</execution>
+				</executions>
+			</plugin>
+
+			<!-- failsafe: StandaloneJarIT launches the packaged standalone jar in a separate JVM -->
+			<plugin>
+				<artifactId>maven-failsafe-plugin</artifactId>
+				<executions>
+					<execution>
+						<goals>
+							<goal>integration-test</goal>
+							<goal>verify</goal>
+						</goals>
+						<configuration>
+							<systemPropertyVariables>
+								<projectVersion>${project.version}</projectVersion>
+								<regularJar>${project.build.directory}/${project.build.finalName}.jar</regularJar>
+								<standaloneJar>${project.build.directory}/${project.build.finalName}-standalone.jar</standaloneJar>
+							</systemPropertyVariables>
+						</configuration>
+					</execution>
+				</executions>
+			</plugin>
+
 			<!-- checkstyle: same version and configLocation as the report inherited from oss-parent -->
 			<plugin>
 				<groupId>org.apache.maven.plugins</groupId>

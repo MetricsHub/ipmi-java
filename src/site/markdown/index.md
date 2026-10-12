@@ -24,6 +24,13 @@ boards) over **IPMI 2.0 over LAN (RMCP+)**, on UDP port 623. It lets a Java appl
 * send **any IPMI command**, including the System Event Log and chassis control commands, in the
   same session or through the low-level connector ([Low-Level API](low-level-api.html)).
 
+The same operations are available from the command line with the **`ipmicli`** client of the
+standalone jar ([Command-Line Client](cli.html)):
+
+```text
+java -jar ipmi-java-${project.version}-standalone.jar -h bmc.example.com -u monitor -pf pw.txt sensors
+```
+
 The library is the IPMI engine of [MetricsHub](https://metricshub.com) hardware monitoring: its
 [`IpmiClient`](apidocs/org/metricshub/ipmi/client/IpmiClient.html) returns the chassis status,
 the inventory and the sensors as typed Java objects.
@@ -111,6 +118,8 @@ completion code, or the operation outlived its deadline
 ## Where to go next
 
 * [Installation](installation.html) — coordinates, supported JDKs and requirements
+* [Command-Line Client](cli.html) — `ipmicli`: the chassis status, the sensors, the FRUs and a
+  Serial over LAN console from the command line, with the standalone jar
 * [Preparing the BMC](preparing-the-bmc.html) — enabling IPMI over LAN, the account, privilege
   level and cipher suites, the firewall
 * [Chassis Status](chassis-status.html) — power state and chassis flags

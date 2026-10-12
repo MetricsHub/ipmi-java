@@ -1,4 +1,4 @@
-keywords: upgrade, migration, release notes, breaking changes, 2.0, fluent client, builder, ipmiclientexception, slf4j, protected fields, accessors, abstractsensorrecord, validateresponse, utf-8, bmc key, cipher suite, integrity, org.sentrysoftware
+keywords: upgrade, migration, release notes, breaking changes, 2.0, fluent client, builder, ipmiclientexception, slf4j, ipmicli, standalone jar, protected fields, accessors, abstractsensorrecord, validateresponse, utf-8, bmc key, cipher suite, integrity, org.sentrysoftware
 description: What changes when upgrading the IPMI Java Client — from 1.x to 2.0.00 (the fluent client), from 1.2.02, from 1.2.01, and from the org.sentrysoftware:ipmi artifact of 1.2.00 and earlier.
 
 # Upgrading
@@ -9,7 +9,9 @@ description: What changes when upgrading the IPMI Java Client — from 1.x to 2.
 
 Version 2.0.00 replaces the client API of 1.x with a fluent client, removes the SLF4J
 dependency, and simplifies the low-level commands. The protocol core and the decoders are the
-same. The semicolon-separated text output of 1.x (`IpmiResultConverter`) is MetricsHub's format,
+same. It also adds a command-line client, `ipmicli`, in a standalone jar
+([Command-Line Client](cli.html)); `CipherSuite` gains `getAuthenticationAlgorithmCode()`,
+`getIntegrityAlgorithmCode()` and `getConfidentialityAlgorithmCode()` for it. The semicolon-separated text output of 1.x (`IpmiResultConverter`) is MetricsHub's format,
 and moves to the [MetricsHub IPMI extension](https://github.com/MetricsHub/metricshub-community/issues/1391),
 where it stays byte-identical to 1.2.x for the same BMC data.
 

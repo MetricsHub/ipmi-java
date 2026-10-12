@@ -1,5 +1,5 @@
-keywords: install, maven, gradle, dependency, jdk, java 8, no dependency
-description: Add the IPMI Java Client to your build, the supported JDKs and requirements; the library has no dependency and does not log.
+keywords: install, maven, gradle, dependency, jdk, java 8, no dependency, standalone jar, command line
+description: Add the IPMI Java Client to your build, the supported JDKs and requirements, and the standalone jar of the command-line client; the library has no dependency and does not log.
 
 # Installation
 
@@ -51,6 +51,20 @@ It does not log either. Every failure reaches the caller as an exception, and ev
 does not fail an operation is part of its result ([Timeouts and Errors](timeouts-and-errors.html)):
 log what you need from there, with the logging framework of your application.
 
+## Command-line client
+
+Every release also publishes `${project.artifactId}-${project.version}-standalone.jar` on the
+[releases page](https://github.com/metricshub/ipmi-java/releases/latest): the library with a
+command-line client as its entry point, which runs on Java 8 or later with no other file.
+
+```bash
+java -jar ${project.artifactId}-${project.version}-standalone.jar -h bmc.example.com -u monitor -pf pw.txt chassis
+```
+
+See [Command-Line Client](cli.html). The same jar is published on Maven Central with the
+`standalone` classifier; a build uses the regular artifact above, which has the same classes
+without the entry point.
+
 ## Building from source
 
 ```bash
@@ -60,4 +74,5 @@ mvn verify
 ```
 
 `mvn verify site` also generates this documentation and the reports (Javadoc, tests, Checkstyle,
-PMD, SpotBugs) in `target/site`.
+PMD, SpotBugs) in `target/site`. `mvn package` produces both jars in `target`: the library jar and
+the `standalone` one.

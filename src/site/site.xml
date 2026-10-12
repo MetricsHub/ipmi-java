@@ -50,6 +50,7 @@
 		<menu name="Getting Started">
 			<item name="Overview" href="index.html" />
 			<item name="Installation" href="installation.html" />
+			<item name="Command-Line Client" href="cli.html" />
 			<item name="Preparing the BMC" href="preparing-the-bmc.html" />
 		</menu>
 

@@ -69,6 +69,8 @@ public class FakeRmcpPlusBmc implements AutoCloseable {
 	public static final int GET_PAYLOAD_INSTANCE_INFO = 0x4b;
 	/** Get Channel Cipher Suites (NetFn App). */
 	public static final int GET_CHANNEL_CIPHER_SUITES = 0x54;
+	/** Get Session Info. */
+	public static final int GET_SESSION_INFO = 0x3d;
 
 	/** Privilege level User. */
 	public static final int USER = 2;
@@ -157,6 +159,8 @@ public class FakeRmcpPlusBmc implements AutoCloseable {
 	private volatile int solInboundPayloadSize;
 	private volatile int solPrivilege;
 	private volatile boolean solActive;
+	/** The managed system session ID of the session that activated the payload: a dead one keeps it, as on Supermicro. */
+	private volatile int solSessionId;
 	private volatile int solStatus;
 	private final Queue<Integer> solReplies = new ConcurrentLinkedQueue<>();
 	/** The status of each reply of {@link #solReplies}, -1 for {@link #solStatus}. */
@@ -263,6 +267,7 @@ public class FakeRmcpPlusBmc implements AutoCloseable {
 		handle(NETFN_APP, GET_CHANNEL_AUTHENTICATION_CAPABILITIES, this::getChannelAuthenticationCapabilities);
 		handle(NETFN_APP, CLOSE_SESSION, this::closeSession);
 		handle(NETFN_APP, SET_SESSION_PRIVILEGE_LEVEL, this::setSessionPrivilegeLevel);
+		handle(NETFN_APP, GET_SESSION_INFO, this::getSessionInfo);
 		handle(NETFN_CHASSIS, GET_CHASSIS_STATUS, data -> concat(new byte[1], CHASSIS_STATUS));
 		socket = new DatagramSocket(0, InetAddress.getLoopbackAddress());
 		Thread thread = new Thread(this::serve, "fake-rmcp-plus-bmc");
@@ -834,8 +839,14 @@ public class FakeRmcpPlusBmc implements AutoCloseable {
 		if (solActive) {
 			return new byte[] { (byte) 0x80 }; // payload already active
 		}
-		// The payload is only activated in a session on its port (section 24.1)
+		// The payload is only activated in a session on its port (section 24.1); the SOL sequence numbers start over
+		// with it (section 15.9), so a packet numbered like one of a previous activation is not a resend
 		solActive = solPort == getPort();
+		solSessionId = current.managedId;
+		synchronized (solReceived) {
+			lastSolSequenceNumber = 0;
+			lastSolAccepted = false;
+		}
 		return ByteBuffer
 				.allocate(13)
 				.order(ByteOrder.LITTLE_ENDIAN)
@@ -869,9 +880,25 @@ public class FakeRmcpPlusBmc implements AutoCloseable {
 				.allocate(13)
 				.order(ByteOrder.LITTLE_ENDIAN)
 				.put((byte) 0x00)
-				.putInt(solActive ? current.managedId : 0)
+				.putInt(solActive ? solSessionId : 0)
 				.put(new byte[8])
 				.array();
+	}
+
+	/**
+	 * Get Session Info (IPMI 2.0 table 22-26), by session ID (index FFh) or for the current session (index 0): the
+	 * handle, the capacity and the count, then the user ID, privilege and channel when the session is the current one
+	 * and still active; a session the BMC expired or closed is not found (three bytes, handle 0), as on Supermicro.
+	 */
+	private byte[] getSessionInfo(byte[] data) {
+		Session current = session;
+		boolean alive = current != null && !current.expired && !current.closed;
+		int lookedUp = data.length >= 5 && (data[0] & 0xff) == 0xff ?
+				ByteBuffer.wrap(data, 1, 4).order(ByteOrder.LITTLE_ENDIAN).getInt() : current == null ? 0 : current.managedId;
+		if (alive && lookedUp == current.managedId) {
+			return new byte[] { 0x00, 0x01, 0x10, 0x01, 0x02, (byte) current.privilege, 0x01 };
+		}
+		return new byte[] { 0x00, 0x00, 0x10, (byte) (alive ? 1 : 0) };
 	}
 
 	/**
@@ -1011,8 +1038,10 @@ public class FakeRmcpPlusBmc implements AutoCloseable {
 			return new byte[] { (byte) 0x87 }; // invalid session ID
 		}
 		current.closed = true;
-		// The payloads of a session end with it (IPMI 2.0 section 24.2)
-		solActive = false;
+		// The payloads of a session end with it (IPMI 2.0 section 24.2): those of this session, not of another one
+		if (solSessionId == current.managedId) {
+			solActive = false;
+		}
 		return new byte[] { 0x00 };
 	}
 

@@ -1,0 +1,51 @@
+FRU 0: System Board 1 (SystemBoard 1)
+  Chassis type               Other
+  Chassis serial number      KD9098C
+  Chassis custom 1           6652a19c93883929b8a7d6cf3789b3c3
+  Board manufacturer         IBM
+  Board product              System Board
+  Board serial number        YK159097Z09Y
+  Board part number          49Y6498
+  Board mfg date             2009-07-20T00:00:00Z
+  Board custom 1             43V7072
+  Board custom 2             0002
+  Board custom 3             0000
+  Board custom 4             0050
+  Board custom 6             01063c0100
+  Board custom 7             00215edb179000215edb1792000000000000000000000000000000000000000000000000000000000000000000000000
+  Board custom 8             6652a19c93883929b8a7d6cf3789b3c3
+  Board custom 9             02
+  Board custom 10            11110000000000000000000000000000
+  Board custom 11            0000000000000000
+  Board custom 12            012c
+  Board custom 13            0000
+  Product manufacturer       IBM
+  Product name               System x3650 M2
+  Product part/model number  794722G
+  Product serial number      KD9098C
+
+FRU 1: PSU 1 (PowerSupply 1)
+  Chassis type               Other
+  Chassis serial number      KD9098C
+  Chassis custom 1           6652a19c93883929b8a7d6cf3789b3c3
+  Board manufacturer         IBM
+  Board product              System Board
+  Board serial number        YK159097Z09Y
+  Board part number          49Y6498
+  Board mfg date             2009-07-20T00:00:00Z
+  Board custom 1             43V7072
+  Board custom 2             0002
+  Board custom 3             0000
+  Board custom 4             0050
+  Board custom 6             01063c0100
+  Board custom 7             00215edb179000215edb1792000000000000000000000000000000000000000000000000000000000000000000000000
+  Board custom 8             6652a19c93883929b8a7d6cf3789b3c3
+  Board custom 9             02
+  Board custom 10            11110000000000000000000000000000
+  Board custom 11            0000000000000000
+  Board custom 12            012c
+  Board custom 13            0000
+  Product manufacturer       IBM
+  Product name               System x3650 M2
+  Product part/model number  794722G
+  Product serial number      KD9098C
