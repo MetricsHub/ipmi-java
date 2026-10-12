@@ -140,6 +140,13 @@ public final class SolConsole implements AutoCloseable {
 	}
 
 	/**
+	 * Marks the console deactivated: the session it ran in is gone, so no character can arrive any more.
+	 */
+	void invalidate() {
+		deactivated = true;
+	}
+
+	/**
 	 * Deactivates the SOL payload and releases the console. Closing a closed console does nothing.
 	 */
 	@Override

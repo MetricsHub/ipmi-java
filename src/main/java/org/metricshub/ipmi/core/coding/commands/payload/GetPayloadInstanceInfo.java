@@ -24,7 +24,6 @@ package org.metricshub.ipmi.core.coding.commands.payload;
 
 import org.metricshub.ipmi.core.coding.commands.CommandCodes;
 import org.metricshub.ipmi.core.coding.commands.IpmiCommandCoder;
-import org.metricshub.ipmi.core.coding.commands.ResponseData;
 import org.metricshub.ipmi.core.coding.payload.IpmiPayload;
 import org.metricshub.ipmi.core.coding.payload.lan.IPMIException;
 import org.metricshub.ipmi.core.coding.payload.lan.IpmiLanRequest;
@@ -39,7 +38,7 @@ import java.util.Arrays;
  * Wrapper for the Get Payload Instance Info command (IPMI 2.0 section 24.5): the session where an instance of a
  * payload is active.
  */
-public class GetPayloadInstanceInfo extends IpmiCommandCoder {
+public class GetPayloadInstanceInfo extends IpmiCommandCoder<GetPayloadInstanceInfoResponseData> {
 
 	private final PayloadType payloadType;
 	private final int payloadInstance;
@@ -75,7 +74,7 @@ public class GetPayloadInstanceInfo extends IpmiCommandCoder {
 	 * Decodes the response: the session ID (LS-byte first), then 8 bytes of payload-specific information (table 24-7).
 	 */
 	@Override
-	public ResponseData getResponseData(IpmiMessage message) throws IPMIException {
+	public GetPayloadInstanceInfoResponseData getResponseData(IpmiMessage message) throws IPMIException {
 		byte[] data = validateResponse(message);
 		// The whole response, before trusting its session ID
 		if (data.length < 12) {

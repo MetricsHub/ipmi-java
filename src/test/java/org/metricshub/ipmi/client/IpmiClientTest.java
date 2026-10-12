@@ -379,6 +379,40 @@ class IpmiClientTest {
 
 	@Test
 	@Timeout(30)
+	void aMalformedReadingReplyCostsThatSensorAndKeepsTheSession() throws Exception {
+		try (FakeRmcpPlusBmc bmc = bmc()) {
+			// One data byte: Get Sensor Reading needs two
+			bmc.handle(NETFN_SENSOR, GET_SENSOR_READING, data -> new byte[] { 0x00, 0x05 });
+			try (IpmiClient client = client(bmc).build()) {
+				SensorList sensors = client.sensors().execute();
+				assertEquals(3, sensors.size());
+				for (Sensor sensor : sensors) {
+					assertEquals(SensorStatus.UNAVAILABLE, sensor.status());
+					assertTrue(sensor.problem().get().contains("GetSensorReading"), sensor.problem().get());
+				}
+				assertEquals(1, bmc.getCount(OPEN_SESSION_REQUEST), "a malformed reply does not lose the session");
+			}
+		}
+	}
+
+	@Test
+	@Timeout(30)
+	void aSolConsoleEndsWhenItsSessionIsDropped() throws Exception {
+		try (FakeRmcpPlusBmc bmc = bmc()) {
+			bmc.enableSol(bmc.getPort(), 255, ADMINISTRATOR);
+			try (
+					IpmiClient client = client(bmc).privilege(PrivilegeLevel.Administrator).build();
+					SolConsole console = client.sol().open()) {
+				bmc.expireSession();
+				assertTrue(client.chassisStatus().powerOn(), "reopened on a new session");
+				assertTrue(console.deactivated(), "the console of the lost session is invalidated");
+				assertEquals(-1, console.input().read(), "its reads end");
+			}
+		}
+	}
+
+	@Test
+	@Timeout(30)
 	void aLostSessionIsReopenedAndAReadIsRetriedButNotASend() throws Exception {
 		try (FakeRmcpPlusBmc bmc = bmc(); IpmiClient client = client(bmc).build()) {
 			client.chassisStatus();

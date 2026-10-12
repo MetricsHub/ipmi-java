@@ -81,7 +81,7 @@ public class GetSensorReading extends IpmiCommandCoder<GetSensorReadingResponseD
 		byte[] raw = validateResponse(message);
 
 		if (raw.length < 2) {
-			throw new IllegalStateException("Invalid data length");
+			throw new IllegalArgumentException("Invalid data length");
 		}
 
 		GetSensorReadingResponseData responseData = new GetSensorReadingResponseData();

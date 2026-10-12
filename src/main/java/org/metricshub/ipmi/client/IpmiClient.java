@@ -35,6 +35,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.Callable;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -42,7 +43,6 @@ import java.util.concurrent.Future;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Predicate;
 
 import org.metricshub.ipmi.core.api.async.ConnectionHandle;
@@ -161,7 +161,11 @@ public final class IpmiClient implements AutoCloseable {
 	private final boolean sdrCache;
 
 	private final ExecutorService worker;
-	private final AtomicBoolean closed = new AtomicBoolean();
+	/** Guards the submissions to the worker and the closed flag: no operation can queue behind the logout. */
+	private final Object submission = new Object();
+	private boolean closed;
+	/** The consoles opened in the current session, to invalidate when the session is dropped. */
+	private final List<SolConsole> consoles = new CopyOnWriteArrayList<SolConsole>();
 
 	// Touched by the worker thread, and by close() once the worker is done
 	private volatile IpmiConnector connector;
@@ -282,10 +286,14 @@ public final class IpmiClient implements AutoCloseable {
 	 */
 	@Override
 	public void close() {
-		if (!closed.compareAndSet(false, true)) {
-			return;
+		Future<?> logout;
+		synchronized (submission) {
+			if (closed) {
+				return;
+			}
+			closed = true;
+			logout = worker.submit(this::logout);
 		}
-		Future<?> logout = worker.submit(this::logout);
 		boolean interrupted = false;
 		try {
 			logout.get(messageTimeoutMs + CLOSE_GRACE_MS, TimeUnit.MILLISECONDS);
@@ -317,6 +325,10 @@ public final class IpmiClient implements AutoCloseable {
 
 	private synchronized void releaseConnector() {
 		link = null;
+		for (SolConsole console : consoles) {
+			console.invalidate();
+		}
+		consoles.clear();
 		if (connector != null) {
 			connector.tearDown();
 			connector = null;
@@ -350,6 +362,12 @@ public final class IpmiClient implements AutoCloseable {
 							null,
 							"Get Sensor Reading failed: " + e.completionCode().getMessage()
 									+ String.format(" (completion code %02Xh)", e.rawCompletionCode()));
+		} catch (IpmiTimeoutException | IpmiConnectionException e) {
+			// The BMC stopped answering: the walk cannot go on
+			throw e;
+		} catch (IpmiClientException e) {
+			// A reply the BMC malformed costs that sensor too
+			return Sensor.of(record, null, e.getMessage());
 		}
 	}
 
@@ -363,7 +381,9 @@ public final class IpmiClient implements AutoCloseable {
 	SolConsole openSol(Duration deadline) {
 		return run("SOL console", deadline, true, false, () -> {
 			try {
-				return new SolConsole(new SerialOverLan(link.connector, link.session));
+				SolConsole console = new SolConsole(new SerialOverLan(link.connector, link.session));
+				consoles.add(console);
+				return console;
 			} catch (SOLException e) {
 				if (e.getCause() instanceof IPMIException) {
 					throw new IpmiCompletionCodeException("Activating the SOL payload", (IPMIException) e.getCause());
@@ -419,10 +439,15 @@ public final class IpmiClient implements AutoCloseable {
 	private <T> T run(String operation, Duration deadline, boolean needsSession, boolean replayable, Callable<T> task) {
 		Duration limit = deadline == null ? timeout : deadline;
 		Future<T> future;
-		try {
-			future = worker.submit(() -> perform(needsSession, replayable, task));
-		} catch (RejectedExecutionException e) {
-			throw new IllegalStateException("The client of " + host + " is closed", e);
+		synchronized (submission) {
+			if (closed) {
+				throw new IllegalStateException("The client of " + host + " is closed");
+			}
+			try {
+				future = worker.submit(() -> perform(needsSession, replayable, task));
+			} catch (RejectedExecutionException e) {
+				throw new IllegalStateException("The client of " + host + " is closed", e);
+			}
 		}
 		try {
 			return future.get(limit.toMillis(), TimeUnit.MILLISECONDS);
@@ -489,6 +514,11 @@ public final class IpmiClient implements AutoCloseable {
 			connector.closeConnection(link.handle);
 			link = null;
 		}
+		// The consoles of the session can receive nothing any more: their reads end
+		for (SolConsole console : consoles) {
+			console.invalidate();
+		}
+		consoles.clear();
 	}
 
 	private IpmiConnector connector() throws IOException {
@@ -688,6 +718,15 @@ public final class IpmiClient implements AutoCloseable {
 			}
 		}
 
+		private boolean isConnectionOpen() {
+			try {
+				connector.getTimeout(handle);
+				return true;
+			} catch (IllegalStateException e) {
+				return false;
+			}
+		}
+
 		private void raisePrivilege(PrivilegeLevel privilege) {
 			try {
 				send(new SetSessionPrivilegeLevel(privilege));
@@ -723,8 +762,12 @@ public final class IpmiClient implements AutoCloseable {
 						"No reply from " + host + " to " + name + " after " + tries + " tries: the session is lost",
 						e);
 			} catch (IllegalStateException e) {
-				lost = true;
-				throw new IpmiConnectionException("The connection to " + host + " is closed", e);
+				// The connection was closed, or a decoder rejected a malformed reply: only the former loses the session
+				if (!isConnectionOpen()) {
+					lost = true;
+					throw new IpmiConnectionException("The connection to " + host + " is closed", e);
+				}
+				throw new IpmiClientException(name + " failed on " + host + ": " + e.getMessage(), e);
 			} catch (InterruptedException e) {
 				lost = true;
 				Thread.currentThread().interrupt();

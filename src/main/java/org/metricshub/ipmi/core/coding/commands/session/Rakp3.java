@@ -24,7 +24,6 @@ package org.metricshub.ipmi.core.coding.commands.session;
 
 import org.metricshub.ipmi.core.coding.commands.IpmiCommandCoder;
 import org.metricshub.ipmi.core.coding.commands.IpmiVersion;
-import org.metricshub.ipmi.core.coding.commands.ResponseData;
 import org.metricshub.ipmi.core.coding.payload.IpmiPayload;
 import org.metricshub.ipmi.core.coding.payload.PlainMessage;
 import org.metricshub.ipmi.core.coding.payload.lan.IPMIException;
@@ -45,7 +44,7 @@ import java.security.NoSuchAlgorithmException;
 /**
  * A wrapper for RMCP+ RAKP3 message and it's response - RAKP4 message.
  */
-public class Rakp3 extends IpmiCommandCoder {
+public class Rakp3 extends IpmiCommandCoder<Rakp3ResponseData> {
 
 	/**
 	 * Status of the previous message.
@@ -284,7 +283,7 @@ public class Rakp3 extends IpmiCommandCoder {
 	}
 
 	@Override
-	public ResponseData getResponseData(IpmiMessage message)
+	public Rakp3ResponseData getResponseData(IpmiMessage message)
 			throws IPMIException,
 			InvalidKeyException,
 			NoSuchAlgorithmException {

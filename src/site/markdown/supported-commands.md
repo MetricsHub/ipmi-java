@@ -118,6 +118,7 @@ decodes the FRU information (Platform Management FRU Information Storage Definit
 | MultiRecord: Management Access | `ManagementAccessInfo` |
 | MultiRecord: Base / Extended Compatibility | `BaseCompatibilityInfo`, `ExtendedCompatibilityInfo` |
 | MultiRecord: OEM | `OemInfo` |
+| MultiRecord: any other type (Extended DC Output, Extended DC Load, reserved) | `RawMultiRecordInfo`, with the type and the bytes of the record |
 
 `frus()` returns every decoded area, the MultiRecord ones included
 ([`Fru.multiRecords()`](apidocs/org/metricshub/ipmi/client/Fru.html)). FRUs in another format,
@@ -129,5 +130,6 @@ The decoder checks the common header checksum and rejects a FRU whose header is 
 that the data read does not hold in full is skipped, the others are returned, and
 `ReadFruData.decodeFruData(data, problems)` reports what was skipped and why. In the
 MultiRecord area, a record of a type the library does not model (such as the Extended DC Output
-and Extended DC Load records) or of an unknown format version is skipped, and the record that
-carries the end-of-list flag is decoded like the others.
+and Extended DC Load records) is kept as a `RawMultiRecordInfo`, a record of an unknown format
+version is skipped and reported, an area that ends without its end-of-list record is reported,
+and the record that carries the end-of-list flag is decoded like the others.

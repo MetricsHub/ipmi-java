@@ -395,7 +395,7 @@ public class SerialOverLan implements Closeable {
 		boolean deactivated = false;
 		while (true) {
 			try {
-				return (ActivateSolPayloadResponseData) ipmiConnector.sendMessage(connectionHandle, activatePayload);
+				return ipmiConnector.sendMessage(connectionHandle, activatePayload);
 			} catch (IPMIException e) {
 				boolean alreadyActive = !deactivated && e.getRawCode() == PAYLOAD_ALREADY_ACTIVE;
 				if (!raised && e.getCompletionCode() == CompletionCode.InsufficentPrivilege) {
@@ -420,7 +420,7 @@ public class SerialOverLan implements Closeable {
 	private boolean isActiveInSession(IpmiConnector ipmiConnector, Session payloadSession) throws Exception {
 		ConnectionHandle connectionHandle = payloadSession.getConnectionHandle();
 		try {
-			GetPayloadInstanceInfoResponseData info = (GetPayloadInstanceInfoResponseData) ipmiConnector
+			GetPayloadInstanceInfoResponseData info = ipmiConnector
 					.sendMessage(
 							connectionHandle,
 							new GetPayloadInstanceInfo(PayloadType.Sol, payloadInstance));
@@ -445,7 +445,7 @@ public class SerialOverLan implements Closeable {
 	private int getFirstAvailablePayloadInstance(IpmiConnector ipmiConnector, ConnectionHandle connectionHandle)
 			throws Exception {
 		GetPayloadActivationStatus getPayloadActivationStatus = new GetPayloadActivationStatus(PayloadType.Sol);
-		GetPayloadActivationStatusResponseData getActivationResponseData = (GetPayloadActivationStatusResponseData) ipmiConnector
+		GetPayloadActivationStatusResponseData getActivationResponseData = ipmiConnector
 				.sendMessage(
 						connectionHandle,
 						getPayloadActivationStatus);

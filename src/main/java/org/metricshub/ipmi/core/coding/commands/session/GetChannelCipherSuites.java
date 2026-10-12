@@ -24,7 +24,6 @@ package org.metricshub.ipmi.core.coding.commands.session;
 
 import org.metricshub.ipmi.core.coding.commands.CommandCodes;
 import org.metricshub.ipmi.core.coding.commands.IpmiCommandCoder;
-import org.metricshub.ipmi.core.coding.commands.ResponseData;
 import org.metricshub.ipmi.core.coding.payload.lan.IPMIException;
 import org.metricshub.ipmi.core.coding.payload.lan.IpmiLanMessage;
 import org.metricshub.ipmi.core.coding.payload.lan.IpmiLanRequest;
@@ -42,7 +41,7 @@ import java.security.NoSuchAlgorithmException;
  * Wrapper for RMCP+ Get Channel Cipher Suites command. This command can be
  * executed prior to establishing a session with the BMC.
  */
-public class GetChannelCipherSuites extends IpmiCommandCoder {
+public class GetChannelCipherSuites extends IpmiCommandCoder<GetChannelCipherSuitesResponseData> {
 
 	private byte channelNumber;
 
@@ -154,7 +153,7 @@ public class GetChannelCipherSuites extends IpmiCommandCoder {
 	}
 
 	@Override
-	public ResponseData getResponseData(IpmiMessage message)
+	public GetChannelCipherSuitesResponseData getResponseData(IpmiMessage message)
 			throws IPMIException,
 			NoSuchAlgorithmException,
 			InvalidKeyException {

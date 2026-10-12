@@ -18,6 +18,7 @@ import org.metricshub.ipmi.core.coding.commands.fru.record.BaseCompatibilityInfo
 import org.metricshub.ipmi.core.coding.commands.fru.record.BoardInfo;
 import org.metricshub.ipmi.core.coding.commands.fru.record.FruRecord;
 import org.metricshub.ipmi.core.coding.commands.fru.record.PowerSupplyInfo;
+import org.metricshub.ipmi.core.coding.commands.fru.record.RawMultiRecordInfo;
 import org.metricshub.ipmi.core.coding.commands.fru.record.ProductInfo;
 
 class ReadFruDataTest {
@@ -139,7 +140,8 @@ class ReadFruDataTest {
 	void everyAreaAndTheLastMultirecordAreDecoded() {
 		List<FruRecord> records = decode(image());
 
-		assertEquals(3, records.size(), "board, product and the power supply record; the unknown record is skipped");
+		assertEquals(4, records.size(), "board, product, the raw Extended DC Output record and the power supply record");
+		assertEquals(EXTENDED_DC_OUTPUT_RECORD, assertInstanceOf(RawMultiRecordInfo.class, records.get(2)).getRecordType());
 
 		BoardInfo board = assertInstanceOf(BoardInfo.class, records.get(0));
 		assertEquals("IBM", board.getBoardManufacturer());
@@ -152,7 +154,7 @@ class ReadFruDataTest {
 		assertEquals("IBM", product.getManufacturerName());
 		assertEquals("Model", product.getProductName());
 
-		PowerSupplyInfo powerSupply = assertInstanceOf(PowerSupplyInfo.class, records.get(2));
+		PowerSupplyInfo powerSupply = assertInstanceOf(PowerSupplyInfo.class, records.get(3));
 		assertEquals(750, powerSupply.getCapacity());
 	}
 
@@ -187,8 +189,8 @@ class ReadFruDataTest {
 
 		List<FruRecord> records = decode(image);
 
-		assertEquals(3, records.size(), "board, product and the power supply record, checksum or not");
-		assertEquals(750, assertInstanceOf(PowerSupplyInfo.class, records.get(2)).getCapacity());
+		assertEquals(4, records.size(), "board, product, the raw record and the power supply record, checksum or not");
+		assertEquals(750, assertInstanceOf(PowerSupplyInfo.class, records.get(3)).getCapacity());
 	}
 
 	@Test
@@ -201,10 +203,11 @@ class ReadFruDataTest {
 
 		List<FruRecord> records = ReadFruData.decodeFruData(Collections.singletonList(chunk), problems);
 
-		assertEquals(2, records.size(), "board and product; the first multirecord is not modelled");
+		assertEquals(3, records.size(), "board, product and the raw Extended DC Output record");
+		assertEquals(EXTENDED_DC_OUTPUT_RECORD, assertInstanceOf(RawMultiRecordInfo.class, records.get(2)).getRecordType());
 		assertEquals(1, problems.size(), problems.toString());
 		assertTrue(problems.get(0).contains("end-of-list"), problems.get(0));
-		assertTrue(ReadFruData.decodeFruData(Collections.singletonList(chunk)).size() == 2);
+		assertEquals(3, ReadFruData.decodeFruData(Collections.singletonList(chunk)).size());
 	}
 
 	@Test
@@ -215,7 +218,7 @@ class ReadFruDataTest {
 
 		List<FruRecord> records = decode(image);
 
-		assertEquals(2, records.size(), "board and product; the area is not read past the corrupt header");
+		assertEquals(3, records.size(), "board, product and the raw record; the area is not read past the corrupt header");
 	}
 
 	@Test

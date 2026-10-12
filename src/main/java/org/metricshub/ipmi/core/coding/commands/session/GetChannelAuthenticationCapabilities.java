@@ -26,7 +26,6 @@ import org.metricshub.ipmi.core.coding.commands.CommandCodes;
 import org.metricshub.ipmi.core.coding.commands.IpmiCommandCoder;
 import org.metricshub.ipmi.core.coding.commands.IpmiVersion;
 import org.metricshub.ipmi.core.coding.commands.PrivilegeLevel;
-import org.metricshub.ipmi.core.coding.commands.ResponseData;
 import org.metricshub.ipmi.core.coding.payload.IpmiPayload;
 import org.metricshub.ipmi.core.coding.payload.lan.IPMIException;
 import org.metricshub.ipmi.core.coding.payload.lan.IpmiLanRequest;
@@ -44,7 +43,8 @@ import java.util.ArrayList;
 /**
  * Wrapper for Get Channel Authentication Capabilities request
  */
-public class GetChannelAuthenticationCapabilities extends IpmiCommandCoder {
+public class GetChannelAuthenticationCapabilities
+		extends IpmiCommandCoder<GetChannelAuthenticationCapabilitiesResponseData> {
 
 	private PrivilegeLevel requestedPrivilegeLevel;
 
@@ -222,7 +222,7 @@ public class GetChannelAuthenticationCapabilities extends IpmiCommandCoder {
 	}
 
 	@Override
-	public ResponseData getResponseData(IpmiMessage message) throws IPMIException {
+	public GetChannelAuthenticationCapabilitiesResponseData getResponseData(IpmiMessage message) throws IPMIException {
 		byte[] raw = validateResponse(message);
 
 		GetChannelAuthenticationCapabilitiesResponseData responseData = new GetChannelAuthenticationCapabilitiesResponseData();

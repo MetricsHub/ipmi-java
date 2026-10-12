@@ -25,7 +25,6 @@ package org.metricshub.ipmi.core.coding.commands.session;
 import org.metricshub.ipmi.core.coding.commands.IpmiCommandCoder;
 import org.metricshub.ipmi.core.coding.commands.IpmiVersion;
 import org.metricshub.ipmi.core.coding.commands.PrivilegeLevel;
-import org.metricshub.ipmi.core.coding.commands.ResponseData;
 import org.metricshub.ipmi.core.coding.payload.IpmiPayload;
 import org.metricshub.ipmi.core.coding.payload.PlainMessage;
 import org.metricshub.ipmi.core.coding.payload.lan.IPMIException;
@@ -44,7 +43,7 @@ import org.metricshub.ipmi.core.common.TypeConverter;
 /**
  * Wrapper class for RMCP+ Open Session request.
  */
-public class OpenSession extends IpmiCommandCoder {
+public class OpenSession extends IpmiCommandCoder<OpenSessionResponseData> {
 
 	private PrivilegeLevel requestedPrivilegeLevel;
 
@@ -225,7 +224,7 @@ public class OpenSession extends IpmiCommandCoder {
 	}
 
 	@Override
-	public ResponseData getResponseData(IpmiMessage message) throws IPMIException {
+	public OpenSessionResponseData getResponseData(IpmiMessage message) throws IPMIException {
 		if (!isCommandResponse(message)) {
 			throw new IllegalArgumentException(
 					"This is not a response for Open Session command");
