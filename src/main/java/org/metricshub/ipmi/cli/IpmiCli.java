@@ -628,8 +628,9 @@ public final class IpmiCli {
 			console.close();
 			client.close();
 		}, "ipmicli-sol-shutdown");
-		Runtime.getRuntime().addShutdownHook(hook);
 		try {
+			// Inside the protected region: a registration that fails must still give the terminal back
+			Runtime.getRuntime().addShutdownHook(hook);
 			if (terminal) {
 				// Like ipmitool: an idle serial console prints nothing until the server does, so say the console is open
 				diagnostic(
