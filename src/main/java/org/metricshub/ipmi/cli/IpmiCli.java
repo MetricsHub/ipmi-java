@@ -608,11 +608,13 @@ public final class IpmiCli {
 			throws InterruptedException {
 		SolConsole console = timed(arguments, err, "SOL console", () -> client.sol().open());
 		RawInput raw = terminal ? rawInput(stdin, err) : null;
-		// A kill (Ctrl+C in line mode) must give the terminal back and free the payload on the BMC
+		// A kill (Ctrl+C in line mode) must give the terminal back and free the payload on the BMC: some BMCs keep
+		// a payload active after its session is gone, so the console is deactivated before the session is closed
 		Thread hook = new Thread(() -> {
 			if (raw != null) {
 				raw.release.run();
 			}
+			console.close();
 			client.close();
 		}, "ipmicli-sol-shutdown");
 		Runtime.getRuntime().addShutdownHook(hook);

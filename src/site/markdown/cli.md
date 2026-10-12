@@ -317,7 +317,9 @@ sequences of the remote console; the typed bytes go to the BMC.
 * When the BMC deactivates the console (another user activated SOL, or the session was lost),
   the CLI says so on stderr and exits with 70. When SOL is already active in another session,
   the activation fails with the completion code of the BMC (80h, *payload already active*); the
-  CLI never deactivates the console of another session.
+  CLI never deactivates the console of another session. A console ended by a kill is deactivated
+  by the shutdown hook; one ended by a hard kill is not, and some BMCs (Supermicro) keep the
+  payload active after its session is gone until it is deactivated (`ipmitool sol deactivate`).
 
 The default privilege of `sol` is Administrator, which most BMCs require to activate the SOL
 payload; `-L user` or `-L operator` is enough on the BMCs that allow it. The SOL console shares
