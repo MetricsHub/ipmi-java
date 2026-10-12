@@ -170,7 +170,7 @@ public final class FakeSdrRepository {
 		int offset = data[4] & 0xff;
 		int count = data[5] & 0xff;
 		int index = recordId == 0 ? 0 : indexOf(recordId);
-		if (index < 0) {
+		if (index < 0 || index >= records.size()) {
 			return new byte[] { (byte) 0xcb }; // requested record not present
 		}
 		byte[] record = records.get(index);

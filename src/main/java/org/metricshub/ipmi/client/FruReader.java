@@ -104,7 +104,7 @@ final class FruReader {
 					}
 				}
 			} else
-				if (!systemBoard.isEmpty()
+				if ((!systemBoard.isEmpty() || !systemBoardProblems.isEmpty())
 						&& !returnedIds.contains(SYSTEM_BOARD_FRU_ID)
 						&& record instanceof CompactSensorRecord
 						&& EntityId.SystemBoard.equals(((CompactSensorRecord) record).getEntityId())) {
@@ -158,9 +158,9 @@ final class FruReader {
 	}
 
 	/**
-	 * Reads and decodes the inventory of a FRU. A read the BMC refuses (absent FRU, timeout on its side) or an
-	 * inventory that cannot be decoded costs that FRU, which is reported with the problem, not the whole walk; a
-	 * BMC that does not answer at all fails the walk.
+	 * Reads and decodes the inventory of a FRU. A read the BMC refuses (absent FRU, timeout on its side), a reply it
+	 * malforms or an inventory that cannot be decoded costs that FRU, which is reported with the problem, not the
+	 * whole walk; a BMC that does not answer at all fails the walk.
 	 */
 	private List<FruRecord> inventory(int fruId, List<String> problems) {
 		List<ReadFruDataResponseData> chunks = new ArrayList<ReadFruDataResponseData>();
@@ -172,8 +172,12 @@ final class FruReader {
 			for (int offset = 0; offset < size; offset += READ_SIZE) {
 				chunks.add(exchange.send(new ReadFruData(fruId, unit, offset, Math.min(READ_SIZE, size - offset))));
 			}
-		} catch (IpmiCompletionCodeException e) {
-			// Stop here: the chunks after a gap would shift into its place and decode into wrong fields
+		} catch (IpmiTimeoutException | IpmiConnectionException e) {
+			// The BMC stopped answering: the walk cannot go on
+			throw e;
+		} catch (IpmiClientException e) {
+			// A read the BMC refused, or a reply it malformed. Stop here: the chunks after a gap would shift into its
+			// place and decode into wrong fields
 			problems
 					.add(
 							chunks.isEmpty() ?

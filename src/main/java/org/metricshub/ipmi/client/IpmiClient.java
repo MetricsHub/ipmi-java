@@ -163,8 +163,8 @@ public final class IpmiClient implements AutoCloseable {
 	private final ExecutorService worker;
 	private final AtomicBoolean closed = new AtomicBoolean();
 
-	// Touched by the worker thread only
-	private IpmiConnector connector;
+	// Touched by the worker thread, and by close() once the worker is done
+	private volatile IpmiConnector connector;
 	private Link link;
 	private SdrRepository repository;
 
@@ -286,18 +286,40 @@ public final class IpmiClient implements AutoCloseable {
 			return;
 		}
 		Future<?> logout = worker.submit(this::logout);
+		boolean interrupted = false;
 		try {
 			logout.get(messageTimeoutMs + CLOSE_GRACE_MS, TimeUnit.MILLISECONDS);
 		} catch (TimeoutException e) {
-			// The worker releases the port by itself once its current wait ends
+			// An operation still running ahead of the logout, or a BMC that does not answer it
 			logout.cancel(true);
 		} catch (InterruptedException e) {
 			logout.cancel(true);
-			Thread.currentThread().interrupt();
+			interrupted = true;
 		} catch (ExecutionException e) {
 			// Best effort: the port and the threads are released anyway
-		} finally {
-			worker.shutdownNow();
+		}
+		worker.shutdownNow();
+		try {
+			// The interrupted operation ends at its current wait; then the port can be released from here
+			if (!worker.awaitTermination(CLOSE_GRACE_MS, TimeUnit.MILLISECONDS)) {
+				// A call that cannot be interrupted (name resolution, a blocking send): the port is released all the
+				// same, and that call fails when it returns
+				interrupted = interrupted || Thread.currentThread().isInterrupted();
+			}
+		} catch (InterruptedException e) {
+			interrupted = true;
+		}
+		releaseConnector();
+		if (interrupted) {
+			Thread.currentThread().interrupt();
+		}
+	}
+
+	private synchronized void releaseConnector() {
+		link = null;
+		if (connector != null) {
+			connector.tearDown();
+			connector = null;
 		}
 	}
 
@@ -500,11 +522,7 @@ public final class IpmiClient implements AutoCloseable {
 				Thread.currentThread().interrupt();
 			}
 		} finally {
-			link = null;
-			if (connector != null) {
-				connector.tearDown();
-				connector = null;
-			}
+			releaseConnector();
 		}
 	}
 
@@ -791,11 +809,19 @@ public final class IpmiClient implements AutoCloseable {
 		 * default, enough for every read operation; Operator for the power control; Administrator for Serial over
 		 * LAN on most BMCs.
 		 *
-		 * @param level the privilege level
+		 * @param level the privilege level: User, Operator or Administrator ({@code MaximumAvailable} is refused, as
+		 *        the session could not be raised to it)
 		 * @return this builder
+		 * @throws IllegalArgumentException for {@code MaximumAvailable}
 		 */
 		public Builder privilege(PrivilegeLevel level) {
-			this.privilege = Objects.requireNonNull(level, "level");
+			Objects.requireNonNull(level, "level");
+			if (level == PrivilegeLevel.MaximumAvailable) {
+				// Set Session Privilege Level needs a level: the highest one the user has is not known here
+				throw new IllegalArgumentException(
+						"Choose the privilege level of the session: User, Operator or Administrator");
+			}
+			this.privilege = level;
 			return this;
 		}
 

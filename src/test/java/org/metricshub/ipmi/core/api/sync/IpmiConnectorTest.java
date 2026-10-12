@@ -90,6 +90,19 @@ class IpmiConnectorTest {
 	}
 
 	@Test
+	void negativeRetriesAreRefused() throws Exception {
+		IpmiConnector connector = new IpmiConnector(0, 0);
+		try {
+			assertThrows(IllegalArgumentException.class, () -> connector.setRetries(-1));
+			assertEquals(3, connector.getRetries());
+			connector.setRetries(0);
+			assertEquals(0, connector.getRetries());
+		} finally {
+			connector.tearDown();
+		}
+	}
+
+	@Test
 	@Timeout(30)
 	void aLostReplyIsSentAgainWithoutPause() throws Exception {
 		// The BMC drops the first request and answers the second one

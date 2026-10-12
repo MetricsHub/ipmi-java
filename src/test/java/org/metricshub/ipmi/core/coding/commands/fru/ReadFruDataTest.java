@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.nio.charset.StandardCharsets;
@@ -188,6 +189,22 @@ class ReadFruDataTest {
 
 		assertEquals(3, records.size(), "board, product and the power supply record, checksum or not");
 		assertEquals(750, assertInstanceOf(PowerSupplyInfo.class, records.get(2)).getCapacity());
+	}
+
+	@Test
+	void aMultirecordAreaWithoutItsEndOfListRecordIsReported() {
+		byte[] image = image();
+		byte[] truncated = Arrays.copyOf(image, image.length - 24 - 5); // without the last multirecord
+		ReadFruDataResponseData chunk = new ReadFruDataResponseData();
+		chunk.setFruData(truncated);
+		List<String> problems = new java.util.ArrayList<>();
+
+		List<FruRecord> records = ReadFruData.decodeFruData(Collections.singletonList(chunk), problems);
+
+		assertEquals(2, records.size(), "board and product; the first multirecord is not modelled");
+		assertEquals(1, problems.size(), problems.toString());
+		assertTrue(problems.get(0).contains("end-of-list"), problems.get(0));
+		assertTrue(ReadFruData.decodeFruData(Collections.singletonList(chunk)).size() == 2);
 	}
 
 	@Test

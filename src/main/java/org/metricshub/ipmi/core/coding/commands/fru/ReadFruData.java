@@ -26,6 +26,7 @@ import org.metricshub.ipmi.core.coding.commands.CommandCodes;
 import org.metricshub.ipmi.core.coding.commands.IpmiCommandCoder;
 import org.metricshub.ipmi.core.coding.commands.fru.record.BoardInfo;
 import org.metricshub.ipmi.core.coding.commands.fru.record.ChassisInfo;
+import org.metricshub.ipmi.core.coding.commands.fru.record.FruMultiRecordType;
 import org.metricshub.ipmi.core.coding.commands.fru.record.FruRecord;
 import org.metricshub.ipmi.core.coding.commands.fru.record.MultiRecordInfo;
 import org.metricshub.ipmi.core.coding.commands.fru.record.ProductInfo;
@@ -289,12 +290,22 @@ public class ReadFruData extends IpmiCommandCoder<ReadFruDataResponseData> {
 			// The record checksum (header byte 4) is a zero checksum of the record data (section 16.2.6) and is not
 			// checked: real firmware gets it wrong on genuine records (a Dell iDRAC 8 writes it off by one on its power
 			// supply records), and the record is length-delimited anyway
-			try {
-				list.add(MultiRecordInfo.populateMultiRecord(data, offset));
-			} catch (RuntimeException e) {
-				problems.add("Cannot decode the multirecord at offset " + offset + ": " + e.getMessage());
+			// A record of a type the library does not model (Extended DC Output, Extended DC Load...) is skipped by
+			// design; a record of a modelled type that cannot be decoded is a problem of the FRU
+			if (FruMultiRecordType.parseInt(TypeConverter.byteToInt(data[offset])) != FruMultiRecordType.Unspecified) {
+				try {
+					list.add(MultiRecordInfo.populateMultiRecord(data, offset));
+				} catch (RuntimeException e) {
+					problems.add("Cannot decode the multirecord at offset " + offset + ": " + e.getMessage());
+				}
 			}
 			offset += MULTIRECORD_HEADER_SIZE + length;
+		}
+		if (!last) {
+			problems
+					.add(
+							"The multirecord area at offset " + multiRecordOffset
+									+ " ends at offset " + offset + " without its end-of-list record: the data read is truncated");
 		}
 	}
 

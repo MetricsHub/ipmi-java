@@ -78,7 +78,10 @@ final class SdrWalker {
 	 */
 	static SdrRepository walk(Exchange exchange, GetSdrRepositoryInfoResponseData info) {
 		SdrWalker walker = new SdrWalker(exchange);
-		walker.walk();
+		// An empty repository answers "record not present" to the first Get SDR
+		if (info == null || info.getRecordCount() > 0) {
+			walker.walk();
+		}
 		return new SdrRepository(walker.records, walker.skipped, info);
 	}
 

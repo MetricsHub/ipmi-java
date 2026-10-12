@@ -297,6 +297,88 @@ class IpmiClientTest {
 
 	@Test
 	@Timeout(30)
+	void aMalformedFruReplyCostsThatFruOnly() throws Exception {
+		try (FakeRmcpPlusBmc bmc = bmc()) {
+			// A byte count larger than the bytes returned: the reply cannot be decoded
+			bmc.handle(NETFN_STORAGE, FakeSdrRepository.READ_FRU_DATA, data -> new byte[] { 0x00, 0x20, 0x01, 0x02 });
+			try (IpmiClient client = client(bmc).build()) {
+				FruList frus = client.frus().execute();
+				assertEquals(2, frus.size(), frus.toString());
+				for (Fru fru : frus) {
+					assertFalse(fru.complete());
+					assertTrue(fru.problems().get(0).contains("ReadFruData"), fru.problems().toString());
+				}
+			}
+		}
+	}
+
+	@Test
+	@Timeout(30)
+	void anUnreadableSystemBoardFruIsReportedWithItsProblem() throws Exception {
+		try (FakeRmcpPlusBmc bmc = new FakeRmcpPlusBmc(SUITES, USER, utf8(PASSWORD), null)) {
+			// A System Board sensor, no locator for FRU 0, and no FRU 0 on the BMC
+			new FakeSdrRepository()
+					.add(
+							compactSensorRecord(
+									1,
+									BOARD_SENSOR,
+									EntityId.SystemBoard.getCode(),
+									1,
+									SensorType.EntityPresence.getCode(),
+									0x08,
+									"Board"))
+					.reading(BOARD_SENSOR, 0x00, 0x40, 0x02)
+					.install(bmc);
+			try (IpmiClient client = client(bmc).build()) {
+				FruList frus = client.frus().ids(0).execute();
+				assertEquals(1, frus.size());
+				assertEquals(0, frus.get(0).id());
+				assertFalse(frus.get(0).complete());
+				assertTrue(frus.get(0).problems().get(0).contains("C3h"), frus.get(0).problems().toString());
+				assertTrue(frus.get(0).records().isEmpty());
+				assertFalse(
+						IpmiResultConverter.convertResult(frus, client.sensors().execute()).contains("FRU;"),
+						"no FRU line without areas");
+			}
+		}
+	}
+
+	@Test
+	@Timeout(30)
+	void anEmptyRepositoryGivesEmptyResults() throws Exception {
+		try (FakeRmcpPlusBmc bmc = new FakeRmcpPlusBmc(SUITES, USER, utf8(PASSWORD), null)) {
+			new FakeSdrRepository().install(bmc);
+			try (IpmiClient client = client(bmc).build()) {
+				assertTrue(client.sensors().execute().isEmpty());
+				assertTrue(client.frus().execute().isEmpty());
+				assertEquals(0, bmc.getCount(NETFN_STORAGE, GET_SDR), "nothing to walk");
+			}
+		}
+	}
+
+	@Test
+	@Timeout(30)
+	void closeDuringALongOperationStillReleasesThePort() throws Exception {
+		Set<Thread> before = Thread.getAllStackTraces().keySet();
+		try (FakeRmcpPlusBmc bmc = bmc()) {
+			bmc.handle(NETFN_CHASSIS, GET_CHASSIS_STATUS, data -> null);
+			// 6 tries of 300 ms: the operation outlives the logout wait of close()
+			IpmiClient client = client(bmc).retries(5).build();
+			ExecutorService thread = Executors.newSingleThreadExecutor();
+			try {
+				Future<?> operation = thread.submit(client::chassisStatus);
+				Thread.sleep(300);
+				client.close();
+				assertThrows(java.util.concurrent.ExecutionException.class, operation::get);
+			} finally {
+				thread.shutdownNow();
+			}
+			assertEquals("", survivors(before), "the UDP listener must not survive close()");
+		}
+	}
+
+	@Test
+	@Timeout(30)
 	void aLostSessionIsReopenedAndAReadIsRetriedButNotASend() throws Exception {
 		try (FakeRmcpPlusBmc bmc = bmc(); IpmiClient client = client(bmc).build()) {
 			client.chassisStatus();
@@ -333,6 +415,7 @@ class IpmiClientTest {
 		assertThrows(IllegalArgumentException.class, () -> builder.retries(-1));
 		assertThrows(NullPointerException.class, () -> builder.credentials(null, new char[0]));
 		assertThrows(NullPointerException.class, () -> builder.privilege(null));
+		assertThrows(IllegalArgumentException.class, () -> builder.privilege(PrivilegeLevel.MaximumAvailable));
 		assertThrows(
 				IllegalArgumentException.class,
 				() -> IpmiClient.builder("bmc").credentials("seventeen-letters", new char[0]).build());
