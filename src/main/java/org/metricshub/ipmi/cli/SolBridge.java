@@ -83,10 +83,16 @@ final class SolBridge {
 		Stats stats = new Stats();
 		daemon("ipmicli-sol-output", () -> outcome.add(pumpOutput(console, out, stats)));
 		daemon("ipmicli-sol-input", () -> outcome.add(pumpInput(console, stdin, err, escape, cooked, failure, stats)));
-		int first = outcome.take();
+		int first;
+		long closing;
+		try {
+			first = outcome.take();
+			closing = System.nanoTime();
+		} finally {
+			// Interrupted or not, the payload is deactivated: some BMCs keep it active after the session is gone
+			console.close();
+		}
 		IOException readFailure = failure[0];
-		long closing = System.nanoTime();
-		console.close();
 		if (verbose) {
 			// A write is one read of the input: a keystroke, a line or a block, which the library sends in one SOL packet
 			// or several when it exceeds the payload size of the BMC
@@ -198,6 +204,12 @@ final class SolBridge {
 					}
 					if (escapePending) {
 						escapePending = false;
+						if (b == escape) {
+							// The escape character itself, whatever it is
+							pending.write(b);
+							atLineStart = false;
+							continue;
+						}
 						if (b == '.') {
 							flush(pending, toBmc, stats);
 							return CLOSED;

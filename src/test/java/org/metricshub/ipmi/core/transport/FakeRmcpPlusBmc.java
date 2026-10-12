@@ -1038,8 +1038,10 @@ public class FakeRmcpPlusBmc implements AutoCloseable {
 			return new byte[] { (byte) 0x87 }; // invalid session ID
 		}
 		current.closed = true;
-		// The payloads of a session end with it (IPMI 2.0 section 24.2)
-		solActive = false;
+		// The payloads of a session end with it (IPMI 2.0 section 24.2): those of this session, not of another one
+		if (solSessionId == current.managedId) {
+			solActive = false;
+		}
 		return new byte[] { 0x00 };
 	}
 

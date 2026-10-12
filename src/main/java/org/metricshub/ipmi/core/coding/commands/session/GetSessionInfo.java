@@ -75,7 +75,8 @@ public class GetSessionInfo extends IpmiCommandCoder<GetSessionInfoResponseData>
 		byte[] data = validateResponse(message);
 		// Session handle, possible active sessions, current active sessions; then, for a session the BMC has, the user
 		// ID, the privilege level and the channel (table 22-26). The channel-specific bytes that may follow are not read
-		if (data.length < 3) {
+		// Three bytes when the BMC has no such session, at least six when it has it: anything else is malformed
+		if (data.length < 3 || data.length > 3 && data.length < SESSION_FOUND_LENGTH) {
 			throw new IllegalArgumentException("Invalid response length");
 		}
 		GetSessionInfoResponseData response = new GetSessionInfoResponseData();

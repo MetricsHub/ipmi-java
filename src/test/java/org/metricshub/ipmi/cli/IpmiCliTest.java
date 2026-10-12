@@ -263,17 +263,21 @@ class IpmiCliTest {
 			awaitClose(bmc);
 
 			assertEquals(0, sol(bmc, "~.\r!.", "sol", "--escape", "!").code);
+			awaitClose(bmc);
+			assertEquals(0, sol(bmc, "..\r.B\r..", "sol", "--escape", ".").code, "a doubled . is a . with --escape .");
+			assertEquals("root\r~\r\r~.\r.\r\r.", ascii(bmc.getSolReceived()), "'..' sends one '.', '.B' a break");
+			awaitClose(bmc);
 			// The fake BMC keeps the characters of the consoles before
-			assertEquals("root\r~\r\r~.\r", ascii(bmc.getSolReceived()));
+			assertEquals("root\r~\r\r~.\r.\r\r.", ascii(bmc.getSolReceived()));
 			awaitClose(bmc);
 
 			Result third = sol(bmc, "~.\r", "sol", "--no-escape");
 			assertEquals(0, third.code, "the end of the input closes");
-			assertEquals("root\r~\r\r~.\r~.\r", ascii(bmc.getSolReceived()));
+			assertEquals("root\r~\r\r~.\r.\r\r.~.\r", ascii(bmc.getSolReceived()));
 			awaitClose(bmc);
 
 			assertEquals(0, sol(bmc, "data\r~", "sol").code, "a lone escape character at the end of the input is data");
-			assertEquals("root\r~\r\r~.\r~.\rdata\r~", ascii(bmc.getSolReceived()));
+			assertEquals("root\r~\r\r~.\r.\r\r.~.\rdata\r~", ascii(bmc.getSolReceived()));
 		}
 	}
 

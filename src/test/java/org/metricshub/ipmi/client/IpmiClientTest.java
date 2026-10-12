@@ -720,6 +720,22 @@ class IpmiClientTest {
 				assertTrue(failure.getMessage().contains("user ID 2, privilege 4"), failure.getMessage());
 				assertEquals(0, bmc.getCount(NETFN_APP, FakeRmcpPlusBmc.DEACTIVATE_PAYLOAD), "never deactivated");
 			}
+			// A BMC that refuses the lookup: the refusal reaches the caller, the holder keeps its console
+			bmc.handle(NETFN_APP, FakeRmcpPlusBmc.GET_SESSION_INFO, data -> new byte[] { (byte) 0xd4 });
+			try (IpmiClient third = client(bmc).privilege(PrivilegeLevel.Administrator).build()) {
+				IpmiCompletionCodeException refused = assertThrows(
+						IpmiCompletionCodeException.class,
+						() -> third.sol().open());
+				assertEquals(CompletionCode.InsufficentPrivilege, refused.completionCode());
+				assertEquals(0, bmc.getCount(NETFN_APP, FakeRmcpPlusBmc.DEACTIVATE_PAYLOAD), "still never deactivated");
+			}
+			// A malformed reply (five bytes) is neither a found nor an absent session
+			bmc.handle(NETFN_APP, FakeRmcpPlusBmc.GET_SESSION_INFO, data -> new byte[] { 0x00, 0x02, 0x10, 0x02, 0x02 });
+			try (IpmiClient fourth = client(bmc).privilege(PrivilegeLevel.Administrator).build()) {
+				IpmiClientException malformed = assertThrows(IpmiClientException.class, () -> fourth.sol().open());
+				assertTrue(malformed.getMessage().contains("Invalid response length"), malformed.getMessage());
+				assertEquals(0, bmc.getCount(NETFN_APP, FakeRmcpPlusBmc.DEACTIVATE_PAYLOAD), "and never deactivated");
+			}
 		}
 	}
 

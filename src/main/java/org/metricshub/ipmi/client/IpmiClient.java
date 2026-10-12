@@ -443,7 +443,11 @@ public final class IpmiClient implements AutoCloseable {
 			try {
 				session = link.send(new GetSessionInfo(holder));
 			} catch (IpmiCompletionCodeException e) {
-				// A BMC that refuses the lookup of a session it does not have
+				// Only a code that says the session is not there (CBh, CCh) allows the deactivation: a refusal (D4h),
+				// an unsupported command (C1h) or a busy BMC reaches the caller, and the holder keeps its console
+				if (e.completionCode() != CompletionCode.DataNotPresent && e.completionCode() != CompletionCode.InvalidData) {
+					throw e;
+				}
 				session = null;
 			}
 			if (holder == 0 || session == null || !session.isSessionFound()) {
