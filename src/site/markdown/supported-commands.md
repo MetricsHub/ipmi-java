@@ -8,8 +8,9 @@ description: Reference of the IPMI commands, cipher suites, SDR record types and
 The library implements **IPMI 2.0 over LAN** (RMCP+ sessions, IPMI 2.0 section 13) with the
 commands below. Each command is a class of
 [`org.metricshub.ipmi.core.coding.commands`](apidocs/org/metricshub/ipmi/core/coding/commands/package-summary.html),
-sent with the [low-level API](low-level-api.html#sending-commands); the last column shows which
-ones `IpmiClient` uses. A command not listed here can be added by
+sent with [`IpmiClient.send()`](low-level-api.html#sending-a-command-through-the-client) or the
+[low-level API](low-level-api.html#sending-commands); the last column shows which operations of
+`IpmiClient` use them. A command not listed here can be added by
 [extending `IpmiCommandCoder`](low-level-api.html#writing-your-own-command).
 
 ## Commands
@@ -17,36 +18,38 @@ ones `IpmiClient` uses. A command not listed here can be added by
 | Command | Class | NetFn / Cmd | Used by `IpmiClient` |
 | --- | --- | --- | --- |
 | **Session** | | | |
-| Get Channel Authentication Capabilities | `GetChannelAuthenticationCapabilities` | App / `38h` | every call |
-| Get Channel Cipher Suites | `GetChannelCipherSuites` | App / `54h` | every call (unless `skipAuth`) |
-| RMCP+ Open Session | `OpenSession` | (payload) | every call |
-| RAKP Message 1 / 3 | `Rakp1`, `Rakp3` | (payload) | every call |
-| Set Session Privilege Level | `SetSessionPrivilegeLevel` | App / `3Bh` | |
-| Close Session | `CloseSession` | App / `3Ch` | every call |
+| Get Channel Authentication Capabilities | `GetChannelAuthenticationCapabilities` | App / `38h` | every session, `capabilities()` |
+| Get Channel Cipher Suites | `GetChannelCipherSuites` | App / `54h` | every session (unless `cipherSuite(id)`), `capabilities()` |
+| RMCP+ Open Session | `OpenSession` | (payload) | every session |
+| RAKP Message 1 / 3 | `Rakp1`, `Rakp3` | (payload) | every session |
+| Set Session Privilege Level | `SetSessionPrivilegeLevel` | App / `3Bh` | `privilege(Operator)`, `privilege(Administrator)` |
+| Close Session | `CloseSession` | App / `3Ch` | `close()` |
 | **Chassis** | | | |
-| Get Chassis Status | `GetChassisStatus` | Chassis / `01h` | `getChassisStatus()` |
+| Get Chassis Status | `GetChassisStatus` | Chassis / `01h` | `chassisStatus()` |
 | Chassis Control | `ChassisControl` | Chassis / `02h` | |
 | **SDR repository and sensors** | | | |
-| Get SDR Repository Info | `GetSdrRepositoryInfo` | Storage / `20h` | |
-| Reserve SDR Repository | `ReserveSdrRepository` | Storage / `22h` | `getSensors()`, `getFrus()` |
-| Get SDR | `GetSdr` | Storage / `23h` | `getSensors()`, `getFrus()` |
-| Get Sensor Reading | `GetSensorReading` | Sensor/Event / `2Dh` | `getSensors()` |
+| Get SDR Repository Info | `GetSdrRepositoryInfo` | Storage / `20h` | `sensors()`, `frus()` ([SDR cache](configuration.html#sdr-cache)) |
+| Reserve SDR Repository | `ReserveSdrRepository` | Storage / `22h` | `sensors()`, `frus()` |
+| Get SDR | `GetSdr` | Storage / `23h` | `sensors()`, `frus()` |
+| Get Sensor Reading | `GetSensorReading` | Sensor/Event / `2Dh` | `sensors()` |
 | **FRU** | | | |
-| Get FRU Inventory Area Info | `GetFruInventoryAreaInfo` | Storage / `10h` | `getFrus()` |
-| Read FRU Data | `ReadFruData` | Storage / `11h` | `getFrus()` |
+| Get FRU Inventory Area Info | `GetFruInventoryAreaInfo` | Storage / `10h` | `frus()` |
+| Read FRU Data | `ReadFruData` | Storage / `11h` | `frus()` |
 | **System Event Log** | | | |
 | Get SEL Info | `GetSelInfo` | Storage / `40h` | |
 | Reserve SEL | `ReserveSel` | Storage / `42h` | |
 | Get SEL Entry | `GetSelEntry` | Storage / `43h` | |
 | **Payloads (Serial over LAN)** | | | |
-| Activate Payload (SOL) | `ActivateSolPayload` | App / `48h` | |
-| Deactivate Payload | `DeactivatePayload` | App / `49h` | |
-| Get Payload Activation Status | `GetPayloadActivationStatus` | App / `4Ah` | |
-| Get Payload Instance Info | `GetPayloadInstanceInfo` | App / `4Bh` | |
+| Activate Payload (SOL) | `ActivateSolPayload` | App / `48h` | `sol()` |
+| Deactivate Payload | `DeactivatePayload` | App / `49h` | `sol()` |
+| Get Payload Activation Status | `GetPayloadActivationStatus` | App / `4Ah` | `sol()` |
+| Get Payload Instance Info | `GetPayloadInstanceInfo` | App / `4Bh` | `sol()` |
 | Get Channel Payload Support | `GetChannelPayloadSupport` | App / `4Eh` | |
 
-The `IpmiClient` calls need nothing above the **User** privilege; Chassis Control needs
-**Operator**, the payload commands and Serial over LAN **Administrator**.
+The read operations of `IpmiClient` need nothing above the **User** privilege; Chassis Control
+needs **Operator**, the payload commands and Serial over LAN **Administrator**
+([Privilege level](configuration.html#privilege-level)). Any command is sent in the session of the
+client with [`send()`](low-level-api.html#sending-a-command-through-the-client).
 
 ## Cipher suites
 
@@ -65,7 +68,7 @@ Hence the cipher suites 0 to 3, 6 to 8, and 15 to 17; see the
 [`SensorRecord.populateSensorRecord()`](apidocs/org/metricshub/ipmi/core/coding/commands/sdr/record/SensorRecord.html)
 decodes the records of the SDR repository (IPMI 2.0, section 43) into these classes:
 
-| Type | Record | Class | Returned by `getSensors()` |
+| Type | Record | Class | Returned by `sensors()` |
 | --- | --- | --- | --- |
 | `01h` | Full Sensor | `FullSensorRecord` | yes, with its reading |
 | `02h` | Compact Sensor | `CompactSensorRecord` | yes, with its reading |
@@ -73,7 +76,7 @@ decodes the records of the SDR repository (IPMI 2.0, section 43) into these clas
 | `08h` | Entity Association | `EntityAssociationRecord` | no |
 | `09h` | Device-relative Entity Association | `DeviceRelativeEntityAssiciationRecord` | no |
 | `10h` | Generic Device Locator | `GenericDeviceLocatorRecord` | no |
-| `11h` | FRU Device Locator | `FruDeviceLocatorRecord` | no (drives `getFrus()`) |
+| `11h` | FRU Device Locator | `FruDeviceLocatorRecord` | no (drives `frus()`) |
 | `12h` | Management Controller Device Locator | `ManagementControllerDeviceLocatorRecord` | no |
 | `13h` | Management Controller Confirmation | `ManagementControllerConfirmationRecord` | no |
 | `C0h` – `FFh` | OEM | `OemRecord` | no |
@@ -93,9 +96,11 @@ a manufacturer ID: for the types `C1h` to `FFh`, `getManufacturerId()` returns `
 the record's vendor.
 
 A record that cannot be decoded — a reserved type such as the deprecated BMC Message Channel
-Info record (`14h`), a record shorter than its header — is **skipped**: the client logs it at
-the `WARN` level and goes on with the next record, so one unexpected record does not cost the
-whole sensor list. When a BMC answers a whole-record Get SDR with fewer bytes than the record
+Info record (`14h`), a record shorter than its header — is **skipped**: the walk goes on with the
+next record, so one unexpected record does not cost the whole sensor list, and the record is
+listed with its reason in `skippedRecords()` of the
+[`SensorList`](apidocs/org/metricshub/ipmi/client/SensorList.html) or
+[`FruList`](apidocs/org/metricshub/ipmi/client/FruList.html). When a BMC answers a whole-record Get SDR with fewer bytes than the record
 declares, the client reads the record again in chunks.
 
 ## FRU records
@@ -105,6 +110,7 @@ decodes the FRU information (Platform Management FRU Information Storage Definit
 
 | Area | Class |
 | --- | --- |
+| Internal Use | `InternalUseInfo`, the vendor-private bytes as they are |
 | Chassis Info | `ChassisInfo` |
 | Board Info | `BoardInfo` |
 | Product Info | `ProductInfo` |
@@ -113,13 +119,18 @@ decodes the FRU information (Platform Management FRU Information Storage Definit
 | MultiRecord: Management Access | `ManagementAccessInfo` |
 | MultiRecord: Base / Extended Compatibility | `BaseCompatibilityInfo`, `ExtendedCompatibilityInfo` |
 | MultiRecord: OEM | `OemInfo` |
+| MultiRecord: any other type (Extended DC Output, Extended DC Load, reserved) | `RawMultiRecordInfo`, with the type and the bytes of the record |
 
-`IpmiClient.getFrus()` returns the Chassis, Board and Product areas only. FRUs in another format,
+`frus()` returns every decoded area, the MultiRecord ones included
+([`Fru.multiRecords()`](apidocs/org/metricshub/ipmi/client/Fru.html)). FRUs in another format,
 such as the SPD data of memory modules, are not decoded
-([#107](https://github.com/metricshub/ipmi-java/issues/107)), and are logged and left out.
+([#107](https://github.com/metricshub/ipmi-java/issues/107)): the FRU is returned without areas,
+with the reason in `Fru.problems()`.
 
 The decoder checks the common header checksum and rejects a FRU whose header is corrupt. An area
-that the data read does not hold in full is skipped and logged, the others are returned. In the
+that the data read does not hold in full is skipped, the others are returned, and
+`ReadFruData.decodeFruData(data, problems)` reports what was skipped and why. In the
 MultiRecord area, a record of a type the library does not model (such as the Extended DC Output
-and Extended DC Load records) or of an unknown format version is skipped, and the record that
-carries the end-of-list flag is decoded like the others.
+and Extended DC Load records) is kept as a `RawMultiRecordInfo`, a record of an unknown format
+version is skipped and reported, an area that ends without its end-of-list record is reported,
+and the record that carries the end-of-list flag is decoded like the others.

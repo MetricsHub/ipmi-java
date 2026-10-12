@@ -25,7 +25,6 @@ package org.metricshub.ipmi.core.connection;
 import org.metricshub.ipmi.core.coding.PayloadCoder;
 import org.metricshub.ipmi.core.coding.commands.CommandCodes;
 import org.metricshub.ipmi.core.coding.commands.IpmiCommandCoder;
-import org.metricshub.ipmi.core.coding.commands.IpmiVersion;
 import org.metricshub.ipmi.core.coding.commands.PrivilegeLevel;
 import org.metricshub.ipmi.core.coding.commands.ResponseData;
 import org.metricshub.ipmi.core.coding.commands.session.GetChannelAuthenticationCapabilitiesResponseData;
@@ -39,7 +38,6 @@ import org.metricshub.ipmi.core.coding.payload.lan.IPMIException;
 import org.metricshub.ipmi.core.coding.payload.lan.IpmiLanMessage;
 import org.metricshub.ipmi.core.coding.payload.lan.IpmiLanRequest;
 import org.metricshub.ipmi.core.coding.payload.lan.NetworkFunction;
-import org.metricshub.ipmi.core.coding.protocol.AuthenticationType;
 import org.metricshub.ipmi.core.coding.protocol.IpmiMessage;
 import org.metricshub.ipmi.core.coding.protocol.Ipmiv20Message;
 import org.metricshub.ipmi.core.coding.protocol.PayloadType;
@@ -48,7 +46,6 @@ import org.metricshub.ipmi.core.coding.security.CipherSuite;
 import org.metricshub.ipmi.core.coding.security.ConfidentialityAesCbc128;
 import org.metricshub.ipmi.core.coding.security.IntegrityHmacSha1_96;
 import org.metricshub.ipmi.core.common.Constants;
-import org.metricshub.ipmi.core.common.PropertiesManager;
 import org.metricshub.ipmi.core.common.TypeConverter;
 import org.metricshub.ipmi.core.sm.MachineObserver;
 import org.metricshub.ipmi.core.sm.StateMachine;
@@ -74,10 +71,6 @@ import org.metricshub.ipmi.core.sm.states.State;
 import org.metricshub.ipmi.core.sm.states.Uninitialized;
 import org.metricshub.ipmi.core.transport.Messenger;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.util.ArrayList;
@@ -94,9 +87,12 @@ import java.util.concurrent.atomic.AtomicInteger;
  * A connection with the specific remote host.
  */
 public class Connection extends TimerTask implements MachineObserver {
-	private static final Logger LOGGER = LoggerFactory.getLogger(Connection.class);
-
 	private static final int DEFAULT_CIPHER_SUITE = 3;
+
+	/**
+	 * Timeout of a message, in milliseconds, until {@link #setTimeout(int)} changes it.
+	 */
+	public static final int DEFAULT_TIMEOUT = 5000;
 	private static final int SESSION_SEQUENCE_NUMBER_UPPER_BOUND = Integer.MAX_VALUE / 4;
 	private static final String ILLEGAL_CONNECTION_STATE_MESSAGE = "Illegal connection state: ";
 
@@ -157,7 +153,7 @@ public class Connection extends TimerTask implements MachineObserver {
 		stateMachine = new StateMachine(messenger);
 		this.handle = handle;
 		listeners = new CopyOnWriteArrayList<ConnectionListener>();
-		timeout = Integer.parseInt(PropertiesManager.getInstance().getProperty("timeout"));
+		timeout = DEFAULT_TIMEOUT;
 		messageHandlers = new EnumMap<PayloadType, MessageHandler>(PayloadType.class);
 		currentSessionSequenceNumber = new AtomicInteger(0);
 	}
@@ -192,9 +188,7 @@ public class Connection extends TimerTask implements MachineObserver {
 	 *        - frequency of the no-op commands that will be sent to keep up
 	 *        the session
 	 * @throws IOException
-	 *         - when properties file was not found
-	 * @throws FileNotFoundException
-	 *         - when properties file was not found
+	 *         - when the connection cannot be created
 	 * @see #disconnect()
 	 */
 	public void connect(InetAddress address, int port, long pingPeriod)
@@ -213,9 +207,7 @@ public class Connection extends TimerTask implements MachineObserver {
 	 *        - determines if the getAvailableCipherSuites and getChannelAuthenticationCapabilities phases should be
 	 *        skipped
 	 * @throws IOException
-	 *         - when properties file was not found
-	 * @throws FileNotFoundException
-	 *         - when properties file was not found
+	 *         - when the connection cannot be created
 	 * @see #disconnect()
 	 */
 	public void connect(InetAddress address, int port, long pingPeriod, boolean skipCiphers) throws IOException {
@@ -741,13 +733,10 @@ public class Connection extends TimerTask implements MachineObserver {
 		if (action instanceof GetSikAction) {
 			sik = ((GetSikAction) action).getSik();
 		} else if (!(action instanceof MessageAction)) {
+			// An ErrorAction reaches the caller waiting in waitForResponse(), which throws its exception
 			synchronized (responseLock) {
 				lastAction = action;
 				responseLock.notifyAll();
-			}
-			if (action instanceof ErrorAction) {
-				ErrorAction errorAction = (ErrorAction) action;
-				LOGGER.error(errorAction.getException().getMessage(), errorAction.getException());
 			}
 		} else {
 			handleIncomingMessage(((MessageAction) action).getIpmiv20Message());
@@ -757,11 +746,7 @@ public class Connection extends TimerTask implements MachineObserver {
 	/**
 	 * The keep-alive request: a Get Device ID, as ipmitool sends.
 	 */
-	private static final class KeepAlive extends IpmiCommandCoder {
-
-		private KeepAlive(CipherSuite cipherSuite) {
-			super(IpmiVersion.V20, cipherSuite, AuthenticationType.RMCPPlus);
-		}
+	private static final class KeepAlive extends IpmiCommandCoder<ResponseData> {
 
 		@Override
 		public byte getCommandCode() {
@@ -800,9 +785,9 @@ public class Connection extends TimerTask implements MachineObserver {
 			return;
 		}
 		try {
-			sendMessage(new KeepAlive(((SessionValid) current).getCipherSuite()), true);
+			sendMessage(new KeepAlive(), true);
 		} catch (Exception e) {
-			LOGGER.error("Keep-alive failed: " + e.getMessage(), e);
+			// Best effort: a keep-alive that cannot be sent is sent again at the next period
 		}
 	}
 

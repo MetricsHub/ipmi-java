@@ -22,9 +22,6 @@ package org.metricshub.ipmi.core.coding.commands.sdr.record;
  * ╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱
  */
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 /**
  * Type of the sensor.
  */
@@ -125,7 +122,6 @@ public enum SensorType {
 	private static final int OEMRESERVED = 118;
 
 	private int code;
-	private static Logger logger = LoggerFactory.getLogger(SensorType.class);
 
 	SensorType(int code) {
 		this.code = code;
@@ -231,7 +227,6 @@ public enum SensorType {
 			if (value >= OEM) {
 				return Oem;
 			}
-			logger.debug("Invalid value: {}", value);
 			return Oem;
 		}
 	}

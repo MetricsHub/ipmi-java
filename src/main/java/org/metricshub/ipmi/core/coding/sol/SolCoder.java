@@ -23,7 +23,6 @@ package org.metricshub.ipmi.core.coding.sol;
  */
 
 import org.metricshub.ipmi.core.coding.PayloadCoder;
-import org.metricshub.ipmi.core.coding.commands.IpmiVersion;
 import org.metricshub.ipmi.core.coding.commands.ResponseData;
 import org.metricshub.ipmi.core.coding.payload.IpmiPayload;
 import org.metricshub.ipmi.core.coding.payload.lan.IPMIException;
@@ -33,10 +32,8 @@ import org.metricshub.ipmi.core.coding.payload.sol.SolInboundStatusField;
 import org.metricshub.ipmi.core.coding.payload.sol.SolOperation;
 import org.metricshub.ipmi.core.coding.payload.sol.SolOutboundMessage;
 import org.metricshub.ipmi.core.coding.payload.sol.SolOutboundOperationField;
-import org.metricshub.ipmi.core.coding.protocol.AuthenticationType;
 import org.metricshub.ipmi.core.coding.protocol.IpmiMessage;
 import org.metricshub.ipmi.core.coding.protocol.PayloadType;
-import org.metricshub.ipmi.core.coding.security.CipherSuite;
 import org.metricshub.ipmi.core.common.TypeConverter;
 
 import java.security.InvalidKeyException;
@@ -72,12 +69,9 @@ public class SolCoder extends PayloadCoder {
 	 *        actual acknowledge state - {@link SolAckState#ACK} or {@link SolAckState#NACK}
 	 * @param operations
 	 *        set of operations to invoke on remote serial port
-	 * @param cipherSuite
-	 *        {@link CipherSuite} containing authentication, confidentiality and integrity algorithms for this session
 	 */
 	public SolCoder(byte[] message, byte ackNackSequenceNumber, byte acceptedCharacters, SolAckState ackState,
-			Set<SolOperation> operations, CipherSuite cipherSuite) {
-		super(IpmiVersion.V20, cipherSuite, AuthenticationType.RMCPPlus);
+			Set<SolOperation> operations) {
 		this.message = message;
 		this.ackNackSequenceNumber = ackNackSequenceNumber;
 		this.acceptedCharacters = acceptedCharacters;
@@ -91,11 +85,9 @@ public class SolCoder extends PayloadCoder {
 	 *
 	 * @param message
 	 *        data to send as byte array
-	 * @param cipherSuite
-	 *        {@link CipherSuite} containing authentication, confidentiality and integrity algorithms for this session.
 	 */
-	public SolCoder(byte[] message, CipherSuite cipherSuite) {
-		this(message, (byte) 0, (byte) 0, SolAckState.ACK, new HashSet<SolOperation>(), cipherSuite);
+	public SolCoder(byte[] message) {
+		this(message, (byte) 0, (byte) 0, SolAckState.ACK, new HashSet<SolOperation>());
 	}
 
 	/**
@@ -104,12 +96,10 @@ public class SolCoder extends PayloadCoder {
 	 *
 	 * @param operations
 	 *        set of operations to invoke on remote serial port.
-	 * @param cipherSuite
-	 *        {@link CipherSuite} containing authentication, confidentiality and integrity algorithms for this session
 	 */
-	public SolCoder(Set<SolOperation> operations, CipherSuite cipherSuite) {
+	public SolCoder(Set<SolOperation> operations) {
 		// No character data: the packet keeps a sequence number, so that the BMC acknowledges it
-		this(new byte[0], (byte) 0, (byte) 0, SolAckState.ACK, operations, cipherSuite);
+		this(new byte[0], (byte) 0, (byte) 0, SolAckState.ACK, operations);
 	}
 
 	/**
@@ -122,11 +112,9 @@ public class SolCoder extends PayloadCoder {
 	 *        number of characters accepted from the ACKd/NACKd packet
 	 * @param ackState
 	 *        actual acknowledge state - {@link SolAckState#ACK} or {@link SolAckState#NACK}
-	 * @param cipherSuite
-	 *        {@link CipherSuite} containing authentication, confidentiality and integrity algorithms for this session.
 	 */
-	public SolCoder(byte ackNackSequenceNumber, byte acceptedCharacters, SolAckState ackState, CipherSuite cipherSuite) {
-		this(ackNackSequenceNumber, acceptedCharacters, ackState, new HashSet<SolOperation>(), cipherSuite);
+	public SolCoder(byte ackNackSequenceNumber, byte acceptedCharacters, SolAckState ackState) {
+		this(ackNackSequenceNumber, acceptedCharacters, ackState, new HashSet<SolOperation>());
 	}
 
 	/**
@@ -141,12 +129,10 @@ public class SolCoder extends PayloadCoder {
 	 *        actual acknowledge state - {@link SolAckState#ACK} or {@link SolAckState#NACK}
 	 * @param operations
 	 *        the operations of the packet: the serial line states the console holds
-	 * @param cipherSuite
-	 *        {@link CipherSuite} containing authentication, confidentiality and integrity algorithms for this session.
 	 */
 	public SolCoder(byte ackNackSequenceNumber, byte acceptedCharacters, SolAckState ackState,
-			Set<SolOperation> operations, CipherSuite cipherSuite) {
-		this(null, ackNackSequenceNumber, acceptedCharacters, ackState, operations, cipherSuite);
+			Set<SolOperation> operations) {
+		this(null, ackNackSequenceNumber, acceptedCharacters, ackState, operations);
 
 		this.acknowledgeOnly = true;
 	}

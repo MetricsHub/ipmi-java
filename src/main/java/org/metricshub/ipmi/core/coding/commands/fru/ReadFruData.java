@@ -24,11 +24,10 @@ package org.metricshub.ipmi.core.coding.commands.fru;
 
 import org.metricshub.ipmi.core.coding.commands.CommandCodes;
 import org.metricshub.ipmi.core.coding.commands.IpmiCommandCoder;
-import org.metricshub.ipmi.core.coding.commands.IpmiVersion;
-import org.metricshub.ipmi.core.coding.commands.ResponseData;
 import org.metricshub.ipmi.core.coding.commands.fru.record.BoardInfo;
 import org.metricshub.ipmi.core.coding.commands.fru.record.ChassisInfo;
 import org.metricshub.ipmi.core.coding.commands.fru.record.FruRecord;
+import org.metricshub.ipmi.core.coding.commands.fru.record.InternalUseInfo;
 import org.metricshub.ipmi.core.coding.commands.fru.record.MultiRecordInfo;
 import org.metricshub.ipmi.core.coding.commands.fru.record.ProductInfo;
 import org.metricshub.ipmi.core.coding.commands.sdr.GetSdr;
@@ -37,14 +36,9 @@ import org.metricshub.ipmi.core.coding.payload.IpmiPayload;
 import org.metricshub.ipmi.core.coding.payload.lan.IPMIException;
 import org.metricshub.ipmi.core.coding.payload.lan.IpmiLanRequest;
 import org.metricshub.ipmi.core.coding.payload.lan.NetworkFunction;
-import org.metricshub.ipmi.core.coding.protocol.AuthenticationType;
 import org.metricshub.ipmi.core.coding.protocol.IpmiMessage;
-import org.metricshub.ipmi.core.coding.security.CipherSuite;
 import org.metricshub.ipmi.core.coding.payload.CompletionCode;
 import org.metricshub.ipmi.core.common.TypeConverter;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.util.function.BiFunction;
 
@@ -57,9 +51,7 @@ import java.util.List;
  * A wrapper class for Read FRU Data Command request. <br>
  * The command returns the specified data from the FRU Inventory Info area.
  */
-public class ReadFruData extends IpmiCommandCoder {
-
-	private static final Logger LOGGER = LoggerFactory.getLogger(ReadFruData.class);
+public class ReadFruData extends IpmiCommandCoder<ReadFruDataResponseData> {
 
 	/** Size of the common header (FRU spec section 8). */
 	private static final int COMMON_HEADER_SIZE = 8;
@@ -79,8 +71,6 @@ public class ReadFruData extends IpmiCommandCoder {
 	 * Initiates ReadFruData for both encoding and decoding. Sets session
 	 * parameters to default.
 	 *
-	 * @see IpmiCommandCoder#setSessionParameters(IpmiVersion, CipherSuite,
-	 *      AuthenticationType)
 	 * @param fruId
 	 *        - ID of the FRU to get info from. Must be less than 256. To
 	 *        get FRU ID use {@link GetSdr} to retrieve
@@ -95,48 +85,6 @@ public class ReadFruData extends IpmiCommandCoder {
 	 */
 	public ReadFruData(int fruId, BaseUnit unit, int offset, int countToRead) {
 		super();
-
-		if (countToRead > 255) {
-			throw new IllegalArgumentException(
-					"Count to read cannot exceed 255");
-		}
-
-		if (fruId > 255) {
-			throw new IllegalArgumentException("FRU ID cannot exceed 255");
-		}
-
-		// Table 34-3: the offset goes on the wire in the unit of the device, the count in bytes (as ipmitool sends it)
-		this.offset = offset / unit.getSize();
-		size = countToRead;
-		this.fruId = fruId;
-	}
-
-	/**
-	 * Initiates ReadFruData for both encoding and decoding.
-	 *
-	 * @param version
-	 *        - IPMI version of the command.
-	 * @param cipherSuite
-	 *        - {@link CipherSuite} containing authentication,
-	 *        confidentiality and integrity algorithms for this session.
-	 * @param authenticationType
-	 *        - Type of authentication used. Must be RMCPPlus for IPMI v2.0.
-	 * @param fruId
-	 *        - ID of the FRU to get info from. Must be less than 256. To
-	 *        get FRU ID use {@link GetSdr} to retrieve
-	 *        {@link FruDeviceLocatorRecord}.
-	 * @param unit
-	 *        - {@link BaseUnit} indicating if the FRU device is accessed in
-	 *        {@link BaseUnit#Bytes} or {@link BaseUnit#Words}
-	 * @param offset
-	 *        - offset to read, in bytes (sent in words when the device is word-addressed, so it must be even then)
-	 * @param countToRead
-	 *        - number of bytes to read. Cannot exceed 255;
-	 */
-	public ReadFruData(IpmiVersion version, CipherSuite cipherSuite,
-			AuthenticationType authenticationType, int fruId, BaseUnit unit,
-			int offset, int countToRead) {
-		super(version, cipherSuite, authenticationType);
 
 		if (countToRead > 255) {
 			throw new IllegalArgumentException(
@@ -188,7 +136,7 @@ public class ReadFruData extends IpmiCommandCoder {
 	}
 
 	@Override
-	public ResponseData getResponseData(IpmiMessage message)
+	public ReadFruDataResponseData getResponseData(IpmiMessage message)
 			throws IPMIException,
 			NoSuchAlgorithmException,
 			InvalidKeyException {
@@ -223,10 +171,20 @@ public class ReadFruData extends IpmiCommandCoder {
 	 *        - list of {@link ReadFruDataResponseData} containing FRU data
 	 * @return list of {@link FruRecord}s containing decoded FRU data.
 	 */
-	@SuppressWarnings("unused")
-	public static List<FruRecord> decodeFruData(
-			List<ReadFruDataResponseData> fruData) {
+	public static List<FruRecord> decodeFruData(List<ReadFruDataResponseData> fruData) {
+		return decodeFruData(fruData, new ArrayList<String>());
+	}
 
+	/**
+	 * Decodes the FRU data read in chunks, reporting the areas and records it had to skip.
+	 *
+	 * @param fruData the chunks of the FRU data, in order
+	 * @param problems receives a message for each area or multirecord that was skipped: beyond or truncated by the
+	 *        data read, or impossible to decode
+	 * @return the records of the chassis, board and product areas and of the multirecord area that could be decoded
+	 * @throws IllegalArgumentException when the common header is missing, of an unknown format or corrupt
+	 */
+	public static List<FruRecord> decodeFruData(List<ReadFruDataResponseData> fruData, List<String> problems) {
 		int size = 0;
 
 		ArrayList<FruRecord> list = new ArrayList<FruRecord>();
@@ -256,102 +214,111 @@ public class ReadFruData extends IpmiCommandCoder {
 			throw new IllegalArgumentException("Invalid common header checksum");
 		}
 
-		// Offsets in multiples of 8 bytes (FRU spec section 8)
-		addArea(list, data, TypeConverter.byteToInt(data[2]) * 8, "chassis", ChassisInfo::new);
-		addArea(list, data, TypeConverter.byteToInt(data[3]) * 8, "board", BoardInfo::new);
-		addArea(list, data, TypeConverter.byteToInt(data[4]) * 8, "product", ProductInfo::new);
+		// Offsets in multiples of 8 bytes (FRU spec section 8). The internal use area is vendor-private data without a
+		// length: it ends where the next area starts
+		int internalUseOffset = TypeConverter.byteToInt(data[1]) * 8;
+		if (internalUseOffset >= data.length) {
+			problems
+					.add(
+							"The internal use area at offset " + internalUseOffset + " is beyond the " + data.length
+									+ " byte(s) read");
+		} else if (internalUseOffset != 0) {
+			int end = data.length;
+			for (int area = 2; area <= 5; area++) {
+				int areaOffset = TypeConverter.byteToInt(data[area]) * 8;
+				if (areaOffset > internalUseOffset && areaOffset < end) {
+					end = areaOffset;
+				}
+			}
+			list.add(new InternalUseInfo(data, internalUseOffset, end));
+		}
+		addArea(list, data, TypeConverter.byteToInt(data[2]) * 8, "chassis", ChassisInfo::new, problems);
+		addArea(list, data, TypeConverter.byteToInt(data[3]) * 8, "board", BoardInfo::new, problems);
+		addArea(list, data, TypeConverter.byteToInt(data[4]) * 8, "product", ProductInfo::new, problems);
 
 		int multiRecordOffset = TypeConverter.byteToInt(data[5]) * 8;
 		if (multiRecordOffset != 0) {
-			addMultirecords(list, data, multiRecordOffset);
+			addMultirecords(list, data, multiRecordOffset, problems);
 		}
 
 		return list;
 	}
 
 	/**
-	 * Decodes one of the chassis, board or product info areas, when the data read holds it: a truncated read, a
-	 * bad checksum or a decoding failure costs that area, not the whole FRU.
+	 * Decodes one of the chassis, board or product info areas, when the data read holds it: a truncated read or a
+	 * decoding failure costs that area, not the whole FRU, and is reported in the problems. A bad area checksum is
+	 * not: the area is decoded anyway, as real firmware gets checksums wrong on genuine data.
 	 */
 	private static void addArea(
 			List<FruRecord> list,
 			byte[] data,
 			int offset,
 			String area,
-			BiFunction<byte[], Integer, FruRecord> decoder) {
+			BiFunction<byte[], Integer, FruRecord> decoder,
+			List<String> problems) {
 		if (offset == 0) {
 			return; // area not present
 		}
 		if (offset + 2 > data.length) {
-			LOGGER.warn("The {} info area at offset {} is beyond the {} byte(s) read: skipped", area, offset, data.length);
+			problems
+					.add("The " + area + " info area at offset " + offset + " is beyond the " + data.length + " byte(s) read");
 			return;
 		}
 		int length = TypeConverter.byteToInt(data[offset + 1]) * 8;
 		if (offset + length > data.length) {
-			LOGGER
-					.warn(
-							"The {} info area at offset {} is truncated ({} of {} bytes read): skipped",
-							area,
-							offset,
-							data.length - offset,
-							length);
+			problems
+					.add(
+							"The " + area + " info area at offset " + offset + " is truncated (" + (data.length - offset) + " of "
+									+ length + " bytes read)");
 			return;
-		}
-		if (!isChecksumValid(data, offset, length)) {
-			LOGGER.debug("The {} info area at offset {} has an invalid checksum: decoded anyway", area, offset);
 		}
 		try {
 			list.add(decoder.apply(data, offset));
 		} catch (RuntimeException e) {
-			LOGGER.warn("Cannot decode the {} info area at offset {}: {}", area, offset, e.getMessage());
+			problems.add("Cannot decode the " + area + " info area at offset " + offset + ": " + e.getMessage());
 		}
 	}
 
 	/**
 	 * Decodes the multirecord area (FRU spec section 16): the records are length-delimited, so one the library does
-	 * not model is skipped, and the record carrying the end-of-list flag is decoded too.
+	 * not model is kept raw, and the record carrying the end-of-list flag is decoded too.
 	 */
-	private static void addMultirecords(List<FruRecord> list, byte[] data, int multiRecordOffset) {
+	private static void addMultirecords(List<FruRecord> list, byte[] data, int multiRecordOffset, List<String> problems) {
 		int offset = multiRecordOffset;
 		boolean last = false;
 
 		while (!last && offset + MULTIRECORD_HEADER_SIZE <= data.length) {
 			// A corrupt header (section 16.2.5) means the length and the end-of-list flag cannot be trusted
 			if (!isChecksumValid(data, offset, MULTIRECORD_HEADER_SIZE)) {
-				LOGGER
-						.warn(
-								"The multirecord header at offset {} has an invalid checksum: the rest of the multirecord area is skipped",
-								offset);
+				problems
+						.add(
+								"The multirecord header at offset " + offset
+										+ " has an invalid checksum: the rest of the multirecord area is skipped");
 				return;
 			}
 			last = (TypeConverter.byteToInt(data[offset + 1]) & 0x80) != 0;
 			int length = TypeConverter.byteToInt(data[offset + 2]);
 
 			if (offset + MULTIRECORD_HEADER_SIZE + length > data.length) {
-				LOGGER.warn("The multirecord at offset {} is truncated: the rest of the multirecord area is skipped", offset);
+				problems
+						.add("The multirecord at offset " + offset + " is truncated: the rest of the multirecord area is skipped");
 				return;
 			}
-			// The record checksum (header byte 4) is a zero checksum of the record data (section 16.2.6). Real
-			// firmware gets it wrong on genuine records (a Dell iDRAC 8 writes it off by one on its power supply
-			// records), so a mismatch is logged, not fatal: the length-delimited record is decoded anyway
-			if (((data[offset + 3] + sum(data, offset + MULTIRECORD_HEADER_SIZE, length)) & 0xff) != 0) {
-				LOGGER
-						.debug(
-								"The multirecord of type 0x{} at offset {} has an invalid record checksum: decoded anyway",
-								Integer.toHexString(TypeConverter.byteToInt(data[offset])),
-								offset);
-			}
+			// The record checksum (header byte 4) is a zero checksum of the record data (section 16.2.6) and is not
+			// checked: real firmware gets it wrong on genuine records (a Dell iDRAC 8 writes it off by one on its power
+			// supply records), and the record is length-delimited anyway
 			try {
 				list.add(MultiRecordInfo.populateMultiRecord(data, offset));
 			} catch (RuntimeException e) {
-				LOGGER
-						.warn(
-								"Skipping the multirecord of type 0x{} at offset {}: {}",
-								Integer.toHexString(TypeConverter.byteToInt(data[offset])),
-								offset,
-								e.getMessage());
+				problems.add("Cannot decode the multirecord at offset " + offset + ": " + e.getMessage());
 			}
 			offset += MULTIRECORD_HEADER_SIZE + length;
+		}
+		if (!last) {
+			problems
+					.add(
+							"The multirecord area at offset " + multiRecordOffset
+									+ " ends at offset " + offset + " without its end-of-list record: the data read is truncated");
 		}
 	}
 

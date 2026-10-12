@@ -23,6 +23,7 @@ package org.metricshub.ipmi.core.sm.states;
  */
 
 import org.metricshub.ipmi.core.coding.Encoder;
+import org.metricshub.ipmi.core.coding.PayloadCoder;
 import org.metricshub.ipmi.core.coding.commands.IpmiVersion;
 import org.metricshub.ipmi.core.coding.commands.PrivilegeLevel;
 import org.metricshub.ipmi.core.coding.commands.session.CloseSession;
@@ -43,8 +44,6 @@ import org.metricshub.ipmi.core.sm.events.Sendv20Message;
 import org.metricshub.ipmi.core.sm.events.SessionUpkeep;
 import org.metricshub.ipmi.core.sm.events.StateMachineEvent;
 import org.metricshub.ipmi.core.sm.events.Timeout;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * {@link State} in which the session is valid and sending IPMI commands to the
@@ -60,8 +59,6 @@ import org.slf4j.LoggerFactory;
  * </ul>
  */
 public class SessionValid extends State {
-
-	private static final Logger LOGGER = LoggerFactory.getLogger(SessionValid.class);
 
 	private CipherSuite cipherSuite;
 
@@ -89,15 +86,7 @@ public class SessionValid extends State {
 		if (machineEvent instanceof Sendv20Message) {
 			Sendv20Message event = (Sendv20Message) machineEvent;
 			try {
-				stateMachine
-						.sendMessage(
-								Encoder
-										.encode(
-												new Protocolv20Encoder(),
-												event.getPayloadCoder(),
-												event.getMessageSequenceNumber(),
-												event.getSessionSequenceNumber(),
-												event.getSessionId()));
+				stateMachine.sendMessage(encode(event));
 			} catch (Exception e) {
 				stateMachine.doExternalAction(new ErrorAction(e));
 			}
@@ -133,11 +122,7 @@ public class SessionValid extends State {
 								Encoder
 										.encode(
 												new Protocolv20Encoder(),
-												new CloseSession(
-														IpmiVersion.V20,
-														cipherSuite,
-														AuthenticationType.RMCPPlus,
-														event.getSessionId()),
+												closeSession(event.getSessionId()),
 												event.getMessageSequenceNumber(),
 												event.getSessionSequenceNumber(),
 												event.getSessionId()));
@@ -152,6 +137,31 @@ public class SessionValid extends State {
 									new IllegalArgumentException("Invalid transition")));
 		}
 
+	}
+
+	/**
+	 * Encodes the command of the event with the parameters of this session. The session signs and encrypts the
+	 * message, so the command carries no session parameters of its own: they are set on it and the message encoded
+	 * under the lock of the coder, as one command instance may be sent on several connections at once.
+	 */
+	private byte[] encode(Sendv20Message event) throws Exception {
+		PayloadCoder coder = event.getPayloadCoder();
+		synchronized (coder) {
+			coder.setSessionParameters(IpmiVersion.V20, cipherSuite, AuthenticationType.RMCPPlus);
+			return Encoder
+					.encode(
+							new Protocolv20Encoder(),
+							coder,
+							event.getMessageSequenceNumber(),
+							event.getSessionSequenceNumber(),
+							event.getSessionId());
+		}
+	}
+
+	private CloseSession closeSession(int closedSessionId) {
+		CloseSession closeSession = new CloseSession(closedSessionId);
+		closeSession.setSessionParameters(IpmiVersion.V20, cipherSuite, AuthenticationType.RMCPPlus);
+		return closeSession;
 	}
 
 	@Override
@@ -179,7 +189,6 @@ public class SessionValid extends State {
 		} catch (Exception e) {
 			// A message that fails the integrity check or cannot be decoded is discarded (IPMI 2.0 section 6.12.4):
 			// the request it may have answered is sent again when it times out
-			LOGGER.warn("Dropped a message of session {}: {}", sessionId, e.getMessage());
 		}
 	}
 

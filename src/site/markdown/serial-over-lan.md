@@ -1,14 +1,16 @@
-keywords: serial over lan, sol, console, serial port, serialoverlan, payload, administrator, break, bmc key, kg
-description: Open a Serial over LAN (SOL) console to a server's serial port through its BMC — sessions, cipher suite selection, reading and writing, serial port operations, events, and closing.
+keywords: serial over lan, sol, console, serial port, solconsole, serialoverlan, payload, administrator, break, bmc key, kg
+description: Open a Serial over LAN (SOL) console to a server's serial port through its BMC — as streams in the session of IpmiClient, or with the low-level SerialOverLan class: reading and writing, serial port operations, events, and closing.
 
 # Serial over LAN
 
 <!-- MACRO{toc|fromDepth=2|toDepth=3|id=toc} -->
 
 **Serial over LAN (SOL)** redirects the server's serial port — the BIOS setup, the boot loader,
-a Linux or Windows EMS serial console — to an IPMI session. The library implements it in
-[`org.metricshub.ipmi.core.api.sol`](apidocs/org/metricshub/ipmi/core/api/sol/package-summary.html),
-on top of the [low-level API](low-level-api.html).
+a Linux or Windows EMS serial console — to an IPMI session. [`IpmiClient`](#with-ipmiclient)
+opens it as a pair of streams in its session; the
+[`SerialOverLan`](#opening-a-console-with-the-low-level-api) class of
+[`org.metricshub.ipmi.core.api.sol`](apidocs/org/metricshub/ipmi/core/api/sol/package-summary.html)
+is the layer below, on top of the [low-level API](low-level-api.html).
 
 ## Prerequisites
 
@@ -20,7 +22,43 @@ on top of the [low-level API](low-level-api.html).
 * No other SOL session is active: a BMC usually supports a single SOL session at a time. The
   console never deactivates a payload that another session activated: activating it then fails.
 
-## Opening a console
+## With `IpmiClient`
+
+```java
+try (IpmiClient bmc = IpmiClient.builder("bmc.example.com")
+		.credentials("admin", password)
+		.privilege(PrivilegeLevel.Administrator) // the SOL payload needs it on most BMCs
+		.build();
+		SolConsole console = bmc.sol().open()) {
+
+	console.output().write("\r\n".getBytes(StandardCharsets.US_ASCII)); // wake the console up
+
+	byte[] buffer = new byte[2048];
+	int read = console.input().read(buffer); // blocks until characters arrive
+	System.out.print(new String(buffer, 0, read, StandardCharsets.US_ASCII));
+}
+```
+
+[`sol().open()`](apidocs/org/metricshub/ipmi/client/SolRequest.html) activates the SOL payload
+in the session of the client (or, when the BMC serves SOL on another UDP port, in a session it
+opens there with the same credentials) and returns a
+[`SolConsole`](apidocs/org/metricshub/ipmi/client/SolConsole.html):
+
+| Method | Behavior |
+| --- | --- |
+| `output()` | An `OutputStream` whose bytes reach the serial port of the server. A write returns once the BMC acknowledged the characters, and throws `IOException` when it does not. |
+| `input()` | An `InputStream` of what the server writes on its serial port. A read blocks until characters arrive, and returns -1 once the console is closed or the BMC deactivated it. |
+| `deactivated()` | Whether the BMC reported the payload deactivated: the session ended, another console took the payload, or the server reset its serial port. |
+| `invokeOperations(SolOperation...)` | The [serial port operations](#serial-port-operations-and-events). |
+| `registerEventListener(SolEventListener)` | The [status events](#serial-port-operations-and-events) of the console. |
+| `close()` | Deactivates the payload and releases the console; the session of the client stays open for its other operations. Closing a closed console does nothing. |
+
+`open()` throws `IpmiCompletionCodeException` when the BMC refuses the activation
+(`InsufficentPrivilege` without the Administrator privilege), and `IpmiClientException` when
+the BMC offers no SOL payload instance or the activation fails. The other operations of the
+client (`chassisStatus()`, `sensors()`, ...) keep working while a console is open.
+
+## Opening a console with the low-level API
 
 ```java
 import java.nio.charset.StandardCharsets;

@@ -1,4 +1,4 @@
-package org.metricshub.ipmi.client.model;
+package org.metricshub.ipmi.core.coding.commands.fru.record;
 
 /*-
  * ╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲
@@ -22,41 +22,33 @@ package org.metricshub.ipmi.client.model;
  * ╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱
  */
 
+import java.util.Arrays;
+
 /**
- * Wraps FRU device vendor, model and serial number
+ * The internal use area of a FRU (FRU specification section 9): vendor-private data, kept as it is. Its length is
+ * not in the data: the area ends where the next area starts, or where the data read ends.
  */
-public class FruDevice {
-	private String vendor;
-	private String model;
-	private String serialNumber;
+public class InternalUseInfo extends FruRecord {
 
-	public FruDevice(String vendor, String model, String serialNumber) {
-		this.vendor = vendor;
-		this.model = model;
-		this.serialNumber = serialNumber;
+	private final byte[] data;
+
+	/**
+	 * Creates the record.
+	 *
+	 * @param fruData the FRU data
+	 * @param offset the offset of the area (its format version byte)
+	 * @param end the offset of the next area, or the end of the data
+	 */
+	public InternalUseInfo(byte[] fruData, int offset, int end) {
+		this.data = Arrays.copyOfRange(fruData, offset, end);
 	}
 
-	public String getVendor() {
-		return vendor;
+	/**
+	 * Returns the area as it is, format version byte first.
+	 *
+	 * @return a copy of the data
+	 */
+	public byte[] getData() {
+		return data.clone();
 	}
-
-	public String getModel() {
-		return model;
-	}
-
-	public String getSerialNumber() {
-		return serialNumber;
-	}
-
-	@Override
-	public String toString() {
-		return new StringBuilder("FRU;")
-				.append(vendor)
-				.append(";")
-				.append(model)
-				.append(";")
-				.append(serialNumber)
-				.toString();
-	}
-
 }

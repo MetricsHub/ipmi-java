@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.nio.charset.StandardCharsets;
@@ -16,7 +17,9 @@ import org.junit.jupiter.api.Test;
 import org.metricshub.ipmi.core.coding.commands.fru.record.BaseCompatibilityInfo;
 import org.metricshub.ipmi.core.coding.commands.fru.record.BoardInfo;
 import org.metricshub.ipmi.core.coding.commands.fru.record.FruRecord;
+import org.metricshub.ipmi.core.coding.commands.fru.record.InternalUseInfo;
 import org.metricshub.ipmi.core.coding.commands.fru.record.PowerSupplyInfo;
+import org.metricshub.ipmi.core.coding.commands.fru.record.RawMultiRecordInfo;
 import org.metricshub.ipmi.core.coding.commands.fru.record.ProductInfo;
 
 class ReadFruDataTest {
@@ -138,7 +141,8 @@ class ReadFruDataTest {
 	void everyAreaAndTheLastMultirecordAreDecoded() {
 		List<FruRecord> records = decode(image());
 
-		assertEquals(3, records.size(), "board, product and the power supply record; the unknown record is skipped");
+		assertEquals(4, records.size(), "board, product, the raw Extended DC Output record and the power supply record");
+		assertEquals(EXTENDED_DC_OUTPUT_RECORD, assertInstanceOf(RawMultiRecordInfo.class, records.get(2)).getRecordType());
 
 		BoardInfo board = assertInstanceOf(BoardInfo.class, records.get(0));
 		assertEquals("IBM", board.getBoardManufacturer());
@@ -151,8 +155,40 @@ class ReadFruDataTest {
 		assertEquals("IBM", product.getManufacturerName());
 		assertEquals("Model", product.getProductName());
 
-		PowerSupplyInfo powerSupply = assertInstanceOf(PowerSupplyInfo.class, records.get(2));
+		PowerSupplyInfo powerSupply = assertInstanceOf(PowerSupplyInfo.class, records.get(3));
 		assertEquals(750, powerSupply.getCapacity());
+	}
+
+	@Test
+	void theInternalUseAreaIsKeptRaw() {
+		byte[] internal = bytes(0x01, 0xaa, 0xbb, 0xcc, 0xdd, 0xee, 0xff, 0x00);
+		byte[] board = boardArea();
+		// Internal use area at 8 (one 8-byte block), board area right after it
+		byte[] header = bytes(1, 1, 0, 2, 0, 0, 0, 0);
+		header[7] = checksum(header, 0, 7);
+
+		List<FruRecord> records = decode(concat(header, internal, board));
+
+		assertEquals(2, records.size(), "the internal use area and the board area");
+		assertArrayEquals(internal, assertInstanceOf(InternalUseInfo.class, records.get(0)).getData());
+		assertInstanceOf(BoardInfo.class, records.get(1));
+	}
+
+	@Test
+	void anInternalUseAreaBeyondTheDataIsReported() {
+		byte[] board = boardArea();
+		// Internal use area declared at offset 64, past the data read
+		byte[] header = bytes(1, 8, 0, 1, 0, 0, 0, 0);
+		header[7] = checksum(header, 0, 7);
+		ReadFruDataResponseData chunk = new ReadFruDataResponseData();
+		chunk.setFruData(concat(header, board));
+		List<String> problems = new java.util.ArrayList<>();
+
+		List<FruRecord> records = ReadFruData.decodeFruData(Collections.singletonList(chunk), problems);
+
+		assertEquals(1, records.size(), "the board area");
+		assertEquals(1, problems.size(), problems.toString());
+		assertTrue(problems.get(0).contains("internal use area"), problems.get(0));
 	}
 
 	@Test
@@ -186,8 +222,25 @@ class ReadFruDataTest {
 
 		List<FruRecord> records = decode(image);
 
-		assertEquals(3, records.size(), "board, product and the power supply record, checksum or not");
-		assertEquals(750, assertInstanceOf(PowerSupplyInfo.class, records.get(2)).getCapacity());
+		assertEquals(4, records.size(), "board, product, the raw record and the power supply record, checksum or not");
+		assertEquals(750, assertInstanceOf(PowerSupplyInfo.class, records.get(3)).getCapacity());
+	}
+
+	@Test
+	void aMultirecordAreaWithoutItsEndOfListRecordIsReported() {
+		byte[] image = image();
+		byte[] truncated = Arrays.copyOf(image, image.length - 24 - 5); // without the last multirecord
+		ReadFruDataResponseData chunk = new ReadFruDataResponseData();
+		chunk.setFruData(truncated);
+		List<String> problems = new java.util.ArrayList<>();
+
+		List<FruRecord> records = ReadFruData.decodeFruData(Collections.singletonList(chunk), problems);
+
+		assertEquals(3, records.size(), "board, product and the raw Extended DC Output record");
+		assertEquals(EXTENDED_DC_OUTPUT_RECORD, assertInstanceOf(RawMultiRecordInfo.class, records.get(2)).getRecordType());
+		assertEquals(1, problems.size(), problems.toString());
+		assertTrue(problems.get(0).contains("end-of-list"), problems.get(0));
+		assertEquals(3, ReadFruData.decodeFruData(Collections.singletonList(chunk)).size());
 	}
 
 	@Test
@@ -198,7 +251,7 @@ class ReadFruDataTest {
 
 		List<FruRecord> records = decode(image);
 
-		assertEquals(2, records.size(), "board and product; the area is not read past the corrupt header");
+		assertEquals(3, records.size(), "board, product and the raw record; the area is not read past the corrupt header");
 	}
 
 	@Test

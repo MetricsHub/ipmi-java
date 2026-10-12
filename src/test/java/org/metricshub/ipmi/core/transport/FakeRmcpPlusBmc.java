@@ -229,6 +229,8 @@ public class FakeRmcpPlusBmc implements AutoCloseable {
 		private byte[] k2;
 		private boolean active;
 		private volatile boolean closed;
+		/** Expired by the BMC: its packets are dropped without a word, as a real BMC does. */
+		private volatile boolean expired;
 		private int sequenceNumber;
 		/** The privilege the console asked for in RAKP Message 1, the most the session can be raised to. */
 		private int maxPrivilege;
@@ -346,6 +348,17 @@ public class FakeRmcpPlusBmc implements AutoCloseable {
 	public boolean isSessionClosed() {
 		Session current = session;
 		return current != null && current.closed;
+	}
+
+	/**
+	 * Expires the current session, as a BMC does after its inactivity timeout or a reboot: its packets are dropped
+	 * from now on, and a new session can be opened.
+	 */
+	public void expireSession() {
+		Session current = session;
+		if (current != null) {
+			current.expired = true;
+		}
 	}
 
 	/**
@@ -662,6 +675,9 @@ public class FakeRmcpPlusBmc implements AutoCloseable {
 	private byte[] receiveInSession(byte[] datagram) throws GeneralSecurityException {
 		Session current = session;
 		ByteBuffer in = ByteBuffer.wrap(datagram).order(ByteOrder.LITTLE_ENDIAN);
+		if (current != null && current.expired && in.getInt(6) == current.managedId) {
+			return null;
+		}
 		if (current == null || !current.active || current.closed || in.getInt(6) != current.managedId) {
 			errors.add("Packet of no open session: " + hex(datagram));
 			return null;

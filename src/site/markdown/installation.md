@@ -1,5 +1,5 @@
-keywords: install, maven, gradle, dependency, jdk, java 8, slf4j, logging
-description: Add the IPMI Java Client to your build, the supported JDKs, its single dependency (the SLF4J API), and how to configure its logging.
+keywords: install, maven, gradle, dependency, jdk, java 8, no dependency
+description: Add the IPMI Java Client to your build, the supported JDKs and requirements; the library has no dependency and does not log.
 
 # Installation
 
@@ -28,8 +28,10 @@ The library is published on
 >   implementation("${project.groupId}:${project.artifactId}:${project.version}")
 >   ```
 
-Versions up to 1.2.00 were published as `org.sentrysoftware:ipmi`, with the
-`org.sentrysoftware.ipmi` packages; see [Upgrading](upgrading.html#upgrading-from-1-2-00-and-earlier).
+Version 2.0.00 replaces the API of the 1.x versions: see
+[Upgrading from 1.x](upgrading.html#upgrading-from-1-x-to-2-0-00). Versions up to 1.2.00 were
+published as `org.sentrysoftware:ipmi`, with the `org.sentrysoftware.ipmi` packages; see
+[Upgrading](upgrading.html#upgrading-from-1-2-00-and-earlier).
 
 ## Requirements
 
@@ -37,39 +39,17 @@ Versions up to 1.2.00 were published as `org.sentrysoftware:ipmi`, with the
 | --- | --- |
 | Java | **Java 8** or later. The library is compiled for Java 8 and built and tested on JDK 17. |
 | Cryptography | The standard JCE algorithms only: `HmacSHA1`, `HmacSHA256`, `HmacMD5`, `AES/CBC/NoPadding`. No extra security provider is needed. |
-| Network | UDP from the machine running the client to port **623** of the BMC (or the port set with [`setPort()`](configuration.html#host-and-port)). Each session also binds an ephemeral local UDP port. |
+| Network | UDP from the machine running the client to port **623** of the BMC (or the port set with [`port()`](configuration.html#host-and-port)). Each client also binds an ephemeral local UDP port while it is open. |
 | A BMC | With IPMI 2.0 over LAN enabled and an account allowed to log in: see [Preparing the BMC](preparing-the-bmc.html). IPMI 1.5-only BMCs are not supported. |
 
 ## Dependencies
 
-The only runtime dependency is the **SLF4J 2 API** (`org.slf4j:slf4j-api`), through which the
-library logs. Nothing else is pulled in: the RMCP+ protocol, the RAKP handshake and the
+The library has **no runtime dependency**: the RMCP+ protocol, the RAKP handshake and the
 encryption are implemented with the JDK alone.
 
-## Logging
-
-The library logs through [SLF4J](https://www.slf4j.org/) under the `org.metricshub.ipmi` logger
-hierarchy. Add the SLF4J provider of your logging framework (`logback-classic`, `slf4j-reload4j`,
-`log4j-slf4j2-impl`, `slf4j-simple`, ...) to see the messages; without a provider, SLF4J prints a
-one-time warning and discards them.
-
-What is logged, and at which level:
-
-| Level | Messages |
-| --- | --- |
-| `ERROR` | A failed session handshake, exceptions in the receiving and keep-alive threads. |
-| `WARN` | An SDR record that cannot be decoded and is skipped, a FRU that cannot be read or decoded (the FRU is then truncated or missing), a sensor whose reading the BMC refused, a message that failed and is resent, a packet whose integrity check failed, a response listener that threw while a timeout was reported. |
-| `DEBUG` | Each message sent, with its tag and attempt number; each message that timed out; a value the decoders do not model (`Invalid value: ...` for an entity ID, sensor type, unit or state); a session that could not be closed cleanly; every lookup of a [`connection.properties`](timeouts-and-errors.html#library-wide-defaults) value. |
-
-> [!TIP]
-> Set the `org.metricshub.ipmi` logger to `WARN` in production, and to `DEBUG` when diagnosing a
-> BMC ([Troubleshooting](troubleshooting.html)).
-
-With `slf4j-simple`, for example:
-
-```bash
-java -Dorg.slf4j.simpleLogger.log.org.metricshub.ipmi=warn -cp ... MyApp
-```
+It does not log either. Every failure reaches the caller as an exception, and every problem that
+does not fail an operation is part of its result ([Timeouts and Errors](timeouts-and-errors.html)):
+log what you need from there, with the logging framework of your application.
 
 ## Building from source
 

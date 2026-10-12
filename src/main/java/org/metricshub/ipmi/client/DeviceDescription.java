@@ -1,4 +1,4 @@
-package org.metricshub.ipmi.client.model;
+package org.metricshub.ipmi.client;
 
 /*-
  * ╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲

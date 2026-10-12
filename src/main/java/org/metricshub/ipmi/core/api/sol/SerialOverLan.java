@@ -26,7 +26,6 @@ import org.metricshub.ipmi.core.api.async.ConnectionHandle;
 import org.metricshub.ipmi.core.api.async.InboundSolMessageListener;
 import org.metricshub.ipmi.core.api.sync.IpmiConnector;
 import org.metricshub.ipmi.core.coding.PayloadCoder;
-import org.metricshub.ipmi.core.coding.commands.IpmiVersion;
 import org.metricshub.ipmi.core.coding.commands.PrivilegeLevel;
 import org.metricshub.ipmi.core.coding.commands.payload.ActivateSolPayload;
 import org.metricshub.ipmi.core.coding.commands.payload.ActivateSolPayloadResponseData;
@@ -42,7 +41,6 @@ import org.metricshub.ipmi.core.coding.payload.sol.SolAckState;
 import org.metricshub.ipmi.core.coding.payload.sol.SolMessage;
 import org.metricshub.ipmi.core.coding.payload.sol.SolOperation;
 import org.metricshub.ipmi.core.coding.payload.sol.SolStatus;
-import org.metricshub.ipmi.core.coding.protocol.AuthenticationType;
 import org.metricshub.ipmi.core.coding.protocol.PayloadType;
 import org.metricshub.ipmi.core.coding.security.CipherSuite;
 import org.metricshub.ipmi.core.coding.sol.SolCoder;
@@ -53,9 +51,6 @@ import org.metricshub.ipmi.core.connection.ConnectionException;
 import org.metricshub.ipmi.core.connection.Session;
 import org.metricshub.ipmi.core.connection.SessionException;
 import org.metricshub.ipmi.core.connection.SessionManager;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.io.Closeable;
 import java.io.IOException;
@@ -73,8 +68,6 @@ import java.util.concurrent.CopyOnWriteArrayList;
  * Entry point for the Serial Over LAN (SOL) communication. Use all SOL operations through this class.
  */
 public class SerialOverLan implements Closeable {
-
-	private static final Logger LOGGER = LoggerFactory.getLogger(SerialOverLan.class);
 
 	/**
 	 * The most characters a packet carries: the BMC acknowledges them with a count of one byte (IPMI 2.0 table 15-2).
@@ -361,7 +354,7 @@ public class SerialOverLan implements Closeable {
 			this.payloadInstance = getFirstAvailablePayloadInstance(ipmiConnector, connectionHandle);
 			this.activationSession = payloadSession;
 
-			ActivateSolPayload activatePayload = new ActivateSolPayload(connectionHandle.getCipherSuite(), payloadInstance);
+			ActivateSolPayload activatePayload = new ActivateSolPayload(payloadInstance);
 			ActivateSolPayloadResponseData activatePayloadResponseData = getActivatePayloadResponse(
 					ipmiConnector,
 					payloadSession,
@@ -402,7 +395,7 @@ public class SerialOverLan implements Closeable {
 		boolean deactivated = false;
 		while (true) {
 			try {
-				return (ActivateSolPayloadResponseData) ipmiConnector.sendMessage(connectionHandle, activatePayload);
+				return ipmiConnector.sendMessage(connectionHandle, activatePayload);
 			} catch (IPMIException e) {
 				boolean alreadyActive = !deactivated && e.getRawCode() == PAYLOAD_ALREADY_ACTIVE;
 				if (!raised && e.getCompletionCode() == CompletionCode.InsufficentPrivilege) {
@@ -427,14 +420,13 @@ public class SerialOverLan implements Closeable {
 	private boolean isActiveInSession(IpmiConnector ipmiConnector, Session payloadSession) throws Exception {
 		ConnectionHandle connectionHandle = payloadSession.getConnectionHandle();
 		try {
-			GetPayloadInstanceInfoResponseData info = (GetPayloadInstanceInfoResponseData) ipmiConnector
+			GetPayloadInstanceInfoResponseData info = ipmiConnector
 					.sendMessage(
 							connectionHandle,
-							new GetPayloadInstanceInfo(connectionHandle.getCipherSuite(), PayloadType.Sol, payloadInstance));
+							new GetPayloadInstanceInfo(PayloadType.Sol, payloadInstance));
 			return info.getSessionId() != 0 && info.getSessionId() == payloadSession.getManagedSystemSessionId();
 		} catch (IPMIException e) {
 			// The command is optional
-			LOGGER.debug("Get Payload Instance Info failed", e);
 			return false;
 		}
 	}
@@ -452,10 +444,8 @@ public class SerialOverLan implements Closeable {
 	 */
 	private int getFirstAvailablePayloadInstance(IpmiConnector ipmiConnector, ConnectionHandle connectionHandle)
 			throws Exception {
-		GetPayloadActivationStatus getPayloadActivationStatus = new GetPayloadActivationStatus(
-				connectionHandle.getCipherSuite(),
-				PayloadType.Sol);
-		GetPayloadActivationStatusResponseData getActivationResponseData = (GetPayloadActivationStatusResponseData) ipmiConnector
+		GetPayloadActivationStatus getPayloadActivationStatus = new GetPayloadActivationStatus(PayloadType.Sol);
+		GetPayloadActivationStatusResponseData getActivationResponseData = ipmiConnector
 				.sendMessage(
 						connectionHandle,
 						getPayloadActivationStatus);
@@ -485,9 +475,6 @@ public class SerialOverLan implements Closeable {
 			privilegeLevel = PrivilegeLevel.Administrator;
 		}
 		SetSessionPrivilegeLevel setSessionPrivilegeLevel = new SetSessionPrivilegeLevel(
-				IpmiVersion.V20,
-				connectionHandle.getCipherSuite(),
-				AuthenticationType.RMCPPlus,
 				privilegeLevel);
 		ipmiConnector.sendMessage(connectionHandle, setSessionPrivilegeLevel);
 	}
@@ -500,6 +487,16 @@ public class SerialOverLan implements Closeable {
 	 *        a byte to write
 	 * @return true if byte was successfully sent and acknowledged by remote server, false otherwise.
 	 */
+	/**
+	 * Returns the connection the console exchanges its packets on: the one of the session it was given, or the one
+	 * of the session it opened on the port of the payload when the BMC serves SOL on another port.
+	 *
+	 * @return the connection handle of the payload session
+	 */
+	public ConnectionHandle getConnectionHandle() {
+		return session.getConnectionHandle();
+	}
+
 	public boolean writeByte(byte singleByte) {
 		return writeBytes(new byte[] { singleByte });
 	}
@@ -839,8 +836,7 @@ public class SerialOverLan implements Closeable {
 				(byte) 0,
 				(byte) 0,
 				SolAckState.ACK,
-				lineOperations,
-				session.getConnectionHandle().getCipherSuite());
+				lineOperations);
 	}
 
 	/**
@@ -853,13 +849,12 @@ public class SerialOverLan implements Closeable {
 			connector
 					.sendOneWayMessage(
 							session.getConnectionHandle(),
-							new SolCoder(operations, session.getConnectionHandle().getCipherSuite()));
+							new SolCoder(operations));
 			return true;
 		} catch (Exception e) {
 			if (e instanceof InterruptedException) {
 				Thread.currentThread().interrupt();
 			}
-			LOGGER.error("Error while sending SOL operations", e);
 			return false;
 		}
 	}
@@ -921,7 +916,6 @@ public class SerialOverLan implements Closeable {
 			Thread.currentThread().interrupt();
 			return null;
 		} catch (Exception e) {
-			LOGGER.error("Error while sending message", e);
 			return null;
 		}
 	}
@@ -954,7 +948,7 @@ public class SerialOverLan implements Closeable {
 		connector
 				.sendMessage(
 						connectionHandle,
-						new DeactivatePayload(connectionHandle.getCipherSuite(), PayloadType.Sol, instance));
+						new DeactivatePayload(PayloadType.Sol, instance));
 	}
 
 	/**
@@ -968,7 +962,7 @@ public class SerialOverLan implements Closeable {
 				deactivatePayload(activatedConnection, activatedInstance);
 			}
 		} catch (Exception e) {
-			warnDeactivationFailure(e);
+			restoreInterruptStatus(e);
 		}
 		try {
 			if (activationSession != null) {
@@ -980,15 +974,14 @@ public class SerialOverLan implements Closeable {
 				}
 			}
 		} catch (Exception e) {
-			warnDeactivationFailure(e);
+			restoreInterruptStatus(e);
 		}
 	}
 
-	private static void warnDeactivationFailure(Exception e) {
+	private static void restoreInterruptStatus(Exception e) {
 		if (e instanceof InterruptedException) {
 			Thread.currentThread().interrupt();
 		}
-		LOGGER.warn("Cannot deactivate the SOL payload after a failed activation", e);
 	}
 
 	/**
@@ -1007,7 +1000,6 @@ public class SerialOverLan implements Closeable {
 				if (e instanceof InterruptedException) {
 					Thread.currentThread().interrupt();
 				}
-				LOGGER.warn("Cannot close the session of the Serial over LAN console", e);
 			}
 			connector.closeConnection(connectionHandle);
 		}

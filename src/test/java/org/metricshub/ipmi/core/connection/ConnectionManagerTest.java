@@ -49,7 +49,7 @@ class ConnectionManagerTest {
 	}
 
 	@Test
-	void pingPeriodComesFromThePropertiesOnlyWhenNotGiven() throws Exception {
+	void pingPeriodIsTheDefaultOnlyWhenNotGiven() throws Exception {
 		assertPingPeriod(30000, new ConnectionManager(0));
 		assertPingPeriod(30000, new ConnectionManager(0, -1));
 		assertPingPeriod(12345, new ConnectionManager(0, 12345));

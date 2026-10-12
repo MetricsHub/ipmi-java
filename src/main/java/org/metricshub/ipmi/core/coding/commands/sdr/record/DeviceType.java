@@ -22,9 +22,6 @@ package org.metricshub.ipmi.core.coding.commands.sdr.record;
  * ╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱
  */
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 public enum DeviceType {
 	Eeprom24C04(DeviceType.EEPROM24C04),
 	Eeprom24C08(DeviceType.EEPROM24C08),
@@ -94,8 +91,6 @@ public enum DeviceType {
 	private static final int EEPROM24C02 = 9;
 
 	private int code;
-
-	private static Logger logger = LoggerFactory.getLogger(DeviceType.class);
 
 	DeviceType(int code) {
 		this.code = code;
@@ -172,7 +167,6 @@ public enum DeviceType {
 		case EEPROM24C02:
 			return Eeprom24C02;
 		default:
-			logger.debug("Invalid value: {}", value);
 			return Other;
 		}
 	}

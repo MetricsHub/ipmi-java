@@ -34,28 +34,33 @@ import org.metricshub.ipmi.core.coding.protocol.PayloadType;
 import org.metricshub.ipmi.core.coding.security.CipherSuite;
 import org.metricshub.ipmi.core.common.TypeConverter;
 
+import java.security.InvalidKeyException;
+import java.security.NoSuchAlgorithmException;
+
 /**
- * A wrapper for IPMI command.
- * Parameterless constructors in classes derived from IpmiCommandCoder are meant
- * to be used for decoding. To avoid omitting setting an important parameter
- * when encoding message use parametered constructors rather than the
- * parameterless ones.
+ * A wrapper for an IPMI command: encodes its request and decodes its response, of type {@code R}. The session the
+ * command is sent in sets its IPMI version, cipher suite and authentication type
+ * ({@link #setSessionParameters(IpmiVersion, CipherSuite, AuthenticationType)}) when it encodes the request.
+ *
+ * @param <R> the type of the response data of the command
  */
-public abstract class IpmiCommandCoder extends PayloadCoder {
+public abstract class IpmiCommandCoder<R extends ResponseData> extends PayloadCoder {
 
-	public IpmiCommandCoder() {
-
-	}
-
-	public IpmiCommandCoder(IpmiVersion version, CipherSuite cipherSuite,
-			AuthenticationType authenticationType) {
-		super(version, cipherSuite, authenticationType);
-	}
+	/**
+	 * Creates the command, with the session parameters of the session that will send it.
+	 */
+	protected IpmiCommandCoder() {}
 
 	@Override
 	public PayloadType getSupportedPayloadType() {
 		return PayloadType.Ipmi;
 	}
+
+	@Override
+	public abstract R getResponseData(IpmiMessage message)
+			throws IPMIException,
+			NoSuchAlgorithmException,
+			InvalidKeyException;
 
 	/**
 	 * Checks if given message contains response command specific for this

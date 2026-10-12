@@ -23,15 +23,11 @@ package org.metricshub.ipmi.core.coding.commands.payload;
  */
 
 import org.metricshub.ipmi.core.coding.commands.IpmiCommandCoder;
-import org.metricshub.ipmi.core.coding.commands.IpmiVersion;
-import org.metricshub.ipmi.core.coding.commands.ResponseData;
 import org.metricshub.ipmi.core.coding.payload.IpmiPayload;
 import org.metricshub.ipmi.core.coding.payload.lan.IPMIException;
 import org.metricshub.ipmi.core.coding.payload.lan.IpmiLanRequest;
 import org.metricshub.ipmi.core.coding.payload.lan.NetworkFunction;
-import org.metricshub.ipmi.core.coding.protocol.AuthenticationType;
 import org.metricshub.ipmi.core.coding.protocol.IpmiMessage;
-import org.metricshub.ipmi.core.coding.security.CipherSuite;
 import org.metricshub.ipmi.core.common.TypeConverter;
 
 import java.security.InvalidKeyException;
@@ -42,33 +38,14 @@ import static org.metricshub.ipmi.core.coding.commands.CommandCodes.GET_CHANNEL_
 /**
  * A wrapper class for Get Channel Payload Support Command.
  */
-public class GetChannelPayloadSupport extends IpmiCommandCoder {
+public class GetChannelPayloadSupport extends IpmiCommandCoder<GetChannelPayloadSupportResponseData> {
 
 	private byte channelNumber;
 
 	/**
 	 * Initiates class for decoding.
 	 */
-	public GetChannelPayloadSupport() {
-		super(IpmiVersion.V20, new CipherSuite((byte) 0, (byte) 0, (byte) 0, (byte) 0), AuthenticationType.RMCPPlus);
-	}
-
-	/**
-	 * Initiates class for both encoding and decoding, in a session of cipher suite 0.
-	 *
-	 * @param channelNumber
-	 *        - must be 0h-Bh or Eh-Fh <br>
-	 *        Eh = retrieve information for channel this request was issued
-	 *        on
-	 * @deprecated the request goes out without integrity and confidentiality, which a session of another cipher suite
-	 *             discards: use {@link #GetChannelPayloadSupport(byte, CipherSuite, AuthenticationType)} with the cipher
-	 *             suite of the session
-	 */
-	@Deprecated
-	public GetChannelPayloadSupport(byte channelNumber) {
-		super(IpmiVersion.V20, new CipherSuite((byte) 0, (byte) 0, (byte) 0, (byte) 0), AuthenticationType.RMCPPlus);
-		setChannelNumber(channelNumber);
-	}
+	public GetChannelPayloadSupport() {}
 
 	/**
 	 * Initiates class for both encoding and decoding.
@@ -77,14 +54,8 @@ public class GetChannelPayloadSupport extends IpmiCommandCoder {
 	 *        - must be 0h-Bh or Eh-Fh <br>
 	 *        Eh = retrieve information for channel this request was issued
 	 *        on
-	 * @param cipherSuite
-	 *        - {@link CipherSuite} containing authentication,
-	 *        confidentiality and integrity algorithms for this session.
-	 * @param authenticationType
-	 *        - Type of authentication used. Must be RMCPPlus for IPMI v2.0.
 	 */
-	public GetChannelPayloadSupport(byte channelNumber, CipherSuite cipherSuite, AuthenticationType authenticationType) {
-		super(IpmiVersion.V20, cipherSuite, authenticationType);
+	public GetChannelPayloadSupport(byte channelNumber) {
 		setChannelNumber(channelNumber);
 	}
 
@@ -135,7 +106,7 @@ public class GetChannelPayloadSupport extends IpmiCommandCoder {
 	}
 
 	@Override
-	public ResponseData getResponseData(IpmiMessage message)
+	public GetChannelPayloadSupportResponseData getResponseData(IpmiMessage message)
 			throws IPMIException,
 			NoSuchAlgorithmException,
 			InvalidKeyException {

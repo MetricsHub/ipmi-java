@@ -22,9 +22,6 @@ package org.metricshub.ipmi.core.coding.commands.sdr.record;
  * ╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱
  */
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 /**
  * The EntityID is used for identifying the physical entity that a sensor or
  * device is associated with.
@@ -222,8 +219,6 @@ public enum EntityId {
 
 	private int code;
 
-	private static Logger logger = LoggerFactory.getLogger(EntityId.class);
-
 	EntityId(int code) {
 		this.code = code;
 	}
@@ -351,7 +346,6 @@ public enum EntityId {
 		case BASEBOARD:
 			return Baseboard;
 		default:
-			logger.debug("Invalid value: {}", value);
 			return Other;
 		}
 	}

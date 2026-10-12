@@ -16,12 +16,9 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.metricshub.ipmi.core.api.async.ConnectionHandle;
 import org.metricshub.ipmi.core.api.async.IpmiAsyncConnector;
-import org.metricshub.ipmi.core.coding.commands.IpmiVersion;
 import org.metricshub.ipmi.core.coding.commands.PrivilegeLevel;
 import org.metricshub.ipmi.core.coding.commands.chassis.GetChassisStatus;
-import org.metricshub.ipmi.core.coding.protocol.AuthenticationType;
 import org.metricshub.ipmi.core.coding.security.CipherSuite;
-import org.metricshub.ipmi.core.common.PropertiesManager;
 import org.metricshub.ipmi.core.connection.Connection;
 import org.metricshub.ipmi.core.connection.ConnectionException;
 import org.metricshub.ipmi.core.connection.ConnectionManager;
@@ -69,7 +66,6 @@ class IpmiConnectorTest {
 	 * trips the timeout of the test, where a resend without pause comes within the message timeout plus one tick of
 	 * the queue timer.
 	 */
-	private static final String LONG_IDLE_TIME = "3600000";
 
 	@Test
 	void aBadReplyFailsTheStepAtOnceAndLeavesItRetriable() throws Exception {
@@ -94,6 +90,22 @@ class IpmiConnectorTest {
 	}
 
 	@Test
+	void negativeRetriesAreRefused() throws Exception {
+		IpmiConnector connector = new IpmiConnector(0, 0);
+		try {
+			assertThrows(IllegalArgumentException.class, () -> connector.setRetries(-1));
+			assertEquals(3, connector.getRetries());
+			assertThrows(IllegalArgumentException.class, () -> connector.setTimeout(0));
+			assertThrows(IllegalArgumentException.class, () -> connector.setTimeout(-5));
+			connector.setTimeout(1);
+			connector.setRetries(0);
+			assertEquals(0, connector.getRetries());
+		} finally {
+			connector.tearDown();
+		}
+	}
+
+	@Test
 	@Timeout(30)
 	void aLostReplyIsSentAgainWithoutPause() throws Exception {
 		// The BMC drops the first request and answers the second one
@@ -114,9 +126,6 @@ class IpmiConnectorTest {
 	 * not at all, for null), and returns the time between the first two tries.
 	 */
 	private static long gapBetweenTwoTries(Function<Integer, Integer> completionCodeOfTry) throws Exception {
-		PropertiesManager properties = PropertiesManager.getInstance();
-		String idleTime = properties.getProperty("idleTime");
-		properties.setProperty("idleTime", LONG_IDLE_TIME);
 		List<Long> arrivals = new CopyOnWriteArrayList<>();
 		try (FakeBmc bmc = new FakeBmc(request -> {
 			arrivals.add(System.nanoTime());
@@ -135,14 +144,12 @@ class IpmiConnectorTest {
 						connector
 								.sendMessage(
 										handle,
-										new GetChassisStatus(IpmiVersion.V20, CipherSuite.getEmpty(), AuthenticationType.RMCPPlus)));
+										new GetChassisStatus()));
 				assertEquals(2, arrivals.size(), "the request must be sent twice");
 				return TimeUnit.NANOSECONDS.toMillis(arrivals.get(1) - arrivals.get(0));
 			} finally {
 				connector.tearDown();
 			}
-		} finally {
-			properties.setProperty("idleTime", idleTime);
 		}
 	}
 

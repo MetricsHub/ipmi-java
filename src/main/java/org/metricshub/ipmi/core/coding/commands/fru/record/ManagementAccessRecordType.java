@@ -22,9 +22,6 @@ package org.metricshub.ipmi.core.coding.commands.fru.record;
  * ╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱
  */
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 public enum ManagementAccessRecordType {
 	SystemManagementUrl(ManagementAccessRecordType.SYSTEMMANAGEMENTURL),
 	SystemName(
@@ -43,8 +40,6 @@ public enum ManagementAccessRecordType {
 	private static final int COMPONENTMANAGEMENTURL = 4;
 
 	private static final int UNSPECIFIED = 0;
-
-	private static Logger logger = LoggerFactory.getLogger(ManagementAccessRecordType.class);
 
 	private int code;
 
@@ -67,7 +62,6 @@ public enum ManagementAccessRecordType {
 		case COMPONENTMANAGEMENTURL:
 			return ComponentManagementURL;
 		default:
-			logger.debug("Invalid value: {}", value);
 			return Unspecified;
 		}
 	}

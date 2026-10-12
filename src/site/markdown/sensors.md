@@ -1,5 +1,5 @@
 keywords: sensors, sdr, sensor data record, sensor reading, thresholds, temperature, voltage, fan, power, states, text output format, ipmiresultconverter
-description: Read the sensors of a server through its BMC — how the SDR repository is walked, the Sensor object, readings and thresholds, discrete states, and the text output format of getFrusAndSensorsAsStringResult.
+description: Read the sensors of a server through its BMC — how the SDR repository is walked, selecting sensors, the Sensor object with its reading, thresholds, status and states, and the text output format of IpmiResultConverter.
 
 # Sensors
 
@@ -11,22 +11,26 @@ board, ...), its unit, the formula that converts its raw reading, and its thresh
 walks this repository and reads the sensors that have a reading.
 
 ```java
-List<Sensor> sensors = IpmiClient.getSensors(config);
+try (IpmiClient bmc = IpmiClient.builder(host).credentials(user, password).build()) {
+	for (Sensor sensor : bmc.sensors().execute()) {
+		System.out.println(sensor);
+	}
+}
 ```
 
 ## How the sensors are read
 
-[`IpmiClient.getSensors()`](apidocs/org/metricshub/ipmi/client/IpmiClient.html) opens a session
-and:
+[`sensors().execute()`](apidocs/org/metricshub/ipmi/client/SensorsRequest.html):
 
 1. walks the SDR repository from the first record to the last with **Get SDR**, reading large
    records in chunks when the BMC cannot return them at once, and reserving the repository
-   (**Reserve SDR Repository**) when the BMC requires it or cancels the reservation;
-2. sends **Get Sensor Reading** for every **Full Sensor** and **Compact Sensor** record.
+   (**Reserve SDR Repository**) when the BMC requires it or cancels the reservation; the walk is
+   done once per client and shared with `frus()` ([SDR cache](configuration.html#sdr-cache));
+2. sends **Get Sensor Reading** for every selected **Full Sensor** and **Compact Sensor** record.
 
 Event-Only records (sensors without a reading), the locator and association records, and the
 OEM records are part of the walk but are not returned. A record the library cannot decode is
-logged and skipped; the walk goes on
+skipped and listed in `skippedRecords()`; the walk goes on
 ([Supported Commands](supported-commands.html#sdr-records)).
 
 The walk reads only the sensors of the **BMC's** SDR repository, through the BMC itself: sensors
@@ -34,51 +38,68 @@ owned by satellite controllers that the BMC does not bridge, and the Device SDRs
 controllers, are not read ([#84](https://github.com/metricshub/ipmi-java/issues/84),
 [#105](https://github.com/metricshub/ipmi-java/issues/105)).
 
+### Selecting sensors
+
+The selection is applied **before** the readings are requested, so that an unselected sensor
+costs no round trip:
+
+```java
+// Only the temperature and fan sensors: one Get Sensor Reading per selected sensor
+SensorList sensors = bmc.sensors().types(SensorType.Temperature, SensorType.Fan).execute();
+
+// By name, case-insensitively: * matches any characters, ? one character
+SensorList cpuTemperatures = bmc.sensors().names("CPU? Temp", "*DTS*").execute();
+
+// With a deadline of its own
+SensorList all = bmc.sensors().timeout(Duration.ofSeconds(30)).execute();
+```
+
 ## The `Sensor` object
 
-Each [`Sensor`](apidocs/org/metricshub/ipmi/client/model/Sensor.html) holds:
+Each [`Sensor`](apidocs/org/metricshub/ipmi/client/Sensor.html) is immutable and holds:
 
 | Method | Content |
 | --- | --- |
-| `getName()` | The sensor name of the SDR record (`CPU1 Temp`, `PSU2 Present`, ...) |
-| `getEntityId()`, `getDeviceId()` | The entity the sensor belongs to: its type (`EntityId.Processor`, `EntityId.PowerSupply`, ...) and instance number |
-| `isFull()`, `isCompact()` | Whether the record is a Full Sensor record (an analog sensor with a conversion formula and thresholds) or a Compact one (usually a discrete sensor) |
-| `getRecord()` | The decoded record: a [`FullSensorRecord`](apidocs/org/metricshub/ipmi/core/coding/commands/sdr/record/FullSensorRecord.html) or a [`CompactSensorRecord`](apidocs/org/metricshub/ipmi/core/coding/commands/sdr/record/CompactSensorRecord.html), both [`AbstractSensorRecord`](apidocs/org/metricshub/ipmi/core/coding/commands/sdr/record/AbstractSensorRecord.html) |
-| `getData()` | The [`GetSensorReadingResponseData`](apidocs/org/metricshub/ipmi/core/coding/commands/sdr/GetSensorReadingResponseData.html), or `null` when the BMC returns no reading for the sensor: completion code `DataNotPresent`, or another error completion code, logged at `WARN` ([Errors that do not fail the call](timeouts-and-errors.html#errors-that-do-not-fail-the-call)) |
-| `getStates()` | The asserted states, as `sensorName=state|sensorName=state...`, or an empty string |
+| `name()` | The sensor name of the SDR record (`CPU1 Temp`, `PSU2 Present`, ...) |
+| `number()` | The sensor number |
+| `type()` | What it measures or monitors: [`SensorType`](apidocs/org/metricshub/ipmi/core/coding/commands/sdr/record/SensorType.html) (`Temperature`, `Voltage`, `Fan`, `PowerSupply`, ...) |
+| `entity()`, `entityInstance()` | The entity the sensor belongs to: its type (`EntityId.Processor`, `EntityId.PowerSupply`, ...) and instance number |
+| `unit()` | The [`SensorUnit`](apidocs/org/metricshub/ipmi/core/coding/commands/sdr/record/SensorUnit.html) of the reading and thresholds |
+| `reading()` | The converted reading of a threshold sensor (`OptionalDouble`), empty for a discrete sensor or when the reading is unavailable |
+| `rawReading()` | The reading byte as the BMC sent it, before conversion |
+| `lowerNonCritical()` ... `upperNonRecoverable()` | The six thresholds, converted like the reading; empty when the record does not define them, so that a threshold of `0` is a threshold |
+| `status()` | [`SensorStatus`](apidocs/org/metricshub/ipmi/client/SensorStatus.html): `OK`, `NON_CRITICAL`, `CRITICAL` or `NON_RECOVERABLE` for a threshold sensor, against its thresholds; `OK` for a discrete sensor that answers; `UNAVAILABLE` when the reading is unavailable |
+| `states()` | The asserted states of a discrete sensor, in the wording of `ipmiutil`, each once |
+| `rawStates()` | The same, as [`ReadingType`](apidocs/org/metricshub/ipmi/core/coding/commands/sdr/record/ReadingType.html)s |
+| `problem()` | Why the sensor has no reading and no states: the BMC refused the reading (with its completion code), the reading is not valid yet, or scanning is disabled; empty otherwise |
+| `record()`, `readingData()` | The decoded record ([`FullSensorRecord`](apidocs/org/metricshub/ipmi/core/coding/commands/sdr/record/FullSensorRecord.html) or [`CompactSensorRecord`](apidocs/org/metricshub/ipmi/core/coding/commands/sdr/record/CompactSensorRecord.html)) and the [`GetSensorReadingResponseData`](apidocs/org/metricshub/ipmi/core/coding/commands/sdr/GetSensorReadingResponseData.html), for everything else |
+
+[`SensorList`](apidocs/org/metricshub/ipmi/client/SensorList.html), the result of `execute()`,
+is an unmodifiable `List<Sensor>` that also gives the SDR records the walk skipped
+(`skippedRecords()`).
 
 ### Readings
 
 For a Full Sensor record, the reading is converted to the sensor's unit with the record's
-linear formula (`M`, `B` and the exponents of IPMI 2.0, section 36.3):
+linear formula (`M`, `B` and the exponents of IPMI 2.0, section 36.3), linearization included:
 
 ```java
-for (Sensor sensor : IpmiClient.getSensors(config)) {
-	if (sensor.isFull() && sensor.getData() != null) {
-		FullSensorRecord record = (FullSensorRecord) sensor.getRecord();
-		GetSensorReadingResponseData data = sensor.getData();
-		// The BMC flags a reading it does not vouch for: unavailable, scanning disabled, or no analog reading
-		if (data.isSensorStateValid() && data.isScanningEnabled() && record.hasAnalogReading()) {
-			double value = data.getSensorReading(record);
-			System.out.println(sensor.getName() + " = " + value + " " + record.getSensorBaseUnit()
-					+ " (upper critical: " + record.getUpperCriticalThreshold() + ")");
-		}
-	}
+for (Sensor sensor : bmc.sensors().execute()) {
+	sensor.reading().ifPresent(value -> System.out.println(sensor.name() + " = " + value + " " + sensor.unit()
+			+ " (upper critical: " + sensor.upperCritical() + ", " + sensor.status() + ")"));
 }
 ```
 
 ```text
-Ambient Temp = 17.0 DegreesC (upper critical: 39.0)
-System Power = 92.0 Watts (upper critical: NaN)
-Fan 1 = 6600.0 Rpm (upper critical: NaN)
-System 3.3V = 3.38 Volts (upper critical: 3.56)
+Ambient Temp = 17.0 DegreesC (upper critical: OptionalDouble[39.0], OK)
+System Power = 92.0 Watts (upper critical: OptionalDouble.empty, OK)
+Fan 1 = 6600.0 Rpm (upper critical: OptionalDouble.empty, OK)
+System 3.3V = 3.38 Volts (upper critical: OptionalDouble[3.56], OK)
 ```
 
-`getSensorBaseUnit()` returns a
-[`SensorUnit`](apidocs/org/metricshub/ipmi/core/coding/commands/sdr/record/SensorUnit.html);
-the six thresholds (`getLowerNonCriticalThreshold()` to `getUpperNonRecoverableThreshold()`)
-are converted with the same formula (linearization included), and are `Double.NaN` when the
-record does not define them, so that a threshold of `0` is a threshold.
+`reading()` is empty when the BMC flags the reading it does not vouch for (unavailable, scanning
+disabled), when the record has no analog reading, or when it refused the reading:
+`problem()` says which.
 
 > [!NOTE]
 > A Compact record that describes several shared sensors is reported as a single sensor
@@ -87,31 +108,34 @@ record does not define them, so that a threshold of `0` is a threshold.
 ### States
 
 Discrete sensors (presence, redundancy, power supply status, processor status, ...) report a set
-of asserted **states** instead of a value. `getStates()` returns the asserted states that have
-a description in the wording of `ipmiutil`, as `sensorName=state`, separated with `|`:
+of asserted **states** instead of a value. `states()` returns the asserted states that have a
+description in the wording of `ipmiutil`:
 
 ```text
-PSU Redundancy=Fully Redundant
-PSU1 Present=Presence detected
-CPU0_Status=Presence detected
+PSU Redundancy: [Fully Redundant]
+PSU1 Present: [Presence detected]
+CPU0_Status: [Presence detected]
 ```
 
-The raw states are available as
-`getData().getStatesAsserted(record.getSensorType(), record.getEventReadingType())`, a list of
-[`ReadingType`](apidocs/org/metricshub/ipmi/core/coding/commands/sdr/record/ReadingType.html).
-For OEM sensors (event/reading types `0x70` to `0x7F`), whose states the specification does not
-define, the state is the raw value of the state bytes: `sensorName=0xHHLL` (`0xLL` when the BMC
-returns a single state byte). An OEM sensor with no state asserted reports no state, like any
-discrete sensor.
+The states of a threshold sensor are the thresholds its reading is at or beyond. For OEM
+sensors (event/reading types `0x70` to `0x7F`), whose states the specification does not define,
+the single state is the raw value of the state bytes: `0xHHLL` (`0xLL` when the BMC returns a
+single state byte). An OEM sensor with no state asserted reports no state, like any discrete
+sensor.
 
 ## Text output format
 
-[`IpmiClient.getFrusAndSensorsAsStringResult()`](apidocs/org/metricshub/ipmi/client/IpmiClient.html)
-reads the FRUs, then the sensors (two sessions, see
-[#102](https://github.com/metricshub/ipmi-java/issues/102)), and converts them with
-[`IpmiResultConverter`](apidocs/org/metricshub/ipmi/client/IpmiResultConverter.html) into
-semicolon-separated lines, the format that MetricsHub's IPMI connectors parse. The lines come in
-three groups, in this order:
+[`IpmiResultConverter.convertResult(frus, sensors)`](apidocs/org/metricshub/ipmi/client/IpmiResultConverter.html)
+converts the FRUs and the sensors of a client into semicolon-separated lines, the format that
+MetricsHub's IPMI connectors parse:
+
+```java
+try (IpmiClient bmc = IpmiClient.builder(host).credentials(user, password).build()) {
+	String text = IpmiResultConverter.convertResult(bmc.frus().execute(), bmc.sensors().execute());
+}
+```
+
+The lines come in three groups, in this order:
 
 ```text
 FRU;LENOVO;RD350;S4M00000 - 00000000000001
@@ -142,7 +166,7 @@ One line per **entity** (device) that has at least one sensor with an asserted s
 | Field | Content |
 | --- | --- |
 | `$deviceType` | The entity type, in the wording of `ipmiutil`: `System Board`, `Processor`, `Power Supply`, `Fan Device`, `Memory Device`, `Disk or Disk Bay`, ... |
-| `$deviceId` | The entity instance number |
+| `$deviceId` | The entity instance number, as the signed byte of the record |
 | `$deviceUniqueId` | `$deviceType $deviceId`, for example `Power Supply 1` |
 | `$vendor`, `$model`, `$serialNumber` | From the FRU of the same entity type and instance, if any; empty otherwise |
 | `$states` | The states of every sensor of the entity, `sensorName=state` separated with `|` |
@@ -178,4 +202,4 @@ Energy;$sensorId;$sensorName;$deviceUniqueId;$value
   not define them.
 
 The chassis status has its own text form:
-[`getChassisStatusAsStringResult()`](chassis-status.html#as-text).
+[`convertResult(ChassisStatus)`](chassis-status.html#as-text).

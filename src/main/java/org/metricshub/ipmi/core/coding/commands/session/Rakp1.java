@@ -25,7 +25,6 @@ package org.metricshub.ipmi.core.coding.commands.session;
 import org.metricshub.ipmi.core.coding.commands.IpmiCommandCoder;
 import org.metricshub.ipmi.core.coding.commands.IpmiVersion;
 import org.metricshub.ipmi.core.coding.commands.PrivilegeLevel;
-import org.metricshub.ipmi.core.coding.commands.ResponseData;
 import org.metricshub.ipmi.core.coding.payload.IpmiPayload;
 import org.metricshub.ipmi.core.coding.payload.PlainMessage;
 import org.metricshub.ipmi.core.coding.payload.lan.IPMIException;
@@ -56,7 +55,7 @@ import java.util.Arrays;
  * given ({@link #calculateSik(Rakp1ResponseData)}).
  * </p>
  */
-public class Rakp1 extends IpmiCommandCoder {
+public class Rakp1 extends IpmiCommandCoder<Rakp1ResponseData> {
 
 	/**
 	 * Maximum length of the password and of the BMC key (Kg) in IPMI v2.0, in bytes (IPMI 2.0 tables 22-30 and
@@ -216,7 +215,7 @@ public class Rakp1 extends IpmiCommandCoder {
 	public Rakp1(int managedSystemSessionId, PrivilegeLevel privilegeLevel,
 			String username, byte[] password, byte[] bmcKey,
 			CipherSuite cipherSuite) {
-		super(IpmiVersion.V20, cipherSuite, AuthenticationType.RMCPPlus);
+		setSessionParameters(IpmiVersion.V20, cipherSuite, AuthenticationType.RMCPPlus);
 		setManagedSystemSessionId(managedSystemSessionId);
 		setRequestedMaximumPrivilegeLevel(privilegeLevel);
 		setUsername(username);
@@ -300,7 +299,7 @@ public class Rakp1 extends IpmiCommandCoder {
 	 *         - when creating of the algorithm key fails
 	 */
 	@Override
-	public ResponseData getResponseData(IpmiMessage message)
+	public Rakp1ResponseData getResponseData(IpmiMessage message)
 			throws IPMIException,
 			NoSuchAlgorithmException,
 			InvalidKeyException {
@@ -353,7 +352,7 @@ public class Rakp1 extends IpmiCommandCoder {
 						prepareKeyExchangeAuthenticationCodeBase(data),
 						key,
 						getPasswordBytes())) {
-			throw new IllegalArgumentException("Authentication check failed");
+			throw new AuthenticationException("Authentication check failed");
 		}
 
 		return data;

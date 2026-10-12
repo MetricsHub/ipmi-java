@@ -7,7 +7,6 @@ import org.junit.jupiter.api.Test;
 import org.metricshub.ipmi.core.api.async.ConnectionHandle;
 import org.metricshub.ipmi.core.api.sol.CipherSuiteSelectionHandler;
 import org.metricshub.ipmi.core.api.sync.IpmiConnector;
-import org.metricshub.ipmi.core.common.PropertiesManager;
 import org.metricshub.ipmi.core.transport.FakeBmc;
 
 class SessionManagerTest {
@@ -16,11 +15,9 @@ class SessionManagerTest {
 
 	@Test
 	void aFailedSessionClosesItsConnectionOnly() throws Exception {
-		PropertiesManager properties = PropertiesManager.getInstance();
-		String timeout = properties.getProperty("timeout");
-		properties.setProperty("timeout", String.valueOf(TIMEOUT_MS));
 		try (FakeBmc bmc = FakeBmc.silent()) {
 			IpmiConnector connector = new IpmiConnector(0);
+			connector.setTimeout(TIMEOUT_MS);
 			try {
 				ConnectionHandle other = connector.createConnection(bmc.getAddress(), bmc.getPort());
 				CipherSuiteSelectionHandler firstSuite = suites -> suites.isEmpty() ? null : suites.get(0);
@@ -45,8 +42,6 @@ class SessionManagerTest {
 			} finally {
 				connector.tearDown();
 			}
-		} finally {
-			properties.setProperty("timeout", timeout);
 		}
 	}
 }

@@ -80,7 +80,9 @@ public abstract class MultiRecordInfo extends FruRecord {
 			recordInfo = new OemInfo(fruData, currentOffset, length);
 			break;
 		default:
-			throw new IllegalArgumentException("Unsupported record type");
+			// A type the library does not model: kept with its data, as the OEM SDR records are
+			recordInfo = new RawMultiRecordInfo(TypeConverter.byteToInt(fruData[offset]), fruData, currentOffset, length);
+			break;
 		}
 
 		return recordInfo;

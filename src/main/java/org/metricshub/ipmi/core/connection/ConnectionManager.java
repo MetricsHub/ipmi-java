@@ -25,7 +25,6 @@ package org.metricshub.ipmi.core.connection;
 import org.metricshub.ipmi.core.coding.commands.PrivilegeLevel;
 import org.metricshub.ipmi.core.coding.commands.session.GetChannelAuthenticationCapabilitiesResponseData;
 import org.metricshub.ipmi.core.coding.security.CipherSuite;
-import org.metricshub.ipmi.core.common.PropertiesManager;
 import org.metricshub.ipmi.core.transport.Messenger;
 import org.metricshub.ipmi.core.transport.UdpListener;
 import org.metricshub.ipmi.core.transport.UdpMessenger;
@@ -52,9 +51,13 @@ public class ConnectionManager {
 	private static final List<Integer> RESERVED_TAGS = new ArrayList<Integer>();
 
 	/**
-	 * Frequency of the no-op commands that will be sent to keep up the session
+	 * Period of the keep-alive messages of the connections created without an explicit one, in milliseconds.
 	 */
+	public static final long DEFAULT_PING_PERIOD = 30000;
+
 	private long pingPeriod = -1;
+
+	private volatile int timeout = Connection.DEFAULT_TIMEOUT;
 
 	/**
 	 * Initiates the connection manager. Wildcard IP address will be used.
@@ -66,7 +69,7 @@ public class ConnectionManager {
 	 */
 	public ConnectionManager(int port, long pingPeriod) throws IOException {
 		messenger = new UdpMessenger(port);
-		// Set before initialize(), which resolves -1 to the connection.properties period
+		// Set before initialize(), which resolves -1 to the default period
 		this.pingPeriod = pingPeriod;
 		initialize();
 	}
@@ -111,7 +114,7 @@ public class ConnectionManager {
 	private void initialize() {
 		connections = new CopyOnWriteArrayList<Connection>();
 		if (pingPeriod == -1) {
-			pingPeriod = Long.parseLong(PropertiesManager.getInstance().getProperty("pingPeriod"));
+			pingPeriod = DEFAULT_PING_PERIOD;
 		}
 	}
 
@@ -122,6 +125,24 @@ public class ConnectionManager {
 	 */
 	long getPingPeriod() {
 		return pingPeriod;
+	}
+
+	/**
+	 * Sets the timeout of the messages of the connections created from now on.
+	 *
+	 * @param timeout the time in milliseconds after which a message without a reply is reported as timed out
+	 */
+	public void setTimeout(int timeout) {
+		this.timeout = timeout;
+	}
+
+	/**
+	 * Returns the timeout of the messages of the connections created from now on.
+	 *
+	 * @return the time in milliseconds after which a message without a reply is reported as timed out
+	 */
+	public int getTimeout() {
+		return timeout;
 	}
 
 	/**
@@ -247,7 +268,7 @@ public class ConnectionManager {
 	 *        skipped
 	 * @return index of the connection
 	 * @throws IOException
-	 *         - when properties file was not found
+	 *         - when the connection cannot be created
 	 */
 	public int createConnection(InetAddress address, int port, int connectionPingPeriod, boolean skipCiphers)
 			throws IOException {
@@ -262,6 +283,7 @@ public class ConnectionManager {
 				throw new IllegalStateException("The connection manager is closed");
 			}
 			connection = new Connection(messenger, connections.size());
+			connection.setTimeout(timeout);
 			connections.add(connection);
 		}
 		// Outside the lock: connect() registers with the messenger (see close())
@@ -284,7 +306,7 @@ public class ConnectionManager {
 	 *        the session
 	 * @return index of the connection
 	 * @throws IOException
-	 *         - when properties file was not found
+	 *         - when the connection cannot be created
 	 */
 	public int createConnection(InetAddress address, int port, int connectionPingPeriod) throws IOException {
 		return connect(address, port, connectionPingPeriod, false);
@@ -298,7 +320,7 @@ public class ConnectionManager {
 	 *        - {@link InetAddress} of the remote host
 	 * @return index of the connection
 	 * @throws IOException
-	 *         when properties file was not found
+	 *         when the connection cannot be created
 	 */
 	public int createConnection(InetAddress address, int port) throws IOException {
 		return connect(address, port, pingPeriod, false);
@@ -314,7 +336,7 @@ public class ConnectionManager {
 	 *        skipped
 	 * @return index of the connection
 	 * @throws IOException
-	 *         when properties file was not found
+	 *         when the connection cannot be created
 	 */
 	public int createConnection(InetAddress address, int port, boolean skipCiphers) throws IOException {
 		return connect(address, port, pingPeriod, skipCiphers);

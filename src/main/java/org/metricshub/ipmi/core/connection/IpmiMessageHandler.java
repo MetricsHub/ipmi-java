@@ -32,17 +32,12 @@ import org.metricshub.ipmi.core.coding.protocol.Ipmiv20Message;
 import org.metricshub.ipmi.core.coding.protocol.PayloadType;
 import org.metricshub.ipmi.core.connection.queue.QueueElement;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import java.io.IOException;
 
 /**
  * Default implementation of {@link MessageHandler} for {@link IpmiLanMessage}s.
  */
 public class IpmiMessageHandler extends MessageHandler {
-
-	private static final Logger LOGGER = LoggerFactory.getLogger(IpmiMessageHandler.class);
 
 	public IpmiMessageHandler(Connection connection, int timeout) throws IOException {
 		// The tags start above the SOL packet sequence numbers (1 to 15): the replies of both payload types are reported
@@ -83,23 +78,13 @@ public class IpmiMessageHandler extends MessageHandler {
 			QueueElement element = getMessageQueue().getElement(tag);
 			PayloadCoder coder = element == null ? null : element.getRequest();
 
-			LOGGER.debug("Received message with tag " + tag);
-
 			if (coder == null) {
-				LOGGER
-						.debug(
-								"No message tagged with " + tag
-										+ " in queue. Dropping orphan message.");
 				return;
 			}
 
 			// A late reply to a request that timed out may carry the tag of a newer queued request: the reply of a
 			// request answers the command of that request, and the request stays queued
 			if (coder instanceof IpmiCommandCoder && !answers((IpmiCommandCoder) coder, lanMessagePayload)) {
-				LOGGER
-						.debug(
-								"Message tagged with " + tag + " answers another command than the queued request."
-										+ " Dropping stale message.");
 				return;
 			}
 

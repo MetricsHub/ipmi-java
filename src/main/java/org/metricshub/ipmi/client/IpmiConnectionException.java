@@ -1,8 +1,5 @@
-/**
- * Includes the IPMI data model for Field Replaceable Unit (FRU) and Sensor devices to be managed by the
- * {@link org.metricshub.ipmi.client.IpmiResultConverter} class.<br>
- */
-package org.metricshub.ipmi.client.model;
+package org.metricshub.ipmi.client;
+
 /*-
  * ╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲
  * IPMI Java Client
@@ -24,3 +21,22 @@ package org.metricshub.ipmi.client.model;
  * <http://www.gnu.org/licenses/lgpl-3.0.html>.
  * ╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱
  */
+
+/**
+ * The session could not be established for a network reason: unknown host, socket error, or no reply to the session
+ * setup after all the tries (wrong host, UDP port 623 filtered, IPMI over LAN disabled).
+ */
+public class IpmiConnectionException extends IpmiClientException {
+
+	private static final long serialVersionUID = 1L;
+
+	/**
+	 * Creates the exception.
+	 *
+	 * @param message what failed
+	 * @param cause the failure of the protocol core
+	 */
+	public IpmiConnectionException(String message, Throwable cause) {
+		super(message, cause);
+	}
+}

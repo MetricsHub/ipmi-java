@@ -24,7 +24,7 @@ only, and works whether the server is powered on or off, as long as the BMC has 
 | IPMI 2.0 (RMCP+) | The client only opens RMCP+ sessions. IPMI 1.5-only BMCs (RMCP with MD2/MD5 or straight password authentication) are not supported. |
 | UDP port 623 | Open from the machine running the client to the BMC. The port can be changed with [`setPort()`](configuration.html#host-and-port). |
 | An account | Enabled, with a password, allowed to log in over IPMI on the LAN channel. |
-| Privilege level | **User** for everything `IpmiClient` does; **Administrator** for [Serial over LAN](serial-over-lan.html). |
+| Privilege level | **User** for everything `IpmiClient` reads; **Operator** for the control commands; **Administrator** for [Serial over LAN](serial-over-lan.html). |
 | A supported cipher suite | Suite **3** or **17** in practice; see [Cipher suites](#cipher-suites). |
 
 ## Enabling IPMI over LAN
@@ -96,8 +96,9 @@ one of them. Prefer **17** where available.
 
 ### How `IpmiClient` chooses the suite
 
-By default (`skipAuth` set to `false`), each call first asks the BMC for its list of cipher
-suites (Get Channel Cipher Suites), then picks the first of these suites that the BMC offers:
+By default (`cipherSuites(17, 3, 8, 16, 2, 7)`), the client first asks the BMC for its list of
+cipher suites (Get Channel Cipher Suites) when it opens its session, then picks the first of these
+suites that the BMC offers:
 
 1. **17**, then **3**, then 8: messages signed and encrypted;
 2. 16, then 2, then 7: messages signed, not encrypted.
@@ -106,8 +107,8 @@ A Lenovo XCC that offers suites 1 to 19 gets suite 17, a Cisco IMC that offers 0
 suite 3. The client never chooses a suite without integrity (0, 1, 6, 15), even when the BMC
 offers nothing else: the list of suites is not authenticated, so an attacker on the network
 could otherwise make the client fall back to a session whose replies can be forged. A BMC that
-offers none of the six fails the call with `ConnectionException: The BMC offers none of the
-cipher suites 17, 3, 8, 16, 2 and 7 (offered: ...)`. The algorithms of a suite are those of the
+offers none of the six fails the first operation with `IpmiClientException: The BMC ... offers
+none of the cipher suites [17, 3, 8, 16, 2, 7] (offered: ...)`. The algorithms of a suite are those of the
 table above, whatever the BMC's record of the suite says, and the OEM suites a BMC may list (as
 Cisco IMC does) are ignored.
 
@@ -116,18 +117,19 @@ To control the suite:
 * **restrict the suites offered by the BMC** — `ipmitool lan print 1` lists them
   (`RMCP+ Cipher Suites`), and the web interface or `ipmitool lan set 1 cipher_privs` can disable
   the ones you do not want; or
-* set **`skipAuth` to `true`**: the client then skips the discovery and always uses
-  **suite 3** with the User privilege, which fails on a BMC that does not offer suite 3
-  ([Configuration](configuration.html#skipauth)); or
+* list the suites the client may use with **`cipherSuites(...)`** on the builder, by order of
+  preference, or set **`cipherSuite(id)`**: the client then skips the discovery and always uses
+  that suite, which fails on a BMC that does not offer it
+  ([Configuration](configuration.html#cipher-suites)); or
 * open the session yourself with the [low-level API](low-level-api.html#choosing-the-cipher-suite).
 
 ## BMC key (Kg)
 
 Some BMCs can be configured with a **BMC key (Kg)** for *two-key* logins: the session keys are
-then derived from this key instead of the user's password. When it is set, pass it as the
-`bmcKey` of the [configuration](configuration.html#bmc-key) (the same key as `ipmitool -k` or
-`-y`, at most 20 bytes). Leave `bmcKey` to `null` otherwise: this is the default on virtually
-every BMC, whose key is then all zeros (a key of zeros only is treated as no key).
+then derived from this key instead of the user's password. When it is set, pass it with
+`bmcKey()` to the [builder](configuration.html#bmc-key) (the same key as `ipmitool -k` or `-y`,
+at most 20 bytes). Leave it unset otherwise: this is the default on virtually every BMC, whose key
+is then all zeros (a key of zeros only is treated as no key).
 
 ## Firewall
 

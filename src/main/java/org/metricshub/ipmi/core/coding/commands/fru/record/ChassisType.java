@@ -22,9 +22,6 @@ package org.metricshub.ipmi.core.coding.commands.fru.record;
  * ╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱
  */
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 /**
  * Specifies possible types of chassis.
  */
@@ -109,8 +106,6 @@ public enum ChassisType {
 
 	private int code;
 
-	private static Logger logger = LoggerFactory.getLogger(ChassisType.class);
-
 	ChassisType(int code) {
 		this.code = code;
 	}
@@ -168,7 +163,6 @@ public enum ChassisType {
 		case LAPTOP:
 			return LapTop;
 		default:
-			logger.debug("Invalid value: {}", value);
 			return Other;
 		}
 	}

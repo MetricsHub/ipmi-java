@@ -6,16 +6,10 @@ import static org.metricshub.ipmi.core.coding.commands.IpmiResponses.response;
 
 import org.junit.jupiter.api.Test;
 import org.metricshub.ipmi.core.coding.commands.CommandCodes;
-import org.metricshub.ipmi.core.coding.commands.IpmiVersion;
-import org.metricshub.ipmi.core.coding.protocol.AuthenticationType;
-import org.metricshub.ipmi.core.coding.security.CipherSuite;
 
 class GetSdrTest {
 
 	private static final GetSdr COMMAND = new GetSdr(
-			IpmiVersion.V20,
-			CipherSuite.getEmpty(),
-			AuthenticationType.RMCPPlus,
 			0,
 			1);
 

@@ -24,23 +24,16 @@ package org.metricshub.ipmi.core.coding.commands.payload;
 
 import org.metricshub.ipmi.core.coding.commands.CommandCodes;
 import org.metricshub.ipmi.core.coding.commands.IpmiCommandCoder;
-import org.metricshub.ipmi.core.coding.commands.IpmiVersion;
-import org.metricshub.ipmi.core.coding.commands.ResponseData;
 import org.metricshub.ipmi.core.coding.payload.CompletionCode;
 import org.metricshub.ipmi.core.coding.payload.IpmiPayload;
 import org.metricshub.ipmi.core.coding.payload.lan.IPMIException;
 import org.metricshub.ipmi.core.coding.payload.lan.IpmiLanRequest;
 import org.metricshub.ipmi.core.coding.payload.lan.IpmiLanResponse;
 import org.metricshub.ipmi.core.coding.payload.lan.NetworkFunction;
-import org.metricshub.ipmi.core.coding.protocol.AuthenticationType;
 import org.metricshub.ipmi.core.coding.protocol.IpmiMessage;
 import org.metricshub.ipmi.core.coding.protocol.PayloadType;
-import org.metricshub.ipmi.core.coding.security.CipherSuite;
 import org.metricshub.ipmi.core.common.MessageComposer;
 import org.metricshub.ipmi.core.common.TypeConverter;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.security.InvalidKeyException;
 import java.security.NoSuchAlgorithmException;
@@ -48,9 +41,7 @@ import java.security.NoSuchAlgorithmException;
 /**
  * A wrapper class for Deactivate Payload Command.
  */
-public class DeactivatePayload extends IpmiCommandCoder {
-
-	private static final Logger LOGGER = LoggerFactory.getLogger(DeactivatePayload.class);
+public class DeactivatePayload extends IpmiCommandCoder<DeactivatePayloadResponseData> {
 
 	private static final int REQUEST_DATA_LENGTH = 6;
 
@@ -64,8 +55,15 @@ public class DeactivatePayload extends IpmiCommandCoder {
 	 */
 	private final int payloadInstance;
 
-	public DeactivatePayload(CipherSuite cipherSuite, PayloadType payloadType, int payloadInstance) {
-		super(IpmiVersion.V20, cipherSuite, AuthenticationType.RMCPPlus);
+	/**
+	 * Creates new instance of the {@link DeactivatePayload} command for deactivating given {@link PayloadType}.
+	 *
+	 * @param payloadType
+	 *        payload to be deactivated.
+	 * @param payloadInstance
+	 *        the instance of the payload, from 1
+	 */
+	public DeactivatePayload(PayloadType payloadType, int payloadInstance) {
 		this.payloadType = payloadType;
 		this.payloadInstance = payloadInstance;
 	}
@@ -73,24 +71,6 @@ public class DeactivatePayload extends IpmiCommandCoder {
 	@Override
 	public byte getCommandCode() {
 		return CommandCodes.DEACTIVATE_PAYLOAD;
-	}
-
-	/**
-	 * Creates new instance of the {@link DeactivatePayload} command for deactivating given {@link PayloadType}, in a
-	 * session of cipher suite 0.
-	 *
-	 * @param payloadType
-	 *        payload to be deactivated.
-	 * @param payloadInstance
-	 *        the instance of the payload, from 1
-	 * @deprecated the request goes out without integrity and confidentiality, which a session of another cipher suite
-	 *             discards: use {@link #DeactivatePayload(CipherSuite, PayloadType, int)} with the cipher suite of the
-	 *             session
-	 */
-	@Deprecated
-	public DeactivatePayload(PayloadType payloadType, int payloadInstance) {
-		this.payloadType = payloadType;
-		this.payloadInstance = payloadInstance;
 	}
 
 	@Override
@@ -112,7 +92,7 @@ public class DeactivatePayload extends IpmiCommandCoder {
 	}
 
 	@Override
-	public ResponseData getResponseData(IpmiMessage message)
+	public DeactivatePayloadResponseData getResponseData(IpmiMessage message)
 			throws IPMIException,
 			NoSuchAlgorithmException,
 			InvalidKeyException {
@@ -131,9 +111,8 @@ public class DeactivatePayload extends IpmiCommandCoder {
 			DeactivatePayloadCompletionCode specificCompletionCode = DeactivatePayloadCompletionCode
 					.parseInt(response.getRawCompletionCode());
 
-			if (specificCompletionCode == DeactivatePayloadCompletionCode.PAYLOAD_ALREADY_DEACTIVATED) {
-				LOGGER.warn(specificCompletionCode.getMessage());
-			} else {
+			// A payload already deactivated is the outcome the caller wants
+			if (specificCompletionCode != DeactivatePayloadCompletionCode.PAYLOAD_ALREADY_DEACTIVATED) {
 				throw new IPMIException(response.getCompletionCode(), response.getRawCompletionCode());
 			}
 		}
@@ -156,18 +135,13 @@ public class DeactivatePayload extends IpmiCommandCoder {
 			return false;
 		}
 
-		if (payloadType != that.payloadType) {
-			return false;
-		}
-
-		return getCipherSuite().equals(that.getCipherSuite());
+		return payloadType == that.payloadType;
 	}
 
 	@Override
 	public int hashCode() {
 		int result = payloadInstance;
 		result = 31 * result + payloadType.getCode();
-		result = 31 * result + (getCipherSuite() == null ? 0 : getCipherSuite().hashCode());
 		return result;
 	}
 }

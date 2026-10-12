@@ -27,41 +27,27 @@ import java.security.NoSuchAlgorithmException;
 
 import org.metricshub.ipmi.core.coding.commands.CommandCodes;
 import org.metricshub.ipmi.core.coding.commands.IpmiCommandCoder;
-import org.metricshub.ipmi.core.coding.commands.IpmiVersion;
-import org.metricshub.ipmi.core.coding.commands.ResponseData;
 import org.metricshub.ipmi.core.coding.payload.IpmiPayload;
 import org.metricshub.ipmi.core.coding.payload.lan.IPMIException;
 import org.metricshub.ipmi.core.coding.payload.lan.IpmiLanRequest;
 import org.metricshub.ipmi.core.coding.payload.lan.NetworkFunction;
-import org.metricshub.ipmi.core.coding.protocol.AuthenticationType;
 import org.metricshub.ipmi.core.coding.protocol.IpmiMessage;
-import org.metricshub.ipmi.core.coding.security.CipherSuite;
 import org.metricshub.ipmi.core.common.TypeConverter;
 
 /**
  * A wrapper class for Get FRU Inventory Area Info Command.
  */
-public class GetFruInventoryAreaInfo extends IpmiCommandCoder {
+public class GetFruInventoryAreaInfo extends IpmiCommandCoder<GetFruInventoryAreaInfoResponseData> {
 
 	private int fruId;
 
 	/**
 	 * Initiates GetFruInventoryAreaInfo for both encoding and decoding.
 	 *
-	 * @param version
-	 *        - IPMI version of the command.
-	 * @param cipherSuite
-	 *        - {@link CipherSuite} containing authentication,
-	 *        confidentiality and integrity algorithms for this session.
-	 * @param authenticationType
-	 *        - Type of authentication used. Must be RMCPPlus for IPMI v2.0.
 	 * @param fruId
 	 *        - ID of the FRU to get info from. Must be less than 256.
 	 */
-	public GetFruInventoryAreaInfo(IpmiVersion version,
-			CipherSuite cipherSuite, AuthenticationType authenticationType,
-			int fruId) {
-		super(version, cipherSuite, authenticationType);
+	public GetFruInventoryAreaInfo(int fruId) {
 
 		if (fruId > 255) {
 			throw new IllegalArgumentException("FRU ID cannot exceed 255");
@@ -93,7 +79,7 @@ public class GetFruInventoryAreaInfo extends IpmiCommandCoder {
 	}
 
 	@Override
-	public ResponseData getResponseData(IpmiMessage message)
+	public GetFruInventoryAreaInfoResponseData getResponseData(IpmiMessage message)
 			throws IPMIException,
 			NoSuchAlgorithmException,
 			InvalidKeyException {

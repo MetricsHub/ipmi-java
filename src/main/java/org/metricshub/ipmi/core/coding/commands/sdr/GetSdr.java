@@ -27,21 +27,17 @@ import java.security.NoSuchAlgorithmException;
 
 import org.metricshub.ipmi.core.coding.commands.CommandCodes;
 import org.metricshub.ipmi.core.coding.commands.IpmiCommandCoder;
-import org.metricshub.ipmi.core.coding.commands.IpmiVersion;
-import org.metricshub.ipmi.core.coding.commands.ResponseData;
 import org.metricshub.ipmi.core.coding.payload.IpmiPayload;
 import org.metricshub.ipmi.core.coding.payload.lan.IPMIException;
 import org.metricshub.ipmi.core.coding.payload.lan.IpmiLanRequest;
 import org.metricshub.ipmi.core.coding.payload.lan.NetworkFunction;
-import org.metricshub.ipmi.core.coding.protocol.AuthenticationType;
 import org.metricshub.ipmi.core.coding.protocol.IpmiMessage;
-import org.metricshub.ipmi.core.coding.security.CipherSuite;
 import org.metricshub.ipmi.core.common.TypeConverter;
 
 /**
  * Wrapper for Get SDR command.
  */
-public class GetSdr extends IpmiCommandCoder {
+public class GetSdr extends IpmiCommandCoder<GetSdrResponseData> {
 
 	private int reservationId;
 
@@ -55,26 +51,15 @@ public class GetSdr extends IpmiCommandCoder {
 	 * Initiates GetSdr for both encoding and decoding. 'Offset info record' and
 	 * 'bytes to read' fields are set to read whole record.
 	 *
-	 * @param version
-	 *        - IPMI version of the command.
-	 * @param cipherSuite
-	 *        - {@link CipherSuite} containing authentication,
-	 *        confidentiality and integrity algorithms for this session.
-	 * @param authenticationType
-	 *        - Type of authentication used. Must be RMCPPlus for IPMI v2.0.
 	 * @param reservationId
 	 *        - SDR reservation ID received via {@link ReserveSdrRepository}
 	 *        command
 	 * @param recordId
 	 *        - ID of the record to get
 	 */
-	public GetSdr(IpmiVersion version, CipherSuite cipherSuite,
-			AuthenticationType authenticationType, int reservationId,
+	public GetSdr(int reservationId,
 			int recordId) {
 		this(
-				version,
-				cipherSuite,
-				authenticationType,
 				reservationId,
 				recordId,
 				0,
@@ -84,13 +69,6 @@ public class GetSdr extends IpmiCommandCoder {
 	/**
 	 * Initiates GetSdr for both encoding and decoding.
 	 *
-	 * @param version
-	 *        - IPMI version of the command.
-	 * @param cipherSuite
-	 *        - {@link CipherSuite} containing authentication,
-	 *        confidentiality and integrity algorithms for this session.
-	 * @param authenticationType
-	 *        - Type of authentication used. Must be RMCPPlus for IPMI v2.0.
 	 * @param reservationId
 	 *        - SDR reservation ID received via {@link ReserveSdrRepository}
 	 *        command
@@ -101,10 +79,8 @@ public class GetSdr extends IpmiCommandCoder {
 	 * @param bytesToRead
 	 *        - number of bytes to read
 	 */
-	public GetSdr(IpmiVersion version, CipherSuite cipherSuite,
-			AuthenticationType authenticationType, int reservationId,
+	public GetSdr(int reservationId,
 			int recordId, int offset, int bytesToRead) {
-		super(version, cipherSuite, authenticationType);
 		this.recordId = recordId;
 		this.reservationId = reservationId;
 		this.offset = offset;
@@ -148,7 +124,7 @@ public class GetSdr extends IpmiCommandCoder {
 	}
 
 	@Override
-	public ResponseData getResponseData(IpmiMessage message)
+	public GetSdrResponseData getResponseData(IpmiMessage message)
 			throws IPMIException,
 			NoSuchAlgorithmException,
 			InvalidKeyException {

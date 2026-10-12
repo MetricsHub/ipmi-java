@@ -13,17 +13,12 @@ import org.metricshub.ipmi.core.coding.commands.session.CloseSession;
 import org.metricshub.ipmi.core.coding.commands.session.GetChannelCipherSuites;
 import org.metricshub.ipmi.core.coding.payload.CompletionCode;
 import org.metricshub.ipmi.core.coding.payload.lan.IPMIException;
-import org.metricshub.ipmi.core.coding.protocol.AuthenticationType;
-import org.metricshub.ipmi.core.coding.security.CipherSuite;
 
 class IpmiCommandCoderTest {
 
 	private static final byte CLOSE_SESSION = 0x3c;
 
-	private static final ReserveSdrRepository COMMAND = new ReserveSdrRepository(
-			IpmiVersion.V20,
-			CipherSuite.getEmpty(),
-			AuthenticationType.RMCPPlus);
+	private static final ReserveSdrRepository COMMAND = new ReserveSdrRepository();
 
 	@Test
 	void successfulResponseIsDecoded() throws Exception {
@@ -78,9 +73,6 @@ class IpmiCommandCoderTest {
 	@Test
 	void readFruDataKnowsItsBusyCode() {
 		ReadFruData readFruData = new ReadFruData(
-				IpmiVersion.V20,
-				CipherSuite.getEmpty(),
-				AuthenticationType.RMCPPlus,
 				0,
 				BaseUnit.Bytes,
 				0,
@@ -94,9 +86,6 @@ class IpmiCommandCoderTest {
 	@Test
 	void closeSessionKnowsItsSessionCodes() {
 		CloseSession closeSession = new CloseSession(
-				IpmiVersion.V20,
-				CipherSuite.getEmpty(),
-				AuthenticationType.RMCPPlus,
 				0x1234);
 		IPMIException invalidId = assertThrows(
 				IPMIException.class,

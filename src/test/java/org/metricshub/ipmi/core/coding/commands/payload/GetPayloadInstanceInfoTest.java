@@ -7,11 +7,10 @@ import static org.metricshub.ipmi.core.coding.commands.IpmiResponses.response;
 import org.junit.jupiter.api.Test;
 import org.metricshub.ipmi.core.coding.commands.CommandCodes;
 import org.metricshub.ipmi.core.coding.protocol.PayloadType;
-import org.metricshub.ipmi.core.coding.security.CipherSuite;
 
 class GetPayloadInstanceInfoTest {
 
-	private final GetPayloadInstanceInfo command = new GetPayloadInstanceInfo(CipherSuite.getEmpty(), PayloadType.Sol, 1);
+	private final GetPayloadInstanceInfo command = new GetPayloadInstanceInfo(PayloadType.Sol, 1);
 
 	@Test
 	void theSessionIdIsReadLsByteFirst() throws Exception {

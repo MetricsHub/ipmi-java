@@ -302,6 +302,22 @@ public class CipherSuite {
 	}
 
 	/**
+	 * Creates one of the standard cipher suites (IPMI 2.0 table 22-20) from its ID, with the algorithms the
+	 * specification assigns to it: the suite to use with a BMC whose offer is not read.
+	 *
+	 * @param id the ID of the suite, 0 to 19
+	 * @return the suite, with uninitialized algorithms
+	 * @throws IllegalArgumentException when the ID is not a standard suite
+	 */
+	public static CipherSuite forId(int id) {
+		if (id < 0 || id >= STANDARD_SUITES.length) {
+			throw new IllegalArgumentException("Cipher suite " + id + " is not a standard suite (0 to 19)");
+		}
+		byte[] algorithms = STANDARD_SUITES[id];
+		return new CipherSuite((byte) id, algorithms[0], algorithms[1], algorithms[2]);
+	}
+
+	/**
 	 * Creates an instance of AuthenticationAlgorithm.
 	 *
 	 * @param supplier constructor of the algorithm

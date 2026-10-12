@@ -1,7 +1,5 @@
-/**
- * Includes IPMI runners for fetching Field Replaceable Units (FRUs), Sensors, and Chassis information.<br>
- */
-package org.metricshub.ipmi.client.runner;
+package org.metricshub.ipmi.core.coding.commands.session;
+
 /*-
  * ╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲
  * IPMI Java Client
@@ -23,3 +21,22 @@ package org.metricshub.ipmi.client.runner;
  * <http://www.gnu.org/licenses/lgpl-3.0.html>.
  * ╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱
  */
+
+/**
+ * The RAKP authentication of a session failed on the console side: the key exchange authentication code of RAKP
+ * Message 2 or the integrity check value of RAKP Message 4 does not match, which means a wrong password or BMC key
+ * (IPMI 2.0 sections 13.31 and 13.32).
+ */
+public class AuthenticationException extends IllegalArgumentException {
+
+	private static final long serialVersionUID = 1L;
+
+	/**
+	 * Creates the exception.
+	 *
+	 * @param message what failed
+	 */
+	public AuthenticationException(String message) {
+		super(message);
+	}
+}

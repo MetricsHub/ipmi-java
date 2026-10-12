@@ -1,4 +1,4 @@
-package org.metricshub.ipmi.client.runner;
+package org.metricshub.ipmi.client;
 
 /*-
  * ╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲
@@ -22,31 +22,18 @@ package org.metricshub.ipmi.client.runner;
  * ╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱
  */
 
-import org.metricshub.ipmi.client.IpmiClientConfiguration;
-import org.metricshub.ipmi.core.coding.commands.IpmiVersion;
-import org.metricshub.ipmi.core.coding.commands.chassis.GetChassisStatus;
-import org.metricshub.ipmi.core.coding.commands.chassis.GetChassisStatusResponseData;
-import org.metricshub.ipmi.core.coding.protocol.AuthenticationType;
-
 /**
- * Get the Chassis Status runner
+ * What caused the last power-down or power-up of the system (Get Chassis Status, IPMI 2.0 table 28-3).
  */
-public class GetChassisStatusRunner extends AbstractIpmiRunner<GetChassisStatusResponseData> {
-
-	public GetChassisStatusRunner(IpmiClientConfiguration ipmiConfiguration) {
-		super(ipmiConfiguration);
-	}
-
-	@Override
-	public GetChassisStatusResponseData call() throws Exception {
-		super.startSession();
-
-		// Send the UDP message and read the response
-		return (GetChassisStatusResponseData) getConnector()
-				.sendMessage(
-						getHandle(),
-						new GetChassisStatus(IpmiVersion.V20, getHandle().getCipherSuite(), AuthenticationType.RMCPPlus));
-
-	}
-
+public enum PowerEvent {
+	/** The system lost its AC supply. */
+	AC_FAILED,
+	/** The system was powered down by a power overload. */
+	POWER_OVERLOAD,
+	/** The system was powered down by a chassis interlock, such as an open panel. */
+	INTERLOCK,
+	/** The system was powered down by a power fault. */
+	POWER_FAULT,
+	/** The system was powered on or off by an IPMI command. */
+	IPMI_COMMAND
 }

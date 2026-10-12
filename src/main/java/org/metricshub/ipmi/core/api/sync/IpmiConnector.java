@@ -26,6 +26,7 @@ import org.metricshub.ipmi.core.api.async.ConnectionHandle;
 import org.metricshub.ipmi.core.api.async.InboundMessageListener;
 import org.metricshub.ipmi.core.api.async.IpmiAsyncConnector;
 import org.metricshub.ipmi.core.coding.PayloadCoder;
+import org.metricshub.ipmi.core.coding.commands.IpmiCommandCoder;
 import org.metricshub.ipmi.core.coding.commands.PrivilegeLevel;
 import org.metricshub.ipmi.core.coding.commands.ResponseData;
 import org.metricshub.ipmi.core.coding.commands.session.GetChannelAuthenticationCapabilitiesResponseData;
@@ -34,16 +35,11 @@ import org.metricshub.ipmi.core.coding.payload.lan.IPMIException;
 import org.metricshub.ipmi.core.coding.protocol.PayloadType;
 import org.metricshub.ipmi.core.coding.security.CipherSuite;
 import org.metricshub.ipmi.core.common.Constants;
-import org.metricshub.ipmi.core.common.PropertiesManager;
 import org.metricshub.ipmi.core.connection.Connection;
 import org.metricshub.ipmi.core.connection.ConnectionException;
 import org.metricshub.ipmi.core.connection.ConnectionManager;
 import org.metricshub.ipmi.core.connection.Session;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.util.List;
@@ -85,13 +81,15 @@ import java.util.Random;
  */
 public class IpmiConnector {
 
-	private static Logger logger = LoggerFactory.getLogger(IpmiConnector.class);
-
 	private IpmiAsyncConnector asyncConnector;
 
-	private int retries;
+	/**
+	 * Upper bound, in milliseconds, of the random pause before resending a request the BMC answered as busy (node busy,
+	 * out of resources, initialization in progress).
+	 */
+	private static final int IDLE_TIME = 4000;
 
-	private int idleTime;
+	private volatile int retries = IpmiAsyncConnector.DEFAULT_RETRIES;
 
 	private Random random = new Random(System.currentTimeMillis());
 
@@ -101,14 +99,11 @@ public class IpmiConnector {
 	 *
 	 * @param port
 	 *        - the port that will be used by {@link IpmiAsyncConnector} to communicate with the remote hosts.
-	 * @throws FileNotFoundException
-	 *         when properties file was not found
 	 * @throws IOException
-	 *         when properties file was not found
+	 *         when the port cannot be bound
 	 */
 	public IpmiConnector(int port) throws IOException {
 		asyncConnector = new IpmiAsyncConnector(port);
-		loadProperties();
 	}
 
 	/**
@@ -118,14 +113,11 @@ public class IpmiConnector {
 	 *        - the port that will be used by {@link IpmiAsyncConnector} to communicate with the remote hosts.
 	 * @param address
 	 *        - the IP address that will be used by {@link IpmiAsyncConnector} to communicate with the remote hosts.
-	 * @throws FileNotFoundException
-	 *         when properties file was not found
 	 * @throws IOException
-	 *         when properties file was not found
+	 *         when the port cannot be bound
 	 */
 	public IpmiConnector(int port, InetAddress address) throws IOException {
 		asyncConnector = new IpmiAsyncConnector(port, address);
-		loadProperties();
 	}
 
 	/**
@@ -141,16 +133,6 @@ public class IpmiConnector {
 	 */
 	public IpmiConnector(int port, long pingPeriod) throws IOException {
 		asyncConnector = new IpmiAsyncConnector(port, pingPeriod);
-		loadProperties();
-	}
-
-	/**
-	 * Loads properties from the properties file.
-	 */
-	private void loadProperties() {
-		PropertiesManager manager = PropertiesManager.getInstance();
-		retries = Integer.parseInt(manager.getProperty("retries"));
-		idleTime = Integer.parseInt(manager.getProperty("idleTime"));
 	}
 
 	/**
@@ -160,9 +142,7 @@ public class IpmiConnector {
 	 *        - {@link InetAddress} of the remote host
 	 * @return handle to the connection to the remote host
 	 * @throws IOException
-	 *         when properties file was not found
-	 * @throws FileNotFoundException
-	 *         when properties file was not found
+	 *         when the connection cannot be created
 	 */
 	public ConnectionHandle createConnection(InetAddress address) throws IOException {
 		return createConnection(address, Constants.IPMI_PORT);
@@ -177,9 +157,7 @@ public class IpmiConnector {
 	 *        - remote UDP port
 	 * @return handle to the connection to the remote host
 	 * @throws IOException
-	 *         when properties file was not found
-	 * @throws FileNotFoundException
-	 *         when properties file was not found
+	 *         when the connection cannot be created
 	 */
 	public ConnectionHandle createConnection(InetAddress address, int port) throws IOException {
 		return asyncConnector.createConnection(address, port);
@@ -193,9 +171,7 @@ public class IpmiConnector {
 	 *        - {@link InetAddress} of the remote host
 	 * @return handle to the connection to the remote host
 	 * @throws IOException
-	 *         when properties file was not found
-	 * @throws FileNotFoundException
-	 *         when properties file was not found
+	 *         when the connection cannot be created
 	 */
 	public ConnectionHandle createConnection(InetAddress address, CipherSuite cipherSuite, PrivilegeLevel privilegeLevel)
 			throws IOException {
@@ -212,9 +188,7 @@ public class IpmiConnector {
 	 *        - remote UDP port
 	 * @return handle to the connection to the remote host
 	 * @throws IOException
-	 *         when properties file was not found
-	 * @throws FileNotFoundException
-	 *         when properties file was not found
+	 *         when the connection cannot be created
 	 */
 	public ConnectionHandle createConnection(
 			InetAddress address,
@@ -358,6 +332,29 @@ public class IpmiConnector {
 	}
 
 	/**
+	 * Sends the IPMI command to the remote host and returns its typed response.
+	 *
+	 * @param <R>
+	 *        the type of the response data of the command
+	 * @param connectionHandle
+	 *        - {@link ConnectionHandle} associated with the remote host.
+	 * @param request
+	 *        - the command to send
+	 * @return the response data of the command
+	 * @throws ConnectionException
+	 *         when connection is in the state that does not allow to perform this operation.
+	 * @throws IPMIException
+	 *         when the BMC answers with an error completion code
+	 * @throws Exception
+	 *         when sending message to the managed system or initializing one of the cipherSuite's algorithms fails
+	 */
+	@SuppressWarnings("unchecked")
+	public <R extends ResponseData> R sendMessage(ConnectionHandle connectionHandle, IpmiCommandCoder<R> request)
+			throws Exception {
+		return (R) sendMessage(connectionHandle, request, true);
+	}
+
+	/**
 	 * Sends the IPMI message to the remote host and doesn't wait for any response.
 	 *
 	 * @param connectionHandle
@@ -435,8 +432,6 @@ public class IpmiConnector {
 				// to, and a reply to the same tag would then be dropped as an orphan
 				int tag = asyncConnector.sendMessage(connectionHandle, request, !waitForResponse);
 
-				logger.debug("Sending message with tag {}, try {}", tag, tries);
-
 				if (waitForResponse) {
 					responseData = listener.waitForAnswer(tag);
 				}
@@ -465,10 +460,9 @@ public class IpmiConnector {
 			throw e;
 		}
 		if (pause) {
-			long sleepTime = (random.nextLong() % (idleTime / 2)) + (idleTime / 2);
+			long sleepTime = (random.nextLong() % (IDLE_TIME / 2)) + (IDLE_TIME / 2);
 			Thread.sleep(sleepTime);
 		}
-		logger.warn("Receiving message failed, retrying: {}: {}", e.getClass().getSimpleName(), e.getMessage());
 	}
 
 	/**
@@ -545,11 +539,33 @@ public class IpmiConnector {
 	}
 
 	/**
-	 * Returns configured number of retries.
+	 * Returns how many times a message without a reply is sent again.
 	 *
-	 * @return number of retries when message could not be sent
+	 * @return the number of resends
 	 */
 	public int getRetries() {
 		return retries;
+	}
+
+	/**
+	 * Sets how many times a message without a reply, or a handshake step without a reply, is sent again.
+	 *
+	 * @param retries the number of resends, 0 to send every message once
+	 * @throws IllegalArgumentException when negative
+	 */
+	public void setRetries(int retries) {
+		asyncConnector.setRetries(retries);
+		this.retries = retries;
+	}
+
+	/**
+	 * Sets the timeout of the messages of the connections created from now on; {@link #setTimeout(ConnectionHandle, int)}
+	 * changes it for an existing connection.
+	 *
+	 * @param timeout the time in milliseconds after which a message without a reply is reported as timed out
+	 * @throws IllegalArgumentException when the timeout is less than one millisecond
+	 */
+	public void setTimeout(int timeout) {
+		asyncConnector.setTimeout(timeout);
 	}
 }
