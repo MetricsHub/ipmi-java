@@ -693,23 +693,41 @@ public final class IpmiCli {
 
 	/**
 	 * The PowerShell program that reads the keys of the console ({@code ReadKey(true)}: no echo, Ctrl+C included) and
-	 * writes them to its standard output as the bytes a terminal sends: the character as UTF-8, the arrow, editing and
-	 * function keys as their ANSI escape sequences.
+	 * writes them to its standard output as the bytes a terminal sends: the character as UTF-8 (ESC before it with
+	 * Alt), the cursor, editing and function keys as their ANSI escape sequences with the xterm modifier parameter
+	 * (2 Shift, 3 Alt, 5 Control, and their sums), Shift+Tab as CSI Z.
 	 */
-	private static final String KEY_READER = "[Console]::TreatControlCAsInput = $true\n"
-			+ "$out = [Console]::OpenStandardOutput()\n" + "while ($true) {\n" + "  $k = [Console]::ReadKey($true)\n"
-			+ "  $b = switch (\"$($k.Key)\") {\n" + "    'UpArrow' { 27, 91, 65 }\n" + "    'DownArrow' { 27, 91, 66 }\n"
-			+ "    'RightArrow' { 27, 91, 67 }\n" + "    'LeftArrow' { 27, 91, 68 }\n" + "    'Home' { 27, 91, 72 }\n"
-			+ "    'End' { 27, 91, 70 }\n" + "    'Insert' { 27, 91, 50, 126 }\n" + "    'Delete' { 27, 91, 51, 126 }\n"
-			+ "    'PageUp' { 27, 91, 53, 126 }\n" + "    'PageDown' { 27, 91, 54, 126 }\n" + "    'F1' { 27, 79, 80 }\n"
-			+ "    'F2' { 27, 79, 81 }\n" + "    'F3' { 27, 79, 82 }\n" + "    'F4' { 27, 79, 83 }\n"
-			+ "    'F5' { 27, 91, 49, 53, 126 }\n" + "    'F6' { 27, 91, 49, 55, 126 }\n"
-			+ "    'F7' { 27, 91, 49, 56, 126 }\n"
-			+ "    'F8' { 27, 91, 49, 57, 126 }\n" + "    'F9' { 27, 91, 50, 48, 126 }\n"
-			+ "    'F10' { 27, 91, 50, 49, 126 }\n"
-			+ "    'F11' { 27, 91, 50, 51, 126 }\n" + "    'F12' { 27, 91, 50, 52, 126 }\n"
-			+ "    default { if ([int]$k.KeyChar -ne 0) { [Text.Encoding]::UTF8.GetBytes([string]$k.KeyChar) } }\n"
-			+ "  }\n" + "  if ($b.Count -gt 0) { $out.Write([byte[]]$b, 0, $b.Count); $out.Flush() }\n" + "}\n";
+	static final String KEY_READER = "$csi = @{ UpArrow = 'A'; DownArrow = 'B'; RightArrow = 'C'; LeftArrow = 'D'; Home = 'H'; End = 'F'; F1 = 'P'; F2 = 'Q'; F3 = 'R'; F4 = 'S' }\n"
+			+ "$tilde = @{ Insert = 2; Delete = 3; PageUp = 5; PageDown = 6; F5 = 15; F6 = 17; F7 = 18; F8 = 19; F9 = 20; F10 = 21; F11 = 23; F12 = 24 }\n"
+			+ "function Encode($k) {\n"
+			+ "  $shift = ($k.Modifiers -band [ConsoleModifiers]::Shift) -ne 0\n"
+			+ "  $alt = ($k.Modifiers -band [ConsoleModifiers]::Alt) -ne 0\n"
+			+ "  $ctrl = ($k.Modifiers -band [ConsoleModifiers]::Control) -ne 0\n"
+			+ "  $m = 1 + [int]$shift + 2 * [int]$alt + 4 * [int]$ctrl\n"
+			+ "  $key = \"$($k.Key)\"\n"
+			+ "  $b = @()\n"
+			+ "  if ($csi.ContainsKey($key)) {\n"
+			+ "    $final = [int][char]$csi[$key]\n"
+			+ "    if ($m -eq 1) { $b = @(27, $(if ($key -like 'F?') { 79 } else { 91 }), $final) }\n"
+			+ "    else { $b = @(27, 91, 49, 59) + [Text.Encoding]::ASCII.GetBytes(\"$m\") + @($final) }\n"
+			+ "  } elseif ($tilde.ContainsKey($key)) {\n"
+			+ "    $b = @(27, 91) + [Text.Encoding]::ASCII.GetBytes(\"$($tilde[$key])\")\n"
+			+ "    if ($m -gt 1) { $b = $b + @(59) + [Text.Encoding]::ASCII.GetBytes(\"$m\") }\n"
+			+ "    $b = $b + @(126)\n"
+			+ "  } elseif ($key -eq 'Tab' -and $shift) {\n"
+			+ "    $b = @(27, 91, 90)\n"
+			+ "  } elseif ([int]$k.KeyChar -ne 0) {\n"
+			+ "    $b = [Text.Encoding]::UTF8.GetBytes([string]$k.KeyChar)\n"
+			+ "    if ($alt) { $b = @(27) + $b }\n"
+			+ "  }\n"
+			+ "  return [byte[]]$b\n"
+			+ "}\n"
+			+ "[Console]::TreatControlCAsInput = $true\n"
+			+ "$out = [Console]::OpenStandardOutput()\n"
+			+ "while ($true) {\n"
+			+ "  $b = Encode([Console]::ReadKey($true))\n"
+			+ "  if ($b.Count -gt 0) { $out.Write($b, 0, $b.Count); $out.Flush() }\n"
+			+ "}\n";
 
 	private static RawInput windowsKeys() throws IOException {
 		// The child inherits the console, so ReadKey reads the keys of the terminal of the user

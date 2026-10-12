@@ -335,6 +335,30 @@ class IpmiCliTest {
 	}
 
 	@Test
+	@Timeout(30)
+	void aFailingInputExitsWith74() throws Exception {
+		try (FakeRmcpPlusBmc bmc = Fixtures.bmc()) {
+			bmc.enableSol(bmc.getPort(), 255, ADMINISTRATOR);
+			InputStream failing = new InputStream() {
+				private boolean first = true;
+
+				@Override
+				public int read() throws IOException {
+					if (first) {
+						first = false;
+						return 'x';
+					}
+					throw new IOException("disk error");
+				}
+			};
+			Result sol = run(bmc, NO_PROMPT, failing, "-u", "admin", "-p", "secret", "sol");
+			assertEquals(IpmiCli.EXIT_IO, sol.code);
+			assertEquals("ipmicli: cannot read the standard input\n", sol.err);
+			assertEquals("x", ascii(bmc.getSolReceived()), "what was read before the failure was sent");
+		}
+	}
+
+	@Test
 	void lineInputAppendsEnterToEachLineReadWithoutEcho() throws Exception {
 		java.util.Iterator<char[]> lines = Arrays.asList("ls".toCharArray(), "p\u00e4ss".toCharArray(), null).iterator();
 		try (InputStream input = new IpmiCli.LineInput(lines::next, StandardCharsets.UTF_8)) {

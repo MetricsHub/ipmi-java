@@ -48,6 +48,7 @@ final class SolBridge {
 	private static final int DEACTIVATED = 1;
 	private static final int OUTPUT_FAILED = 2;
 	private static final int INPUT_FAILED = 3;
+	private static final int INPUT_READ_FAILED = 4;
 	private static final int BUFFER_SIZE = 4096;
 
 	private SolBridge() {}
@@ -82,6 +83,9 @@ final class SolBridge {
 		case INPUT_FAILED:
 			IpmiCli.diagnostic(err, "the BMC did not accept the input");
 			return IpmiCli.EXIT_PROTOCOL;
+		case INPUT_READ_FAILED:
+			IpmiCli.diagnostic(err, "cannot read the standard input");
+			return IpmiCli.EXIT_IO;
 		default:
 			return 0;
 		}
@@ -127,8 +131,8 @@ final class SolBridge {
 				try {
 					count = stdin.read(buffer);
 				} catch (IOException e) {
-					// The local input is gone: the same as its end
-					count = -1;
+					// A redirected input that fails after some bytes: a truncated transfer, not a clean end
+					return INPUT_READ_FAILED;
 				}
 				if (count < 0) {
 					if (escapePending) {
