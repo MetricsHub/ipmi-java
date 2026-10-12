@@ -723,7 +723,7 @@ public final class IpmiCli {
 			+ "    $b = $b + @(126)\n"
 			+ "  } elseif ($key -eq 'Tab' -and $shift) {\n"
 			+ "    $b = @(27, 91, 90)\n"
-			+ "  } elseif ($ctrl -and [int]$k.KeyChar -eq 0) {\n" + "    $b = @(0)\n"
+			+ "  } elseif ($ctrl -and -not $alt -and [int]$k.KeyChar -eq 0) {\n" + "    $b = @(0)\n"
 			+ "  } elseif ([int]$k.KeyChar -ne 0) {\n"
 			+ "    $b = [Text.Encoding]::UTF8.GetBytes([string]$k.KeyChar)\n"
 			+ "    if ($alt -and -not $ctrl) { $b = @(27) + $b }\n"

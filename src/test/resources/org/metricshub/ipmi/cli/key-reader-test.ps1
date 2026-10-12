@@ -21,6 +21,8 @@ $cases = @(
   @('e-acute', (key ([char]0xe9) 'Oem1' $false $false $false), 'c3 a9'),
   @('Ctrl+Space', (key ([char]0) 'Spacebar' $false $false $true), '00'),
   @('Ctrl+at (Ctrl+Shift+2)', (key ([char]0) 'D2' $true $false $true), '00'),
+  @('AltGr dead key (tilde on AZERTY: Ctrl+Alt, no character yet)', (key ([char]0) 'D2' $false $true $true), ''),
+  @('the tilde the dead key composes', (key '~' 'D2' $false $false $false), '7e'),
   @('AltGr+at (Ctrl+Alt with a character)', (key '@' 'D0' $false $true $true), '40'),
   @('Space', (key ' ' 'Spacebar' $false $false $false), '20'),
   @('Shift alone', (key ([char]0) 'NoName' $true $false $false), '')
