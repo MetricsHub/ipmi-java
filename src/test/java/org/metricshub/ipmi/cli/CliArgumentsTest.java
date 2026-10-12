@@ -175,6 +175,9 @@ class CliArgumentsTest {
 		assertEquals("--no-escape requires the sol subcommand", usageError(login("chassis", "--no-escape")));
 		assertEquals("unknown sensor type 'Fans'", usageError(login("sensors", "--type", "Fans")));
 		assertEquals("--name requires a glob", usageError(login("sensors", "--name", ",")));
+		assertEquals("--type requires a sensor type", usageError(login("sensors", "--type", ",")));
+		assertEquals("--type requires a sensor type", usageError(login("sensors", "--type", "Fan,")));
+		assertEquals("--type requires a sensor type", usageError(login("sensors", "--type", "")));
 		assertEquals("--name requires a glob", usageError(login("sensors", "--name", "")));
 		assertEquals("--name requires a glob", usageError(login("sensors", "--name", "CPU*,,Fan*")));
 		assertEquals("--name requires a glob", usageError(login("sensors", "--name", "CPU*,")));

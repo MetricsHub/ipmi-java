@@ -288,7 +288,10 @@ final class CliArguments implements AutoCloseable {
 			if (types == null) {
 				types = EnumSet.noneOf(SensorType.class);
 			}
-			for (String type : optionValue(rest, index, option).split(",")) {
+			for (String type : optionValue(rest, index, option).split(",", -1)) {
+				if (type.trim().isEmpty()) {
+					throw new CliUsageException(option + " requires a sensor type");
+				}
 				types.add(parseSensorType(type.trim()));
 			}
 			return nextIndex(argument, index);

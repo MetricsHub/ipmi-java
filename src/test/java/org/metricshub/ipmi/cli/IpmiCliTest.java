@@ -332,14 +332,19 @@ class IpmiCliTest {
 				int code = SolBridge
 						.run(
 								console,
-								new ByteArrayInputStream("~?\nls\r\nid\n~.".getBytes(StandardCharsets.US_ASCII)),
+								new ByteArrayInputStream("~?\nls\r\nid\n~B\n~.".getBytes(StandardCharsets.US_ASCII)),
 								new PrintStream(out, true, "UTF-8"),
 								new PrintStream(err, true, "UTF-8"),
 								'~',
 								true);
 				assertEquals(0, code);
-				assertEquals("ls\rid\r", ascii(bmc.getSolReceived()), "the Enter that ends ~? is not sent");
+				assertEquals("ls\rid\r", ascii(bmc.getSolReceived()), "the Enters that end ~? and ~B are not sent");
 				assertTrue(err.toString("UTF-8").contains("~.  close the console"));
+				boolean sentBreak = false;
+				for (SolPacket packet : bmc.getSolPackets()) {
+					sentBreak |= (packet.operation & 1 << SolOperation.Break.getOperationNumber()) != 0;
+				}
+				assertTrue(sentBreak, "the break of ~B reached the BMC, and ~. right after it closed the console");
 			}
 		}
 	}

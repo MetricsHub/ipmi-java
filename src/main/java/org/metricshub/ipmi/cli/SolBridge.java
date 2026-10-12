@@ -181,7 +181,7 @@ final class SolBridge {
 							if (!console.invokeOperations(SolOperation.Break)) {
 								return INPUT_FAILED;
 							}
-							atLineStart = false;
+							// Nothing was sent since the newline: the next sequence is recognized too
 							swallowEnter = cooked;
 							continue;
 						}
