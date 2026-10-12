@@ -147,7 +147,7 @@ With `ipmitool`, add `-I lanplus -H <bmc> -U <user> -P <password> -L USER -C <su
 | `chassisStatus()` | `chassis status` | `health` |
 | `frus().execute()` | `fru print` | `fru` |
 | `sensors().execute()` | `sdr elist` | `sensor` |
-| `send(new GetSelInfo())`, `send(new GetSelEntry(...))` | `sel info`, `sel elist` | `sel` |
+| `sel().execute()` | `sel info`, `sel elist` | `sel` |
 | `sol().open()` | `sol activate` | `sol -a` |
 
 The state descriptions of [`Sensor.states()`](sensors.html#states) follow the wording of

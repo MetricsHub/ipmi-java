@@ -1,5 +1,5 @@
-keywords: upgrade, migration, release notes, breaking changes, 2.0, fluent client, builder, ipmiclientexception, slf4j, ipmicli, standalone jar, protected fields, accessors, abstractsensorrecord, validateresponse, utf-8, bmc key, cipher suite, integrity, org.sentrysoftware
-description: What changes when upgrading the IPMI Java Client — from 1.x to 2.0.00 (the fluent client), from 1.2.02, from 1.2.01, and from the org.sentrysoftware:ipmi artifact of 1.2.00 and earlier.
+keywords: upgrade, migration, release notes, breaking changes, 2.0, fluent client, builder, ipmiclientexception, slf4j, ipmicli, standalone jar, sel, system event log, protected fields, accessors, abstractsensorrecord, validateresponse, utf-8, bmc key, cipher suite, integrity, org.sentrysoftware
+description: What changes when upgrading the IPMI Java Client — from 1.x to 2.0.00 (the fluent client, the System Event Log), from 1.2.02, from 1.2.01, and from the org.sentrysoftware:ipmi artifact of 1.2.00 and earlier.
 
 # Upgrading
 
@@ -32,6 +32,7 @@ methods and `IpmiClientConfiguration` are gone.
 | `IpmiClient.getChassisStatus(config)` | `bmc.chassisStatus()`, a [`ChassisStatus`](chassis-status.html) (`data()` gives the `GetChassisStatusResponseData`) |
 | `IpmiClient.getSensors(config)` | `bmc.sensors().execute()`, a [`SensorList`](sensors.html) of typed [`Sensor`](apidocs/org/metricshub/ipmi/client/Sensor.html)s; `types()` and `names()` select sensors before their readings are requested |
 | `IpmiClient.getFrus(config)` | `bmc.frus().execute()`, a [`FruList`](fru-inventory.html) of typed [`Fru`](apidocs/org/metricshub/ipmi/client/Fru.html)s; `ids()` selects FRUs |
+| `GetSelInfo`, `GetSelEntry` sent by hand | `bmc.sel().execute()`, a [`SelEntryList`](system-event-log.html) of typed [`SelEntry`](apidocs/org/metricshub/ipmi/client/SelEntry.html)s; `since(id)` reads the entries added after one already read |
 | `IpmiClient.getChassisStatusAsStringResult(config)` | `bmc.chassisStatus().powerOn()`; the `System power state is up` text is produced by the MetricsHub IPMI extension |
 | `IpmiClient.getFrusAndSensorsAsStringResult(config)` | `bmc.frus().execute()` and `bmc.sensors().execute()`, one session and one SDR walk instead of two; the text lines are produced by the MetricsHub IPMI extension, which took `IpmiResultConverter` over |
 | A new session per call | One session per client, serialized operations, [reopened](timeouts-and-errors.html#session-recovery) when the BMC loses it |
@@ -64,6 +65,9 @@ try (IpmiClient bmc = IpmiClient.builder(host)
 
 New in the client: [`capabilities()`](apidocs/org/metricshub/ipmi/client/BmcCapabilities.html)
 reads the cipher suites and authentication options of a BMC without credentials,
+[`sel()`](system-event-log.html) reads the System Event Log as typed entries (the sensor, the
+event in the wording of `ipmiutil`, the direction, the timestamp, the OEM bytes), whole or since
+the last entry read,
 [`send(command)`](low-level-api.html#sending-a-command-through-the-client) sends any command of
 the core in the session, [`sol().open()`](serial-over-lan.html#with-ipmiclient) opens a Serial
 over LAN console as streams, `privilege(PrivilegeLevel)` opens the session at the Operator or
@@ -106,6 +110,13 @@ reply) are ignored.
   one-argument form keeps decoding what it can, silently.
 * The decoders no longer log the values they do not model: they return the same defaults as
   before (`Other`, `Unknown`, `Unspecified`, `Oem`).
+* `SelRecord` decodes the generator ID, the event/reading type and the three event data bytes of
+  a system event (`getGeneratorId()`, `getEventType()`, `getEventData()`), and refuses a record
+  shorter than 16 bytes with `IllegalArgumentException` instead of
+  `ArrayIndexOutOfBoundsException`. `TypeConverter.decodeDate()` decodes the IPMI timestamps as
+  unsigned (IPMI 2.0 section 37.1): the dates from 2038 on, and the `FFFFFFFFh` marker of an
+  unspecified timestamp, were negative dates in 1.x. It is used by the SEL and SDR repository
+  timestamps.
 
 ## Upgrading from 1.2.02
 

@@ -36,6 +36,7 @@ import java.nio.CharBuffer;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Base64;
@@ -61,6 +62,9 @@ import org.metricshub.ipmi.client.IpmiCompletionCodeException;
 import org.metricshub.ipmi.client.IpmiConnectionException;
 import org.metricshub.ipmi.client.IpmiTimeoutException;
 import org.metricshub.ipmi.client.PowerEvent;
+import org.metricshub.ipmi.client.SelEntry;
+import org.metricshub.ipmi.client.SelEntryList;
+import org.metricshub.ipmi.client.SelRequest;
 import org.metricshub.ipmi.client.Sensor;
 import org.metricshub.ipmi.client.SensorList;
 import org.metricshub.ipmi.client.SensorsRequest;
@@ -259,6 +263,8 @@ public final class IpmiCli {
 			return sensors(arguments, client, out, err);
 		case FRU:
 			return frus(arguments, client, out, err);
+		case SEL:
+			return sel(arguments, client, out, err);
 		case SOL:
 			return sol(arguments, client, out, err, stdin, terminal);
 		default:
@@ -613,6 +619,78 @@ public final class IpmiCli {
 			fields.put("problems", fru.problems());
 		}
 		return fields;
+	}
+
+	private static int sel(CliArguments arguments, IpmiClient client, PrintStream out, PrintStream err) {
+		SelRequest request = client.sel();
+		if (arguments.since() >= 0) {
+			request.since(arguments.since());
+		}
+		SelEntryList entries = timed(arguments, err, "SEL", request::execute);
+		if (arguments.verbose() && entries.totalEntries().isPresent()) {
+			diagnostic(
+					err,
+					"SEL: " + entries.totalEntries().getAsInt() + " entries, last addition "
+							+ entries.lastAddition().map(Instant::toString).orElse("unknown") + ", last erase "
+							+ entries.lastErase().map(Instant::toString).orElse("unknown"));
+		}
+		if (arguments.json()) {
+			for (SelEntry entry : entries) {
+				JsonLinesWriter.write(selFields(entry), out);
+			}
+			return 0;
+		}
+		List<String[]> rows = new ArrayList<String[]>();
+		rows.add(new String[] { "ID", "Time", "Type", "Sensor", "Event", "Direction" });
+		for (SelEntry entry : entries) {
+			rows
+					.add(
+							new String[]
+							{
+									String.valueOf(entry.id()),
+									entry.timestamp().map(Instant::toString).orElse(preInit(entry)),
+									entry.sensorType().map(SensorType::name).orElse(entry.type().name()),
+									entry.sensorNumber().isPresent() ? String.valueOf(entry.sensorNumber().getAsInt()) : "",
+									entry.description(),
+									entry.direction().map(direction -> direction.name().toLowerCase(Locale.ROOT)).orElse("") });
+		}
+		out.print(table(rows));
+		return 0;
+	}
+
+	private static String preInit(SelEntry entry) {
+		return entry.preInitSeconds().isPresent() ? "pre-init " + entry.preInitSeconds().getAsLong() + "s" : "";
+	}
+
+	private static Map<String, Object> selFields(SelEntry entry) {
+		Map<String, Object> fields = new LinkedHashMap<String, Object>();
+		fields.put("id", entry.id());
+		fields.put("type", entry.type().name());
+		entry.timestamp().ifPresent(time -> fields.put("timestamp", time.toString()));
+		entry.preInitSeconds().ifPresent(seconds -> fields.put("preInitSeconds", seconds));
+		entry.sensorType().ifPresent(type -> fields.put("sensorType", type.name()));
+		entry.sensorNumber().ifPresent(number -> fields.put("sensorNumber", number));
+		entry.generatorId().ifPresent(id -> fields.put("generatorId", id));
+		entry.eventType().ifPresent(type -> fields.put("eventType", type));
+		entry.event().ifPresent(event -> fields.put("event", event.name()));
+		fields.put("description", entry.description());
+		entry.direction().ifPresent(direction -> fields.put("direction", direction.name()));
+		if (entry.eventData().length > 0) {
+			fields.put("eventData", hex(entry.eventData()));
+		}
+		entry.manufacturerId().ifPresent(id -> fields.put("manufacturerId", id));
+		if (entry.oemData().length > 0) {
+			fields.put("oemData", hex(entry.oemData()));
+		}
+		return fields;
+	}
+
+	private static String hex(byte[] bytes) {
+		StringBuilder text = new StringBuilder();
+		for (byte b : bytes) {
+			text.append(String.format("%02x", b));
+		}
+		return text.toString();
 	}
 
 	private static int sol(
@@ -1085,6 +1163,7 @@ public final class IpmiCli {
 				+ " -h <host> -u <user> [options] power status\n" + "  " + program
 				+ " -h <host> -u <user> [options] sensors [--type <type>,...] [--name <glob>,...] [--long] [--json]\n"
 				+ "  " + program + " -h <host> -u <user> [options] fru [<id>...] [--json]\n" + "  " + program
+				+ " -h <host> -u <user> [options] sel [--since <id>] [--json]\n" + "  " + program
 				+ " -h <host> -u <user> [options] sol [--escape <char> | --no-escape]\n" + "  " + program
 				+ " --help | --version\n" + "\n" + "Connection options (before the subcommand):\n"
 				+ "  -h, --hostname <host>         BMC host name or IP address (required)\n"
@@ -1104,14 +1183,15 @@ public final class IpmiCli {
 				+ "      --help                    Show this help\n"
 				+ "      --version                 Show the project version\n" + "\n"
 				+ "Subcommand options (after the subcommand, in any order with its arguments):\n"
-				+ "      --json                    probe, chassis, sensors, fru: print JSON Lines instead of text\n"
+				+ "      --json                    probe, chassis, sensors, fru, sel: print JSON Lines instead of text\n"
 				+ "      --type <type>,...         sensors: only these sensor types (Temperature, Fan, Voltage, ...)\n"
 				+ "      --name <glob>,...         sensors: only the sensors whose name matches (* and ?, case-insensitive)\n"
 				+ "      --long                    sensors: add the number, the entity, the thresholds and the problem\n"
+				+ "      --since <id>              sel: only the entries after this record ID (the last one read before)\n"
 				+ "      --escape <char>           sol: the escape character (default: ~)\n"
 				+ "      --no-escape               sol: no escape sequences (binary transfers); end of input closes\n"
 				+ "                                (in the console, ~. at the start of a line closes it, ~? lists the sequences)\n"
-				+ "\n" + "Default privilege: user for chassis, power status, sensors and fru; administrator for sol.\n"
+				+ "\n" + "Default privilege: user for chassis, power status, sensors, fru and sel; administrator for sol.\n"
 				+ "If neither password option is given, the password is requested from the interactive console.\n" + "\n"
 				+ "Full manual - output formats, the SOL console, exit codes, ipmitool equivalents:\n"
 				+ "  https://metricshub.org/ipmi-java/cli.html\n";

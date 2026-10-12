@@ -3,6 +3,9 @@ package org.metricshub.ipmi.client;
 import static org.metricshub.ipmi.core.transport.FakeSdrRepository.compactSensorRecord;
 import static org.metricshub.ipmi.core.transport.FakeSdrRepository.fruDeviceLocatorRecord;
 import static org.metricshub.ipmi.core.transport.FakeSdrRepository.record;
+import static org.metricshub.ipmi.core.transport.FakeSel.oemTimestamped;
+import static org.metricshub.ipmi.core.transport.FakeSel.selRecord;
+import static org.metricshub.ipmi.core.transport.FakeSel.systemEvent;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -11,6 +14,7 @@ import org.metricshub.ipmi.core.coding.commands.sdr.record.EntityId;
 import org.metricshub.ipmi.core.coding.commands.sdr.record.SensorType;
 import org.metricshub.ipmi.core.transport.FakeRmcpPlusBmc;
 import org.metricshub.ipmi.core.transport.FakeSdrRepository;
+import org.metricshub.ipmi.core.transport.FakeSel;
 
 /**
  * Real SDR and FRU bytes: the Full Sensor record of the "Ambient Temp" sensor of a front panel board (record ID 1,
@@ -30,6 +34,10 @@ public final class Fixtures {
 	public static final int FAN_SENSOR = 0x10;
 	public static final int BOARD_SENSOR = 0x11;
 	public static final int PSU_FRU = 1;
+	/** 2024-05-15T09:15:25Z: when the SEL of {@link #bmc()} was reset. */
+	public static final long SEL_RESET_TIME = 1715764525L;
+	/** The IANA enterprise number of Lenovo. */
+	public static final int LENOVO = 19046;
 
 	private Fixtures() {}
 
@@ -65,7 +73,55 @@ public final class Fixtures {
 				.fru(0, BASE_BOARD_PRODUCT_INFO)
 				.fru(PSU_FRU, BASE_BOARD_PRODUCT_INFO)
 				.install(bmc);
+		sel().install(bmc);
 		return bmc;
+	}
+
+	/**
+	 * The System Event Log of {@link #bmc()}: as a Lenovo IMM logs it, a log reset, an OEM record, a temperature
+	 * threshold crossed, a power-off deassertion, a non-timestamped OEM record, and an event logged before the BMC
+	 * had the time.
+	 *
+	 * @return the log
+	 */
+	public static FakeSel sel() {
+		return new FakeSel()
+				.add(
+						systemEvent(
+								1,
+								SEL_RESET_TIME,
+								SensorType.EventLoggingDisabled.getCode(),
+								0x72,
+								0x6f,
+								true,
+								0x02,
+								0xff,
+								0xff))
+				.add(oemTimestamped(2, 0xc0, SEL_RESET_TIME + 5, LENOVO, 0x02, 0x01, 0x05, 0x00, 0x00, 0x00))
+				.add(
+						systemEvent(
+								3,
+								SEL_RESET_TIME + 482,
+								SensorType.Temperature.getCode(),
+								TEMPERATURE_SENSOR,
+								0x01,
+								true,
+								0x57,
+								0x9a,
+								0x98))
+				.add(
+						systemEvent(
+								4,
+								SEL_RESET_TIME + 489,
+								SensorType.PowerUnit.getCode(),
+								1,
+								0x6f,
+								false,
+								0x00,
+								0xff,
+								0xff))
+				.add(selRecord(5, 0xe0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13))
+				.add(systemEvent(6, 5, SensorType.Processor.getCode(), 2, 0x6f, true, 0x00, 0xff, 0xff));
 	}
 
 	/**

@@ -6,10 +6,13 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.metricshub.ipmi.client.Fixtures.BOARD_SENSOR;
 import static org.metricshub.ipmi.client.Fixtures.FAN_SENSOR;
+import static org.metricshub.ipmi.client.Fixtures.LENOVO;
 import static org.metricshub.ipmi.client.Fixtures.PASSWORD;
 import static org.metricshub.ipmi.client.Fixtures.PSU_FRU;
+import static org.metricshub.ipmi.client.Fixtures.SEL_RESET_TIME;
 import static org.metricshub.ipmi.client.Fixtures.SUITES;
 import static org.metricshub.ipmi.client.Fixtures.TEMPERATURE_SENSOR;
 import static org.metricshub.ipmi.client.Fixtures.USER;
@@ -30,12 +33,18 @@ import static org.metricshub.ipmi.core.transport.FakeSdrRepository.NETFN_STORAGE
 import static org.metricshub.ipmi.core.transport.FakeSdrRepository.compactSensorRecord;
 import static org.metricshub.ipmi.core.transport.FakeSdrRepository.fruDeviceLocatorRecord;
 import static org.metricshub.ipmi.core.transport.FakeSdrRepository.record;
+import static org.metricshub.ipmi.core.transport.FakeSel.GET_SEL_ENTRY;
+import static org.metricshub.ipmi.core.transport.FakeSel.GET_SEL_INFO;
+import static org.metricshub.ipmi.core.transport.FakeSel.RESERVE_SEL;
+import static org.metricshub.ipmi.core.transport.FakeSel.systemEvent;
 
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
@@ -53,13 +62,17 @@ import org.metricshub.ipmi.core.coding.commands.PrivilegeLevel;
 import org.metricshub.ipmi.core.coding.commands.chassis.GetChassisStatus;
 import org.metricshub.ipmi.core.coding.commands.sdr.record.EntityId;
 import org.metricshub.ipmi.core.coding.commands.sdr.record.OemRecord;
+import org.metricshub.ipmi.core.coding.commands.sdr.record.ReadingType;
 import org.metricshub.ipmi.core.coding.commands.sdr.record.SensorType;
 import org.metricshub.ipmi.core.coding.commands.sdr.record.SensorUnit;
+import org.metricshub.ipmi.core.coding.commands.sel.EventDirection;
+import org.metricshub.ipmi.core.coding.commands.sel.SelRecordType;
 import org.metricshub.ipmi.core.coding.payload.CompletionCode;
 import org.metricshub.ipmi.core.coding.payload.lan.NetworkFunction;
 import org.metricshub.ipmi.core.transport.FakeBmc;
 import org.metricshub.ipmi.core.transport.FakeRmcpPlusBmc;
 import org.metricshub.ipmi.core.transport.FakeSdrRepository;
+import org.metricshub.ipmi.core.transport.FakeSel;
 
 class IpmiClientTest {
 
@@ -153,6 +166,155 @@ class IpmiClientTest {
 			assertFalse(sensors.toString().isEmpty());
 			assertFalse(frus.toString().isEmpty());
 			assertFalse(client.chassisStatus().toString().isEmpty());
+		}
+	}
+
+	@Test
+	@Timeout(30)
+	void selEntriesAreTypedAndReadSinceAnEntry() throws Exception {
+		try (FakeRmcpPlusBmc bmc = bmc(); IpmiClient client = client(bmc).build()) {
+			SelEntryList log = client.sel().execute();
+			assertEquals(6, log.size(), log.toString());
+			assertEquals(6, log.totalEntries().getAsInt());
+			assertEquals(Instant.ofEpochSecond(SEL_RESET_TIME + 489), log.lastAddition().get());
+			assertFalse(log.lastErase().isPresent(), "FFFFFFFFh: never erased");
+			assertTrue(log.info().isPresent());
+			assertEquals(1, bmc.getCount(NETFN_STORAGE, GET_SEL_INFO));
+			assertEquals(6, bmc.getCount(NETFN_STORAGE, GET_SEL_ENTRY), "one whole read per entry");
+			assertEquals(0, bmc.getCount(NETFN_STORAGE, RESERVE_SEL), "a whole read needs no reservation");
+
+			SelEntry reset = log.get(0);
+			assertEquals(1, reset.id());
+			assertEquals(SelRecordType.System, reset.type());
+			assertEquals(Instant.ofEpochSecond(SEL_RESET_TIME), reset.timestamp().get());
+			assertFalse(reset.preInitSeconds().isPresent());
+			assertEquals(SensorType.EventLoggingDisabled, reset.sensorType().get());
+			assertEquals(0x72, reset.sensorNumber().getAsInt());
+			assertEquals(FakeSel.GENERATOR_BMC, reset.generatorId().getAsInt());
+			assertEquals(0x6f, reset.eventType().getAsInt());
+			assertEquals(ReadingType.LogAreaReset, reset.event().get());
+			assertEquals(EventDirection.Assertion, reset.direction().get());
+			assertEquals("Log area reset/cleared", reset.description());
+			assertArrayEquals(new byte[] { 0x02, (byte) 0xff, (byte) 0xff }, reset.eventData());
+			assertFalse(reset.manufacturerId().isPresent());
+			assertEquals(0, reset.oemData().length);
+			assertEquals(
+					"SEL entry 1 at 2024-05-15T09:15:25Z: EventLoggingDisabled sensor 114, Log area reset/cleared (assertion)",
+					reset.toString());
+
+			SelEntry oem = log.get(1);
+			assertEquals(SelRecordType.OemTimestamped, oem.type());
+			assertEquals(Instant.ofEpochSecond(SEL_RESET_TIME + 5), oem.timestamp().get());
+			assertEquals(LENOVO, oem.manufacturerId().getAsInt());
+			assertArrayEquals(new byte[] { 2, 1, 5, 0, 0, 0 }, oem.oemData());
+			assertEquals("OEM data 02 01 05 00 00 00", oem.description());
+			assertFalse(oem.sensorType().isPresent());
+			assertFalse(oem.sensorNumber().isPresent());
+			assertFalse(oem.generatorId().isPresent());
+			assertFalse(oem.eventType().isPresent());
+			assertFalse(oem.event().isPresent());
+			assertFalse(oem.direction().isPresent());
+			assertEquals(0, oem.eventData().length);
+			assertEquals(
+					"SEL entry 2 at 2024-05-15T09:15:30Z: OemTimestamped of manufacturer 19046, OEM data 02 01 05 00 00 00",
+					oem.toString());
+
+			SelEntry threshold = log.get(2);
+			assertEquals(SensorType.Temperature, threshold.sensorType().get());
+			assertEquals(TEMPERATURE_SENSOR, threshold.sensorNumber().getAsInt());
+			assertEquals(1, threshold.eventType().getAsInt());
+			assertEquals(ReadingType.UpperNonCriticalGoingHigh, threshold.event().get());
+			assertEquals("Upper Non Critical Going High", threshold.description(), "a name ipmiutil does not give");
+			assertArrayEquals(new byte[] { 0x57, (byte) 0x9a, (byte) 0x98 }, threshold.eventData());
+
+			SelEntry power = log.get(3);
+			assertEquals(ReadingType.PowerOffOrDown, power.event().get());
+			assertEquals(EventDirection.Deassertion, power.direction().get());
+			assertEquals("Power off/down", power.description());
+
+			SelEntry nonTimestamped = log.get(4);
+			assertEquals(SelRecordType.OemNonTimestamped, nonTimestamped.type());
+			assertFalse(nonTimestamped.timestamp().isPresent());
+			assertFalse(nonTimestamped.manufacturerId().isPresent());
+			assertEquals(13, nonTimestamped.oemData().length);
+			assertEquals(
+					"SEL entry 5: OemNonTimestamped, OEM data 01 02 03 04 05 06 07 08 09 0A 0B 0C 0D",
+					nonTimestamped.toString());
+
+			SelEntry preInit = log.get(5);
+			assertFalse(preInit.timestamp().isPresent(), "a timestamp up to 20000000h is not a date");
+			assertEquals(5, preInit.preInitSeconds().getAsLong());
+			assertEquals("IERR", preInit.description());
+			assertEquals("SEL entry 6 5 s after initialization: Processor sensor 2, IERR (assertion)", preInit.toString());
+
+			SelEntryList since = client.sel().since(3).execute();
+			assertEquals(Arrays.asList(4, 5, 6), since.stream().map(SelEntry::id).collect(Collectors.toList()));
+			assertEquals(6, since.totalEntries().getAsInt(), "the count of the whole log");
+			assertEquals(6 + 4, bmc.getCount(NETFN_STORAGE, GET_SEL_ENTRY), "the entry given, then the three after it");
+			assertTrue(client.sel().since(6).execute().isEmpty(), "nothing after the last entry");
+			assertEquals(6, client.sel().since(9).execute().size(), "an entry the log does not hold: the whole log");
+
+			assertThrows(IllegalArgumentException.class, () -> client.sel().since(0));
+			assertThrows(IllegalArgumentException.class, () -> client.sel().since(0xffff));
+		}
+	}
+
+	@Test
+	@Timeout(30)
+	void anEmptySelABmcWithoutGetSelInfoAndACanceledReservation() throws Exception {
+		try (FakeRmcpPlusBmc bmc = new FakeRmcpPlusBmc(SUITES, USER, utf8(PASSWORD), null)) {
+			FakeSel sel = new FakeSel();
+			sel.install(bmc);
+			try (IpmiClient client = client(bmc).build()) {
+				SelEntryList empty = client.sel().execute();
+				assertTrue(empty.isEmpty());
+				assertEquals(0, empty.totalEntries().getAsInt());
+				assertEquals(0, bmc.getCount(NETFN_STORAGE, GET_SEL_ENTRY), "an empty log is not read");
+				assertEquals("0 SEL entries of 0: []", empty.toString());
+
+				sel.unsupportedInfo();
+				SelEntryList unknown = client.sel().execute();
+				assertTrue(unknown.isEmpty());
+				assertFalse(unknown.totalEntries().isPresent());
+				assertFalse(unknown.info().isPresent());
+				assertEquals(1, bmc.getCount(NETFN_STORAGE, GET_SEL_ENTRY), "without Get SEL Info, the first read tells");
+
+				sel.add(systemEvent(1, SEL_RESET_TIME, SensorType.Fan.getCode(), FAN_SENSOR, 0x0a, true, 0x01, 0xff, 0xff));
+				assertEquals(1, client.sel().execute().size());
+				assertEquals(
+						"1 SEL entry: [SEL entry 1 at 2024-05-15T09:15:25Z: Fan sensor 16, Transition to In Test"
+								+ " (assertion)]",
+						client.sel().execute().toString());
+
+				sel
+						.add(
+								systemEvent(
+										2,
+										SEL_RESET_TIME + 1,
+										SensorType.Fan.getCode(),
+										FAN_SENSOR,
+										0x0a,
+										false,
+										0x01,
+										0xff,
+										0xff));
+				sel.cancelReservationOnce(2);
+				assertEquals(2, client.sel().execute().size(), "a canceled reservation: take one and read the entry again");
+				assertEquals(1, bmc.getCount(NETFN_STORAGE, RESERVE_SEL));
+
+				sel.cancelReservationOnce(2).cancelReservationOnce(2);
+				IpmiCompletionCodeException refused = assertThrows(
+						IpmiCompletionCodeException.class,
+						() -> client.sel().execute());
+				assertEquals(CompletionCode.ReservationCanceled, refused.completionCode(), "canceled twice: once is enough");
+
+				sel.add(FakeSel.selRecord(3, 0x10, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13));
+				SelEntry reserved = client.sel().since(2).execute().get(0);
+				assertEquals(SelRecordType.Reserved, reserved.type());
+				assertEquals("Reserved record type", reserved.description());
+				assertFalse(reserved.timestamp().isPresent());
+				assertEquals("SEL entry 3: Reserved, Reserved record type", reserved.toString());
+			}
 		}
 	}
 

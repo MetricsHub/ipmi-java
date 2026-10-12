@@ -402,11 +402,14 @@ public final class TypeConverter {
 	}
 
 	/**
-	 * Decodes date encoded as number of seconds from 00:00:00, January 1, 1970
-	 * GMT.
+	 * Decodes a date encoded as an unsigned 32-bit number of seconds from 00:00:00, January 1, 1970 GMT (IPMI 2.0
+	 * section 37.1): the dates from 2038 on, and the FFFFFFFFh marker of an unspecified timestamp, are not negative.
+	 *
+	 * @param date the timestamp as the BMC sent it
+	 * @return the date
 	 */
 	public static Date decodeDate(int date) {
-		return new Date((long) date * 1000);
+		return new Date((date & 0xFFFFFFFFL) * 1000);
 	}
 
 	/**

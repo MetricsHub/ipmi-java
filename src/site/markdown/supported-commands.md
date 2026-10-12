@@ -1,5 +1,5 @@
-keywords: supported commands, ipmi commands, cipher suites, sdr record types, oem records, fru records, multirecord, completion codes
-description: Reference of the IPMI commands, cipher suites, SDR record types and FRU records the library implements, and how it handles OEM and unknown records.
+keywords: supported commands, ipmi commands, cipher suites, sdr record types, oem records, sel records, fru records, multirecord, completion codes
+description: Reference of the IPMI commands, cipher suites, SDR, SEL and FRU records the library implements, and how it handles OEM and unknown records.
 
 # Supported Commands
 
@@ -37,9 +37,9 @@ sent with [`IpmiClient.send()`](low-level-api.html#sending-a-command-through-the
 | Get FRU Inventory Area Info | `GetFruInventoryAreaInfo` | Storage / `10h` | `frus()` |
 | Read FRU Data | `ReadFruData` | Storage / `11h` | `frus()` |
 | **System Event Log** | | | |
-| Get SEL Info | `GetSelInfo` | Storage / `40h` | |
-| Reserve SEL | `ReserveSel` | Storage / `42h` | |
-| Get SEL Entry | `GetSelEntry` | Storage / `43h` | |
+| Get SEL Info | `GetSelInfo` | Storage / `40h` | `sel()` |
+| Reserve SEL | `ReserveSel` | Storage / `42h` | `sel()`, when the BMC asks for a reservation |
+| Get SEL Entry | `GetSelEntry` | Storage / `43h` | `sel()` |
 | **Payloads (Serial over LAN)** | | | |
 | Activate Payload (SOL) | `ActivateSolPayload` | App / `48h` | `sol()` |
 | Deactivate Payload | `DeactivatePayload` | App / `49h` | `sol()` |
@@ -103,6 +103,22 @@ listed with its reason in `skippedRecords()` of the
 [`SensorList`](apidocs/org/metricshub/ipmi/client/SensorList.html) or
 [`FruList`](apidocs/org/metricshub/ipmi/client/FruList.html). When a BMC answers a whole-record Get SDR with fewer bytes than the record
 declares, the client reads the record again in chunks.
+
+## SEL records
+
+[`SelRecord.populateSelRecord()`](apidocs/org/metricshub/ipmi/core/coding/commands/sel/SelRecord.html)
+decodes the 16-byte entries of the System Event Log (IPMI 2.0, section 32), which `sel()` returns
+as [`SelEntry`](system-event-log.html#the-selentry-object)s:
+
+| Type | Record | Decoded fields |
+| --- | --- | --- |
+| `02h` | System event | Timestamp, generator ID, sensor type and number, event/reading type, event offset (as a `ReadingType`), direction, the three event data bytes |
+| `C0h` – `DFh` | OEM, timestamped | Timestamp, manufacturer ID, 6 OEM bytes |
+| `E0h` – `FFh` | OEM, not timestamped | 13 OEM bytes |
+| `03h` – `BFh` | Reserved | The record ID only |
+
+An entry shorter than 16 bytes is refused with `IllegalArgumentException`, which ends the read
+with an `IpmiClientException`: no BMC tested returns one.
 
 ## FRU records
 

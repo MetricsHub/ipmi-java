@@ -10,7 +10,7 @@
 
 	<custom>
 		<noDefaultLinks>true</noDefaultLinks>
-		<keywords>ipmi, bmc, rmcp+, sensors, fru, sdr, chassis, serial over lan, java, hardware monitoring</keywords>
+		<keywords>ipmi, bmc, rmcp+, sensors, fru, sdr, sel, system event log, chassis, serial over lan, java, hardware monitoring</keywords>
 		<social>
 			<custom>
 				<title>IPMI Java Client on GitHub</title>
@@ -58,6 +58,7 @@
 			<item name="Chassis Status" href="chassis-status.html" />
 			<item name="FRU Inventory" href="fru-inventory.html" />
 			<item name="Sensors" href="sensors.html" />
+			<item name="System Event Log" href="system-event-log.html" />
 			<item name="Configuration" href="configuration.html" />
 			<item name="Timeouts and Errors" href="timeouts-and-errors.html" />
 			<item name="Low-Level API" href="low-level-api.html" />

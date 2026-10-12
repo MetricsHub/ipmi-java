@@ -210,6 +210,41 @@ class IpmiCliTest {
 	}
 
 	@Test
+	@Timeout(30)
+	void selTextJsonAndSince() throws Exception {
+		try (FakeRmcpPlusBmc bmc = Fixtures.bmc()) {
+			Result sel = login(bmc, "sel");
+			assertEquals(0, sel.code, sel.err);
+			assertEquals(golden("sel.txt"), sel.out);
+			assertEquals("", sel.err);
+			assertEquals(golden("sel-json.txt"), login(bmc, "sel", "--json").out);
+
+			Result since = login(bmc, "-v", "sel", "--since", "4");
+			assertEquals(0, since.code, since.err);
+			assertEquals(
+					"ID  Time         Type               Sensor  Event                                            Direction\n"
+							+ "5                OemNonTimestamped          OEM data 01 02 03 04 05 06 07 08 09 0A 0B 0C 0D\n"
+							+ "6   pre-init 5s  Processor          2       IERR                                             assertion\n",
+					since.out);
+			assertTrue(
+					since.err.contains("ipmicli: SEL: 6 entries, last addition 2024-05-15T09:23:34Z, last erase unknown\n"),
+					since.err);
+			assertEquals(
+					"ID  Time  Type  Sensor  Event  Direction\n",
+					login(bmc, "sel", "--since=6").out,
+					"nothing after the last entry: the header alone, as sensors prints for an empty selection");
+
+			Result badId = login(bmc, "sel", "--since", "0");
+			assertEquals(IpmiCli.EXIT_USAGE, badId.code);
+			assertTrue(badId.err.startsWith("ipmicli: --since must be between 1 and 65534"), badId.err);
+			Result wrongSubcommand = login(bmc, "sensors", "--since", "1");
+			assertEquals(IpmiCli.EXIT_USAGE, wrongSubcommand.code);
+			assertTrue(wrongSubcommand.err.startsWith("ipmicli: --since requires the sel subcommand"), wrongSubcommand.err);
+			assertEquals(IpmiCli.EXIT_USAGE, login(bmc, "sel", "1").code, "sel takes no argument");
+		}
+	}
+
+	@Test
 	@Timeout(60)
 	void eachFailureHasItsExitCode() throws Exception {
 		try (FakeRmcpPlusBmc bmc = Fixtures.bmc()) {

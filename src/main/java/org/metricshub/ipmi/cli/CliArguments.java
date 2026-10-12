@@ -59,6 +59,7 @@ final class CliArguments implements AutoCloseable {
 		POWER,
 		SENSORS,
 		FRU,
+		SEL,
 		SOL
 	}
 
@@ -68,11 +69,13 @@ final class CliArguments implements AutoCloseable {
 	/** The preference of the client, repeated here for the usage text and the {@code probe} output. */
 	static final int[] DEFAULT_CIPHER_SUITES = { 17, 3, 8, 16, 2, 7 };
 	static final char DEFAULT_ESCAPE = '~';
-	static final String SUBCOMMANDS = "probe, chassis, power, sensors, fru or sol";
+	static final String SUBCOMMANDS = "probe, chassis, power, sensors, fru, sel or sol";
 
 	private static final int MAX_PORT = 65_535;
 	private static final int MAX_KEY_BYTES = 20;
 	private static final int MAX_FRU_ID = 255;
+	/** 0000h and FFFFh are not the IDs of entries (IPMI 2.0 section 31.6). */
+	private static final int MAX_SEL_RECORD_ID = 0xfffe;
 	private static final int LAST_STANDARD_SUITE = 19;
 	private static final int HEX_RADIX = 16;
 	private static final char DELETE = 0x7f;
@@ -94,6 +97,7 @@ final class CliArguments implements AutoCloseable {
 	private Set<SensorType> types;
 	private final List<String> names = new ArrayList<String>();
 	private final List<Integer> fruIds = new ArrayList<Integer>();
+	private int since = -1;
 	private int escape = DEFAULT_ESCAPE;
 	private boolean escapeGiven;
 	private boolean noEscape;
@@ -239,6 +243,9 @@ final class CliArguments implements AutoCloseable {
 		case "fru":
 			subcommand = Subcommand.FRU;
 			break;
+		case "sel":
+			subcommand = Subcommand.SEL;
+			break;
 		case "sol":
 			subcommand = Subcommand.SOL;
 			break;
@@ -284,9 +291,19 @@ final class CliArguments implements AutoCloseable {
 			subcommand = Subcommand.HELP;
 			return flag(argument, option, index);
 		case "--json":
-			requireSubcommand(option, Subcommand.PROBE, Subcommand.CHASSIS, Subcommand.SENSORS, Subcommand.FRU);
+			requireSubcommand(
+					option,
+					Subcommand.PROBE,
+					Subcommand.CHASSIS,
+					Subcommand.SENSORS,
+					Subcommand.FRU,
+					Subcommand.SEL);
 			json = true;
 			return flag(argument, option, index);
+		case "--since":
+			requireSubcommand(option, Subcommand.SEL);
+			since = (int) parseNumber(optionValue(rest, index, option), option, 1, MAX_SEL_RECORD_ID);
+			return nextIndex(argument, index);
 		case "--type":
 			requireSubcommand(option, Subcommand.SENSORS);
 			if (types == null) {
@@ -605,6 +622,13 @@ final class CliArguments implements AutoCloseable {
 	/** @return the FRU IDs of {@code fru <id>...}, empty for all */
 	List<Integer> fruIds() {
 		return Collections.unmodifiableList(fruIds);
+	}
+
+	/**
+	 * @return the record ID after which {@code sel} reads, -1 for the whole log
+	 */
+	int since() {
+		return since;
 	}
 
 	/** @return the escape character of the SOL console, {@code -1} with {@code --no-escape} */

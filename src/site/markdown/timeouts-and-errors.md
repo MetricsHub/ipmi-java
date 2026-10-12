@@ -64,7 +64,7 @@ that much of its expiry.
 The client keeps its session open between operations with its
 [keep-alive](configuration.html#keep-alive) messages. When the session is lost all the same (the
 BMC rebooted, expired it, or another client deleted it), the next operation opens a new one. A
-**read** operation (`chassisStatus()`, `sensors()`, `frus()`) that fails because the session was
+**read** operation (`chassisStatus()`, `sensors()`, `frus()`, `sel()`) that fails because the session was
 lost while it ran is retried **once** on a new session; `send()` and the control operations are
 never replayed, as a chassis control sent twice is not the same as sent once.
 

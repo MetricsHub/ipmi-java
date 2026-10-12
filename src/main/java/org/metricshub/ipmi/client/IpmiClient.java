@@ -96,6 +96,9 @@ import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
  * 	for (Fru fru : bmc.frus().execute()) {
  * 		System.out.println(fru.name() + ": " + fru.manufacturer() + " " + fru.model() + " S/N " + fru.serialNumber());
  * 	}
+ * 	for (SelEntry entry : bmc.sel().execute()) {
+ * 		System.out.println(entry);
+ * 	}
  * }
  * </pre>
  * <p>
@@ -264,8 +267,18 @@ public final class IpmiClient implements AutoCloseable {
 	}
 
 	/**
+	 * Reads the System Event Log (SEL): {@code sel().execute()} for every entry, with {@link SelRequest#since} for the
+	 * entries added after one already read.
+	 *
+	 * @return the request to complete
+	 */
+	public SelRequest sel() {
+		return new SelRequest(this);
+	}
+
+	/**
 	 * Sends any command of the protocol core in the session and returns its typed reply, for the commands the client
-	 * does not wrap: {@code bmc.send(new GetSelInfo())}. A command is never replayed on a new session.
+	 * does not wrap: {@code bmc.send(new GetDeviceId())}. A command is never replayed on a new session.
 	 *
 	 * @param <R> the type of the reply
 	 * @param command the command
@@ -383,6 +396,10 @@ public final class IpmiClient implements AutoCloseable {
 			SdrRepository sdr = repository();
 			return new FruList(FruReader.read(link, sdr.records(), ids), sdr.skippedRecords());
 		});
+	}
+
+	SelEntryList readSel(int since, Duration deadline) {
+		return run("SEL", deadline, true, true, () -> SelReader.read(link, since));
 	}
 
 	SolConsole openSol(Duration deadline) {
