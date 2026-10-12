@@ -95,6 +95,9 @@ class IpmiConnectorTest {
 		try {
 			assertThrows(IllegalArgumentException.class, () -> connector.setRetries(-1));
 			assertEquals(3, connector.getRetries());
+			assertThrows(IllegalArgumentException.class, () -> connector.setTimeout(0));
+			assertThrows(IllegalArgumentException.class, () -> connector.setTimeout(-5));
+			connector.setTimeout(1);
 			connector.setRetries(0);
 			assertEquals(0, connector.getRetries());
 		} finally {
