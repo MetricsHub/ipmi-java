@@ -55,6 +55,7 @@ class IpmiCliTest {
 		assertEquals(0, help.code);
 		assertTrue(help.out.startsWith("Usage:"), help.out);
 		assertTrue(help.out.contains("-pf, --password-file"), help.out);
+		assertTrue(IpmiCli.usage().contains("~."), "the usage names the way out of the console");
 		assertEquals("", help.err);
 
 		Result version = run(null, NO_PROMPT, "--version");

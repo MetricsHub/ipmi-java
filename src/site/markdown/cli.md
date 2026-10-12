@@ -309,7 +309,9 @@ sequences of the remote console; the typed bytes go to the BMC.
   kill). On Windows, where Java cannot switch the console to raw mode, a PowerShell child reads
   the keys of the console (`[Console]::ReadKey`) and hands them over, the arrow, editing and
   function keys as their ANSI sequences; use Windows Terminal (the default since Windows 11) for
-  the escape sequences of the remote console to be interpreted. When neither works, the console
+  the escape sequences of the remote console to be interpreted. Ctrl+C is a key for the BMC
+  there too, and the Windows console stops treating it as a signal while the console is open:
+  `~.` is the way out, and Ctrl+Break ends the program through the shutdown hook. When neither works, the console
   falls back to line mode: the input is sent when Enter is pressed, without local echo.
 * When stdin is not a terminal, its bytes are forwarded as they come and the end of the input
   closes the console, so `printf 'root\r' | ipmicli ... sol` works in scripts. Each read of the

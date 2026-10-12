@@ -640,8 +640,8 @@ public final class IpmiCli {
 										"")
 								+ (arguments.escape() < 0 ?
 										"; the end of the input closes it" :
-										"; " + (char) arguments.escape() + ". closes it, " + (char) arguments.escape()
-												+ "? lists the escape sequences"));
+										"; " + (char) arguments.escape() + ". at the start of a line closes it, "
+												+ (char) arguments.escape() + "? lists the escape sequences"));
 			}
 			boolean lineMode = terminal && raw == null;
 			// In line mode the console would echo the typed line locally, and the remote console echoes it again (or
@@ -1091,6 +1091,7 @@ public final class IpmiCli {
 				+ "      --long                    sensors: add the number, the entity, the thresholds and the problem\n"
 				+ "      --escape <char>           sol: the escape character (default: ~)\n"
 				+ "      --no-escape               sol: no escape sequences (binary transfers); end of input closes\n"
+				+ "                                (in the console, ~. at the start of a line closes it, ~? lists the sequences)\n"
 				+ "\n" + "Default privilege: user for chassis, power status, sensors and fru; administrator for sol.\n"
 				+ "If neither password option is given, the password is requested from the interactive console.\n" + "\n"
 				+ "Full manual - output formats, the SOL console, exit codes, ipmitool equivalents:\n"
