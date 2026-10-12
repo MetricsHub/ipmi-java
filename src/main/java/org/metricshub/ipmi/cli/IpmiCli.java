@@ -32,9 +32,11 @@ import java.math.RoundingMode;
 import java.nio.ByteBuffer;
 import java.nio.CharBuffer;
 import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Base64;
 import java.util.Date;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -604,11 +606,11 @@ public final class IpmiCli {
 			boolean terminal)
 			throws InterruptedException {
 		SolConsole console = timed(arguments, err, "SOL console", () -> client.sol().open());
-		Runnable restoreTerminal = terminal ? rawTerminal(err) : null;
+		RawInput raw = terminal ? rawInput(stdin, err) : null;
 		// A kill (Ctrl+C in line mode) must give the terminal back and free the payload on the BMC
 		Thread hook = new Thread(() -> {
-			if (restoreTerminal != null) {
-				restoreTerminal.run();
+			if (raw != null) {
+				raw.release.run();
 			}
 			client.close();
 		}, "ipmicli-sol-shutdown");
@@ -619,7 +621,7 @@ public final class IpmiCli {
 				diagnostic(
 						err,
 						"SOL console open"
-								+ (restoreTerminal == null ?
+								+ (raw == null ?
 										", line-oriented: the input is sent when Enter is pressed and echoed by the remote console only" :
 										"")
 								+ (arguments.escape() < 0 ?
@@ -627,15 +629,16 @@ public final class IpmiCli {
 										"; " + (char) arguments.escape() + ". closes it, " + (char) arguments.escape()
 												+ "? lists the escape sequences"));
 			}
-			boolean lineMode = terminal && restoreTerminal == null;
+			boolean lineMode = terminal && raw == null;
 			// In line mode the console would echo the typed line locally, and the remote console echoes it again (or
 			// hides it: a password prompt): read the lines without echo, so that only the remote echo shows
 			InputStream input = lineMode ?
-					new LineInput(() -> System.console().readPassword(), Charset.defaultCharset()) : stdin;
+					new LineInput(() -> System.console().readPassword(), Charset.defaultCharset()) :
+					raw == null ? stdin : raw.input;
 			return SolBridge.run(console, input, out, err, arguments.escape(), lineMode);
 		} finally {
-			if (restoreTerminal != null) {
-				restoreTerminal.run();
+			if (raw != null) {
+				raw.release.run();
 			}
 			try {
 				Runtime.getRuntime().removeShutdownHook(hook);
@@ -645,20 +648,32 @@ public final class IpmiCli {
 		}
 	}
 
-	/**
-	 * Switches the terminal to raw mode with {@code stty} on {@code /dev/tty}, so that every keystroke (arrow keys,
-	 * Ctrl+C, function keys) goes to the BMC.
-	 *
-	 * @return how to restore the terminal, {@code null} when it cannot be switched (Windows, no {@code sh})
-	 */
-	private static Runnable rawTerminal(PrintStream err) {
-		if (System.getProperty("os.name", "").toLowerCase(Locale.ROOT).contains("win")) {
-			return null;
+	/** The keystrokes of the terminal, one by one and without echo, and how to give the terminal back. */
+	private static final class RawInput {
+		private final InputStream input;
+		private final Runnable release;
+
+		private RawInput(InputStream input, Runnable release) {
+			this.input = input;
+			this.release = release;
 		}
+	}
+
+	/**
+	 * Takes the keystrokes of the terminal one by one, without local echo, so that every key (arrow keys, Ctrl+C,
+	 * function keys) goes to the BMC: {@code stty raw -echo} on {@code /dev/tty} on Unix, a PowerShell child reading
+	 * the keys of the console on Windows, where Java cannot switch the console to raw mode.
+	 *
+	 * @return the keystrokes and the release of the terminal, {@code null} when neither works (line mode then)
+	 */
+	private static RawInput rawInput(InputStream stdin, PrintStream err) {
 		try {
+			if (System.getProperty("os.name", "").toLowerCase(Locale.ROOT).contains("win")) {
+				return windowsKeys();
+			}
 			String saved = stty("-g").trim();
 			stty("raw -echo");
-			return () -> {
+			return new RawInput(stdin, () -> {
 				try {
 					stty(saved);
 				} catch (IOException e) {
@@ -666,14 +681,48 @@ public final class IpmiCli {
 				} catch (InterruptedException e) {
 					Thread.currentThread().interrupt();
 				}
-			};
+			});
 		} catch (IOException | InterruptedException e) {
 			if (e instanceof InterruptedException) {
 				Thread.currentThread().interrupt();
 			}
-			diagnostic(err, "cannot switch the terminal to raw mode (" + e.getMessage() + ")");
+			diagnostic(err, "cannot take the keystrokes of the terminal (" + e.getMessage() + ")");
 			return null;
 		}
+	}
+
+	/**
+	 * The PowerShell program that reads the keys of the console ({@code ReadKey(true)}: no echo, Ctrl+C included) and
+	 * writes them to its standard output as the bytes a terminal sends: the character as UTF-8, the arrow, editing and
+	 * function keys as their ANSI escape sequences.
+	 */
+	private static final String KEY_READER = "[Console]::TreatControlCAsInput = $true\n"
+			+ "$out = [Console]::OpenStandardOutput()\n" + "while ($true) {\n" + "  $k = [Console]::ReadKey($true)\n"
+			+ "  $b = switch (\"$($k.Key)\") {\n" + "    'UpArrow' { 27, 91, 65 }\n" + "    'DownArrow' { 27, 91, 66 }\n"
+			+ "    'RightArrow' { 27, 91, 67 }\n" + "    'LeftArrow' { 27, 91, 68 }\n" + "    'Home' { 27, 91, 72 }\n"
+			+ "    'End' { 27, 91, 70 }\n" + "    'Insert' { 27, 91, 50, 126 }\n" + "    'Delete' { 27, 91, 51, 126 }\n"
+			+ "    'PageUp' { 27, 91, 53, 126 }\n" + "    'PageDown' { 27, 91, 54, 126 }\n" + "    'F1' { 27, 79, 80 }\n"
+			+ "    'F2' { 27, 79, 81 }\n" + "    'F3' { 27, 79, 82 }\n" + "    'F4' { 27, 79, 83 }\n"
+			+ "    'F5' { 27, 91, 49, 53, 126 }\n" + "    'F6' { 27, 91, 49, 55, 126 }\n"
+			+ "    'F7' { 27, 91, 49, 56, 126 }\n"
+			+ "    'F8' { 27, 91, 49, 57, 126 }\n" + "    'F9' { 27, 91, 50, 48, 126 }\n"
+			+ "    'F10' { 27, 91, 50, 49, 126 }\n"
+			+ "    'F11' { 27, 91, 50, 51, 126 }\n" + "    'F12' { 27, 91, 50, 52, 126 }\n"
+			+ "    default { if ([int]$k.KeyChar -ne 0) { [Text.Encoding]::UTF8.GetBytes([string]$k.KeyChar) } }\n"
+			+ "  }\n" + "  if ($b.Count -gt 0) { $out.Write([byte[]]$b, 0, $b.Count); $out.Flush() }\n" + "}\n";
+
+	private static RawInput windowsKeys() throws IOException {
+		// The child inherits the console, so ReadKey reads the keys of the terminal of the user
+		Process keys = new ProcessBuilder(
+				"powershell.exe",
+				"-NoProfile",
+				"-NoLogo",
+				"-EncodedCommand",
+				Base64.getEncoder().encodeToString(KEY_READER.getBytes(StandardCharsets.UTF_16LE)))
+				.redirectInput(ProcessBuilder.Redirect.INHERIT)
+				.redirectError(ProcessBuilder.Redirect.INHERIT)
+				.start();
+		return new RawInput(keys.getInputStream(), keys::destroy);
 	}
 
 	private static String stty(String arguments) throws IOException, InterruptedException {

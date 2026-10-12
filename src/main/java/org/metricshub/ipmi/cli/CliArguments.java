@@ -75,6 +75,7 @@ final class CliArguments implements AutoCloseable {
 	private static final int MAX_FRU_ID = 255;
 	private static final int LAST_STANDARD_SUITE = 19;
 	private static final int HEX_RADIX = 16;
+	private static final char DELETE = 0x7f;
 
 	private Subcommand subcommand;
 	private String hostname;
@@ -298,8 +299,9 @@ final class CliArguments implements AutoCloseable {
 		case "--escape": {
 			requireSubcommand(option, Subcommand.SOL);
 			String value = optionValue(rest, index, option);
-			if (value.length() != 1) {
-				throw new CliUsageException(option + " requires a single character");
+			// The escape is matched against the bytes of the input: one printable ASCII character is one byte
+			if (value.length() != 1 || value.charAt(0) <= ' ' || value.charAt(0) >= DELETE) {
+				throw new CliUsageException(option + " requires a single printable ASCII character");
 			}
 			escape = value.charAt(0);
 			escapeGiven = true;

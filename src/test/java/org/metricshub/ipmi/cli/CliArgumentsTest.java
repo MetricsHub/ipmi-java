@@ -164,7 +164,9 @@ class CliArgumentsTest {
 		assertEquals(
 				"--escape and --no-escape are mutually exclusive",
 				usageError(login("sol", "--escape", "!", "--no-escape")));
-		assertEquals("--escape requires a single character", usageError(login("sol", "--escape", "~~")));
+		assertEquals("--escape requires a single printable ASCII character", usageError(login("sol", "--escape", "~~")));
+		assertEquals("--escape requires a single printable ASCII character", usageError(login("sol", "--escape", "é")));
+		assertEquals("--escape requires a single printable ASCII character", usageError(login("sol", "--escape", " ")));
 		assertEquals(
 				"--json requires the probe or chassis or sensors or fru subcommand",
 				usageError(login("sol", "--json")));

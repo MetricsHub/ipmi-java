@@ -300,16 +300,17 @@ sequences of the remote console; the typed bytes go to the BMC.
 
 * **Escape sequences**, recognized at the start of a line, as with `ssh` and
   `ipmitool sol activate`: `~.` closes the console, `~B` sends a serial break, `~?` lists the
-  sequences, `~~` sends a `~`. `--escape <char>` changes the escape character, `--no-escape`
+  sequences, `~~` sends a `~`. `--escape <char>` changes the escape character (one printable ASCII character), `--no-escape`
   disables the sequences (for binary transfers); the end of the input then closes the console.
-* **Raw terminal mode** on Linux and macOS: the terminal is switched with `stty raw -echo` on
-  `/dev/tty`, and restored when the console closes, on an error, and from a shutdown hook (a
-  kill). Every keystroke goes to the BMC, Ctrl+C included, so arrow keys, function keys and BIOS
-  setup screens work; `~.` is the way out. On Windows, Java 8 cannot switch the console to raw
-  mode: the console is line-oriented (the input is sent when Enter is pressed), which is enough
-  for an OS login prompt but not for a BIOS setup screen. The typed line is not echoed locally,
-  since the remote console echoes it (or hides it, at a password prompt): what you type appears
-  when the server answers.
+* **Every keystroke goes to the BMC**, Ctrl+C included, without local echo (the remote console
+  echoes, or hides a password), so arrow keys, function keys and BIOS setup screens work; `~.`
+  is the way out. On Linux and macOS, the terminal is switched with `stty raw -echo` on
+  `/dev/tty` and restored when the console closes, on an error, and from a shutdown hook (a
+  kill). On Windows, where Java cannot switch the console to raw mode, a PowerShell child reads
+  the keys of the console (`[Console]::ReadKey`) and hands them over, the arrow, editing and
+  function keys as their ANSI sequences; use Windows Terminal (the default since Windows 11) for
+  the escape sequences of the remote console to be interpreted. When neither works, the console
+  falls back to line mode: the input is sent when Enter is pressed, without local echo.
 * When stdin is not a terminal, its bytes are forwarded as they come and the end of the input
   closes the console, so `printf 'root\r' | ipmicli ... sol` works in scripts. Each read of the
   input is one SOL packet: a keystroke in raw mode, a line or a block from a pipe.
