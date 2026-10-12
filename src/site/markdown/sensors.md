@@ -1,5 +1,5 @@
-keywords: sensors, sdr, sensor data record, sensor reading, thresholds, temperature, voltage, fan, power, states, text output format, ipmiresultconverter
-description: Read the sensors of a server through its BMC — how the SDR repository is walked, selecting sensors, the Sensor object with its reading, thresholds, status and states, and the text output format of IpmiResultConverter.
+keywords: sensors, sdr, sensor data record, sensor reading, thresholds, temperature, voltage, fan, power, states
+description: Read the sensors of a server through its BMC — how the SDR repository is walked, selecting sensors, and the Sensor object with its reading, thresholds, status and states.
 
 # Sensors
 
@@ -123,83 +123,3 @@ the single state is the raw value of the state bytes: `0xHHLL` (`0xLL` when the 
 single state byte). An OEM sensor with no state asserted reports no state, like any discrete
 sensor.
 
-## Text output format
-
-[`IpmiResultConverter.convertResult(frus, sensors)`](apidocs/org/metricshub/ipmi/client/IpmiResultConverter.html)
-converts the FRUs and the sensors of a client into semicolon-separated lines, the format that
-MetricsHub's IPMI connectors parse:
-
-```java
-try (IpmiClient bmc = IpmiClient.builder(host).credentials(user, password).build()) {
-	String text = IpmiResultConverter.convertResult(bmc.frus().execute(), bmc.sensors().execute());
-}
-```
-
-The lines come in three groups, in this order:
-
-```text
-FRU;LENOVO;RD350;S4M00000 - 00000000000001
-FRU;LITEON;PS-2451-6L-LF;0000
-Power Unit;3;Power Unit 3;;;;PSU Redundancy=Fully Redundant
-Power Supply;1;Power Supply 1;;;;PSU1 Present=Presence detected
-Power Supply;2;Power Supply 2;;;;PSU2 Present=Presence detected
-Temperature;0008;Ambient Temp;Air Inlet 1;17.0;37;39
-Temperature;0009;CPU1 DTS;Processor 1;-44.0;;
-PowerConsumption;000d;System Power;Power Unit 2;92.0
-Fan;0014;Fan 1;Fan Device 1;6600.0;1600;
-Voltage;0022;System 3.3V;System Board 1;3380.0;3040;3560
-```
-
-### FRU lines
-
-`FRU;$vendor;$model;$serialNumber` — one per FRU, see
-[FRU Inventory](fru-inventory.html#fru-lines-of-the-text-output).
-
-### Device state lines
-
-```text
-$deviceType;$deviceId;$deviceUniqueId;$vendor;$model;$serialNumber;$states
-```
-
-One line per **entity** (device) that has at least one sensor with an asserted state:
-
-| Field | Content |
-| --- | --- |
-| `$deviceType` | The entity type, in the wording of `ipmiutil`: `System Board`, `Processor`, `Power Supply`, `Fan Device`, `Memory Device`, `Disk or Disk Bay`, ... |
-| `$deviceId` | The entity instance number, as the signed byte of the record |
-| `$deviceUniqueId` | `$deviceType $deviceId`, for example `Power Supply 1` |
-| `$vendor`, `$model`, `$serialNumber` | From the FRU of the same entity type and instance, if any; empty otherwise |
-| `$states` | The states of every sensor of the entity, `sensorName=state` separated with `|` |
-
-Sensors that report `Device Absent` are left out.
-
-### Reading lines
-
-One line per Full Sensor record with a reading, for the units below; sensors in other units are
-not reported, and neither are sensors with no reading (raw value `0xFF`).
-
-```text
-Temperature;$sensorId;$sensorName;$deviceUniqueId;$value;$threshold1;$threshold2
-Voltage;$sensorId;$sensorName;$deviceUniqueId;$value;$threshold1;$threshold2
-Fan;$sensorId;$sensorName;$deviceUniqueId;$value;$threshold1;$threshold2
-Current;$sensorId;$sensorName;$deviceUniqueId;$value
-PowerConsumption;$sensorId;$sensorName;$deviceUniqueId;$value
-Energy;$sensorId;$sensorName;$deviceUniqueId;$value
-```
-
-| Line | Unit of `$value` | `$threshold1` | `$threshold2` |
-| --- | --- | --- | --- |
-| Temperature | °C (°F and K are converted) | Upper non-critical | Upper critical, else upper non-recoverable |
-| Voltage | **mV** | Lower non-critical, else lower critical, else lower non-recoverable | Upper non-critical, else upper critical, else upper non-recoverable |
-| Fan | RPM | Lower critical, else lower non-recoverable | Lower non-critical |
-| Current | A | | |
-| PowerConsumption | W | | |
-| Energy | J | | |
-
-* `$sensorId` is the SDR record ID, as 4 lowercase hexadecimal digits.
-* `$deviceUniqueId` is the entity of the sensor, as in the device state lines.
-* Thresholds are rounded to integers, in the same unit as `$value`, and empty when the BMC does
-  not define them.
-
-The chassis status has its own text form:
-[`convertResult(ChassisStatus)`](chassis-status.html#as-text).

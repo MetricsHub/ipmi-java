@@ -1,5 +1,5 @@
 keywords: fru, field replaceable unit, inventory, serial number, part number, manufacturer, product, board, chassis, read fru data
-description: Read the FRU inventory of a server through its BMC — which FRUs are read, the Fru object with the Board, Chassis, Product and MultiRecord areas, and the FRU lines of the text output.
+description: Read the FRU inventory of a server through its BMC — which FRUs are read, and the Fru object with the Board, Chassis, Product and MultiRecord areas.
 
 # FRU Inventory
 
@@ -81,40 +81,3 @@ for (Fru fru : bmc.frus().execute()) {
 unmodifiable `List<Fru>` that also gives the SDR records the walk skipped
 (`skippedRecords()`).
 
-## FRU lines of the text output
-
-[`IpmiResultConverter.convertResult(frus, sensors)`](sensors.html#text-output-format) starts
-with one line per FRU:
-
-```text
-FRU;$vendor;$model;$serialNumber
-```
-
-For example (serial numbers masked):
-
-```text
-FRU;LENOVO;RD350;S4M00000 - 00000000000001
-FRU;LITEON;PS-2451-6L-LF;0000
-FRU;LENOVO;Riser 1x16;8SSC50A00000V1SH4AX0000 - SC50A00000
-```
-
-The fields come from the **Product** area when it has a manufacturer name, and from the **Board**
-area otherwise:
-
-| Field | Product area | Board area |
-| --- | --- | --- |
-| `$vendor` | Manufacturer name | Board manufacturer |
-| `$model` | Product name | Board product name |
-| `$serialNumber` | Product serial number, followed by ` - ` and the product part/model number when both exist | Board serial number, followed by ` - ` and the board part number when both exist |
-
-A FRU with neither a vendor nor a model is not listed. The lines are sorted by how complete and
-how central they are:
-
-1. the system chassis and system board, with a model and a serial number (from the Product
-   area);
-2. the front and back panel boards, then the other FRUs, with a model and a serial number (from
-   the Product area);
-3. every other FRU (incomplete Product area, or Board area only).
-
-The same vendor, model and serial number are repeated on the
-[device lines](sensors.html#device-state-lines) of the sensors that belong to the same entity.

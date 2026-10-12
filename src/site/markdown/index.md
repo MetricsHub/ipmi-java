@@ -25,11 +25,8 @@ boards) over **IPMI 2.0 over LAN (RMCP+)**, on UDP port 623. It lets a Java appl
   same session or through the low-level connector ([Low-Level API](low-level-api.html)).
 
 The library is the IPMI engine of [MetricsHub](https://metricshub.com) hardware monitoring: its
-[`IpmiClient`](apidocs/org/metricshub/ipmi/client/IpmiClient.html) returns the inventory and the
-sensors as Java objects, which
-[`IpmiResultConverter`](apidocs/org/metricshub/ipmi/client/IpmiResultConverter.html) turns into
-the semicolon-separated text that the MetricsHub connectors parse
-([text output format](sensors.html#text-output-format)).
+[`IpmiClient`](apidocs/org/metricshub/ipmi/client/IpmiClient.html) returns the chassis status,
+the inventory and the sensors as typed Java objects.
 
 It is a fork of the [IPMI Library for Java by Verax Systems](https://en.wikipedia.org/wiki/Verax_IPMI),
 with the RAKP-HMAC-SHA256 and RAKP-HMAC-MD5 authentication algorithms added, tolerance for the OEM
@@ -104,30 +101,6 @@ Fan 1 = 6600.0 Rpm (OK)
 System 3.3V = 3.38 Volts (OK)
 ```
 
-The text that MetricsHub parses comes from the same results:
-
-```java
-try (IpmiClient bmc = IpmiClient.builder(host).credentials(user, password).build()) {
-	// "System power state is up"
-	System.out.println(IpmiResultConverter.convertResult(bmc.chassisStatus()));
-
-	// One line per FRU, per device with states, and per sensor reading
-	System.out.println(IpmiResultConverter.convertResult(bmc.frus().execute(), bmc.sensors().execute()));
-}
-```
-
-```text
-System power state is up
-FRU;LENOVO;RD350;S4M00000 - 00000000000001
-FRU;LITEON;PS-2451-6L-LF;0000
-Power Unit;3;Power Unit 3;;;;PSU Redundancy=Fully Redundant
-Power Supply;1;Power Supply 1;;;;PSU1 Present=Presence detected
-Temperature;0008;Ambient Temp;Air Inlet 1;17.0;37;39
-PowerConsumption;000d;System Power;Power Unit 2;92.0
-Fan;0014;Fan 1;Fan Device 1;6600.0;1600;
-Voltage;0022;System 3.3V;System Board 1;3380.0;3040;3560
-```
-
 The client runs its operations one at a time on its session, walks the SDR repository once for
 both `frus()` and `sensors()`, and reopens the session when the BMC loses it. Every failure is an
 unchecked [`IpmiClientException`](apidocs/org/metricshub/ipmi/client/IpmiClientException.html)
@@ -142,7 +115,7 @@ completion code, or the operation outlived its deadline
   level and cipher suites, the firewall
 * [Chassis Status](chassis-status.html) — power state and chassis flags
 * [FRU Inventory](fru-inventory.html) — how FRUs are read and which fields are reported
-* [Sensors](sensors.html) — readings, thresholds, states, and the text output format
+* [Sensors](sensors.html) — readings, thresholds, status and states
 * [Configuration](configuration.html) — every option of the client builder
 * [Timeouts and Errors](timeouts-and-errors.html) — deadlines, message timeouts, retries, session
   recovery and the exceptions

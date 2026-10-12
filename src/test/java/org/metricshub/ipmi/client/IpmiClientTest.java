@@ -67,11 +67,6 @@ class IpmiClientTest {
 	private static final int BOARD_SENSOR = 0x11;
 	private static final int PSU_FRU = 1;
 	private static final int RECORDS = 6;
-	private static final String FRU_LINE = "FRU;IBM;System x3650 M2;KD9098C - 794722G";
-	private static final String TEXT_OUTPUT = FRU_LINE + "\n" + FRU_LINE + "\n"
-			+ "Fan Device;1;Fan Device 1;;;;Fan 1=Device Present\n"
-			+ "System Board;1;System Board 1;IBM;System x3650 M2;KD9098C - 794722G;Board=Device Present\n"
-			+ "Temperature;0001;Ambient Temp;Front Panel Board 1;22.0;38;41";
 
 	/**
 	 * A BMC with a repository of 6 records: a temperature (Full), a fan presence and a system board presence
@@ -80,7 +75,7 @@ class IpmiClientTest {
 	private static FakeRmcpPlusBmc bmc() throws IOException {
 		FakeRmcpPlusBmc bmc = new FakeRmcpPlusBmc(SUITES, USER, utf8(PASSWORD), null);
 		new FakeSdrRepository()
-				.add(IpmiResultConverterTest.FRONT_PANEL_FULL_RECORD)
+				.add(Fixtures.FRONT_PANEL_FULL_RECORD)
 				.add(compactSensorRecord(2, FAN_SENSOR, EntityId.Fan.getCode(), 1, SensorType.Fan.getCode(), 0x08, "Fan 1"))
 				.add(
 						compactSensorRecord(
@@ -99,8 +94,8 @@ class IpmiClientTest {
 				.reading(TEMPERATURE_SENSOR, 0x9a, 0x40, 0x00)
 				.reading(FAN_SENSOR, 0x00, 0x40, 0x02)
 				.reading(BOARD_SENSOR, 0x00, 0x40, 0x02)
-				.fru(0, IpmiResultConverterTest.BASE_BOARD_PRODUCT_INFO)
-				.fru(PSU_FRU, IpmiResultConverterTest.BASE_BOARD_PRODUCT_INFO)
+				.fru(0, Fixtures.BASE_BOARD_PRODUCT_INFO)
+				.fru(PSU_FRU, Fixtures.BASE_BOARD_PRODUCT_INFO)
 				.install(bmc);
 		return bmc;
 	}
@@ -140,7 +135,9 @@ class IpmiClientTest {
 			assertEquals(2, bmc.getCount(NETFN_STORAGE, GET_SDR_REPOSITORY_INFO), "each walk checks the repository");
 			assertEquals(0, bmc.getCount(NETFN_APP, SET_SESSION_PRIVILEGE_LEVEL), "User needs no raise");
 
-			assertEquals(TEXT_OUTPUT, IpmiResultConverter.convertResult(frus, sensors));
+			assertEquals(EntityId.SystemBoard, frus.get(0).entity(), "the synthetic system board FRU comes first");
+			assertEquals("IBM", frus.get(0).manufacturer());
+			assertEquals("PSU 1", frus.get(1).name());
 		}
 	}
 
@@ -230,7 +227,7 @@ class IpmiClientTest {
 			// A Cisco IMC returns the large records in chunks only, and cancels the reservation during the walk
 			new FakeSdrRepository()
 					.add(compactSensorRecord(1, 0x10, EntityId.Fan.getCode(), 1, SensorType.Fan.getCode(), 0x08, "Fan 1"))
-					.add(FakeSdrRepository.withId(IpmiResultConverterTest.FRONT_PANEL_FULL_RECORD, 2))
+					.add(FakeSdrRepository.withId(Fixtures.FRONT_PANEL_FULL_RECORD, 2))
 					.add(compactSensorRecord(3, 0x11, EntityId.Fan.getCode(), 2, SensorType.Fan.getCode(), 0x08, "Fan 2"))
 					.chunkedOnly(1)
 					.cancelReservationOnce(1, 8)
@@ -277,7 +274,7 @@ class IpmiClientTest {
 	void aRefusedReadingAndAnUnreadableFruAreReportedInTheResult() throws Exception {
 		try (FakeRmcpPlusBmc bmc = bmc()) {
 			new FakeSdrRepository()
-					.add(IpmiResultConverterTest.FRONT_PANEL_FULL_RECORD)
+					.add(Fixtures.FRONT_PANEL_FULL_RECORD)
 					.add(fruDeviceLocatorRecord(4, PSU_FRU, EntityId.PowerSupply.getCode(), 1, "PSU 1"))
 					.reading(TEMPERATURE_SENSOR, 0xcb)
 					.install(bmc);
@@ -336,9 +333,7 @@ class IpmiClientTest {
 				assertFalse(frus.get(0).complete());
 				assertTrue(frus.get(0).problems().get(0).contains("C3h"), frus.get(0).problems().toString());
 				assertTrue(frus.get(0).records().isEmpty());
-				assertFalse(
-						IpmiResultConverter.convertResult(frus, client.sensors().execute()).contains("FRU;"),
-						"no FRU line without areas");
+				assertEquals("", frus.get(0).manufacturer(), "no area to take a manufacturer from");
 			}
 		}
 	}
