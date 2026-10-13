@@ -1190,6 +1190,17 @@ class IpmiClientTest {
 			bmc.inject(bmc.getSessionRequests() + 1, FakeRmcpPlusBmc.Fault.DROP);
 			assertThrows(IpmiTimeoutException.class, () -> client.chassisIdentify(5));
 			assertEquals(1, bmc.getCount(NETFN_CHASSIS, CHASSIS_IDENTIFY));
+
+			// C3h: the BMC timed out on its side and cannot say what it did; a read is retried, a control is not
+			bmc.handle(NETFN_CHASSIS, CHASSIS_CONTROL, data -> new byte[] { (byte) 0xc3 });
+			IpmiCompletionCodeException unavailable = assertThrows(
+					IpmiCompletionCodeException.class,
+					() -> client.chassisControl(PowerCommand.PowerDown));
+			assertEquals(CompletionCode.Timeout, unavailable.completionCode());
+			assertEquals(2, bmc.getCount(NETFN_CHASSIS, CHASSIS_CONTROL), "not sent again on C3h");
+			bmc.handle(NETFN_CHASSIS, GET_CHASSIS_STATUS, data -> new byte[] { (byte) 0xc3 });
+			assertThrows(IpmiCompletionCodeException.class, () -> client.chassisStatus());
+			assertEquals(2 + 1 + 1, bmc.getCount(NETFN_CHASSIS, GET_CHASSIS_STATUS), "a read is sent again on C3h: 2 tries");
 		}
 	}
 

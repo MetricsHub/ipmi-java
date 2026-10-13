@@ -258,9 +258,10 @@ public final class IpmiClient implements AutoCloseable {
 	 * carry it out afterwards: {@link #chassisStatus()} tells when the power state changed. Needs the Operator
 	 * privilege ({@link Builder#privilege(PrivilegeLevel)}).
 	 * <p>
-	 * The command is <b>sent once</b>, never again when its reply is lost (the BMC may have carried it out: a reset
-	 * sent again would reset the system twice) and never on a new session: a lost reply fails with
-	 * {@link IpmiTimeoutException}, and the power state is then to be read with {@link #chassisStatus()}. A
+	 * The command is <b>sent once</b>, never again when its reply is lost or is a {@code C3h} (timeout on the BMC
+	 * side, response unavailable), as the BMC may have carried it out and a reset sent again would reset the system
+	 * twice, and never on a new session: a lost reply fails with {@link IpmiTimeoutException}, a {@code C3h} with
+	 * {@link IpmiCompletionCodeException}, and the power state is then to be read with {@link #chassisStatus()}. A
 	 * {@link PowerCommand#PowerCycle} is refused when the system is off, as the specification recommends: some BMCs
 	 * would power the system up instead of doing nothing.
 	 * </p>
@@ -925,8 +926,8 @@ public final class IpmiClient implements AutoCloseable {
 		}
 
 		/**
-		 * Sends a command once, never again when its reply is lost: a control command the BMC may have carried out
-		 * (a reset) must not reach it twice. A lost reply says nothing about the session, which is kept.
+		 * Sends a command once, never again when its reply is lost or is a C3h: a control command the BMC may have
+		 * carried out (a reset) must not reach it twice. A lost reply says nothing about the session, which is kept.
 		 */
 		<R extends ResponseData> R sendOnce(IpmiCommandCoder<R> command) {
 			return exchange(command, true);

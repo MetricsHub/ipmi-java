@@ -77,9 +77,11 @@ Operator, `D5h` for a command the system's present state does not allow, `CCh` f
 command the BMC does not implement.
 
 Unlike the read operations, a control command is **sent once**: not again when its reply is
-lost, since the BMC may have carried it out and a second reset would reset the system twice, and
-not on a new session. A lost reply fails with `IpmiTimeoutException`, and `chassisStatus()` then
-tells what the BMC did. `PowerCycle` is refused with `IllegalStateException`, before anything is
+lost or is a `C3h` (a timeout on the BMC side, which says the response is unavailable, not that
+nothing was done), since the BMC may have carried it out and a second reset would reset the
+system twice, and not on a new session. A lost reply fails with `IpmiTimeoutException`, a `C3h`
+with `IpmiCompletionCodeException`, and `chassisStatus()` then tells what the BMC did; a busy
+BMC (`C0h`), which did nothing, is retried as for any command. `PowerCycle` is refused with `IllegalStateException`, before anything is
 sent, when the system is off: the specification recommends that check, as some BMCs power the
 system up instead of doing nothing.
 

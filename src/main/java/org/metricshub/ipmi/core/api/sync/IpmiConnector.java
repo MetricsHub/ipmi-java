@@ -357,8 +357,9 @@ public class IpmiConnector {
 	/**
 	 * Sends the IPMI command to the remote host with its own number of resends when no reply comes, instead of
 	 * {@link #getRetries()}: 0 for a command the BMC must not receive twice (a chassis reset, whose reply can be lost
-	 * after the BMC carried it out). A reply with a transient completion code (busy, {@code C3h}) is still retried
-	 * {@link #getRetries()} times: the BMC says it did not carry the command out.
+	 * after the BMC carried it out). The limit also covers a {@code C3h} reply (timeout on the BMC side, response
+	 * unavailable), which says nothing about what was done; a busy reply, which says the command was not carried
+	 * out, is still retried {@link #getRetries()} times.
 	 *
 	 * @param <R>
 	 *        the type of the response data of the command
@@ -480,7 +481,7 @@ public class IpmiConnector {
 				// A wrong request, a closed connection, an interruption: sending it again cannot help
 				throw e;
 			} catch (IPMIException e) {
-				handleErrorResponse(tries, e);
+				handleErrorResponse(tries, e, resends);
 			} catch (Exception e) {
 				// No reply in time: the BMC already had the whole message timeout, the request is sent again at once
 				handleRetriesWhenException(tries, e, false, resends);
@@ -505,12 +506,16 @@ public class IpmiConnector {
 	}
 
 	/**
-	 * Retries a request the BMC answered with a transient completion code: after a pause when the BMC says it is busy,
-	 * at once after a timeout on its side (C3h), where it already waited for the device it could not reach.
+	 * Retries a request the BMC answered with a transient completion code: after a pause when the BMC says it is busy
+	 * (it did not carry the request out: up to {@link #retries} times whatever the request), at once after a timeout
+	 * on its side (C3h), where it already waited for the device it could not reach. C3h says the response is
+	 * unavailable, not that nothing was done, so it is retried {@code resends} times like a lost reply.
 	 */
-	private void handleErrorResponse(int tries, IPMIException e) throws Exception {
-		if (e.getCompletionCode().isTransient()) {
-			handleRetriesWhenException(tries, e, e.getCompletionCode() != CompletionCode.Timeout, retries);
+	private void handleErrorResponse(int tries, IPMIException e, int resends) throws Exception {
+		if (e.getCompletionCode() == CompletionCode.Timeout) {
+			handleRetriesWhenException(tries, e, false, resends);
+		} else if (e.getCompletionCode().isTransient()) {
+			handleRetriesWhenException(tries, e, true, retries);
 		} else {
 			throw e;
 		}

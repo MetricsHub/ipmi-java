@@ -107,7 +107,8 @@ reply) are ignored.
 * `CipherSuite.forId(int)` builds one of the standard suites 0 to 19 with the algorithms of the
   specification, for `createConnection()` without discovery.
 * `IpmiConnector.sendMessage(handle, command, resends)` sends a command with its own number of
-  resends when no reply comes, 0 for a command the BMC must not receive twice.
+  resends when no reply comes or the BMC answers `C3h`, 0 for a command the BMC must not receive
+  twice.
 * `PowerCommand` has the three chassis controls 1.x left out: `PowerCycle` (`2h`),
   `DiagnosticInterrupt` (`4h`) and `SoftShutdown` (`5h`); `parseInt()` accepts their codes. The new
   `ChassisIdentify` command (IPMI 2.0 section 28.5) takes the interval in seconds and the "force
