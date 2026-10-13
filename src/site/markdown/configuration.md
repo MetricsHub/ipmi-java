@@ -89,7 +89,7 @@ operation with `IpmiAuthenticationException`.
 | Level | Enough for |
 | --- | --- |
 | `User` (default) | Every read operation: `chassisStatus()`, `sensors()`, `frus()`, `sel()` |
-| `Operator` | The control commands sent with `send()`: Chassis Control, chassis identify |
+| `Operator` | The control operations: `chassisControl()`, `chassisIdentify()`, `chassisIdentifyForever()` |
 | `Administrator` | Serial over LAN on most BMCs, the configuration commands |
 
 The account must be allowed that level on the LAN channel

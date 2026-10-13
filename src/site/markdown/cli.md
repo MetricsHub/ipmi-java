@@ -1,4 +1,4 @@
-keywords: cli, command line, ipmicli, standalone, jar, probe, chassis, power, sensors, fru, sel, system event log, sol, serial over lan, json, exit codes, ipmitool
+keywords: cli, command line, ipmicli, standalone, jar, probe, chassis, power, power on, power off, power cycle, reset, identify, sensors, fru, sel, system event log, sol, serial over lan, json, exit codes, ipmitool
 description: Manual of the ipmicli command-line client of the IPMI Java Client - subcommands, connection options, passwords and BMC key, text and JSON output, the System Event Log, the interactive Serial over LAN console, exit codes, and the ipmitool equivalents.
 
 # Command-Line Client
@@ -31,7 +31,8 @@ as exit codes. It is meant to feel familiar to `ipmitool` users: see the
 ```text
 ipmicli -h <host> probe [--json]
 ipmicli -h <host> -u <user> [options] chassis [--json]
-ipmicli -h <host> -u <user> [options] power status
+ipmicli -h <host> -u <user> [options] power status | on | off | cycle | reset | soft | diag
+ipmicli -h <host> -u <user> [options] identify [<seconds> | force | off]
 ipmicli -h <host> -u <user> [options] sensors [--type <type>,...] [--name <glob>,...] [--long] [--json]
 ipmicli -h <host> -u <user> [options] fru [<id>...] [--json]
 ipmicli -h <host> -u <user> [options] sel [--since <id>] [--json]
@@ -50,6 +51,8 @@ summary, `--version` the version of the build.
 | `probe` | `capabilities()` | What the BMC offers **before any login**: IPMI 2.0 support, whether a BMC key (Kg) is required, the anonymous and null-user logins, per-message and user-level authentication, and the cipher suites with their algorithms, whether the library implements them, and the one the CLI would choose. Needs no credentials: the first thing to run when a login fails. |
 | `chassis` | `chassisStatus()` | The power state, the power restore policy, the last power event, the faults (power, cooling, drive), interlock, overload, intrusion, front panel lockout, and the identify state. |
 | `power status` | `chassisStatus()` | Prints `on` or `off`. |
+| `power on`, `off`, `cycle`, `reset`, `soft`, `diag` | `chassisControl()` | Powers the system on; off at once; off then on; resets it; asks the operating system to shut down (ACPI); pulses a diagnostic interrupt (NMI). Prints nothing: the exit code says whether the BMC accepted the command, which it carries out afterwards. |
+| `identify`, `identify <seconds>`, `identify force`, `identify off` | `chassisIdentify()` | Blinks the identify LED of the chassis for 15 seconds, or for `<seconds>` (1 to 255), or until `identify off` with `force` (not every BMC supports it). Prints nothing. |
 | `sensors` | `sensors()` | One line per sensor with its reading, unit and status. `--type` and `--name` select the sensors **before** they are read (fewer round trips on a slow BMC); `--long` adds the sensor number, the entity, the six thresholds and the problem of a sensor without reading. |
 | `fru` | `frus()` | The FRU inventory, one block per FRU with the fields of its chassis, board and product areas; `<id>...` reads only these FRU IDs. |
 | `sel` | `sel()` | The System Event Log, one line per entry with its time, the sensor that reported it, the event and its direction; `--since <id>` reads only the entries after the given record ID. |
@@ -61,10 +64,8 @@ summary, `--version` the version of the build.
 `--name` takes globs where `*` matches any characters and `?` one, case-insensitively, and
 either option can be repeated or given a comma-separated list.
 
-The chassis power control, chassis identify, Get Device ID and raw command subcommands follow
-with the corresponding operations of the library
-([#104](https://github.com/metricshub/ipmi-java/issues/104),
-[#111](https://github.com/metricshub/ipmi-java/issues/111),
+The Get Device ID and raw command subcommands follow with the corresponding operations of the
+library ([#111](https://github.com/metricshub/ipmi-java/issues/111),
 [#131](https://github.com/metricshub/ipmi-java/issues/131)).
 
 ## Connection options
@@ -102,6 +103,7 @@ account is not allowed that level. So the CLI asks for the **least** privilege t
 | Subcommands | Default `-L` |
 | --- | --- |
 | `chassis`, `power status`, `sensors`, `fru`, `sel` | `user` |
+| `power on`, `off`, `cycle`, `reset`, `soft`, `diag`, `identify` | `operator` |
 | `sol` | `administrator` |
 
 A BMC that refuses a command at the session's level answers `D4h`: the CLI exits with 77 and says
@@ -192,6 +194,29 @@ none), and the `Identify` line is only printed by a BMC that reports the identif
 ```
 
 `power status` prints just `on` or `off`.
+
+### `power` actions and `identify`
+
+```text
+$ ipmicli -h bmc.example.com -u operator -pf pw.txt power off; echo $?
+0
+$ ipmicli -h bmc.example.com -u operator -pf pw.txt power status
+off
+```
+
+A power action and `identify` print nothing: the exit code is 0 once the BMC has accepted the
+command. The BMC carries it out afterwards (a power off takes a few seconds, a `soft` shutdown
+as long as the operating system needs): `power status` shows the result. The actions map to the
+[`PowerCommand`](chassis-status.html#controlling-the-power) of the library: `on` is `PowerUp`,
+`off` is `PowerDown` (immediate, no operating system shutdown), `cycle` is `PowerCycle` (off for
+at least a second, then on), `reset` is `HardReset`, `soft` is `SoftShutdown` and `diag` is
+`DiagnosticInterrupt`. `cycle` and `reset` of a system that is off are refused by most BMCs with
+`D5h` (exit code 70); `cycle`, `soft` and `diag` are optional in the specification, and a BMC
+that does not implement them answers `CCh`.
+
+`identify` blinks the identify LED for 15 seconds, `identify 60` for a minute (1 to 255), and
+`identify force` until `identify off`, on the BMCs that implement the "force identify on" option
+(the others answer `CCh`). `chassis` shows the identify state on the BMCs that report it.
 
 ### `sensors`
 
@@ -422,6 +447,14 @@ The power state, reading the password from a file:
 ipmicli -h bmc.example.com -u monitor -pf pw.txt power status
 ```
 
+Power a server on, then make it blink its identify LED for a minute, with an account allowed
+the Operator level:
+
+```bash
+ipmicli -h bmc.example.com -u operator -pf pw.txt power on
+ipmicli -h bmc.example.com -u operator -pf pw.txt identify 60
+```
+
 The temperatures and fans of a BMC that requires a BMC key, with the time of each step:
 
 ```bash
@@ -458,6 +491,8 @@ ipmicli -h bmc.example.com -u admin -pf pw.txt sol
 | --- | --- |
 | `ipmitool -I lanplus -H h -U u -P p chassis status` | `ipmicli -h h -u u -p p chassis` |
 | `ipmitool -I lanplus ... chassis power status` | `ipmicli ... power status` |
+| `ipmitool -I lanplus ... chassis power on` (and `off`, `cycle`, `reset`, `soft`, `diag`) | `ipmicli ... power on` (same actions; the session is opened at the Operator level, not Administrator) |
+| `ipmitool -I lanplus ... chassis identify [<seconds>]`, `chassis identify force` | `ipmicli ... identify [<seconds>]`, `identify force`, `identify off` (`chassis identify 0` in ipmitool) |
 | `ipmitool -I lanplus ... sdr list` or `sensor list` | `ipmicli ... sensors` (`--long` for the thresholds) |
 | `ipmitool -I lanplus ... sdr type Temperature` | `ipmicli ... sensors --type Temperature` |
 | `ipmitool -I lanplus ... fru print` | `ipmicli ... fru` |

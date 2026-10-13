@@ -12,7 +12,8 @@ The **IPMI Java Client** talks to the **Baseboard Management Controller (BMC)** 
 boards) over **IPMI 2.0 over LAN (RMCP+)**, on UDP port 623. It lets a Java application:
 
 * read the **chassis status**: power on or off, last power event, power restore policy, faults,
-  intrusion ([Chassis Status](chassis-status.html)),
+  intrusion, and **control the power** (on, off, cycle, reset) and the identify LED
+  ([Chassis Status](chassis-status.html)),
 * read the **FRU inventory**: manufacturer, product name, part and serial numbers of the chassis,
   boards, power supplies and other Field Replaceable Units ([FRU Inventory](fru-inventory.html)),
 * read the **sensors** of the BMC's SDR repository (its Full and Compact sensor records):
@@ -24,8 +25,8 @@ boards) over **IPMI 2.0 over LAN (RMCP+)**, on UDP port 623. It lets a Java appl
   ([System Event Log](system-event-log.html)),
 * open a **Serial over LAN** console on the server's serial port ([Serial over LAN](serial-over-lan.html)),
   and
-* send **any IPMI command**, including the chassis control commands, in the same session or
-  through the low-level connector ([Low-Level API](low-level-api.html)).
+* send **any IPMI command** in the same session or through the low-level connector
+  ([Low-Level API](low-level-api.html)).
 
 The same operations are available from the command line with the **`ipmicli`** client of the
 standalone jar ([Command-Line Client](cli.html)):
@@ -121,11 +122,13 @@ completion code, or the operation outlived its deadline
 ## Where to go next
 
 * [Installation](installation.html) — coordinates, supported JDKs and requirements
-* [Command-Line Client](cli.html) — `ipmicli`: the chassis status, the sensors, the FRUs, the
-  System Event Log and a Serial over LAN console from the command line, with the standalone jar
+* [Command-Line Client](cli.html) — `ipmicli`: the chassis status, the power control, the
+  sensors, the FRUs, the System Event Log and a Serial over LAN console from the command line,
+  with the standalone jar
 * [Preparing the BMC](preparing-the-bmc.html) — enabling IPMI over LAN, the account, privilege
   level and cipher suites, the firewall
-* [Chassis Status](chassis-status.html) — power state and chassis flags
+* [Chassis Status](chassis-status.html) — power state and chassis flags, power control, identify
+  LED
 * [FRU Inventory](fru-inventory.html) — how FRUs are read and which fields are reported
 * [Sensors](sensors.html) — readings, thresholds, status and states
 * [System Event Log](system-event-log.html) — the logged events, OEM entries, polling for new

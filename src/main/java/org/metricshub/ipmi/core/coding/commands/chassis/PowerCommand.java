@@ -35,6 +35,12 @@ public enum PowerCommand {
 	PowerDown(PowerCommand.POWERDOWN),
 	PowerUp(PowerCommand.POWERUP),
 	/**
+	 * Power cycle (optional): a power off interval of at least 1 second, then power up. When the system is off,
+	 * the BMC is recommended to do nothing and answer D5h; some power the system up instead. Check the power state
+	 * first and only cycle a system that is on.
+	 */
+	PowerCycle(PowerCommand.POWERCYCLE),
+	/**
 	 * Hard reset. In some implementations, the BMC may not know whether a reset
 	 * will cause any particular effect and will pulse the system reset signal
 	 * regardless of power state. If the implementation can tell that no action
@@ -42,11 +48,23 @@ public enum PowerCommand {
 	 * recommended (but still optional) that a D5h 'Request parameter(s) not
 	 * supported in present state.' error completion code be returned.
 	 */
-	HardReset(PowerCommand.HARDRESET),;
+	HardReset(PowerCommand.HARDRESET),
+	/**
+	 * Pulse a diagnostic interrupt (optional) that goes directly to the processors, typically to make the
+	 * operating system write a diagnostic dump: an NMI on IA-32 systems.
+	 */
+	DiagnosticInterrupt(PowerCommand.DIAGNOSTICINTERRUPT),
+	/**
+	 * Initiate a soft shutdown of the operating system via ACPI (optional), by emulating a fatal overtemperature.
+	 */
+	SoftShutdown(PowerCommand.SOFTSHUTDOWN),;
 
 	private static final int POWERDOWN = 0;
 	private static final int POWERUP = 1;
+	private static final int POWERCYCLE = 2;
 	private static final int HARDRESET = 3;
+	private static final int DIAGNOSTICINTERRUPT = 4;
+	private static final int SOFTSHUTDOWN = 5;
 
 	private int code;
 
@@ -64,8 +82,14 @@ public enum PowerCommand {
 			return PowerDown;
 		case POWERUP:
 			return PowerUp;
+		case POWERCYCLE:
+			return PowerCycle;
 		case HARDRESET:
 			return HardReset;
+		case DIAGNOSTICINTERRUPT:
+			return DiagnosticInterrupt;
+		case SOFTSHUTDOWN:
+			return SoftShutdown;
 		default:
 			throw new IllegalArgumentException("Invalid value: " + value);
 		}

@@ -53,6 +53,10 @@ public class FakeRmcpPlusBmc implements AutoCloseable {
 	public static final int NETFN_APP = 0x06;
 	/** Get Chassis Status (NetFn Chassis). */
 	public static final int GET_CHASSIS_STATUS = 0x01;
+	/** Chassis Control (NetFn Chassis). */
+	public static final int CHASSIS_CONTROL = 0x02;
+	/** Chassis Identify (NetFn Chassis). */
+	public static final int CHASSIS_IDENTIFY = 0x04;
 	/** Get Channel Authentication Capabilities (NetFn App). */
 	public static final int GET_CHANNEL_AUTHENTICATION_CAPABILITIES = 0x38;
 	/** Set Session Privilege Level (NetFn App). */
@@ -154,6 +158,12 @@ public class FakeRmcpPlusBmc implements AutoCloseable {
 	private final List<String> errors = new CopyOnWriteArrayList<>();
 	private volatile Session session;
 	private volatile SocketAddress console;
+
+	private volatile boolean powerOn = true;
+	/** The chassis control of the last Chassis Control the BMC accepted, -1 before the first. */
+	private volatile int chassisControl = -1;
+	/** The request data of the last Chassis Identify the BMC accepted, null before the first. */
+	private volatile byte[] chassisIdentify;
 
 	private volatile int solPort;
 	private volatile int solInboundPayloadSize;
@@ -268,7 +278,9 @@ public class FakeRmcpPlusBmc implements AutoCloseable {
 		handle(NETFN_APP, CLOSE_SESSION, this::closeSession);
 		handle(NETFN_APP, SET_SESSION_PRIVILEGE_LEVEL, this::setSessionPrivilegeLevel);
 		handle(NETFN_APP, GET_SESSION_INFO, this::getSessionInfo);
-		handle(NETFN_CHASSIS, GET_CHASSIS_STATUS, data -> concat(new byte[1], CHASSIS_STATUS));
+		handle(NETFN_CHASSIS, GET_CHASSIS_STATUS, this::getChassisStatus);
+		handle(NETFN_CHASSIS, CHASSIS_CONTROL, this::chassisControl);
+		handle(NETFN_CHASSIS, CHASSIS_IDENTIFY, this::chassisIdentify);
 		socket = new DatagramSocket(0, InetAddress.getLoopbackAddress());
 		Thread thread = new Thread(this::serve, "fake-rmcp-plus-bmc");
 		thread.setDaemon(true);
@@ -451,6 +463,77 @@ public class FakeRmcpPlusBmc implements AutoCloseable {
 	 */
 	public boolean isSolActive() {
 		return solActive;
+	}
+
+	/**
+	 * @return whether the system is powered on: on at the start, then as the last Chassis Control left it
+	 */
+	public boolean isPowerOn() {
+		return powerOn;
+	}
+
+	/**
+	 * @return the chassis control (IPMI 2.0 table 28-4) of the last Chassis Control the BMC accepted, -1 before the
+	 *         first
+	 */
+	public int getChassisControl() {
+		return chassisControl;
+	}
+
+	/**
+	 * @return the request data of the last Chassis Identify the BMC accepted, null before the first
+	 */
+	public byte[] getChassisIdentify() {
+		return chassisIdentify == null ? null : chassisIdentify.clone();
+	}
+
+	/**
+	 * Get Chassis Status (IPMI 2.0 table 28-3): {@link #CHASSIS_STATUS} with the current power state.
+	 */
+	private byte[] getChassisStatus(byte[] data) {
+		byte[] status = CHASSIS_STATUS.clone();
+		status[0] = (byte) (powerOn ? status[0] | 0x01 : status[0] & ~0x01);
+		return concat(new byte[1], status);
+	}
+
+	/**
+	 * Chassis Control (IPMI 2.0 table 28-4): Operator privilege; a power cycle or a hard reset of a system that is
+	 * off is refused with D5h, as the specification recommends.
+	 */
+	private byte[] chassisControl(byte[] data) {
+		if (session.privilege < OPERATOR) {
+			return new byte[] { (byte) 0xd4 }; // insufficient privilege
+		}
+		if (data.length != 1 || (data[0] & 0x0f) > 5) {
+			errors.add("Unexpected Chassis Control request: " + hex(data));
+			return new byte[] { (byte) 0xcc }; // invalid data field
+		}
+		int control = data[0] & 0x0f;
+		if ((control == 2 || control == 3) && !powerOn) {
+			return new byte[] { (byte) 0xd5 }; // not supported in present state
+		}
+		chassisControl = control;
+		if (control == 0 || control == 5) {
+			powerOn = false;
+		} else if (control == 1 || control == 2) {
+			powerOn = true;
+		}
+		return new byte[1];
+	}
+
+	/**
+	 * Chassis Identify (IPMI 2.0 table 28-6): Operator privilege; the interval byte and the optional force byte.
+	 */
+	private byte[] chassisIdentify(byte[] data) {
+		if (session.privilege < OPERATOR) {
+			return new byte[] { (byte) 0xd4 }; // insufficient privilege
+		}
+		if (data.length > 2) {
+			errors.add("Unexpected Chassis Identify request: " + hex(data));
+			return new byte[] { (byte) 0xcc }; // invalid data field
+		}
+		chassisIdentify = data.clone();
+		return new byte[1];
 	}
 
 	/**

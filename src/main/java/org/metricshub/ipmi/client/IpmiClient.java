@@ -52,7 +52,10 @@ import org.metricshub.ipmi.core.api.sync.IpmiConnector;
 import org.metricshub.ipmi.core.coding.commands.IpmiCommandCoder;
 import org.metricshub.ipmi.core.coding.commands.PrivilegeLevel;
 import org.metricshub.ipmi.core.coding.commands.ResponseData;
+import org.metricshub.ipmi.core.coding.commands.chassis.ChassisControl;
+import org.metricshub.ipmi.core.coding.commands.chassis.ChassisIdentify;
 import org.metricshub.ipmi.core.coding.commands.chassis.GetChassisStatus;
+import org.metricshub.ipmi.core.coding.commands.chassis.PowerCommand;
 import org.metricshub.ipmi.core.coding.commands.payload.DeactivatePayload;
 import org.metricshub.ipmi.core.coding.commands.payload.GetPayloadActivationStatus;
 import org.metricshub.ipmi.core.coding.commands.payload.GetPayloadActivationStatusResponseData;
@@ -90,6 +93,9 @@ import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
  * <pre>
  * try (IpmiClient bmc = IpmiClient.builder("bmc.example.com").credentials("monitor", password).build()) {
  * 	ChassisStatus chassis = bmc.chassisStatus();
+ * 	if (!chassis.powerOn()) {
+ * 		bmc.chassisControl(PowerCommand.PowerUp); // with privilege(PrivilegeLevel.Operator) on the builder
+ * 	}
  * 	for (Sensor sensor : bmc.sensors().types(SensorType.Temperature).execute()) {
  * 		sensor.reading().ifPresent(value -&gt; System.out.println(sensor.name() + " = " + value + " " + sensor.unit()));
  * 	}
@@ -243,6 +249,53 @@ public final class IpmiClient implements AutoCloseable {
 	 */
 	public ChassisStatus chassisStatus() {
 		return run("chassis status", timeout, true, true, () -> new ChassisStatus(link.send(new GetChassisStatus())));
+	}
+
+	/**
+	 * Controls the power of the chassis (Chassis Control, IPMI 2.0 section 28.3): power up, power down, power
+	 * cycle, hard reset, soft shutdown or diagnostic interrupt. The BMC answers once it accepts the command and may
+	 * carry it out afterwards: {@link #chassisStatus()} tells when the power state changed. Needs the Operator
+	 * privilege ({@link Builder#privilege(PrivilegeLevel)}). Never replayed on a new session.
+	 *
+	 * @param command the power command
+	 * @throws IpmiCompletionCodeException when the BMC refuses the command: {@code D4h} at a session below Operator,
+	 *         {@code D5h} for a command it cannot carry out in the present state (a power cycle or a reset of a
+	 *         system that is off), {@code CCh} for an optional command it does not implement
+	 * @throws IpmiClientException when the session cannot be opened or the BMC does not answer
+	 */
+	public void chassisControl(PowerCommand command) {
+		Objects.requireNonNull(command, "command");
+		run("chassis control " + command, timeout, true, false, () -> link.send(new ChassisControl(command)));
+	}
+
+	/**
+	 * Makes the chassis identify itself (Chassis Identify, IPMI 2.0 section 28.5), typically with a blinking LED,
+	 * for the given number of seconds, or turns the identify off. Needs the Operator privilege. Never replayed on a
+	 * new session.
+	 *
+	 * @param seconds how long the identify stays on, 1 to 255 (the BMC may stretch it by 20%); 0 turns it off
+	 * @throws IllegalArgumentException when {@code seconds} is not between 0 and 255
+	 * @throws IpmiCompletionCodeException when the BMC refuses the command: {@code D4h} at a session below Operator,
+	 *         {@code C1h} when it does not implement it
+	 * @throws IpmiClientException when the session cannot be opened or the BMC does not answer
+	 */
+	public void chassisIdentify(int seconds) {
+		ChassisIdentify command = new ChassisIdentify(seconds, false);
+		run("chassis identify", timeout, true, false, () -> link.send(command));
+	}
+
+	/**
+	 * Makes the chassis identify itself until {@link #chassisIdentify(int) chassisIdentify(0)} turns it off: the
+	 * optional "force identify on" of Chassis Identify, which not every BMC implements. Needs the Operator privilege.
+	 * Never replayed on a new session.
+	 *
+	 * @throws IpmiCompletionCodeException when the BMC refuses the command: {@code D4h} at a session below Operator,
+	 *         {@code C1h} when it does not implement Chassis Identify, {@code CCh} when it does not implement the
+	 *         force byte
+	 * @throws IpmiClientException when the session cannot be opened or the BMC does not answer
+	 */
+	public void chassisIdentifyForever() {
+		run("chassis identify", timeout, true, false, () -> link.send(new ChassisIdentify(0, true)));
 	}
 
 	/**

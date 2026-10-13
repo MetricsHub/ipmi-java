@@ -1,5 +1,6 @@
 package org.metricshub.ipmi.cli;
 
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -153,6 +154,51 @@ class IpmiCliTest {
 			assertTrue(verbose.err.contains("with the User privilege"), verbose.err);
 			assertTrue(verbose.err.contains("ipmicli: chassis status: "), verbose.err);
 			assertFalse(verbose.err.contains("secret"), verbose.err);
+		}
+	}
+
+	@Test
+	@Timeout(30)
+	void powerActionsAndIdentify() throws Exception {
+		try (FakeRmcpPlusBmc bmc = Fixtures.bmc()) {
+			Result off = login(bmc, "-v", "power", "off");
+			assertEquals(0, off.code, off.err);
+			assertEquals("", off.out, "nothing to print: the exit code says the BMC accepted the command");
+			assertTrue(off.err.contains("with the Operator privilege"), off.err);
+			assertTrue(off.err.contains("ipmicli: chassis control: "), off.err);
+			assertEquals(0, bmc.getChassisControl());
+			assertEquals("off\n", login(bmc, "power", "status").out);
+
+			Result reset = login(bmc, "power", "reset");
+			assertEquals(IpmiCli.EXIT_PROTOCOL, reset.code, "D5h: a reset of a system that is off");
+			assertTrue(reset.err.contains("completion code D5h"), reset.err);
+			assertEquals(0, login(bmc, "power", "on").code);
+			assertEquals(1, bmc.getChassisControl());
+			assertEquals("on\n", login(bmc, "power", "status").out);
+			assertEquals(0, login(bmc, "power", "cycle").code);
+			assertEquals(2, bmc.getChassisControl());
+			assertEquals(0, login(bmc, "power", "soft").code);
+			assertEquals(5, bmc.getChassisControl());
+			assertEquals("off\n", login(bmc, "power", "status").out);
+
+			Result user = login(bmc, "-L", "user", "power", "on");
+			assertEquals(IpmiCli.EXIT_AUTHENTICATION, user.code, "D4h at the User privilege");
+			assertTrue(user.err.contains("use -L operator or -L administrator"), user.err);
+			assertEquals("off\n", login(bmc, "power", "status").out, "the refused command did nothing");
+
+			assertEquals(0, login(bmc, "identify").code);
+			assertArrayEquals(new byte[] { 15 }, bmc.getChassisIdentify(), "the default interval of the specification");
+			assertEquals(0, login(bmc, "identify", "5").code);
+			assertArrayEquals(new byte[] { 5 }, bmc.getChassisIdentify());
+			assertEquals(0, login(bmc, "identify", "force").code);
+			assertArrayEquals(new byte[] { 0, 1 }, bmc.getChassisIdentify());
+			Result identifyOff = login(bmc, "-v", "identify", "off");
+			assertEquals(0, identifyOff.code);
+			assertEquals("", identifyOff.out);
+			assertTrue(identifyOff.err.contains("ipmicli: chassis identify: "), identifyOff.err);
+			assertArrayEquals(new byte[] { 0 }, bmc.getChassisIdentify());
+			assertEquals(IpmiCli.EXIT_AUTHENTICATION, login(bmc, "-L", "user", "identify").code);
+			assertTrue(bmc.getErrors().isEmpty(), bmc.getErrors().toString());
 		}
 	}
 

@@ -1,5 +1,5 @@
-keywords: chassis status, power state, power on, power off, power restore policy, intrusion, fault, get chassis status
-description: Read the chassis status of a server through its BMC — power state, last power event, power restore policy, faults, intrusion and identify LED.
+keywords: chassis status, power state, power on, power off, power cycle, reset, chassis control, chassis identify, identify led, power restore policy, intrusion, fault, get chassis status
+description: Read the chassis status of a server through its BMC — power state, last power event, power restore policy, faults, intrusion and identify LED — and control its power and identify LED.
 
 # Chassis Status
 
@@ -46,18 +46,49 @@ in the specification, and a BMC that does not implement them reports `false`.
 
 ## Controlling the power
 
-`chassisStatus()` only reads. To power the server on or off or reset it, send the
-[`ChassisControl`](apidocs/org/metricshub/ipmi/core/coding/commands/chassis/ChassisControl.html)
-command with [`send()`](low-level-api.html#sending-a-command-through-the-client), on a client
-built with the **Operator** or **Administrator** privilege. The supported power commands are
-`PowerDown`, `PowerUp` and `HardReset`:
+`chassisControl(PowerCommand)` sends the **Chassis Control** command (IPMI 2.0, section 28.3).
+It needs a client built with the **Operator** or **Administrator**
+[privilege](configuration.html#privilege-level): at the default User level the BMC refuses it
+with `D4h`.
 
 ```java
 try (IpmiClient bmc = IpmiClient.builder(host).credentials(user, password)
 		.privilege(PrivilegeLevel.Operator).build()) {
-	bmc.send(new ChassisControl(PowerCommand.PowerUp));
+	if (!bmc.chassisStatus().powerOn()) {
+		bmc.chassisControl(PowerCommand.PowerUp);
+	}
 }
 ```
 
-A dedicated `power()` operation is tracked in
-[#104](https://github.com/metricshub/ipmi-java/issues/104).
+| `PowerCommand` | Effect |
+| --- | --- |
+| `PowerUp` | Power the system on |
+| `PowerDown` | Power it off at once (soft off, S4/S5), without shutting the operating system down |
+| `PowerCycle` | Power it off for at least a second, then on. Optional: a BMC should refuse it with `D5h` when the system is off, but some power the system on instead, so check `powerOn()` first |
+| `HardReset` | Pulse the reset signal. A BMC that can tell it would do nothing (the system is off) should refuse it with `D5h` |
+| `SoftShutdown` | Ask the operating system to shut down through ACPI, by emulating a fatal overtemperature (optional) |
+| `DiagnosticInterrupt` | Pulse a diagnostic interrupt, an NMI on x86, so that the operating system writes a diagnostic dump (optional) |
+
+The BMC answers as soon as it **accepts** the command, and carries it out afterwards: a power
+off takes a few seconds, a soft shutdown as long as the operating system needs. Poll
+`chassisStatus().powerOn()` to see the state change. A refused command fails with
+[`IpmiCompletionCodeException`](timeouts-and-errors.html#exceptions): `D4h` at a session below
+Operator, `D5h` for a command the system's present state does not allow, `CCh` for an optional
+command the BMC does not implement. The command is never sent again on a new session when the
+session is lost while it runs.
+
+## The identify LED
+
+`chassisIdentify(int seconds)` sends the **Chassis Identify** command (IPMI 2.0, section 28.5):
+the chassis identifies itself, typically by blinking a LED, for the given number of seconds (1 to
+255; the BMC may stretch it by 20%). `chassisIdentify(0)` turns the identify off, and
+`chassisIdentifyForever()` keeps it on until then, with the optional "force identify on" byte of
+the command, which not every BMC implements (`CCh` from those that do not). Both need the
+Operator privilege, and `identifyState()` of the [chassis status](#the-chassisstatus-object)
+reports the result on the BMCs that support it:
+
+```java
+bmc.chassisIdentify(30);
+System.out.println(bmc.chassisStatus().identifyState()); // Optional[TemporaryOn]
+bmc.chassisIdentify(0);
+```

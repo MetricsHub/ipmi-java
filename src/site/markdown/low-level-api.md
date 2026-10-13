@@ -73,14 +73,19 @@ client tells them apart ([Timestamps](system-event-log.html#timestamps)).
 
 ### Controlling the power
 
-On a client built with the `Operator` or `Administrator` [privilege](configuration.html#privilege-level):
+[`chassisControl()`](chassis-status.html#controlling-the-power) wraps the Chassis Control
+command, and `chassisIdentify()` the Chassis Identify command. Sending them yourself, on a client
+built with the `Operator` or `Administrator` [privilege](configuration.html#privilege-level),
+is the same:
 
 ```java
 bmc.send(new ChassisControl(PowerCommand.PowerUp));
+bmc.send(new ChassisIdentify(15, false)); // 15 seconds; (0, false) turns it off, (0, true) forces it on
 ```
 
-`PowerCommand` supports `PowerUp`, `PowerDown` (immediate, without shutting down the operating
-system) and `HardReset`.
+`PowerCommand` has the six controls of the specification: `PowerUp`, `PowerDown` (immediate,
+without shutting down the operating system), `PowerCycle`, `HardReset`, `SoftShutdown` and
+`DiagnosticInterrupt`.
 
 ## A complete session with `IpmiConnector`
 

@@ -27,7 +27,8 @@ sent with [`IpmiClient.send()`](low-level-api.html#sending-a-command-through-the
 | Close Session | `CloseSession` | App / `3Ch` | `close()` |
 | **Chassis** | | | |
 | Get Chassis Status | `GetChassisStatus` | Chassis / `01h` | `chassisStatus()` |
-| Chassis Control | `ChassisControl` | Chassis / `02h` | |
+| Chassis Control | `ChassisControl` | Chassis / `02h` | `chassisControl()` |
+| Chassis Identify | `ChassisIdentify` | Chassis / `04h` | `chassisIdentify()`, `chassisIdentifyForever()` |
 | **SDR repository and sensors** | | | |
 | Get SDR Repository Info | `GetSdrRepositoryInfo` | Storage / `20h` | `sensors()`, `frus()` ([SDR cache](configuration.html#sdr-cache)) |
 | Reserve SDR Repository | `ReserveSdrRepository` | Storage / `22h` | `sensors()`, `frus()` |
@@ -49,7 +50,7 @@ sent with [`IpmiClient.send()`](low-level-api.html#sending-a-command-through-the
 | Get Channel Payload Support | `GetChannelPayloadSupport` | App / `4Eh` | |
 
 The read operations of `IpmiClient` need nothing above the **User** privilege; Chassis Control
-needs **Operator**, the payload commands and Serial over LAN **Administrator**
+and Chassis Identify need **Operator**, the payload commands and Serial over LAN **Administrator**
 ([Privilege level](configuration.html#privilege-level)). Any command is sent in the session of the
 client with [`send()`](low-level-api.html#sending-a-command-through-the-client).
 

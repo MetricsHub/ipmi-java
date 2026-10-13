@@ -40,6 +40,8 @@ import java.util.Locale;
 import java.util.Set;
 
 import org.metricshub.ipmi.core.coding.commands.PrivilegeLevel;
+import org.metricshub.ipmi.core.coding.commands.chassis.ChassisIdentify;
+import org.metricshub.ipmi.core.coding.commands.chassis.PowerCommand;
 import org.metricshub.ipmi.core.coding.commands.sdr.record.SensorType;
 import org.metricshub.ipmi.core.common.Constants;
 
@@ -57,6 +59,7 @@ final class CliArguments implements AutoCloseable {
 		PROBE,
 		CHASSIS,
 		POWER,
+		IDENTIFY,
 		SENSORS,
 		FRU,
 		SEL,
@@ -69,7 +72,10 @@ final class CliArguments implements AutoCloseable {
 	/** The preference of the client, repeated here for the usage text and the {@code probe} output. */
 	static final int[] DEFAULT_CIPHER_SUITES = { 17, 3, 8, 16, 2, 7 };
 	static final char DEFAULT_ESCAPE = '~';
-	static final String SUBCOMMANDS = "probe, chassis, power, sensors, fru, sel or sol";
+	static final String SUBCOMMANDS = "probe, chassis, power, identify, sensors, fru, sel or sol";
+	static final String POWER_ACTIONS = "status, on, off, cycle, reset, soft or diag";
+	/** The identify interval of {@code identify} without argument: the default of the specification (section 28.5). */
+	static final int DEFAULT_IDENTIFY_SECONDS = 15;
 
 	private static final int MAX_PORT = 65_535;
 	private static final int MAX_KEY_BYTES = 20;
@@ -98,6 +104,9 @@ final class CliArguments implements AutoCloseable {
 	private final List<String> names = new ArrayList<String>();
 	private final List<Integer> fruIds = new ArrayList<Integer>();
 	private int since = -1;
+	private PowerCommand powerCommand;
+	private int identifySeconds = DEFAULT_IDENTIFY_SECONDS;
+	private boolean identifyForever;
 	private int escape = DEFAULT_ESCAPE;
 	private boolean escapeGiven;
 	private boolean noEscape;
@@ -237,6 +246,9 @@ final class CliArguments implements AutoCloseable {
 		case "power":
 			subcommand = Subcommand.POWER;
 			break;
+		case "identify":
+			subcommand = Subcommand.IDENTIFY;
+			break;
 		case "sensors":
 			subcommand = Subcommand.SENSORS;
 			break;
@@ -266,8 +278,17 @@ final class CliArguments implements AutoCloseable {
 		}
 		switch (subcommand) {
 		case POWER:
-			if (positional.size() != 1 || !"status".equals(positional.get(0))) {
-				throw new CliUsageException("power requires one action: status");
+			if (positional.size() != 1) {
+				throw new CliUsageException("power requires one action: " + POWER_ACTIONS);
+			}
+			powerCommand = parsePowerAction(positional.get(0));
+			break;
+		case IDENTIFY:
+			if (positional.size() > 1) {
+				throw new CliUsageException("identify takes one argument at most: <seconds>, force or off");
+			}
+			if (positional.size() == 1) {
+				parseIdentify(positional.get(0));
 			}
 			break;
 		case FRU:
@@ -352,6 +373,42 @@ final class CliArguments implements AutoCloseable {
 		}
 	}
 
+	/** @return the power command of a {@code power} action, null for {@code status} */
+	private static PowerCommand parsePowerAction(String action) throws CliUsageException {
+		switch (action) {
+		case "status":
+			return null;
+		case "on":
+			return PowerCommand.PowerUp;
+		case "off":
+			return PowerCommand.PowerDown;
+		case "cycle":
+			return PowerCommand.PowerCycle;
+		case "reset":
+			return PowerCommand.HardReset;
+		case "soft":
+			return PowerCommand.SoftShutdown;
+		case "diag":
+			return PowerCommand.DiagnosticInterrupt;
+		default:
+			throw new CliUsageException("power requires one action: " + POWER_ACTIONS);
+		}
+	}
+
+	private void parseIdentify(String argument) throws CliUsageException {
+		switch (argument) {
+		case "force":
+			identifyForever = true;
+			break;
+		case "off":
+			identifySeconds = 0;
+			break;
+		default:
+			identifySeconds = (int) parseNumber(argument, "identify <seconds>", 1, ChassisIdentify.MAX_INTERVAL);
+			break;
+		}
+	}
+
 	private void requireSubcommand(String option, Subcommand... allowed) throws CliUsageException {
 		if (!Arrays.asList(allowed).contains(subcommand)) {
 			StringBuilder list = new StringBuilder();
@@ -373,7 +430,9 @@ final class CliArguments implements AutoCloseable {
 			throw new CliUsageException("--escape and --no-escape are mutually exclusive");
 		}
 		if (privilege == null) {
-			privilege = subcommand == Subcommand.SOL ? PrivilegeLevel.Administrator : PrivilegeLevel.User;
+			privilege = subcommand == Subcommand.SOL ?
+					PrivilegeLevel.Administrator :
+					subcommand == Subcommand.IDENTIFY || powerCommand != null ? PrivilegeLevel.Operator : PrivilegeLevel.User;
 		}
 	}
 
@@ -629,6 +688,21 @@ final class CliArguments implements AutoCloseable {
 	 */
 	int since() {
 		return since;
+	}
+
+	/** @return the power command of {@code power <action>}, {@code null} for {@code power status} */
+	PowerCommand powerCommand() {
+		return powerCommand;
+	}
+
+	/** @return the identify interval of {@code identify} in seconds, 0 for {@code off} */
+	int identifySeconds() {
+		return identifySeconds;
+	}
+
+	/** @return whether {@code identify force} was asked */
+	boolean identifyForever() {
+		return identifyForever;
 	}
 
 	/** @return the escape character of the SOL console, {@code -1} with {@code --no-escape} */

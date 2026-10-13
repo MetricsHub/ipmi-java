@@ -17,6 +17,7 @@ import java.util.EnumSet;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.metricshub.ipmi.core.coding.commands.PrivilegeLevel;
+import org.metricshub.ipmi.core.coding.commands.chassis.PowerCommand;
 import org.metricshub.ipmi.core.coding.commands.sdr.record.SensorType;
 
 class CliArgumentsTest {
@@ -110,6 +111,9 @@ class CliArgumentsTest {
 	void thePrivilegeDefaultsToTheLowestTheSubcommandNeeds() throws Exception {
 		assertEquals(PrivilegeLevel.User, parse("chassis").privilege());
 		assertEquals(PrivilegeLevel.User, parse("power", "status").privilege());
+		assertEquals(PrivilegeLevel.Operator, parse("power", "on").privilege());
+		assertEquals(PrivilegeLevel.Operator, parse("identify").privilege());
+		assertEquals(PrivilegeLevel.User, parse("-L", "user", "power", "on").privilege());
 		assertEquals(PrivilegeLevel.User, parse("sensors").privilege());
 		assertEquals(PrivilegeLevel.User, parse("fru").privilege());
 		assertEquals(PrivilegeLevel.User, parse("probe").privilege());
@@ -151,7 +155,7 @@ class CliArgumentsTest {
 	}
 
 	@Test
-	void usageErrors() {
+	void usageErrors() throws Exception {
 		assertEquals("missing subcommand (" + CliArguments.SUBCOMMANDS + ")", usageError("-h", "bmc"));
 		assertEquals("unknown subcommand 'reboot' (" + CliArguments.SUBCOMMANDS + ")", usageError("-h", "bmc", "reboot"));
 		assertEquals("missing required option --hostname", usageError("-u", "admin", "chassis"));
@@ -181,8 +185,33 @@ class CliArgumentsTest {
 		assertEquals("--name requires a glob", usageError(login("sensors", "--name", "")));
 		assertEquals("--name requires a glob", usageError(login("sensors", "--name", "CPU*,,Fan*")));
 		assertEquals("--name requires a glob", usageError(login("sensors", "--name", "CPU*,")));
-		assertEquals("power requires one action: status", usageError(login("power")));
-		assertEquals("power requires one action: status", usageError(login("power", "on")));
+		assertNull(parse("power", "status").powerCommand());
+		assertEquals(PowerCommand.PowerUp, parse("power", "on").powerCommand());
+		assertEquals(PowerCommand.PowerDown, parse("power", "off").powerCommand());
+		assertEquals(PowerCommand.PowerCycle, parse("power", "cycle").powerCommand());
+		assertEquals(PowerCommand.HardReset, parse("power", "reset").powerCommand());
+		assertEquals(PowerCommand.SoftShutdown, parse("power", "soft").powerCommand());
+		assertEquals(PowerCommand.DiagnosticInterrupt, parse("power", "diag").powerCommand());
+		assertEquals(
+				"power requires one action: status, on, off, cycle, reset, soft or diag",
+				usageError(login("power")));
+		assertEquals(
+				"power requires one action: status, on, off, cycle, reset, soft or diag",
+				usageError(login("power", "On")));
+		assertEquals(
+				"power requires one action: status, on, off, cycle, reset, soft or diag",
+				usageError(login("power", "on", "off")));
+		assertEquals(15, parse("identify").identifySeconds());
+		assertFalse(parse("identify").identifyForever());
+		assertEquals(5, parse("identify", "5").identifySeconds());
+		assertEquals(0, parse("identify", "off").identifySeconds());
+		assertTrue(parse("identify", "force").identifyForever());
+		assertEquals("identify <seconds> must be between 1 and 255", usageError(login("identify", "0")));
+		assertEquals("identify <seconds> must be between 1 and 255", usageError(login("identify", "256")));
+		assertEquals("identify <seconds> must be a number", usageError(login("identify", "forever")));
+		assertEquals(
+				"identify takes one argument at most: <seconds>, force or off",
+				usageError(login("identify", "5", "force")));
 		assertEquals("chassis takes no argument", usageError(login("chassis", "status")));
 		assertEquals("fru <id> must be a number", usageError(login("fru", "psu")));
 		assertEquals("fru <id> must be between 0 and 255", usageError(login("fru", "256")));
