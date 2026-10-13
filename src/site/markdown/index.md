@@ -1,5 +1,5 @@
-keywords: ipmi java client, ipmi 2.0, rmcp+, bmc, hardware monitoring, sensors, fru, overview
-description: A Java client for IPMI 2.0 over LAN (RMCP+): read the chassis power state, the FRU inventory and the sensors of a server's BMC, open a Serial over LAN console, or send any IPMI command yourself.
+keywords: ipmi java client, ipmi 2.0, rmcp+, bmc, hardware monitoring, sensors, fru, sel, overview
+description: A Java client for IPMI 2.0 over LAN (RMCP+): read the chassis power state, the FRU inventory, the sensors and the System Event Log of a server's BMC, open a Serial over LAN console, or send any IPMI command yourself.
 
 # IPMI Java Client
 
@@ -19,10 +19,13 @@ boards) over **IPMI 2.0 over LAN (RMCP+)**, on UDP port 623. It lets a Java appl
   temperatures, voltages, fan speeds, currents, power and energy readings with their thresholds,
   and the discrete states (presence, redundancy, failure, ...); [Sensors](sensors.html) lists
   what is not read,
+* read the **System Event Log**: the hardware events the BMC logged (thresholds crossed, power
+  supply failures, memory errors, intrusion), whole or since the last entry read
+  ([System Event Log](system-event-log.html)),
 * open a **Serial over LAN** console on the server's serial port ([Serial over LAN](serial-over-lan.html)),
   and
-* send **any IPMI command**, including the System Event Log and chassis control commands, in the
-  same session or through the low-level connector ([Low-Level API](low-level-api.html)).
+* send **any IPMI command**, including the chassis control commands, in the same session or
+  through the low-level connector ([Low-Level API](low-level-api.html)).
 
 The same operations are available from the command line with the **`ipmicli`** client of the
 standalone jar ([Command-Line Client](cli.html)):
@@ -118,13 +121,15 @@ completion code, or the operation outlived its deadline
 ## Where to go next
 
 * [Installation](installation.html) — coordinates, supported JDKs and requirements
-* [Command-Line Client](cli.html) — `ipmicli`: the chassis status, the sensors, the FRUs and a
-  Serial over LAN console from the command line, with the standalone jar
+* [Command-Line Client](cli.html) — `ipmicli`: the chassis status, the sensors, the FRUs, the
+  System Event Log and a Serial over LAN console from the command line, with the standalone jar
 * [Preparing the BMC](preparing-the-bmc.html) — enabling IPMI over LAN, the account, privilege
   level and cipher suites, the firewall
 * [Chassis Status](chassis-status.html) — power state and chassis flags
 * [FRU Inventory](fru-inventory.html) — how FRUs are read and which fields are reported
 * [Sensors](sensors.html) — readings, thresholds, status and states
+* [System Event Log](system-event-log.html) — the logged events, OEM entries, polling for new
+  entries
 * [Configuration](configuration.html) — every option of the client builder
 * [Timeouts and Errors](timeouts-and-errors.html) — deadlines, message timeouts, retries, session
   recovery and the exceptions

@@ -153,7 +153,7 @@ class CliArgumentsTest {
 	@Test
 	void usageErrors() {
 		assertEquals("missing subcommand (" + CliArguments.SUBCOMMANDS + ")", usageError("-h", "bmc"));
-		assertEquals("unknown subcommand 'sel' (" + CliArguments.SUBCOMMANDS + ")", usageError("-h", "bmc", "sel"));
+		assertEquals("unknown subcommand 'reboot' (" + CliArguments.SUBCOMMANDS + ")", usageError("-h", "bmc", "reboot"));
 		assertEquals("missing required option --hostname", usageError("-u", "admin", "chassis"));
 		assertEquals("missing required option --username", usageError("-h", "bmc", "chassis"));
 		assertEquals("unknown option '--https'", usageError("-h", "bmc", "--https", "chassis"));
@@ -168,7 +168,7 @@ class CliArgumentsTest {
 		assertEquals("--escape requires a single printable ASCII character", usageError(login("sol", "--escape", "é")));
 		assertEquals("--escape requires a single printable ASCII character", usageError(login("sol", "--escape", " ")));
 		assertEquals(
-				"--json requires the probe or chassis or sensors or fru subcommand",
+				"--json requires the probe or chassis or sensors or fru or sel subcommand",
 				usageError(login("sol", "--json")));
 		assertEquals("--type requires the sensors subcommand", usageError(login("fru", "--type", "Fan")));
 		assertEquals("--long requires the sensors subcommand", usageError(login("chassis", "--long")));

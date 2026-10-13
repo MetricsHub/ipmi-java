@@ -1,5 +1,5 @@
-keywords: cli, command line, ipmicli, standalone, jar, probe, chassis, power, sensors, fru, sol, serial over lan, json, exit codes, ipmitool
-description: Manual of the ipmicli command-line client of the IPMI Java Client - subcommands, connection options, passwords and BMC key, text and JSON output, the interactive Serial over LAN console, exit codes, and the ipmitool equivalents.
+keywords: cli, command line, ipmicli, standalone, jar, probe, chassis, power, sensors, fru, sel, system event log, sol, serial over lan, json, exit codes, ipmitool
+description: Manual of the ipmicli command-line client of the IPMI Java Client - subcommands, connection options, passwords and BMC key, text and JSON output, the System Event Log, the interactive Serial over LAN console, exit codes, and the ipmitool equivalents.
 
 # Command-Line Client
 
@@ -34,6 +34,7 @@ ipmicli -h <host> -u <user> [options] chassis [--json]
 ipmicli -h <host> -u <user> [options] power status
 ipmicli -h <host> -u <user> [options] sensors [--type <type>,...] [--name <glob>,...] [--long] [--json]
 ipmicli -h <host> -u <user> [options] fru [<id>...] [--json]
+ipmicli -h <host> -u <user> [options] sel [--since <id>] [--json]
 ipmicli -h <host> -u <user> [options] sol [--escape <char> | --no-escape]
 ipmicli --help | --version
 ```
@@ -51,6 +52,7 @@ summary, `--version` the version of the build.
 | `power status` | `chassisStatus()` | Prints `on` or `off`. |
 | `sensors` | `sensors()` | One line per sensor with its reading, unit and status. `--type` and `--name` select the sensors **before** they are read (fewer round trips on a slow BMC); `--long` adds the sensor number, the entity, the six thresholds and the problem of a sensor without reading. |
 | `fru` | `frus()` | The FRU inventory, one block per FRU with the fields of its chassis, board and product areas; `<id>...` reads only these FRU IDs. |
+| `sel` | `sel()` | The System Event Log, one line per entry with its time, the sensor that reported it, the event and its direction; `--since <id>` reads only the entries after the given record ID. |
 | `sol` | `sol().open()` | An interactive [Serial over LAN console](#interactive-sol-console) on the serial port of the server. |
 
 `sensors` lists the sensor types to pass to `--type` as they are named in
@@ -59,10 +61,9 @@ summary, `--version` the version of the build.
 `--name` takes globs where `*` matches any characters and `?` one, case-insensitively, and
 either option can be repeated or given a comma-separated list.
 
-The chassis power control, chassis identify, System Event Log, Get Device ID and raw command
-subcommands follow with the corresponding operations of the library
+The chassis power control, chassis identify, Get Device ID and raw command subcommands follow
+with the corresponding operations of the library
 ([#104](https://github.com/metricshub/ipmi-java/issues/104),
-[#103](https://github.com/metricshub/ipmi-java/issues/103),
 [#111](https://github.com/metricshub/ipmi-java/issues/111),
 [#131](https://github.com/metricshub/ipmi-java/issues/131)).
 
@@ -100,7 +101,7 @@ account is not allowed that level. So the CLI asks for the **least** privilege t
 
 | Subcommands | Default `-L` |
 | --- | --- |
-| `chassis`, `power status`, `sensors`, `fru` | `user` |
+| `chassis`, `power status`, `sensors`, `fru`, `sel` | `user` |
 | `sol` | `administrator` |
 
 A BMC that refuses a command at the session's level answers `D4h`: the CLI exits with 77 and says
@@ -127,8 +128,8 @@ and of the key when it ends.
 
 Diagnostics go **only to stderr**, so stdout can always be piped or parsed. The text output is
 meant for humans and is stable enough for `grep`; `--json` prints UTF-8
-[JSON Lines](https://jsonlines.org/): one object per sensor or FRU, one object for `probe` and
-`chassis`. Absent values (a reading the sensor does not have, a threshold the record does not
+[JSON Lines](https://jsonlines.org/): one object per sensor, FRU or SEL entry, one object for
+`probe` and `chassis`. Absent values (a reading the sensor does not have, a threshold the record does not
 set, an empty FRU field) are omitted from the JSON objects, never printed as `0`.
 
 The output below was captured on a Lenovo RD350 (serial numbers masked), with
@@ -288,6 +289,51 @@ nested object per area:
 
 An incomplete FRU has `"complete":false` and a `problems` array.
 
+### `sel`
+
+```text
+$ ipmicli -h bmc.example.com -u monitor -pf pw.txt sel
+ID   Time                  Type                  Sensor  Event                                          Direction
+1    2024-05-15T09:15:25Z  EventLoggingDisabled  254     Log area reset/cleared                         assertion
+2    2024-05-15T09:16:11Z  OemTimestamped                OEM data 02 01 05 00 00 00
+3    2024-05-15T09:16:11Z  OemTimestamped                OEM data 02 08 05 00 00 00
+5    2024-05-15T09:23:27Z  PowerUnit             100     Power off/down                                 assertion
+6    2024-05-15T09:23:34Z  PowerUnit             100     Power off/down                                 deassertion
+7    2024-05-15T09:24:15Z  VersionChange         0       Firmware or software incompatibility detected  assertion
+640  pre-init 315532807s   PowerSupply           219     Presence detected                              assertion
+643  pre-init 315532815s   PowerSupply           156     Fully Redundant                                assertion
+```
+
+(An excerpt: the Lenovo card has 643 entries, 358 of them OEM records.) One line per entry of
+the [System Event Log](system-event-log.html), in the order of the log: the record ID, the time
+(UTC, ISO-8601; `pre-init <seconds>` for an event logged before the BMC had the time, like the
+`Pre-Init` of `ipmitool`; empty for an OEM entry without timestamp), the sensor type of a system
+event or the record type of an OEM one, the sensor number, the event in the wording of
+`ipmiutil` or the OEM bytes, and `assertion` or `deassertion`. The times are UTC whatever the
+BMC keeps (it reports the offset of a local SEL time with Get SEL Time UTC Offset). `-v` adds to
+stderr what Get SEL Info says of the log: its number of entries, the time of the last addition
+and erase, and that offset.
+
+`--since <id>` prints only the entries after the given record ID, the ID of the last entry of a
+previous run (the whole log when the BMC does not hold that entry any more, as after a clear;
+a log cleared and filled up to that ID again goes unnoticed: the `lastErase` time of `-v` tells);
+the header alone means no new entry. `--json` prints one object per entry with the fields of
+[`SelEntry`](system-event-log.html#the-selentry-object): `timestamp` only when it is a date,
+`preInitSeconds` only for a pre-init one, the system event fields (`sensorType`, `sensorNumber`,
+`generatorId`, `eventType`, `event`, `direction`, `eventData` in hexadecimal) only for a system
+event, `manufacturerId` and `oemData` only for an OEM entry:
+
+```text
+$ ipmicli -h bmc.example.com -u monitor -pf pw.txt sel --since 5 --json
+{"id":6,"type":"System","timestamp":"2024-05-15T09:23:34Z","sensorType":"PowerUnit","sensorNumber":100,"generatorId":32,"eventType":111,"event":"PowerOffOrDown","description":"Power off/down","direction":"Deassertion","eventData":"00ffff"}
+{"id":7,"type":"System","timestamp":"2024-05-15T09:24:15Z","sensorType":"VersionChange","sensorNumber":0,"generatorId":1,"eventType":111,"event":"FirmwareOrSoftwareIncompatibilityDetected","description":"Firmware or software incompatibility detected","direction":"Assertion","eventData":"830800"}
+{"id":8,"type":"OemTimestamped","timestamp":"2024-05-15T09:29:39Z","description":"OEM data 02 01 05 05 00 00","manufacturerId":19046,"oemData":"020105050000"}
+```
+
+The sensor names are not resolved: join `sensorNumber` with the `number` of `sensors --json`
+when you need them (`ipmitool sel elist` walks the SDR repository for that, which takes as long
+as `sensors` on a slow BMC).
+
 ## Interactive SOL console
 
 ```bash
@@ -394,6 +440,12 @@ The system board FRU of a BMC that only offers cipher suite 3, on another port:
 ipmicli -h bmc.example.com -P 6230 -u monitor -pf pw.txt -C 3 fru 0
 ```
 
+The events logged since entry 643, the last one of the previous run:
+
+```bash
+ipmicli -h bmc.example.com -u monitor -pf pw.txt sel --since 643
+```
+
 A console on the serial port, closed with `~.`:
 
 ```bash
@@ -409,6 +461,8 @@ ipmicli -h bmc.example.com -u admin -pf pw.txt sol
 | `ipmitool -I lanplus ... sdr list` or `sensor list` | `ipmicli ... sensors` (`--long` for the thresholds) |
 | `ipmitool -I lanplus ... sdr type Temperature` | `ipmicli ... sensors --type Temperature` |
 | `ipmitool -I lanplus ... fru print` | `ipmicli ... fru` |
+| `ipmitool -I lanplus ... sel list` or `sel elist` | `ipmicli ... sel` (the sensor numbers, not the names) |
+| `ipmitool -I lanplus ... sel info` | `ipmicli ... -v sel` (on stderr) |
 | `ipmitool -I lanplus ... sol activate` | `ipmicli ... sol` |
 | `ipmitool -I lanplus ... lan print` (the cipher suites) | `ipmicli -h h probe` (no login needed) |
 | `-I lanplus` | Implied: the CLI speaks RMCP+ (IPMI 2.0) only. |

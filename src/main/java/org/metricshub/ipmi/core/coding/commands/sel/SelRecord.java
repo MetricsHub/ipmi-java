@@ -33,6 +33,9 @@ import java.util.Arrays;
 
 public class SelRecord {
 
+	/** The size of every SEL record, whatever its type (IPMI 2.0 section 32): 16 bytes. */
+	public static final int RECORD_SIZE = 16;
+
 	private int recordId;
 
 	private SelRecordType recordType;
@@ -49,9 +52,28 @@ public class SelRecord {
 	 */
 	private int sensorNumber;
 
+	/**
+	 * Generator ID (IPMI 2.0 section 32.1): the slave address or system software ID of the controller or software that
+	 * logged the event in the LS byte, its channel number and LUN in the MS byte
+	 */
+	private int generatorId;
+
 	private EventDirection eventDirection;
 
+	/**
+	 * Event/reading type code (IPMI 2.0 table 42-1): 01h threshold, 02h-0Ch generic discrete, 6Fh sensor-specific,
+	 * 70h-7Fh OEM
+	 */
+	private int eventType;
+
 	private ReadingType event;
+
+	/**
+	 * The three event data bytes as the BMC sent them (IPMI 2.0 table 32-1): the event offset and the usage of the
+	 * other two bytes in the first one, then the reading and the threshold of a threshold event or what the sensor
+	 * type defines
+	 */
+	private byte[] eventData;
 
 	/**
 	 * Reading that triggered event. Provided in raw value (need to do
@@ -63,8 +85,40 @@ public class SelRecord {
 
 	private byte[] oemData;
 
+	/** The 16 bytes of the record as the BMC sent them */
+	private byte[] rawData;
+
+	/**
+	 * @return the 16 bytes of the record as the BMC sent them, null for a record built by hand
+	 */
+	public byte[] getRawData() {
+		return rawData;
+	}
+
+	/**
+	 * @param rawData the 16 bytes of the record as the BMC sent them
+	 */
+	public void setRawData(byte[] rawData) {
+		this.rawData = rawData;
+	}
+
+	/**
+	 * Decodes a SEL record (IPMI 2.0 section 32).
+	 *
+	 * @param data the 16 bytes of the record
+	 * @return the record: a system event, an OEM record with its OEM bytes, or a record of a reserved type with its ID
+	 *         only
+	 * @throws IllegalArgumentException when the data is shorter than a SEL record
+	 */
 	public static SelRecord populateSelRecord(byte[] data) {
+		if (data == null || data.length < RECORD_SIZE) {
+			throw new IllegalArgumentException(
+					"A SEL record is " + RECORD_SIZE + " bytes, not " + (data == null ? 0 : data.length));
+		}
+
 		SelRecord record = new SelRecord();
+
+		record.setRawData(Arrays.copyOf(data, RECORD_SIZE));
 
 		byte[] buffer = new byte[4];
 
@@ -114,6 +168,13 @@ public class SelRecord {
 
 		record.setTimestamp(TypeConverter.decodeDate(TypeConverter.littleEndianByteArrayToInt(buffer)));
 
+		buffer[0] = data[7];
+		buffer[1] = data[8];
+		buffer[2] = 0;
+		buffer[3] = 0;
+
+		record.setGeneratorId(TypeConverter.littleEndianByteArrayToInt(buffer));
+
 		record.setSensorType(SensorType.parseInt(TypeConverter.byteToInt(data[10])));
 
 		record.setSensorNumber(TypeConverter.byteToInt(data[11]));
@@ -122,11 +183,62 @@ public class SelRecord {
 
 		int eventType = TypeConverter.byteToInt(data[12]) & 0x7f;
 
+		record.setEventType(eventType);
+
 		int eventOffset = TypeConverter.byteToInt(data[13]) & 0xf;
 
 		record.setEvent(ReadingType.parseInt(record.getSensorType(), eventType, eventOffset));
 
+		record.setEventData(Arrays.copyOfRange(data, 13, RECORD_SIZE));
+
 		record.setReading(data[14]);
+	}
+
+	/**
+	 * @return the generator ID of a system event (IPMI 2.0 section 32.1): the slave address or system software ID
+	 *         of the controller or software that logged the event in the low byte, its channel number and LUN in the
+	 *         high byte; 0 for the other record types
+	 */
+	public int getGeneratorId() {
+		return generatorId;
+	}
+
+	/**
+	 * @param generatorId the generator ID of a system event
+	 */
+	public void setGeneratorId(int generatorId) {
+		this.generatorId = generatorId;
+	}
+
+	/**
+	 * @return the event/reading type code of a system event (IPMI 2.0 table 42-1: 01h threshold, 02h to 0Ch generic
+	 *         discrete, 6Fh sensor-specific, 70h to 7Fh OEM); 0 for the other record types
+	 */
+	public int getEventType() {
+		return eventType;
+	}
+
+	/**
+	 * @param eventType the event/reading type code of a system event
+	 */
+	public void setEventType(int eventType) {
+		this.eventType = eventType;
+	}
+
+	/**
+	 * @return the three event data bytes of a system event as the BMC sent them (IPMI 2.0 table 32-1): the event
+	 *         offset and the usage of the next two bytes in the first one, then the reading and the threshold of a
+	 *         threshold event, or what the sensor type defines; null for the other record types
+	 */
+	public byte[] getEventData() {
+		return eventData;
+	}
+
+	/**
+	 * @param eventData the three event data bytes of a system event, null for the other record types
+	 */
+	public void setEventData(byte[] eventData) {
+		this.eventData = eventData;
 	}
 
 	/**

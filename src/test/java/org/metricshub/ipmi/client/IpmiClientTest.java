@@ -6,10 +6,13 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.metricshub.ipmi.client.Fixtures.BOARD_SENSOR;
 import static org.metricshub.ipmi.client.Fixtures.FAN_SENSOR;
+import static org.metricshub.ipmi.client.Fixtures.LENOVO;
 import static org.metricshub.ipmi.client.Fixtures.PASSWORD;
 import static org.metricshub.ipmi.client.Fixtures.PSU_FRU;
+import static org.metricshub.ipmi.client.Fixtures.SEL_RESET_TIME;
 import static org.metricshub.ipmi.client.Fixtures.SUITES;
 import static org.metricshub.ipmi.client.Fixtures.TEMPERATURE_SENSOR;
 import static org.metricshub.ipmi.client.Fixtures.USER;
@@ -30,12 +33,18 @@ import static org.metricshub.ipmi.core.transport.FakeSdrRepository.NETFN_STORAGE
 import static org.metricshub.ipmi.core.transport.FakeSdrRepository.compactSensorRecord;
 import static org.metricshub.ipmi.core.transport.FakeSdrRepository.fruDeviceLocatorRecord;
 import static org.metricshub.ipmi.core.transport.FakeSdrRepository.record;
+import static org.metricshub.ipmi.core.transport.FakeSel.GET_SEL_ENTRY;
+import static org.metricshub.ipmi.core.transport.FakeSel.GET_SEL_INFO;
+import static org.metricshub.ipmi.core.transport.FakeSel.RESERVE_SEL;
+import static org.metricshub.ipmi.core.transport.FakeSel.systemEvent;
 
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
@@ -53,13 +62,17 @@ import org.metricshub.ipmi.core.coding.commands.PrivilegeLevel;
 import org.metricshub.ipmi.core.coding.commands.chassis.GetChassisStatus;
 import org.metricshub.ipmi.core.coding.commands.sdr.record.EntityId;
 import org.metricshub.ipmi.core.coding.commands.sdr.record.OemRecord;
+import org.metricshub.ipmi.core.coding.commands.sdr.record.ReadingType;
 import org.metricshub.ipmi.core.coding.commands.sdr.record.SensorType;
 import org.metricshub.ipmi.core.coding.commands.sdr.record.SensorUnit;
+import org.metricshub.ipmi.core.coding.commands.sel.EventDirection;
+import org.metricshub.ipmi.core.coding.commands.sel.SelRecordType;
 import org.metricshub.ipmi.core.coding.payload.CompletionCode;
 import org.metricshub.ipmi.core.coding.payload.lan.NetworkFunction;
 import org.metricshub.ipmi.core.transport.FakeBmc;
 import org.metricshub.ipmi.core.transport.FakeRmcpPlusBmc;
 import org.metricshub.ipmi.core.transport.FakeSdrRepository;
+import org.metricshub.ipmi.core.transport.FakeSel;
 
 class IpmiClientTest {
 
@@ -153,6 +166,527 @@ class IpmiClientTest {
 			assertFalse(sensors.toString().isEmpty());
 			assertFalse(frus.toString().isEmpty());
 			assertFalse(client.chassisStatus().toString().isEmpty());
+		}
+	}
+
+	@Test
+	@Timeout(30)
+	void selEntriesAreTypedAndReadSinceAnEntry() throws Exception {
+		try (FakeRmcpPlusBmc bmc = bmc(); IpmiClient client = client(bmc).build()) {
+			SelEntryList log = client.sel().execute();
+			assertEquals(6, log.size(), log.toString());
+			assertEquals(6, log.totalEntries().getAsInt());
+			assertEquals(Instant.ofEpochSecond(SEL_RESET_TIME + 489), log.lastAddition().get());
+			assertFalse(log.lastErase().isPresent(), "FFFFFFFFh: never erased");
+			assertTrue(log.info().isPresent());
+			assertEquals(2, bmc.getCount(NETFN_STORAGE, GET_SEL_INFO), "before and after the walk");
+			assertEquals(6 + 1, bmc.getCount(NETFN_STORAGE, GET_SEL_ENTRY), "one whole read per entry, then the first again");
+			assertEquals(0, bmc.getCount(NETFN_STORAGE, RESERVE_SEL), "a whole read needs no reservation");
+
+			SelEntry reset = log.get(0);
+			assertEquals(1, reset.id());
+			assertEquals(SelRecordType.System, reset.type());
+			assertEquals(Instant.ofEpochSecond(SEL_RESET_TIME), reset.timestamp().get());
+			assertFalse(reset.preInitSeconds().isPresent());
+			assertEquals(SensorType.EventLoggingDisabled, reset.sensorType().get());
+			assertEquals(0x72, reset.sensorNumber().getAsInt());
+			assertEquals(FakeSel.GENERATOR_BMC, reset.generatorId().getAsInt());
+			assertEquals(0x6f, reset.eventType().getAsInt());
+			assertEquals(ReadingType.LogAreaReset, reset.event().get());
+			assertEquals(EventDirection.Assertion, reset.direction().get());
+			assertEquals("Log area reset/cleared", reset.description());
+			assertArrayEquals(new byte[] { 0x02, (byte) 0xff, (byte) 0xff }, reset.eventData());
+			assertFalse(reset.manufacturerId().isPresent());
+			assertEquals(0, reset.oemData().length);
+			assertEquals(
+					"SEL entry 1 at 2024-05-15T09:15:25Z: EventLoggingDisabled sensor 114, Log area reset/cleared (assertion)",
+					reset.toString());
+
+			SelEntry oem = log.get(1);
+			assertEquals(SelRecordType.OemTimestamped, oem.type());
+			assertEquals(Instant.ofEpochSecond(SEL_RESET_TIME + 5), oem.timestamp().get());
+			assertEquals(LENOVO, oem.manufacturerId().getAsInt());
+			assertArrayEquals(new byte[] { 2, 1, 5, 0, 0, 0 }, oem.oemData());
+			assertEquals("OEM data 02 01 05 00 00 00", oem.description());
+			assertFalse(oem.sensorType().isPresent());
+			assertFalse(oem.sensorNumber().isPresent());
+			assertFalse(oem.generatorId().isPresent());
+			assertFalse(oem.eventType().isPresent());
+			assertFalse(oem.event().isPresent());
+			assertFalse(oem.direction().isPresent());
+			assertEquals(0, oem.eventData().length);
+			assertEquals(
+					"SEL entry 2 at 2024-05-15T09:15:30Z: OemTimestamped of manufacturer 19046, OEM data 02 01 05 00 00 00",
+					oem.toString());
+
+			SelEntry threshold = log.get(2);
+			assertEquals(SensorType.Temperature, threshold.sensorType().get());
+			assertEquals(TEMPERATURE_SENSOR, threshold.sensorNumber().getAsInt());
+			assertEquals(1, threshold.eventType().getAsInt());
+			assertEquals(ReadingType.UpperNonCriticalGoingHigh, threshold.event().get());
+			assertEquals("Upper Non Critical Going High", threshold.description(), "a name ipmiutil does not give");
+			assertArrayEquals(new byte[] { 0x57, (byte) 0x9a, (byte) 0x98 }, threshold.eventData());
+			SensorList sensors = client.sensors().execute();
+			assertTrue(threshold.isFrom(sensors.get(0)), "the BMC's temperature sensor 50: " + sensors.get(0));
+			assertFalse(threshold.isFrom(sensors.get(1)), "another number");
+			assertFalse(reset.isFrom(sensors.get(0)), "sensor 114 of the BMC, not in the repository");
+			assertFalse(oem.isFrom(sensors.get(0)), "an OEM entry is from no sensor");
+
+			SelEntry power = log.get(3);
+			assertEquals(ReadingType.PowerOffOrDown, power.event().get());
+			assertEquals(EventDirection.Deassertion, power.direction().get());
+			assertEquals("Power off/down", power.description());
+
+			SelEntry nonTimestamped = log.get(4);
+			assertEquals(SelRecordType.OemNonTimestamped, nonTimestamped.type());
+			assertFalse(nonTimestamped.timestamp().isPresent());
+			assertFalse(nonTimestamped.manufacturerId().isPresent());
+			assertEquals(13, nonTimestamped.oemData().length);
+			assertEquals(
+					"SEL entry 5: OemNonTimestamped, OEM data 01 02 03 04 05 06 07 08 09 0A 0B 0C 0D",
+					nonTimestamped.toString());
+
+			SelEntry preInit = log.get(5);
+			assertFalse(preInit.timestamp().isPresent(), "a timestamp up to 20000000h is not a date");
+			assertEquals(5, preInit.preInitSeconds().getAsLong());
+			assertEquals("IERR", preInit.description());
+			assertEquals("SEL entry 6 5 s after initialization: Processor sensor 2, IERR (assertion)", preInit.toString());
+
+			SelEntryList since = client.sel().since(3).execute();
+			assertEquals(Arrays.asList(4, 5, 6), since.stream().map(SelEntry::id).collect(Collectors.toList()));
+			assertEquals(6, since.totalEntries().getAsInt(), "the count of the whole log");
+			assertEquals(
+					7 + 5,
+					bmc.getCount(NETFN_STORAGE, GET_SEL_ENTRY),
+					"the entry given, the three after it, the first of them again");
+			assertTrue(client.sel().since(6).execute().isEmpty(), "nothing after the last entry");
+			assertEquals(6, client.sel().since(9).execute().size(), "an entry the log does not hold: the whole log");
+
+			assertThrows(IllegalArgumentException.class, () -> client.sel().since(0));
+			assertThrows(IllegalArgumentException.class, () -> client.sel().since(0xffff));
+		}
+	}
+
+	@Test
+	@Timeout(30)
+	void aClearedLogIsReadWholeEvenWhenItsIdsAreReused() throws Exception {
+		try (FakeRmcpPlusBmc bmc = new FakeRmcpPlusBmc(SUITES, USER, utf8(PASSWORD), null)) {
+			FakeSel sel = Fixtures.sel();
+			sel.install(bmc);
+			try (IpmiClient client = client(bmc).build()) {
+				SelEntryList log = client.sel().execute();
+				SelEntry last = log.get(log.size() - 1);
+				assertTrue(client.sel().since(last).execute().isEmpty(), "nothing after the last entry");
+				assertEquals(
+						Arrays.asList(4, 5, 6),
+						client.sel().since(log.get(2)).execute().stream().map(SelEntry::id).collect(Collectors.toList()));
+
+				// The log is cleared and six other events are logged: the IDs 1 to 6 name other entries now
+				sel.clear();
+				for (int id = 1; id <= 6; id++) {
+					sel
+							.add(
+									systemEvent(
+											id,
+											SEL_RESET_TIME + 1000 + id,
+											SensorType.Fan.getCode(),
+											FAN_SENSOR,
+											0x0a,
+											true,
+											0x01,
+											0xff,
+											0xff));
+				}
+				SelEntryList afterClear = client.sel().since(last).execute();
+				assertEquals(6, afterClear.size(), "another entry under the ID of the last one read: the whole log");
+				assertTrue(afterClear.lastErase().isPresent());
+				assertFalse(afterClear.get(5).equals(last), "same ID, another record");
+				assertEquals(afterClear.get(5), client.sel().execute().get(5), "the same record read twice");
+				assertEquals(afterClear.get(5).hashCode(), client.sel().execute().get(5).hashCode());
+				assertTrue(client.sel().since(afterClear.get(5)).execute().isEmpty());
+
+				assertTrue(client.sel().since(6).execute().isEmpty(), "an ID alone cannot tell a reused ID apart");
+				assertEquals(6, client.sel().since(7).execute().size(), "an ID the log does not hold: the whole log");
+			}
+		}
+	}
+
+	@Test
+	@Timeout(30)
+	void aLogThatChangesUnderTheWalkIsReadAgainOnce() throws Exception {
+		try (FakeRmcpPlusBmc bmc = new FakeRmcpPlusBmc(SUITES, USER, utf8(PASSWORD), null)) {
+			FakeSel sel = Fixtures.sel();
+			sel.install(bmc);
+			try (IpmiClient client = client(bmc).build()) {
+				// Entry 4, named as the next one by entry 3, is deleted between the two reads: the walk starts over
+				sel.vanishOnce(4);
+				assertEquals(6, client.sel().execute().size());
+				assertEquals(3, bmc.getCount(NETFN_STORAGE, GET_SEL_INFO), "before, after, and after the second walk");
+				assertEquals(
+						3 + 1 + 6 + 1,
+						bmc.getCount(NETFN_STORAGE, GET_SEL_ENTRY),
+						"three entries, the missing one, then all and the first again");
+
+				sel.vanishOnce(4).vanishOnce(4);
+				IpmiClientException twice = assertThrows(IpmiClientException.class, () -> client.sel().execute());
+				assertTrue(twice.getMessage().contains("changed twice while it was read"), twice.getMessage());
+
+				// The entry after which to read is gone, then entry 4 under the whole-log walk: the second walk reads the
+				// whole log, whatever the cursor
+				sel.vanishOnce(3).vanishOnce(4);
+				assertEquals(6, client.sel().since(3).execute().size(), "the second walk is whole");
+			}
+		}
+	}
+
+	@Test
+	@Timeout(30)
+	void aLogClearedAndRefilledUnderTheWalkIsReadAgain() throws Exception {
+		try (FakeRmcpPlusBmc bmc = new FakeRmcpPlusBmc(SUITES, USER, utf8(PASSWORD), null)) {
+			FakeSel sel = Fixtures.sel();
+			sel.install(bmc);
+			// Between the reads of entries 1 and 2, the log is cleared and filled again with entries 1 to 6: entry 2
+			// exists again, so the walk alone would mix the old entry 1 with the new 2 to 6
+			sel.before(2, () -> {
+				sel.clear();
+				for (int id = 1; id <= 6; id++) {
+					sel
+							.add(
+									systemEvent(
+											id,
+											SEL_RESET_TIME + 2000 + id,
+											SensorType.Fan.getCode(),
+											FAN_SENSOR,
+											0x0a,
+											true,
+											0x01,
+											0xff,
+											0xff));
+				}
+			});
+			try (IpmiClient client = client(bmc).build()) {
+				SelEntryList log = client.sel().execute();
+				assertEquals(6, log.size());
+				assertTrue(log.stream().allMatch(entry -> entry.sensorType().get() == SensorType.Fan), "the new log only");
+				assertEquals(Instant.ofEpochSecond(SEL_RESET_TIME + 2001), log.get(0).timestamp().get());
+				assertTrue(log.lastErase().isPresent());
+				assertEquals(3, bmc.getCount(NETFN_STORAGE, GET_SEL_INFO), "the erase timestamp changed: read again");
+
+				// A Clear SEL in progress answers 81h: the read waits for its end
+				sel.eraseInProgressOnce(2);
+				assertEquals(6, client.sel().execute().size());
+			}
+		}
+	}
+
+	@Test
+	@Timeout(30)
+	void aCursorIsDroppedWhenTheLogWasErasedUnderTheWalk() throws Exception {
+		try (FakeRmcpPlusBmc bmc = new FakeRmcpPlusBmc(SUITES, USER, utf8(PASSWORD), null)) {
+			FakeSel sel = Fixtures.sel();
+			sel.install(bmc);
+			// Reading after entry 3, the log is cleared and filled again before entry 5 is read: the new log holds
+			// another entry 3, which the ID alone cannot tell, so the second walk reads the whole new log
+			sel.before(5, () -> {
+				sel.clear();
+				for (int id = 1; id <= 4; id++) {
+					sel
+							.add(
+									systemEvent(
+											id,
+											SEL_RESET_TIME + 3000 + id,
+											SensorType.Fan.getCode(),
+											FAN_SENSOR,
+											0x0a,
+											true,
+											0x01,
+											0xff,
+											0xff));
+				}
+			});
+			try (IpmiClient client = client(bmc).build()) {
+				SelEntryList log = client.sel().since(3).execute();
+				assertEquals(Arrays.asList(1, 2, 3, 4), log.stream().map(SelEntry::id).collect(Collectors.toList()));
+				assertTrue(log.stream().allMatch(entry -> entry.sensorType().get() == SensorType.Fan), "the new log only");
+			}
+		}
+	}
+
+	@Test
+	@Timeout(30)
+	void aClearThatLeavesTheEraseTimestampUnchangedIsCaughtByTheFirstEntry() throws Exception {
+		try (FakeRmcpPlusBmc bmc = new FakeRmcpPlusBmc(SUITES, USER, utf8(PASSWORD), null)) {
+			FakeSel sel = Fixtures.sel();
+			sel.install(bmc);
+			// A second clear within the same second as the previous one: the erase timestamp does not move
+			sel.before(4, () -> {
+				sel.clearWithoutErase();
+				for (int id = 1; id <= 5; id++) {
+					sel
+							.add(
+									systemEvent(
+											id,
+											SEL_RESET_TIME + 4000 + id,
+											SensorType.Fan.getCode(),
+											FAN_SENSOR,
+											0x0a,
+											true,
+											0x01,
+											0xff,
+											0xff));
+				}
+			});
+			try (IpmiClient client = client(bmc).build()) {
+				SelEntryList log = client.sel().execute();
+				assertEquals(5, log.size());
+				assertTrue(log.stream().allMatch(entry -> entry.sensorType().get() == SensorType.Fan), "the new log only");
+				assertEquals(
+						5 + 1 + 5 + 1,
+						bmc.getCount(NETFN_STORAGE, GET_SEL_ENTRY),
+						"entries 1 to 5 (4 and 5 new), entry 1 again, then the new log and its entry 1 again");
+			}
+		}
+	}
+
+	@Test
+	@Timeout(30)
+	void getSelInfoRefusalsArePropagatedOrWaitedOut() throws Exception {
+		try (FakeRmcpPlusBmc bmc = new FakeRmcpPlusBmc(SUITES, USER, utf8(PASSWORD), null)) {
+			FakeSel sel = Fixtures.sel();
+			sel.install(bmc);
+			try (IpmiClient client = client(bmc).build()) {
+				sel.infoEraseInProgressOnce();
+				assertEquals(6, client.sel().execute().size(), "81h on Get SEL Info: waited out");
+
+				sel.refuseInfo(0xd4);
+				IpmiCompletionCodeException refused = assertThrows(
+						IpmiCompletionCodeException.class,
+						() -> client.sel().execute());
+				assertEquals(CompletionCode.InsufficentPrivilege, refused.completionCode());
+
+				sel.refuseInfo(0xd5);
+				assertFalse(client.sel().execute().info().isPresent(), "not supported in the present state: no info");
+			}
+		}
+	}
+
+	@Test
+	@Timeout(30)
+	void aSinceWalkThatReadsNothingChecksItsCursorAgain() throws Exception {
+		try (FakeRmcpPlusBmc bmc = new FakeRmcpPlusBmc(SUITES, USER, utf8(PASSWORD), null)) {
+			FakeSel sel = Fixtures.sel();
+			sel.install(bmc);
+			try (IpmiClient client = client(bmc).build()) {
+				SelEntryList log = client.sel().execute();
+				SelEntry last = log.get(5);
+				// The cursor lookup finds entry 6 unchanged and the walk reads nothing; then, before entry 6 is read
+				// again, the log is cleared and filled up to six entries without the erase timestamp moving
+				sel.before(6, () -> sel.before(6, () -> {
+					sel.clearWithoutErase();
+					for (int id = 1; id <= 6; id++) {
+						sel
+								.add(
+										systemEvent(
+												id,
+												SEL_RESET_TIME + 5000 + id,
+												SensorType.Fan.getCode(),
+												FAN_SENSOR,
+												0x0a,
+												true,
+												0x01,
+												0xff,
+												0xff));
+					}
+				}));
+				SelEntryList refilled = client.sel().since(last).execute();
+				assertEquals(6, refilled.size(), "the cursor is another entry now: the whole new log");
+				assertTrue(refilled.stream().allMatch(entry -> entry.sensorType().get() == SensorType.Fan));
+			}
+		}
+	}
+
+	@Test
+	@Timeout(30)
+	void aChangeSeenByTheAnchorAloneGetsItsRetry() throws Exception {
+		try (FakeRmcpPlusBmc bmc = new FakeRmcpPlusBmc(SUITES, USER, utf8(PASSWORD), null)) {
+			FakeSel sel = Fixtures.sel();
+			sel.install(bmc);
+			// The walk asks for record 0000h: the first request for entry 1 by its ID is the check after the walk, and
+			// the log is cleared and filled again right before it
+			sel.before(1, () -> {
+				sel.clear();
+				for (int id = 1; id <= 3; id++) {
+					sel
+							.add(
+									systemEvent(
+											id,
+											SEL_RESET_TIME + 6000 + id,
+											SensorType.Fan.getCode(),
+											FAN_SENSOR,
+											0x0a,
+											true,
+											0x01,
+											0xff,
+											0xff));
+				}
+			});
+			try (IpmiClient client = client(bmc).build()) {
+				SelEntryList log = client.sel().execute();
+				assertEquals(3, log.size(), "one change, one retry");
+				assertTrue(log.lastErase().isPresent());
+			}
+		}
+	}
+
+	@Test
+	@Timeout(30)
+	void anEntryWithASelectorAsRecordIdIsRejected() throws Exception {
+		try (FakeRmcpPlusBmc bmc = new FakeRmcpPlusBmc(SUITES, USER, utf8(PASSWORD), null)) {
+			new FakeSel()
+					.add(systemEvent(0, SEL_RESET_TIME, SensorType.Fan.getCode(), FAN_SENSOR, 0x0a, true, 0x01, 0xff, 0xff))
+					.install(bmc);
+			try (IpmiClient client = client(bmc).build()) {
+				IpmiClientException selector = assertThrows(IpmiClientException.class, () -> client.sel().execute());
+				assertEquals("The System Event Log answered an entry whose record ID is 0000h", selector.getMessage());
+			}
+		}
+	}
+
+	@Test
+	@Timeout(30)
+	void anotherEntryThanTheOneAskedForIsRejected() throws Exception {
+		try (FakeRmcpPlusBmc bmc = new FakeRmcpPlusBmc(SUITES, USER, utf8(PASSWORD), null)) {
+			FakeSel sel = Fixtures.sel().serveInsteadOnce(3, 5);
+			sel.install(bmc);
+			try (IpmiClient client = client(bmc).build()) {
+				IpmiClientException wrong = assertThrows(IpmiClientException.class, () -> client.sel().execute());
+				assertEquals("The System Event Log answered entry 0005h when asked for entry 0003h", wrong.getMessage());
+				sel.serveInsteadOnce(3, 5);
+				assertEquals(6, client.sel().since(3).execute().size(), "the cursor lookup got another entry: the whole log");
+			}
+		}
+	}
+
+	@Test
+	@Timeout(30)
+	void aLoopInTheNextRecordIdsIsRejected() throws Exception {
+		try (FakeRmcpPlusBmc bmc = new FakeRmcpPlusBmc(SUITES, USER, utf8(PASSWORD), null)) {
+			FakeSel sel = Fixtures.sel().nextRecordId(4, 2);
+			sel.install(bmc);
+			try (IpmiClient client = client(bmc).build()) {
+				IpmiClientException loop = assertThrows(IpmiClientException.class, () -> client.sel().execute());
+				assertEquals(
+						"The System Event Log loops: entry 0004h names entry 0002h as the next one, which was read already",
+						loop.getMessage());
+				assertEquals(4 + 1, bmc.getCount(NETFN_STORAGE, GET_SEL_ENTRY), "entries 1 to 4, then 2 again, once");
+
+				sel.nextRecordId(4, 4);
+				assertTrue(
+						assertThrows(IpmiClientException.class, () -> client.sel().execute())
+								.getMessage()
+								.contains("entry 0004h names entry 0004h as the next one"),
+						"an entry that names itself");
+			}
+		}
+	}
+
+	@Test
+	@Timeout(30)
+	void anUnspecifiedOrRefusedSelTimeUtcOffset() throws Exception {
+		try (FakeRmcpPlusBmc bmc = new FakeRmcpPlusBmc(SUITES, USER, utf8(PASSWORD), null)) {
+			FakeSel sel = Fixtures.sel().utcOffset(0x7ff);
+			sel.install(bmc);
+			try (IpmiClient client = client(bmc).build()) {
+				SelEntryList log = client.sel().execute();
+				assertEquals(0, log.utcOffsetMinutes(), "07FFh: unspecified, not 2047 minutes");
+				assertEquals(Instant.ofEpochSecond(SEL_RESET_TIME), log.get(0).timestamp().get());
+
+				sel.refuseUtcOffset(0xd5);
+				assertEquals(0, client.sel().execute().utcOffsetMinutes(), "not supported in the present state: UTC");
+
+				sel.refuseUtcOffset(0xd4);
+				IpmiCompletionCodeException refused = assertThrows(
+						IpmiCompletionCodeException.class,
+						() -> client.sel().execute());
+				assertEquals(CompletionCode.InsufficentPrivilege, refused.completionCode(), "a refusal the caller can act on");
+			}
+		}
+	}
+
+	@Test
+	@Timeout(30)
+	void theSelTimeUtcOffsetIsApplied() throws Exception {
+		try (FakeRmcpPlusBmc bmc = new FakeRmcpPlusBmc(SUITES, USER, utf8(PASSWORD), null)) {
+			FakeSel sel = Fixtures.sel().utcOffset(540);
+			sel.install(bmc);
+			try (IpmiClient client = client(bmc).build()) {
+				// The BMC keeps its SEL time as local time, 9 hours ahead of UTC
+				SelEntryList log = client.sel().execute();
+				assertEquals(540, log.utcOffsetMinutes());
+				assertEquals(Instant.ofEpochSecond(SEL_RESET_TIME - 9 * 3600), log.get(0).timestamp().get());
+				assertEquals(Instant.ofEpochSecond(SEL_RESET_TIME + 489 - 9 * 3600), log.lastAddition().get());
+				assertEquals(5, log.get(5).preInitSeconds().getAsLong(), "a pre-init timestamp is not a time of day");
+				assertEquals(1, bmc.getCount(NETFN_STORAGE, FakeSel.GET_SEL_TIME_UTC_OFFSET));
+			}
+		}
+	}
+
+	@Test
+	@Timeout(30)
+	void anEmptySelABmcWithoutGetSelInfoAndACanceledReservation() throws Exception {
+		try (FakeRmcpPlusBmc bmc = new FakeRmcpPlusBmc(SUITES, USER, utf8(PASSWORD), null)) {
+			FakeSel sel = new FakeSel();
+			sel.install(bmc);
+			try (IpmiClient client = client(bmc).build()) {
+				SelEntryList empty = client.sel().execute();
+				assertTrue(empty.isEmpty());
+				assertEquals(0, empty.totalEntries().getAsInt());
+				assertEquals(0, bmc.getCount(NETFN_STORAGE, GET_SEL_ENTRY), "an empty log is not read");
+				assertEquals("0 SEL entries of 0: []", empty.toString());
+
+				sel.unsupportedInfo();
+				SelEntryList unknown = client.sel().execute();
+				assertTrue(unknown.isEmpty());
+				assertFalse(unknown.totalEntries().isPresent());
+				assertFalse(unknown.info().isPresent());
+				assertEquals(1, bmc.getCount(NETFN_STORAGE, GET_SEL_ENTRY), "without Get SEL Info, the first read tells");
+
+				sel.add(systemEvent(1, SEL_RESET_TIME, SensorType.Fan.getCode(), FAN_SENSOR, 0x0a, true, 0x01, 0xff, 0xff));
+				assertEquals(1, client.sel().execute().size());
+				assertEquals(
+						"1 SEL entry: [SEL entry 1 at 2024-05-15T09:15:25Z: Fan sensor 16, Transition to In Test"
+								+ " (assertion)]",
+						client.sel().execute().toString());
+
+				sel
+						.add(
+								systemEvent(
+										2,
+										SEL_RESET_TIME + 1,
+										SensorType.Fan.getCode(),
+										FAN_SENSOR,
+										0x0a,
+										false,
+										0x01,
+										0xff,
+										0xff));
+				sel.cancelReservationOnce(2);
+				assertEquals(2, client.sel().execute().size(), "a canceled reservation: take one and read the entry again");
+				assertEquals(1, bmc.getCount(NETFN_STORAGE, RESERVE_SEL));
+
+				sel.cancelReservationOnce(2).cancelReservationOnce(2);
+				IpmiCompletionCodeException refused = assertThrows(
+						IpmiCompletionCodeException.class,
+						() -> client.sel().execute());
+				assertEquals(CompletionCode.ReservationCanceled, refused.completionCode(), "canceled twice: once is enough");
+
+				sel.add(FakeSel.selRecord(3, 0x10, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13));
+				SelEntry reserved = client.sel().since(2).execute().get(0);
+				assertEquals(SelRecordType.Reserved, reserved.type());
+				assertEquals("Reserved record type", reserved.description());
+				assertFalse(reserved.timestamp().isPresent());
+				assertEquals("SEL entry 3: Reserved, Reserved record type", reserved.toString());
+			}
 		}
 	}
 

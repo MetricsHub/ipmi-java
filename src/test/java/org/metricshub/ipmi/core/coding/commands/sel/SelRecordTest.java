@@ -3,6 +3,7 @@ package org.metricshub.ipmi.core.coding.commands.sel;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.util.Date;
 
@@ -36,8 +37,34 @@ class SelRecordTest {
 		assertEquals(SensorType.Temperature, record.getSensorType());
 		assertEquals(5, record.getSensorNumber());
 		assertEquals(ReadingType.UpperNonCriticalGoingHigh, record.getEvent());
+		assertEquals(0x0020, record.getGeneratorId());
+		assertEquals(0x01, record.getEventType());
+		assertArrayEquals(bytes(0x07, 0x00, 0x00), record.getEventData());
 		assertNull(record.getManufacturerId());
 		assertNull(record.getOemData());
+	}
+
+	@Test
+	void theGeneratorIdAndEventDataAreThoseOfTheRecord() {
+		// Logged by system software ID 41h on channel 1, deassertion of a sensor-specific event with its data bytes
+		SelRecord record = SelRecord
+				.populateSelRecord(
+						bytes(0x05, 0x00, 0x02, 0xff, 0xff, 0xff, 0xff, 0x41, 0x10, 0x04, 0x09, 0x01, 0xef, 0xa0, 0x12, 0x34));
+
+		assertEquals(0x1041, record.getGeneratorId());
+		assertEquals(0x6f, record.getEventType());
+		assertEquals(EventDirection.Deassertion, record.getEventDirection());
+		assertEquals(ReadingType.PowerOffOrDown, record.getEvent());
+		assertArrayEquals(bytes(0xa0, 0x12, 0x34), record.getEventData());
+		assertEquals(new Date(0xffffffffL * 1000), record.getTimestamp(), "FFFFFFFFh is not negative");
+	}
+
+	@Test
+	void aShortRecordIsRefusedWithItsLength() {
+		IllegalArgumentException refused = assertThrows(
+				IllegalArgumentException.class,
+				() -> SelRecord.populateSelRecord(bytes(0x01, 0x00, 0x02)));
+		assertEquals("A SEL record is 16 bytes, not 3", refused.getMessage());
 	}
 
 	@Test

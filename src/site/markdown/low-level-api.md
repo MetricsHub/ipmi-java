@@ -39,27 +39,21 @@ next operation opens a new session.
 
 ### Reading the System Event Log
 
+[`sel()`](system-event-log.html) reads the log; the raw commands behind it are Get SEL Info and
+one Get SEL Entry per entry, following the next record IDs:
+
 ```java
 GetSelInfoResponseData info = bmc.send(new GetSelInfo());
 System.out.println("SEL entries: " + info.getEntriesCount());
 
 if (info.getEntriesCount() > 0) { // Get SEL Entry fails on an empty SEL
-	// GetSelEntry reads whole entries, which need no reservation (IPMI 2.0, section 31.5):
-	// 0 works on every BMC, including those that do not implement Reserve SEL
-	int reservationId = 0;
-
+	// A whole entry needs no reservation (IPMI 2.0, section 31.5): reservation ID 0
 	int recordId = 0; // 0: the first entry
 	while (recordId != 0xFFFF) { // 0xFFFF: no more entries
-		GetSelEntryResponseData entry = bmc.send(new GetSelEntry(reservationId, recordId));
+		GetSelEntryResponseData entry = bmc.send(new GetSelEntry(0, recordId));
 		SelRecord record = entry.getSelRecord();
-		if (record.getRecordType() == SelRecordType.System) {
-			System.out.println(record.getTimestamp() + " " + record.getSensorType() + " " + record.getEvent() + " "
-					+ record.getEventDirection());
-		} else {
-			// OEM entries (IPMI 2.0 sections 32.2 and 32.3): the manufacturer ID is null for the non-timestamped ones
-			System.out.println(record.getRecordType() + " entry " + record.getRecordId() + " from manufacturer "
-					+ record.getManufacturerId() + ": " + Arrays.toString(record.getOemData()));
-		}
+		System.out.println(record.getRecordId() + " " + record.getRecordType() + " " + record.getTimestamp() + " "
+				+ record.getSensorType() + " " + record.getEvent() + " " + record.getEventDirection());
 		recordId = entry.getNextRecordId();
 	}
 }
@@ -67,16 +61,15 @@ if (info.getEntriesCount() > 0) { // Get SEL Entry fails on an empty SEL
 
 ```text
 SEL entries: 643
-Wed May 15 11:15:25 CEST 2024 EventLoggingDisabled LogAreaReset Assertion
-OemTimestamped entry 2 from manufacturer 19046: [2, 1, 5, 0, 0, 0]
-OemTimestamped entry 3 from manufacturer 19046: [2, 8, 5, 0, 0, 0]
-OemTimestamped entry 4 from manufacturer 19046: [2, 2, 5, 0, 0, 0]
-Wed May 15 11:23:27 CEST 2024 PowerUnit PowerOffOrDown Assertion
-Wed May 15 11:23:34 CEST 2024 PowerUnit PowerOffOrDown Deassertion
+1 System Wed May 15 11:15:25 CEST 2024 EventLoggingDisabled LogAreaReset Assertion
+2 OemTimestamped Wed May 15 11:16:11 CEST 2024 null null null
+5 System Wed May 15 11:23:27 CEST 2024 PowerUnit PowerOffOrDown Assertion
+6 System Wed May 15 11:23:34 CEST 2024 PowerUnit PowerOffOrDown Deassertion
 ```
 
-A dedicated `sel()` operation is tracked in
-[#103](https://github.com/metricshub/ipmi-java/issues/103).
+`SelRecord` keeps the timestamp as the BMC sent it (a `Date` of the unsigned 32-bit value, so
+`FFFFFFFFh` and the pre-init values are dates of 2106 and of 1970 to 1987); `SelEntry` of the
+client tells them apart ([Timestamps](system-event-log.html#timestamps)).
 
 ### Controlling the power
 
