@@ -23,8 +23,10 @@ package org.metricshub.ipmi.client;
  */
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
+import java.util.Set;
 
 import org.metricshub.ipmi.core.coding.commands.sel.GetSelEntry;
 import org.metricshub.ipmi.core.coding.commands.sel.GetSelEntryResponseData;
@@ -83,9 +85,10 @@ final class SelReader {
 		List<SelEntry> entries = reader.walk(since, sinceEntry, before);
 		GetSelInfoResponseData after = reader.info();
 		if (entries == null || erased(before, after)) {
-			// The log changed under the walk (an entry deleted, the log cleared): read it again, once, as it is now
+			// The log changed under the walk (an entry deleted, the log cleared): read it again, once, as it is now, and
+			// whole: the entry after which to read may be another one by now
 			before = after;
-			entries = reader.walk(since, sinceEntry, before);
+			entries = reader.walk(-1, null, before);
 			after = reader.info();
 			if (entries == null || erased(before, after)) {
 				throw new IpmiClientException(
@@ -150,6 +153,8 @@ final class SelReader {
 				next = last.getNextRecordId();
 			}
 		}
+		Set<Integer> read = new HashSet<Integer>();
+		int previous = sinceId;
 		while (next != LAST_RECORD_ID) {
 			GetSelEntryResponseData reply = entry(next);
 			if (reply == null) {
@@ -157,7 +162,19 @@ final class SelReader {
 				// Nothing at a record another entry named as the next one: the log changed under the walk
 				return next == FIRST_RECORD_ID && entries.isEmpty() ? entries : null;
 			}
-			entries.add(new SelEntry(reply.getSelRecord(), utcOffsetMinutes));
+			SelEntry entry = new SelEntry(reply.getSelRecord(), utcOffsetMinutes);
+			boolean self = reply.getNextRecordId() == entry.id();
+			if (!read.add(entry.id()) || self) {
+				// A BMC whose next record IDs loop would be read for ever
+				throw new IpmiClientException(
+						String
+								.format(
+										"The System Event Log loops: entry %04Xh names entry %04Xh as the next one, which was read already",
+										self ? entry.id() : previous,
+										entry.id()));
+			}
+			entries.add(entry);
+			previous = entry.id();
 			next = reply.getNextRecordId();
 		}
 		return entries;

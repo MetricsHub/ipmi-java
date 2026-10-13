@@ -42,9 +42,10 @@ SEL entry 7 at 2024-05-15T09:24:15Z: VersionChange sensor 0, Firmware or softwar
 Get SEL Info is sent again after the walk: when the log was **erased meanwhile** (its erase
 timestamp changed, after a Clear SEL or a Delete SEL Entry, whose record IDs may be reused), or
 when an entry named as the next one is not there any more (`CBh`), the read **starts over**,
-once, from what the log is now; a log that changes twice during a read fails it with
-`IpmiClientException` rather than return a list that mixes two logs. While a Clear SEL is in
-progress (`81h`), the read waits for its end, up to 10 s.
+once, whole (the entry given to `since()` may be another one by then) and from what the log is
+now; a log that changes twice during a read fails it with `IpmiClientException` rather than
+return a list that mixes two logs, and so does a log whose next record IDs loop. While a Clear
+SEL is in progress (`81h`), the read waits for its end, up to 10 s.
 
 Every record type is decoded: the system events, the OEM records with and without timestamp,
 and the reserved types, of which only the record ID is defined
@@ -69,6 +70,7 @@ Each [`SelEntry`](apidocs/org/metricshub/ipmi/client/SelEntry.html) is immutable
 | `sensorType()` | The [`SensorType`](apidocs/org/metricshub/ipmi/core/coding/commands/sdr/record/SensorType.html) of the sensor that reported a system event (`Temperature`, `PowerSupply`, `Memory`, `PhysicalSecurity`, ...) |
 | `sensorNumber()` | Its sensor number: the [`Sensor.number()`](sensors.html#the-sensor-object) of the sensor in the SDR repository, unique for a given `generatorId()` |
 | `generatorId()` | What logged the event: the slave address (`0x20` for the BMC) or system software ID in the low byte, its channel and LUN in the high byte |
+| `isFrom(sensor)` | Whether a [`Sensor`](sensors.html#the-sensor-object) of the SDR repository is the one that reported the event: same owner (address or software ID, LUN) and same number |
 | `eventType()` | The event/reading type code: `0x01` for a threshold event, `0x02`–`0x0C` generic discrete, `0x6F` sensor-specific, `0x70`–`0x7F` OEM |
 | `event()` | What happened, as the [`ReadingType`](apidocs/org/metricshub/ipmi/core/coding/commands/sdr/record/ReadingType.html) of the event offset: `UpperCriticalGoingHigh`, `PowerSupplyInputLost`, `LogAreaReset`, ... |
 | `direction()` | [`EventDirection`](apidocs/org/metricshub/ipmi/core/coding/commands/sel/EventDirection.html): `Assertion` (the threshold crossed, the failure detected) or `Deassertion` (back within the threshold, the failure gone) |
@@ -115,26 +117,22 @@ the raw reading that triggered it (second byte) and the threshold (third byte), 
 of the first byte announce (`01` in bits 7:6 for the reading, `01` in bits 5:4 for the threshold).
 They are raw bytes: convert them with the `calcFormula()` of the sensor's
 [`FullSensorRecord`](apidocs/org/metricshub/ipmi/core/coding/commands/sdr/record/FullSensorRecord.html),
-found among `bmc.sensors().execute()` by its owner and number: a sensor number is unique for
-its owner only (the BMC, a satellite controller, the BIOS...). The low byte of `generatorId()`
-is the owner's address as the SEL encodes it, the 7-bit slave address or software ID shifted
-left by one (`0x20` for the BMC), while the SDR record gives the 7-bit value (`0x10`):
+found among `bmc.sensors().execute()` with `isFrom(sensor)`: a sensor number is unique for its
+owner only (the BMC, a satellite controller, the BIOS...), so `isFrom()` matches the
+`generatorId()` of the event (the address or software ID and the LUN of what logged it) with
+the owner of the SDR record, and the sensor number, as `ipmitool sel elist` does:
 
 ```java
-Map<Integer, Sensor> sensors = new HashMap<>();
-for (Sensor sensor : bmc.sensors().execute()) {
-	AbstractSensorRecord record = (AbstractSensorRecord) sensor.record();
-	sensors.put((record.getSensorOwnerId() & 0x7F) << 8 | sensor.number(), sensor);
-}
+SensorList sensors = bmc.sensors().execute();
 for (SelEntry entry : bmc.sel().execute()) {
 	if (entry.eventType().orElse(0) == 0x01 && entry.direction().get() == EventDirection.Assertion) {
-		int owner = (entry.generatorId().getAsInt() & 0xFF) >> 1;
-		Sensor sensor = sensors.get(owner << 8 | entry.sensorNumber().getAsInt());
 		byte[] data = entry.eventData();
-		if (sensor != null && (data[0] & 0xC0) == 0x40 && sensor.record() instanceof FullSensorRecord) {
-			FullSensorRecord record = (FullSensorRecord) sensor.record();
-			System.out.println(entry.timestamp().orElse(null) + " " + sensor.name() + ": " + entry.description()
-					+ " at " + record.calcFormula(data[1] & 0xFF) + " " + sensor.unit());
+		for (Sensor sensor : sensors) {
+			if (entry.isFrom(sensor) && (data[0] & 0xC0) == 0x40 && sensor.record() instanceof FullSensorRecord) {
+				FullSensorRecord record = (FullSensorRecord) sensor.record();
+				System.out.println(entry.timestamp().orElse(null) + " " + sensor.name() + ": " + entry.description()
+						+ " at " + record.calcFormula(data[1] & 0xFF) + " " + sensor.unit());
+			}
 		}
 	}
 }

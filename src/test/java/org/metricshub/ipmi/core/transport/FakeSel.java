@@ -34,6 +34,20 @@ public final class FakeSel {
 	private final Map<Integer, Integer> vanishOnce = new ConcurrentHashMap<>();
 	private final Map<Integer, Integer> erasingOnce = new ConcurrentHashMap<>();
 	private final Map<Integer, Runnable> before = new ConcurrentHashMap<>();
+	private final Map<Integer, Integer> nextOverrides = new ConcurrentHashMap<>();
+
+	/**
+	 * Makes the reply of the given record name another record as the next one, as a malformed BMC does.
+	 *
+	 * @param recordId the record ID
+	 * @param next the next record ID to report
+	 * @return this log
+	 */
+	public FakeSel nextRecordId(int recordId, int next) {
+		nextOverrides.put(recordId, next);
+		return this;
+	}
+
 	private volatile Integer utcOffsetMinutes;
 	private volatile int utcOffsetRefusal = 0xc1;
 
@@ -203,7 +217,10 @@ public final class FakeSel {
 		if (index < 0 || index >= records.size()) {
 			return new byte[] { (byte) 0xcb }; // requested record not present
 		}
-		int next = index + 1 < records.size() ? id(records.get(index + 1)) : LAST_RECORD_ID;
+		int next = nextOverrides
+				.getOrDefault(
+						id(records.get(index)),
+						index + 1 < records.size() ? id(records.get(index + 1)) : LAST_RECORD_ID);
 		return ByteBuffer
 				.allocate(3 + RECORD_SIZE)
 				.order(ByteOrder.LITTLE_ENDIAN)

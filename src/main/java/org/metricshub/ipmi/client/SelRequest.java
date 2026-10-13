@@ -90,7 +90,8 @@ public final class SelRequest {
 	/**
 	 * Reads the entries: Get SEL Info, Get SEL Time UTC Offset, then one Get SEL Entry per entry, each read whole (so
 	 * without a reservation, IPMI 2.0 section 31.5; one is taken when the BMC asks for it). A log that changes while
-	 * it is read (an entry deleted, the log cleared) is read again from the start, once.
+	 * it is read (an entry deleted, the log cleared) is read again from the start, once, and whole: the entry given to
+	 * {@code since()} may be another one by then.
 	 *
 	 * @return the entries, in the order of the log
 	 * @throws IpmiClientException when the log cannot be read: the BMC does not answer, refuses an entry, returns a

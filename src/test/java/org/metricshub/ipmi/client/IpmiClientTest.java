@@ -226,6 +226,11 @@ class IpmiClientTest {
 			assertEquals(ReadingType.UpperNonCriticalGoingHigh, threshold.event().get());
 			assertEquals("Upper Non Critical Going High", threshold.description(), "a name ipmiutil does not give");
 			assertArrayEquals(new byte[] { 0x57, (byte) 0x9a, (byte) 0x98 }, threshold.eventData());
+			SensorList sensors = client.sensors().execute();
+			assertTrue(threshold.isFrom(sensors.get(0)), "the BMC's temperature sensor 50: " + sensors.get(0));
+			assertFalse(threshold.isFrom(sensors.get(1)), "another number");
+			assertFalse(reset.isFrom(sensors.get(0)), "sensor 114 of the BMC, not in the repository");
+			assertFalse(oem.isFrom(sensors.get(0)), "an OEM entry is from no sensor");
 
 			SelEntry power = log.get(3);
 			assertEquals(ReadingType.PowerOffOrDown, power.event().get());
@@ -320,12 +325,10 @@ class IpmiClientTest {
 				IpmiClientException twice = assertThrows(IpmiClientException.class, () -> client.sel().execute());
 				assertTrue(twice.getMessage().contains("changed twice while it was read"), twice.getMessage());
 
-				// The entry after which to read is gone, then entry 4 under the whole-log walk: the second walk starts over
+				// The entry after which to read is gone, then entry 4 under the whole-log walk: the second walk reads the
+				// whole log, whatever the cursor
 				sel.vanishOnce(3).vanishOnce(4);
-				assertEquals(
-						3,
-						client.sel().since(3).execute().size(),
-						"the second walk finds entry 3 again: the entries after it");
+				assertEquals(6, client.sel().since(3).execute().size(), "the second walk is whole");
 			}
 		}
 	}
@@ -366,6 +369,62 @@ class IpmiClientTest {
 				// A Clear SEL in progress answers 81h: the read waits for its end
 				sel.eraseInProgressOnce(2);
 				assertEquals(6, client.sel().execute().size());
+			}
+		}
+	}
+
+	@Test
+	@Timeout(30)
+	void aCursorIsDroppedWhenTheLogWasErasedUnderTheWalk() throws Exception {
+		try (FakeRmcpPlusBmc bmc = new FakeRmcpPlusBmc(SUITES, USER, utf8(PASSWORD), null)) {
+			FakeSel sel = Fixtures.sel();
+			sel.install(bmc);
+			// Reading after entry 3, the log is cleared and filled again before entry 5 is read: the new log holds
+			// another entry 3, which the ID alone cannot tell, so the second walk reads the whole new log
+			sel.before(5, () -> {
+				sel.clear();
+				for (int id = 1; id <= 4; id++) {
+					sel
+							.add(
+									systemEvent(
+											id,
+											SEL_RESET_TIME + 3000 + id,
+											SensorType.Fan.getCode(),
+											FAN_SENSOR,
+											0x0a,
+											true,
+											0x01,
+											0xff,
+											0xff));
+				}
+			});
+			try (IpmiClient client = client(bmc).build()) {
+				SelEntryList log = client.sel().since(3).execute();
+				assertEquals(Arrays.asList(1, 2, 3, 4), log.stream().map(SelEntry::id).collect(Collectors.toList()));
+				assertTrue(log.stream().allMatch(entry -> entry.sensorType().get() == SensorType.Fan), "the new log only");
+			}
+		}
+	}
+
+	@Test
+	@Timeout(30)
+	void aLoopInTheNextRecordIdsIsRejected() throws Exception {
+		try (FakeRmcpPlusBmc bmc = new FakeRmcpPlusBmc(SUITES, USER, utf8(PASSWORD), null)) {
+			FakeSel sel = Fixtures.sel().nextRecordId(4, 2);
+			sel.install(bmc);
+			try (IpmiClient client = client(bmc).build()) {
+				IpmiClientException loop = assertThrows(IpmiClientException.class, () -> client.sel().execute());
+				assertEquals(
+						"The System Event Log loops: entry 0004h names entry 0002h as the next one, which was read already",
+						loop.getMessage());
+				assertEquals(4 + 1, bmc.getCount(NETFN_STORAGE, GET_SEL_ENTRY), "entries 1 to 4, then 2 again, once");
+
+				sel.nextRecordId(4, 4);
+				assertTrue(
+						assertThrows(IpmiClientException.class, () -> client.sel().execute())
+								.getMessage()
+								.contains("entry 0004h names entry 0004h as the next one"),
+						"an entry that names itself");
 			}
 		}
 	}

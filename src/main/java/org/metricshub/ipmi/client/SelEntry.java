@@ -27,10 +27,13 @@ import java.time.temporal.ChronoUnit;
 import java.util.Arrays;
 import java.util.Date;
 import java.util.Locale;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.OptionalInt;
 import java.util.OptionalLong;
 
+import org.metricshub.ipmi.core.coding.commands.sdr.record.AbstractSensorRecord;
+import org.metricshub.ipmi.core.coding.commands.sdr.record.AddressType;
 import org.metricshub.ipmi.core.coding.commands.sdr.record.ReadingType;
 import org.metricshub.ipmi.core.coding.commands.sdr.record.SensorType;
 import org.metricshub.ipmi.core.coding.commands.sel.EventDirection;
@@ -60,6 +63,9 @@ public final class SelEntry {
 	private static final long UNSPECIFIED_TIMESTAMP = 0xFFFFFFFFL;
 
 	private static final int OFFSET_MASK = 0x0f;
+	private static final int OWNER_ID_MASK = 0x7f;
+	private static final int BYTE_MASK = 0xff;
+	private static final int LUN_MASK = 0x03;
 
 	private final SelRecord record;
 	private final String description;
@@ -293,6 +299,32 @@ public final class SelEntry {
 		long seconds = seconds(timestamp);
 		return seconds <= LAST_PRE_INIT_TIMESTAMP || seconds == UNSPECIFIED_TIMESTAMP ?
 				Optional.<Instant>empty() : Optional.of(timestamp.toInstant().minus(utcOffsetMinutes, ChronoUnit.MINUTES));
+	}
+
+	/**
+	 * Tells whether a system event was reported by the given sensor: the sensor that owns the number of the event,
+	 * for the owner that logged it. The {@link #generatorId() generator ID} is matched against the owner of the SDR
+	 * record (its slave address or system software ID, whichever bit 0 says, and its LUN) and the sensor number
+	 * against {@link Sensor#number()}, as {@code ipmitool sel elist} does; the channel number is not compared, as
+	 * BMCs do not log it consistently.
+	 *
+	 * @param sensor a sensor of the SDR repository
+	 * @return whether the event is from that sensor; false for the OEM and reserved entries
+	 */
+	public boolean isFrom(Sensor sensor) {
+		Objects.requireNonNull(sensor, "sensor");
+		if (!isSystemEvent() || !(sensor.record() instanceof AbstractSensorRecord)) {
+			return false;
+		}
+		AbstractSensorRecord owner = (AbstractSensorRecord) sensor.record();
+		int generator = record.getGeneratorId();
+		// Generator ID byte 1 (IPMI 2.0 table 32-1): the 7-bit address or ID in bits 7:1, bit 0 set for a software ID;
+		// byte 2: the channel in bits 7:4, the LUN in bits 1:0
+		int address = (owner.getSensorOwnerId() & OWNER_ID_MASK) << 1
+				| (owner.getAddressType() == AddressType.SystemSoftwareId ? 1 : 0);
+		return record.getSensorNumber() == sensor.number()
+				&& (generator & BYTE_MASK) == address
+				&& (generator >> Byte.SIZE & LUN_MASK) == (owner.getSensorOwnerLun() & LUN_MASK);
 	}
 
 	/**
