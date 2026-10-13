@@ -466,6 +466,14 @@ public class FakeRmcpPlusBmc implements AutoCloseable {
 	}
 
 	/**
+	 * @return how many valid IPMI requests were received in sessions so far: {@code inject(getSessionRequests() + 1,
+	 *         fault)} faults the reply to the next one
+	 */
+	public int getSessionRequests() {
+		return sessionRequests.get();
+	}
+
+	/**
 	 * @return whether the system is powered on: on at the start, then as the last Chassis Control left it
 	 */
 	public boolean isPowerOn() {

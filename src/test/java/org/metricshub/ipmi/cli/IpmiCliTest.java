@@ -172,6 +172,10 @@ class IpmiCliTest {
 			Result reset = login(bmc, "power", "reset");
 			assertEquals(IpmiCli.EXIT_PROTOCOL, reset.code, "D5h: a reset of a system that is off");
 			assertTrue(reset.err.contains("completion code D5h"), reset.err);
+			Result cycleOff = login(bmc, "power", "cycle");
+			assertEquals(IpmiCli.EXIT_PROTOCOL, cycleOff.code, "a cycle of a system that is off is refused by the client");
+			assertTrue(cycleOff.err.contains("ipmicli: The system is off"), cycleOff.err);
+			assertEquals("off\n", login(bmc, "power", "status").out, "nothing was sent");
 			assertEquals(0, login(bmc, "power", "on").code);
 			assertEquals(1, bmc.getChassisControl());
 			assertEquals("on\n", login(bmc, "power", "status").out);

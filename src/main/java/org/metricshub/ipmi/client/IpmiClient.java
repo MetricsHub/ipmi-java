@@ -91,10 +91,11 @@ import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
  * at a time on that session.
  *
  * <pre>
- * try (IpmiClient bmc = IpmiClient.builder("bmc.example.com").credentials("monitor", password).build()) {
+ * IpmiClient.Builder builder = IpmiClient.builder("bmc.example.com").credentials("monitor", password);
+ * try (IpmiClient bmc = builder.privilege(PrivilegeLevel.Operator).build()) {
  * 	ChassisStatus chassis = bmc.chassisStatus();
  * 	if (!chassis.powerOn()) {
- * 		bmc.chassisControl(PowerCommand.PowerUp); // with privilege(PrivilegeLevel.Operator) on the builder
+ * 		bmc.chassisControl(PowerCommand.PowerUp); // the Operator privilege set above
  * 	}
  * 	for (Sensor sensor : bmc.sensors().types(SensorType.Temperature).execute()) {
  * 		sensor.reading().ifPresent(value -&gt; System.out.println(sensor.name() + " = " + value + " " + sensor.unit()));
@@ -255,47 +256,65 @@ public final class IpmiClient implements AutoCloseable {
 	 * Controls the power of the chassis (Chassis Control, IPMI 2.0 section 28.3): power up, power down, power
 	 * cycle, hard reset, soft shutdown or diagnostic interrupt. The BMC answers once it accepts the command and may
 	 * carry it out afterwards: {@link #chassisStatus()} tells when the power state changed. Needs the Operator
-	 * privilege ({@link Builder#privilege(PrivilegeLevel)}). Never replayed on a new session.
+	 * privilege ({@link Builder#privilege(PrivilegeLevel)}).
+	 * <p>
+	 * The command is <b>sent once</b>, never again when its reply is lost (the BMC may have carried it out: a reset
+	 * sent again would reset the system twice) and never on a new session: a lost reply fails with
+	 * {@link IpmiTimeoutException}, and the power state is then to be read with {@link #chassisStatus()}. A
+	 * {@link PowerCommand#PowerCycle} is refused when the system is off, as the specification recommends: some BMCs
+	 * would power the system up instead of doing nothing.
+	 * </p>
 	 *
 	 * @param command the power command
+	 * @throws IllegalStateException for a power cycle of a system that is off
 	 * @throws IpmiCompletionCodeException when the BMC refuses the command: {@code D4h} at a session below Operator,
-	 *         {@code D5h} for a command it cannot carry out in the present state (a power cycle or a reset of a
-	 *         system that is off), {@code CCh} for an optional command it does not implement
-	 * @throws IpmiClientException when the session cannot be opened or the BMC does not answer
+	 *         {@code D5h} for a command it cannot carry out in the present state (a reset of a system that is off),
+	 *         {@code CCh} for an optional command it does not implement
+	 * @throws IpmiTimeoutException when the BMC does not answer: whether it carried the command out is unknown
+	 * @throws IpmiClientException when the session cannot be opened
 	 */
 	public void chassisControl(PowerCommand command) {
 		Objects.requireNonNull(command, "command");
-		run("chassis control " + command, timeout, true, false, () -> link.send(new ChassisControl(command)));
+		run("chassis control " + command, timeout, true, false, () -> {
+			if (command == PowerCommand.PowerCycle && !link.send(new GetChassisStatus()).isPowerOn()) {
+				throw new IllegalStateException(
+						"The system is off: a power cycle would power it up on some BMCs, use PowerUp to power it up");
+			}
+			return link.sendOnce(new ChassisControl(command));
+		});
 	}
 
 	/**
 	 * Makes the chassis identify itself (Chassis Identify, IPMI 2.0 section 28.5), typically with a blinking LED,
-	 * for the given number of seconds, or turns the identify off. Needs the Operator privilege. Never replayed on a
-	 * new session.
+	 * for the given number of seconds, or turns the identify off. Needs the Operator privilege. Sent once, never
+	 * again when its reply is lost nor on a new session: a lost reply fails with {@link IpmiTimeoutException}, and
+	 * {@link ChassisStatus#identifyState()} tells what the BMC did.
 	 *
 	 * @param seconds how long the identify stays on, 1 to 255 (the BMC may stretch it by 20%); 0 turns it off
 	 * @throws IllegalArgumentException when {@code seconds} is not between 0 and 255
 	 * @throws IpmiCompletionCodeException when the BMC refuses the command: {@code D4h} at a session below Operator,
 	 *         {@code C1h} when it does not implement it
-	 * @throws IpmiClientException when the session cannot be opened or the BMC does not answer
+	 * @throws IpmiTimeoutException when the BMC does not answer
+	 * @throws IpmiClientException when the session cannot be opened
 	 */
 	public void chassisIdentify(int seconds) {
 		ChassisIdentify command = new ChassisIdentify(seconds, false);
-		run("chassis identify", timeout, true, false, () -> link.send(command));
+		run("chassis identify", timeout, true, false, () -> link.sendOnce(command));
 	}
 
 	/**
 	 * Makes the chassis identify itself until {@link #chassisIdentify(int) chassisIdentify(0)} turns it off: the
 	 * optional "force identify on" of Chassis Identify, which not every BMC implements. Needs the Operator privilege.
-	 * Never replayed on a new session.
+	 * Sent once, like {@link #chassisIdentify(int)}.
 	 *
 	 * @throws IpmiCompletionCodeException when the BMC refuses the command: {@code D4h} at a session below Operator,
 	 *         {@code C1h} when it does not implement Chassis Identify, {@code CCh} when it does not implement the
 	 *         force byte
-	 * @throws IpmiClientException when the session cannot be opened or the BMC does not answer
+	 * @throws IpmiTimeoutException when the BMC does not answer
+	 * @throws IpmiClientException when the session cannot be opened
 	 */
 	public void chassisIdentifyForever() {
-		run("chassis identify", timeout, true, false, () -> link.send(new ChassisIdentify(0, true)));
+		run("chassis identify", timeout, true, false, () -> link.sendOnce(new ChassisIdentify(0, true)));
 	}
 
 	/**
@@ -902,12 +921,30 @@ public final class IpmiClient implements AutoCloseable {
 
 		@Override
 		public <R extends ResponseData> R send(IpmiCommandCoder<R> command) {
+			return exchange(command, false);
+		}
+
+		/**
+		 * Sends a command once, never again when its reply is lost: a control command the BMC may have carried out
+		 * (a reset) must not reach it twice. A lost reply says nothing about the session, which is kept.
+		 */
+		<R extends ResponseData> R sendOnce(IpmiCommandCoder<R> command) {
+			return exchange(command, true);
+		}
+
+		private <R extends ResponseData> R exchange(IpmiCommandCoder<R> command, boolean once) {
 			String name = command.getClass().getSimpleName();
 			try {
-				return connector.sendMessage(handle, command);
+				return once ? connector.sendMessage(handle, command, 0) : connector.sendMessage(handle, command);
 			} catch (IPMIException e) {
 				throw new IpmiCompletionCodeException(command, e);
 			} catch (ConnectionException e) {
+				if (once) {
+					throw new IpmiTimeoutException(
+							"No reply from " + host + " to " + name + ", which is sent once and not again: whether the BMC"
+									+ " carried it out is unknown",
+							e);
+				}
 				lost = true;
 				throw new IpmiTimeoutException(
 						"No reply from " + host + " to " + name + " after " + tries + " tries: the session is lost",

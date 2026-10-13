@@ -210,9 +210,12 @@ as long as the operating system needs): `power status` shows the result. The act
 [`PowerCommand`](chassis-status.html#controlling-the-power) of the library: `on` is `PowerUp`,
 `off` is `PowerDown` (immediate, no operating system shutdown), `cycle` is `PowerCycle` (off for
 at least a second, then on), `reset` is `HardReset`, `soft` is `SoftShutdown` and `diag` is
-`DiagnosticInterrupt`. `cycle` and `reset` of a system that is off are refused by most BMCs with
-`D5h` (exit code 70); `cycle`, `soft` and `diag` are optional in the specification, and a BMC
-that does not implement them answers `CCh`.
+`DiagnosticInterrupt`. `cycle` of a system that is off is refused by the client before anything
+is sent (exit code 70: some BMCs would power the system up), `reset` of a system that is off by
+most BMCs with `D5h` (exit code 70); `cycle`, `soft` and `diag` are optional in the
+specification, and a BMC that does not implement them answers `CCh`. An action is sent once,
+never again when its reply is lost (the BMC may have carried it out): a lost reply exits with
+124, and `power status` tells what the BMC did.
 
 `identify` blinks the identify LED for 15 seconds, `identify 60` for a minute (1 to 255), and
 `identify force` until `identify off`, on the BMCs that implement the "force identify on" option

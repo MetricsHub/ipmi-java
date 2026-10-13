@@ -328,7 +328,7 @@ public class IpmiConnector {
 	 *         when sending message to the managed system or initializing one of the cipherSuite's algorithms fails
 	 */
 	public ResponseData sendMessage(ConnectionHandle connectionHandle, PayloadCoder request) throws Exception {
-		return sendMessage(connectionHandle, request, true);
+		return sendMessage(connectionHandle, request, true, retries);
 	}
 
 	/**
@@ -351,7 +351,41 @@ public class IpmiConnector {
 	@SuppressWarnings("unchecked")
 	public <R extends ResponseData> R sendMessage(ConnectionHandle connectionHandle, IpmiCommandCoder<R> request)
 			throws Exception {
-		return (R) sendMessage(connectionHandle, request, true);
+		return (R) sendMessage(connectionHandle, request, true, retries);
+	}
+
+	/**
+	 * Sends the IPMI command to the remote host with its own number of resends when no reply comes, instead of
+	 * {@link #getRetries()}: 0 for a command the BMC must not receive twice (a chassis reset, whose reply can be lost
+	 * after the BMC carried it out). A reply with a transient completion code (busy, {@code C3h}) is still retried
+	 * {@link #getRetries()} times: the BMC says it did not carry the command out.
+	 *
+	 * @param <R>
+	 *        the type of the response data of the command
+	 * @param connectionHandle
+	 *        - {@link ConnectionHandle} associated with the remote host.
+	 * @param request
+	 *        - the command to send
+	 * @param resends
+	 *        how many times the command is sent again when no reply comes within the timeout, 0 to send it once
+	 * @return the response data of the command
+	 * @throws ConnectionException
+	 *         when connection is in the state that does not allow to perform this operation, or no reply came
+	 * @throws IPMIException
+	 *         when the BMC answers with an error completion code
+	 * @throws Exception
+	 *         when sending message to the managed system or initializing one of the cipherSuite's algorithms fails
+	 */
+	@SuppressWarnings("unchecked")
+	public <R extends ResponseData> R sendMessage(
+			ConnectionHandle connectionHandle,
+			IpmiCommandCoder<R> request,
+			int resends)
+			throws Exception {
+		if (resends < 0) {
+			throw new IllegalArgumentException("resends must not be negative: " + resends);
+		}
+		return (R) sendMessage(connectionHandle, request, true, resends);
 	}
 
 	/**
@@ -367,7 +401,7 @@ public class IpmiConnector {
 	 *         when sending message to the managed system or initializing one of the cipherSuite's algorithms fails
 	 */
 	public void sendOneWayMessage(ConnectionHandle connectionHandle, PayloadCoder request) throws Exception {
-		sendMessage(connectionHandle, request, false);
+		sendMessage(connectionHandle, request, false, retries);
 	}
 
 	/**
@@ -396,18 +430,22 @@ public class IpmiConnector {
 		}
 	}
 
-	private ResponseData sendMessage(ConnectionHandle connectionHandle, PayloadCoder request, boolean waitForResponse)
+	private ResponseData sendMessage(
+			ConnectionHandle connectionHandle,
+			PayloadCoder request,
+			boolean waitForResponse,
+			int resends)
 			throws Exception {
 		MessageListener listener = new MessageListener(connectionHandle);
 
 		if (!waitForResponse) {
-			return sendThroughAsyncConnector(request, connectionHandle, listener, false);
+			return sendThroughAsyncConnector(request, connectionHandle, listener, false, resends);
 		}
 
 		// Unregistered whatever the outcome: a listener left behind would keep every later reply of the connection
 		asyncConnector.registerListener(listener);
 		try {
-			return sendThroughAsyncConnector(request, connectionHandle, listener, true);
+			return sendThroughAsyncConnector(request, connectionHandle, listener, true, resends);
 		} finally {
 			asyncConnector.unregisterListener(listener);
 		}
@@ -417,7 +455,8 @@ public class IpmiConnector {
 			PayloadCoder request,
 			ConnectionHandle connectionHandle,
 			MessageListener listener,
-			boolean waitForResponse)
+			boolean waitForResponse,
+			int resends)
 			throws Exception {
 		ResponseData responseData = null;
 
@@ -444,7 +483,7 @@ public class IpmiConnector {
 				handleErrorResponse(tries, e);
 			} catch (Exception e) {
 				// No reply in time: the BMC already had the whole message timeout, the request is sent again at once
-				handleRetriesWhenException(tries, e, false);
+				handleRetriesWhenException(tries, e, false, resends);
 			}
 		}
 
@@ -452,11 +491,11 @@ public class IpmiConnector {
 	}
 
 	/**
-	 * Throws the exception when the request was already sent again {@link #retries} times (retries + 1 tries),
-	 * otherwise lets the caller send it again, after a random pause of up to {@link #idleTime} ms if asked.
+	 * Throws the exception when the request was already sent again {@code limit} times (limit + 1 tries), otherwise
+	 * lets the caller send it again, after a random pause of up to {@link #idleTime} ms if asked.
 	 */
-	private void handleRetriesWhenException(int tries, Exception e, boolean pause) throws Exception {
-		if (tries > retries) {
+	private void handleRetriesWhenException(int tries, Exception e, boolean pause, int limit) throws Exception {
+		if (tries > limit) {
 			throw e;
 		}
 		if (pause) {
@@ -471,7 +510,7 @@ public class IpmiConnector {
 	 */
 	private void handleErrorResponse(int tries, IPMIException e) throws Exception {
 		if (e.getCompletionCode().isTransient()) {
-			handleRetriesWhenException(tries, e, e.getCompletionCode() != CompletionCode.Timeout);
+			handleRetriesWhenException(tries, e, e.getCompletionCode() != CompletionCode.Timeout, retries);
 		} else {
 			throw e;
 		}

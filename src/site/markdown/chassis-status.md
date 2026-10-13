@@ -74,8 +74,14 @@ off takes a few seconds, a soft shutdown as long as the operating system needs. 
 `chassisStatus().powerOn()` to see the state change. A refused command fails with
 [`IpmiCompletionCodeException`](timeouts-and-errors.html#exceptions): `D4h` at a session below
 Operator, `D5h` for a command the system's present state does not allow, `CCh` for an optional
-command the BMC does not implement. The command is never sent again on a new session when the
-session is lost while it runs.
+command the BMC does not implement.
+
+Unlike the read operations, a control command is **sent once**: not again when its reply is
+lost, since the BMC may have carried it out and a second reset would reset the system twice, and
+not on a new session. A lost reply fails with `IpmiTimeoutException`, and `chassisStatus()` then
+tells what the BMC did. `PowerCycle` is refused with `IllegalStateException`, before anything is
+sent, when the system is off: the specification recommends that check, as some BMCs power the
+system up instead of doing nothing.
 
 ## The identify LED
 
@@ -84,8 +90,8 @@ the chassis identifies itself, typically by blinking a LED, for the given number
 255; the BMC may stretch it by 20%). `chassisIdentify(0)` turns the identify off, and
 `chassisIdentifyForever()` keeps it on until then, with the optional "force identify on" byte of
 the command, which not every BMC implements (`CCh` from those that do not). Both need the
-Operator privilege, and `identifyState()` of the [chassis status](#the-chassisstatus-object)
-reports the result on the BMCs that support it:
+Operator privilege, are sent once like the power commands, and `identifyState()` of the
+[chassis status](#the-chassisstatus-object) reports the result on the BMCs that support it:
 
 ```java
 bmc.chassisIdentify(30);

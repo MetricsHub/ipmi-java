@@ -1136,6 +1136,12 @@ class IpmiClientTest {
 						() -> client.chassisControl(PowerCommand.HardReset));
 				assertEquals(CompletionCode.CommandNotSupported, off.completionCode(), "D5h: a reset of a system that is off");
 				assertEquals(0xd5, off.rawCompletionCode());
+				int controls = bmc.getCount(NETFN_CHASSIS, CHASSIS_CONTROL);
+				IllegalStateException cycleOff = assertThrows(
+						IllegalStateException.class,
+						() -> client.chassisControl(PowerCommand.PowerCycle));
+				assertTrue(cycleOff.getMessage().contains("The system is off"), cycleOff.getMessage());
+				assertEquals(controls, bmc.getCount(NETFN_CHASSIS, CHASSIS_CONTROL), "a cycle of an off system is not sent");
 
 				client.chassisControl(PowerCommand.PowerUp);
 				assertTrue(client.chassisStatus().powerOn());
@@ -1162,6 +1168,28 @@ class IpmiClientTest {
 			}
 			awaitClose(bmc);
 			assertEquals(Collections.emptyList(), bmc.getErrors());
+		}
+	}
+
+	@Test
+	@Timeout(30)
+	void aChassisControlWhoseReplyIsLostIsNotSentAgain() throws Exception {
+		try (FakeRmcpPlusBmc bmc = bmc(); IpmiClient client = client(bmc).privilege(PrivilegeLevel.Operator).build()) {
+			// The BMC carries the reset out and loses the reply
+			assertTrue(client.chassisStatus().powerOn());
+			bmc.inject(bmc.getSessionRequests() + 1, FakeRmcpPlusBmc.Fault.DROP);
+			IpmiTimeoutException lost = assertThrows(
+					IpmiTimeoutException.class,
+					() -> client.chassisControl(PowerCommand.HardReset));
+			assertTrue(lost.getMessage().contains("sent once"), lost.getMessage());
+			assertEquals(1, bmc.getCount(NETFN_CHASSIS, CHASSIS_CONTROL), "a reset the BMC may have done is not sent again");
+			assertEquals(3, bmc.getChassisControl(), "the BMC did carry it out");
+			assertTrue(client.chassisStatus().powerOn(), "the session is kept: a read goes on");
+			assertEquals(1, bmc.getCount(OPEN_SESSION_REQUEST), "no new session for one lost reply");
+
+			bmc.inject(bmc.getSessionRequests() + 1, FakeRmcpPlusBmc.Fault.DROP);
+			assertThrows(IpmiTimeoutException.class, () -> client.chassisIdentify(5));
+			assertEquals(1, bmc.getCount(NETFN_CHASSIS, CHASSIS_IDENTIFY));
 		}
 	}
 
