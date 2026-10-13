@@ -39,13 +39,18 @@ SEL entry 7 at 2024-05-15T09:24:15Z: VersionChange sensor 0, Firmware or softwar
    needed (IPMI 2.0, section 31.5); when a BMC asks for one anyway, or cancels the one it gave
    (`C5h`), the client takes a reservation with **Reserve SEL** and reads the entry again.
 
-Get SEL Info is sent again after the walk: when the log was **erased meanwhile** (its erase
-timestamp changed, after a Clear SEL or a Delete SEL Entry, whose record IDs may be reused), or
-when an entry named as the next one is not there any more (`CBh`), the read **starts over**,
+Get SEL Info is sent again after the walk, and so is the first entry read: when the log was
+**erased meanwhile** (its erase timestamp changed, after a Clear SEL or a Delete SEL Entry, whose
+record IDs may be reused; or the first entry is another one, as two erases within a second
+leave the timestamp unchanged), or when an entry named as the next one is not there any more
+(`CBh`), the read **starts over**,
 once, whole (the entry given to `since()` may be another one by then) and from what the log is
 now; a log that changes twice during a read fails it with `IpmiClientException` rather than
-return a list that mixes two logs, and so does a log whose next record IDs loop. While a Clear
-SEL is in progress (`81h`), the read waits for its end, up to 10 s.
+return a list that mixes two logs, and so does a log whose next record IDs loop or that answers
+another entry than the one asked for. While a Clear SEL is in progress (`81h`), the read waits
+for its end, up to 10 s. A BMC without Get SEL Info (`C1h`, `D5h`) is read all the same, without
+the counts and timestamps; any other refusal of it fails the read, as a clear could then go
+unnoticed.
 
 Every record type is decoded: the system events, the OEM records with and without timestamp,
 and the reserved types, of which only the record ID is defined
@@ -102,7 +107,10 @@ of IPMI 2.0 revision 1.1, and the client subtracts that offset from every timest
 so that `timestamp()`, `lastAddition()` and `lastErase()` are UTC instants; `utcOffsetMinutes()`
 gives the offset applied: 0 when the BMC does not implement the command (`C1h`, `D5h`) or leaves
 the offset unspecified (`07FFh`, as after a Set SEL Time), while any other refusal (`D4h`...)
-fails the read, as the timestamps would be off by an unknown offset. The timestamps are
+fails the read, as the timestamps would be off by an unknown offset. The offset is the one in
+force when the log is read: the log records none per entry, so an entry logged under another
+offset (before a daylight saving change, or a change of the time zone of the BMC) comes out
+shifted by the difference, an hour usually. The timestamps are
 still only as good as the clock of the BMC: of the BMCs tested, a Supermicro keeps UTC, a Lenovo
 IMM reports an offset of 60 minutes, and a Dell iDRAC runs its SEL clock on the local time of
 its time zone setting *without* implementing the command, so its timestamps come out two hours

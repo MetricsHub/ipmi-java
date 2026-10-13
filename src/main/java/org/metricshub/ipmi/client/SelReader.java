@@ -84,13 +84,13 @@ final class SelReader {
 		GetSelInfoResponseData before = reader.info();
 		List<SelEntry> entries = reader.walk(since, sinceEntry, before);
 		GetSelInfoResponseData after = reader.info();
-		if (entries == null || erased(before, after)) {
+		if (entries == null || erased(before, after) || reader.changed(entries)) {
 			// The log changed under the walk (an entry deleted, the log cleared): read it again, once, as it is now, and
 			// whole: the entry after which to read may be another one by now
 			before = after;
 			entries = reader.walk(-1, null, before);
 			after = reader.info();
-			if (entries == null || erased(before, after)) {
+			if (entries == null || erased(before, after) || reader.changed(entries)) {
 				throw new IpmiClientException(
 						"The System Event Log of " + host + " changed twice while it was read: it was erased, or an entry"
 								+ " named as the next one is not there any more");
@@ -107,13 +107,55 @@ final class SelReader {
 		return before != null && after != null && !Objects.equals(before.getEraseTimestamp(), after.getEraseTimestamp());
 	}
 
-	private GetSelInfoResponseData info() {
-		try {
-			return exchange.send(new GetSelInfo());
-		} catch (IpmiCompletionCodeException e) {
-			// A BMC that refuses Get SEL Info: an empty log then answers "not present" to the first Get SEL Entry
-			return null;
+	/**
+	 * Tells whether the first entry read is still the first entry of the log, byte for byte: a log cleared and filled
+	 * again while it was walked holds another entry under its ID, even when two erases within a second left the erase
+	 * timestamp unchanged.
+	 */
+	private boolean changed(List<SelEntry> entries) {
+		if (entries.isEmpty()) {
+			return false;
 		}
+		GetSelEntryResponseData first = entry(entries.get(0).id());
+		return first == null || !entries.get(0).equals(new SelEntry(first.getSelRecord()));
+	}
+
+	private GetSelInfoResponseData info() {
+		int erasing = 0;
+		while (true) {
+			try {
+				return exchange.send(new GetSelInfo());
+			} catch (IpmiCompletionCodeException e) {
+				if (e.completionCode() == CompletionCode.InvalidCommand
+						|| e.completionCode() == CompletionCode.CommandNotSupported) {
+					// A BMC without Get SEL Info: an empty log then answers "not present" to the first Get SEL Entry
+					return null;
+				}
+				if (e.rawCompletionCode() != SEL_ERASE_IN_PROGRESS) {
+					// A refusal the caller can act on (privilege, busy): without the erase timestamp, a log cleared
+					// under the walk would go unnoticed
+					throw e;
+				}
+				erasing = waitForErase(erasing, e);
+			}
+		}
+	}
+
+	/**
+	 * Waits for the end of a Clear SEL in progress, once more.
+	 *
+	 * @param waits how many times the end was waited for already
+	 * @return the new count
+	 * @throws IpmiClientException when the Clear SEL takes too long
+	 */
+	private static int waitForErase(int waits, IpmiCompletionCodeException e) {
+		if (waits >= ERASE_WAITS) {
+			throw new IpmiClientException(
+					"The System Event Log is still being erased after " + ERASE_WAITS * ERASE_WAIT_MS / MS_PER_SECOND + " s",
+					e);
+		}
+		pause();
+		return waits + 1;
 	}
 
 	private int utcOffset() {
@@ -149,7 +191,9 @@ final class SelReader {
 			// The entry read last gives the next one. When the log does not hold it any more, or holds another entry
 			// under its ID (the log was cleared and its IDs started over), the whole log is read
 			GetSelEntryResponseData last = entry(sinceId);
-			if (last != null && (sinceEntry == null || sinceEntry.equals(new SelEntry(last.getSelRecord())))) {
+			if (last != null
+					&& last.getSelRecord().getRecordId() == sinceId
+					&& (sinceEntry == null || sinceEntry.equals(new SelEntry(last.getSelRecord())))) {
 				next = last.getNextRecordId();
 			}
 		}
@@ -163,6 +207,11 @@ final class SelReader {
 				return next == FIRST_RECORD_ID && entries.isEmpty() ? entries : null;
 			}
 			SelEntry entry = new SelEntry(reply.getSelRecord(), utcOffsetMinutes);
+			if (next != FIRST_RECORD_ID && entry.id() != next) {
+				// A malformed reply: following it would skip the entry asked for
+				throw new IpmiClientException(
+						String.format("The System Event Log answered entry %04Xh when asked for entry %04Xh", entry.id(), next));
+			}
 			boolean self = reply.getNextRecordId() == entry.id();
 			if (!read.add(entry.id()) || self) {
 				// A BMC whose next record IDs loop would be read for ever
@@ -197,13 +246,7 @@ final class SelReader {
 				}
 				if (e.rawCompletionCode() == SEL_ERASE_IN_PROGRESS) {
 					// A Clear SEL is in progress: wait for its end, within the deadline of the operation
-					if (++erasing > ERASE_WAITS) {
-						throw new IpmiClientException(
-								"The System Event Log is still being erased after " + ERASE_WAITS * ERASE_WAIT_MS / MS_PER_SECOND
-										+ " s",
-								e);
-					}
-					pause();
+					erasing = waitForErase(erasing, e);
 					continue;
 				}
 				// A BMC that wants a reservation for a whole entry, or canceled the one it gave (it does so when another

@@ -35,6 +35,50 @@ public final class FakeSel {
 	private final Map<Integer, Integer> erasingOnce = new ConcurrentHashMap<>();
 	private final Map<Integer, Runnable> before = new ConcurrentHashMap<>();
 	private final Map<Integer, Integer> nextOverrides = new ConcurrentHashMap<>();
+	private final Map<Integer, Integer> servedInstead = new ConcurrentHashMap<>();
+	private volatile int infoRefusal = 0xc1;
+	private volatile int infoErasingOnce;
+
+	/**
+	 * Serves another record the next time the given one is asked for, as a malformed BMC does.
+	 *
+	 * @param recordId the record ID asked for
+	 * @param served the record ID to serve instead
+	 * @return this log
+	 */
+	public FakeSel serveInsteadOnce(int recordId, int served) {
+		servedInstead.put(recordId, served);
+		return this;
+	}
+
+	/**
+	 * Refuses Get SEL Info with the given completion code from now on.
+	 *
+	 * @param completionCode the completion code
+	 * @return this log
+	 */
+	public FakeSel refuseInfo(int completionCode) {
+		infoRefusal = completionCode;
+		infoSupported = false;
+		return this;
+	}
+
+	/**
+	 * Answers "SEL erase in progress" (81h) to the next Get SEL Info.
+	 *
+	 * @return this log
+	 */
+	public FakeSel infoEraseInProgressOnce() {
+		infoErasingOnce++;
+		return this;
+	}
+
+	/**
+	 * Clears the log without touching its erase timestamp, as a second clear within the same second does.
+	 */
+	public void clearWithoutErase() {
+		records.clear();
+	}
 
 	/**
 	 * Makes the reply of the given record name another record as the next one, as a malformed BMC does.
@@ -177,8 +221,12 @@ public final class FakeSel {
 	}
 
 	private byte[] info(byte[] data) {
+		if (infoErasingOnce > 0) {
+			infoErasingOnce--;
+			return new byte[] { (byte) 0x81 };
+		}
 		if (!infoSupported) {
-			return new byte[] { (byte) 0xc1 };
+			return new byte[] { (byte) infoRefusal };
 		}
 		return ByteBuffer
 				.allocate(15)
@@ -213,7 +261,9 @@ public final class FakeSel {
 		if (action != null) {
 			action.run();
 		}
-		int index = recordId == 0 ? 0 : recordId == LAST_RECORD_ID ? records.size() - 1 : indexOf(recordId);
+		Integer instead = servedInstead.remove(recordId);
+		int wanted = instead == null ? recordId : instead;
+		int index = wanted == 0 ? 0 : wanted == LAST_RECORD_ID ? records.size() - 1 : indexOf(wanted);
 		if (index < 0 || index >= records.size()) {
 			return new byte[] { (byte) 0xcb }; // requested record not present
 		}
