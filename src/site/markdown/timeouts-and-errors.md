@@ -40,6 +40,13 @@ Below the deadline, each message has its own timeout and is retried:
    over LAN disabled), with `IpmiTimeoutException` in the session, where the session is then
    considered [lost](#session-recovery).
 
+The control commands are the exception: `chassisControl()` and `chassisIdentify()` send their
+command **once**, since a BMC that carried out a reset and lost the reply would carry it out again;
+a lost reply fails them with `IpmiTimeoutException` without losing the session, a `C3h` reply
+(which says the response is unavailable, not that nothing was done) with
+`IpmiCompletionCodeException` at once, and
+`chassisStatus()` tells what the BMC did ([Controlling the power](chassis-status.html#controlling-the-power)).
+
 BMC replies with a *transient* completion code are retried too: the request is sent again after
 a random pause of up to 4 seconds when the BMC says it is busy (node busy, out of resources,
 initialization in progress), and at once after a timeout on the BMC side (`C3h`), where the BMC

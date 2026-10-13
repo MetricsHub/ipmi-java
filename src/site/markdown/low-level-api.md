@@ -73,14 +73,23 @@ client tells them apart ([Timestamps](system-event-log.html#timestamps)).
 
 ### Controlling the power
 
-On a client built with the `Operator` or `Administrator` [privilege](configuration.html#privilege-level):
+[`chassisControl()`](chassis-status.html#controlling-the-power) wraps the Chassis Control
+command, and `chassisIdentify()` the Chassis Identify command. The coders can also be sent
+yourself, on a client built with the `Operator` or `Administrator`
+[privilege](configuration.html#privilege-level), but `send()` has none of the safeguards of the
+operations: it sends the command again after a lost reply or a `C3h`, with the configured
+[retries](timeouts-and-errors.html#message-timeout-and-retries), so a reset or a power cycle can
+reach the BMC twice, and it does not refuse a `PowerCycle` of a system that is off. Prefer the
+operations for the power commands; a raw send is for the commands the client does not wrap:
 
 ```java
-bmc.send(new ChassisControl(PowerCommand.PowerUp));
+bmc.send(new ChassisControl(PowerCommand.PowerUp)); // chassisControl(PowerCommand.PowerUp) is safer
+bmc.send(new ChassisIdentify(15, false)); // 15 seconds; (0, false) turns it off, (0, true) forces it on
 ```
 
-`PowerCommand` supports `PowerUp`, `PowerDown` (immediate, without shutting down the operating
-system) and `HardReset`.
+`PowerCommand` has the six controls of the specification: `PowerUp`, `PowerDown` (immediate,
+without shutting down the operating system), `PowerCycle`, `HardReset`, `SoftShutdown` and
+`DiagnosticInterrupt`.
 
 ## A complete session with `IpmiConnector`
 

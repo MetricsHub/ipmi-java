@@ -50,6 +50,11 @@ public final class CommandCodes {
 	public static final byte CHASSIS_CONTROL = 0x02;
 
 	/**
+	 * An IPMI code for Chassis Identify command
+	 */
+	public static final byte CHASSIS_IDENTIFY = 0x04;
+
+	/**
 	 * An IPMI code for Get FRU Inventory Area Info command
 	 */
 	public static final byte GET_FRU_INVENTORY_AREA_INFO = 0x10;

@@ -257,7 +257,25 @@ public final class IpmiCli {
 			chassis(arguments, timed(arguments, err, "chassis status", client::chassisStatus), out);
 			return 0;
 		case POWER:
-			out.println(timed(arguments, err, "chassis status", client::chassisStatus).powerOn() ? "on" : "off");
+			if (arguments.powerCommand() == null) {
+				out.println(timed(arguments, err, "chassis status", client::chassisStatus).powerOn() ? "on" : "off");
+			} else {
+				// Nothing to print: the exit code says whether the BMC accepted the command
+				timed(arguments, err, "chassis control", () -> {
+					client.chassisControl(arguments.powerCommand());
+					return null;
+				});
+			}
+			return 0;
+		case IDENTIFY:
+			timed(arguments, err, "chassis identify", () -> {
+				if (arguments.identifyForever()) {
+					client.chassisIdentifyForever();
+				} else {
+					client.chassisIdentify(arguments.identifySeconds());
+				}
+				return null;
+			});
 			return 0;
 		case SENSORS:
 			return sensors(arguments, client, out, err);
@@ -1161,7 +1179,8 @@ public final class IpmiCli {
 		String program = programName();
 		return "Usage:\n" + "  " + program + " -h <host> probe [--json]\n" + "  " + program
 				+ " -h <host> -u <user> [options] chassis [--json]\n" + "  " + program
-				+ " -h <host> -u <user> [options] power status\n" + "  " + program
+				+ " -h <host> -u <user> [options] power status | on | off | cycle | reset | soft | diag\n" + "  " + program
+				+ " -h <host> -u <user> [options] identify [<seconds> | force | off]\n" + "  " + program
 				+ " -h <host> -u <user> [options] sensors [--type <type>,...] [--name <glob>,...] [--long] [--json]\n"
 				+ "  " + program + " -h <host> -u <user> [options] fru [<id>...] [--json]\n" + "  " + program
 				+ " -h <host> -u <user> [options] sel [--since <id>] [--json]\n" + "  " + program
@@ -1192,7 +1211,8 @@ public final class IpmiCli {
 				+ "      --escape <char>           sol: the escape character (default: ~)\n"
 				+ "      --no-escape               sol: no escape sequences (binary transfers); end of input closes\n"
 				+ "                                (in the console, ~. at the start of a line closes it, ~? lists the sequences)\n"
-				+ "\n" + "Default privilege: user for chassis, power status, sensors, fru and sel; administrator for sol.\n"
+				+ "\n" + "Default privilege: user for chassis, power status, sensors, fru and sel; operator for the other\n"
+				+ "power actions and identify; administrator for sol.\n"
 				+ "If neither password option is given, the password is requested from the interactive console.\n" + "\n"
 				+ "Full manual - output formats, the SOL console, exit codes, ipmitool equivalents:\n"
 				+ "  https://metricshub.org/ipmi-java/cli.html\n";

@@ -21,6 +21,8 @@ import static org.metricshub.ipmi.client.Fixtures.utf8;
 import static org.metricshub.ipmi.core.transport.FakeRmcpPlusBmc.ADMINISTRATOR;
 import static org.metricshub.ipmi.core.transport.FakeRmcpPlusBmc.GET_CHANNEL_CIPHER_SUITES;
 import static org.metricshub.ipmi.core.transport.FakeRmcpPlusBmc.GET_CHASSIS_STATUS;
+import static org.metricshub.ipmi.core.transport.FakeRmcpPlusBmc.CHASSIS_CONTROL;
+import static org.metricshub.ipmi.core.transport.FakeRmcpPlusBmc.CHASSIS_IDENTIFY;
 import static org.metricshub.ipmi.core.transport.FakeRmcpPlusBmc.NETFN_APP;
 import static org.metricshub.ipmi.core.transport.FakeRmcpPlusBmc.NETFN_CHASSIS;
 import static org.metricshub.ipmi.core.transport.FakeRmcpPlusBmc.OPEN_SESSION_REQUEST;
@@ -60,6 +62,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.metricshub.ipmi.core.coding.commands.PrivilegeLevel;
 import org.metricshub.ipmi.core.coding.commands.chassis.GetChassisStatus;
+import org.metricshub.ipmi.core.coding.commands.chassis.PowerCommand;
 import org.metricshub.ipmi.core.coding.commands.sdr.record.EntityId;
 import org.metricshub.ipmi.core.coding.commands.sdr.record.OemRecord;
 import org.metricshub.ipmi.core.coding.commands.sdr.record.ReadingType;
@@ -1099,6 +1102,105 @@ class IpmiClientTest {
 			assertEquals(discoveries, bmc.getCount(NETFN_APP, GET_CHANNEL_CIPHER_SUITES), "no discovery with a fixed suite");
 			awaitClose(bmc);
 			assertEquals(Collections.emptyList(), bmc.getErrors());
+		}
+	}
+
+	@Test
+	@Timeout(30)
+	void chassisControlAndIdentifyNeedTheOperatorPrivilege() throws Exception {
+		try (FakeRmcpPlusBmc bmc = bmc()) {
+			try (IpmiClient client = client(bmc).build()) {
+				IpmiCompletionCodeException refused = assertThrows(
+						IpmiCompletionCodeException.class,
+						() -> client.chassisControl(PowerCommand.PowerDown));
+				assertEquals(CompletionCode.InsufficentPrivilege, refused.completionCode(), "a User session");
+				assertTrue(refused.getMessage().contains("privilege(PrivilegeLevel.Operator)"), refused.getMessage());
+				assertEquals(
+						CompletionCode.InsufficentPrivilege,
+						assertThrows(IpmiCompletionCodeException.class, () -> client.chassisIdentify(5)).completionCode());
+				assertTrue(bmc.isPowerOn(), "the refused command did nothing");
+				assertEquals(-1, bmc.getChassisControl());
+				assertNull(bmc.getChassisIdentify());
+				assertThrows(NullPointerException.class, () -> client.chassisControl(null));
+				assertThrows(IllegalArgumentException.class, () -> client.chassisIdentify(-1));
+				assertThrows(IllegalArgumentException.class, () -> client.chassisIdentify(256));
+			}
+			awaitClose(bmc);
+			try (IpmiClient client = client(bmc).privilege(PrivilegeLevel.Operator).build()) {
+				client.chassisControl(PowerCommand.PowerDown);
+				assertEquals(0, bmc.getChassisControl());
+				assertFalse(client.chassisStatus().powerOn(), "the fake BMC carries the command out at once");
+
+				IpmiCompletionCodeException off = assertThrows(
+						IpmiCompletionCodeException.class,
+						() -> client.chassisControl(PowerCommand.HardReset));
+				assertEquals(CompletionCode.CommandNotSupported, off.completionCode(), "D5h: a reset of a system that is off");
+				assertEquals(0xd5, off.rawCompletionCode());
+				int controls = bmc.getCount(NETFN_CHASSIS, CHASSIS_CONTROL);
+				IllegalStateException cycleOff = assertThrows(
+						IllegalStateException.class,
+						() -> client.chassisControl(PowerCommand.PowerCycle));
+				assertTrue(cycleOff.getMessage().contains("The system is off"), cycleOff.getMessage());
+				assertEquals(controls, bmc.getCount(NETFN_CHASSIS, CHASSIS_CONTROL), "a cycle of an off system is not sent");
+
+				client.chassisControl(PowerCommand.PowerUp);
+				assertTrue(client.chassisStatus().powerOn());
+				client.chassisControl(PowerCommand.PowerCycle);
+				assertEquals(2, bmc.getChassisControl());
+				client.chassisControl(PowerCommand.HardReset);
+				assertEquals(3, bmc.getChassisControl());
+				client.chassisControl(PowerCommand.DiagnosticInterrupt);
+				assertEquals(4, bmc.getChassisControl());
+				client.chassisControl(PowerCommand.SoftShutdown);
+				assertEquals(5, bmc.getChassisControl());
+				assertFalse(client.chassisStatus().powerOn());
+
+				client.chassisIdentify(5);
+				assertArrayEquals(new byte[] { 5 }, bmc.getChassisIdentify(), "the interval byte alone");
+				client.chassisIdentify(255);
+				assertArrayEquals(new byte[] { (byte) 0xff }, bmc.getChassisIdentify());
+				client.chassisIdentifyForever();
+				assertArrayEquals(new byte[] { 0, 1 }, bmc.getChassisIdentify(), "the force byte set");
+				client.chassisIdentify(0);
+				assertArrayEquals(new byte[] { 0 }, bmc.getChassisIdentify(), "off");
+				assertEquals(8, bmc.getCount(NETFN_CHASSIS, CHASSIS_CONTROL), "six accepted, two refused");
+				assertEquals(5, bmc.getCount(NETFN_CHASSIS, CHASSIS_IDENTIFY), "four accepted, one refused");
+			}
+			awaitClose(bmc);
+			assertEquals(Collections.emptyList(), bmc.getErrors());
+		}
+	}
+
+	@Test
+	@Timeout(30)
+	void aChassisControlWhoseReplyIsLostIsNotSentAgain() throws Exception {
+		try (FakeRmcpPlusBmc bmc = bmc(); IpmiClient client = client(bmc).privilege(PrivilegeLevel.Operator).build()) {
+			// The BMC carries the reset out and loses the reply
+			assertTrue(client.chassisStatus().powerOn());
+			bmc.inject(bmc.getSessionRequests() + 1, FakeRmcpPlusBmc.Fault.DROP);
+			IpmiTimeoutException lost = assertThrows(
+					IpmiTimeoutException.class,
+					() -> client.chassisControl(PowerCommand.HardReset));
+			assertTrue(lost.getMessage().contains("sent once"), lost.getMessage());
+			assertEquals(1, bmc.getCount(NETFN_CHASSIS, CHASSIS_CONTROL), "a reset the BMC may have done is not sent again");
+			assertEquals(3, bmc.getChassisControl(), "the BMC did carry it out");
+			assertTrue(client.chassisStatus().powerOn(), "the session is kept: a read goes on");
+			assertEquals(1, bmc.getCount(OPEN_SESSION_REQUEST), "no new session for one lost reply");
+
+			bmc.inject(bmc.getSessionRequests() + 1, FakeRmcpPlusBmc.Fault.DROP);
+			assertThrows(IpmiTimeoutException.class, () -> client.chassisIdentify(5));
+			assertEquals(1, bmc.getCount(NETFN_CHASSIS, CHASSIS_IDENTIFY));
+
+			// C3h: the BMC timed out on its side and cannot say what it did; a read is retried, a control is not
+			bmc.handle(NETFN_CHASSIS, CHASSIS_CONTROL, data -> new byte[] { (byte) 0xc3 });
+			IpmiCompletionCodeException unavailable = assertThrows(
+					IpmiCompletionCodeException.class,
+					() -> client.chassisControl(PowerCommand.PowerDown));
+			assertEquals(CompletionCode.Timeout, unavailable.completionCode());
+			assertEquals(2, bmc.getCount(NETFN_CHASSIS, CHASSIS_CONTROL), "not sent again on C3h");
+			bmc.handle(NETFN_CHASSIS, GET_CHASSIS_STATUS, data -> new byte[] { (byte) 0xc3 });
+			assertThrows(IpmiCompletionCodeException.class, () -> client.chassisStatus());
+			assertEquals(2 + 1 + 1, bmc.getCount(NETFN_CHASSIS, GET_CHASSIS_STATUS), "a read is sent again on C3h: 2 tries");
 		}
 	}
 

@@ -1,4 +1,4 @@
-keywords: upgrade, migration, release notes, breaking changes, 2.0, fluent client, builder, ipmiclientexception, slf4j, ipmicli, standalone jar, sel, system event log, protected fields, accessors, abstractsensorrecord, validateresponse, utf-8, bmc key, cipher suite, integrity, org.sentrysoftware
+keywords: upgrade, migration, release notes, breaking changes, 2.0, fluent client, builder, ipmiclientexception, slf4j, ipmicli, standalone jar, sel, system event log, chassis control, chassis identify, protected fields, accessors, abstractsensorrecord, validateresponse, utf-8, bmc key, cipher suite, integrity, org.sentrysoftware
 description: What changes when upgrading the IPMI Java Client — from 1.x to 2.0.00 (the fluent client, the System Event Log), from 1.2.02, from 1.2.01, and from the org.sentrysoftware:ipmi artifact of 1.2.00 and earlier.
 
 # Upgrading
@@ -33,6 +33,7 @@ methods and `IpmiClientConfiguration` are gone.
 | `IpmiClient.getSensors(config)` | `bmc.sensors().execute()`, a [`SensorList`](sensors.html) of typed [`Sensor`](apidocs/org/metricshub/ipmi/client/Sensor.html)s; `types()` and `names()` select sensors before their readings are requested |
 | `IpmiClient.getFrus(config)` | `bmc.frus().execute()`, a [`FruList`](fru-inventory.html) of typed [`Fru`](apidocs/org/metricshub/ipmi/client/Fru.html)s; `ids()` selects FRUs |
 | `GetSelInfo`, `GetSelEntry` sent by hand | `bmc.sel().execute()`, a [`SelEntryList`](system-event-log.html) of typed [`SelEntry`](apidocs/org/metricshub/ipmi/client/SelEntry.html)s; `since(entry)` reads the entries added after one already read |
+| `ChassisControl` sent by hand | `bmc.chassisControl(PowerCommand)` on a client built with `privilege(PrivilegeLevel.Operator)` ([Controlling the power](chassis-status.html#controlling-the-power)); `chassisIdentify(seconds)` and `chassisIdentifyForever()` drive the identify LED |
 | `IpmiClient.getChassisStatusAsStringResult(config)` | `bmc.chassisStatus().powerOn()`; the `System power state is up` text is produced by the MetricsHub IPMI extension |
 | `IpmiClient.getFrusAndSensorsAsStringResult(config)` | `bmc.frus().execute()` and `bmc.sensors().execute()`, one session and one SDR walk instead of two; the text lines are produced by the MetricsHub IPMI extension, which took `IpmiResultConverter` over |
 | A new session per call | One session per client, serialized operations, [reopened](timeouts-and-errors.html#session-recovery) when the BMC loses it |
@@ -68,6 +69,8 @@ reads the cipher suites and authentication options of a BMC without credentials,
 [`sel()`](system-event-log.html) reads the System Event Log as typed entries (the sensor, the
 event in the wording of `ipmiutil`, the direction, the timestamp, the OEM bytes), whole or since
 the last entry read,
+[`chassisControl(PowerCommand)`](chassis-status.html#controlling-the-power) powers the system
+on or off, cycles or resets it, and `chassisIdentify(seconds)` blinks the identify LED,
 [`send(command)`](low-level-api.html#sending-a-command-through-the-client) sends any command of
 the core in the session, [`sol().open()`](serial-over-lan.html#with-ipmiclient) opens a Serial
 over LAN console as streams, `privilege(PrivilegeLevel)` opens the session at the Operator or
@@ -103,6 +106,13 @@ reply) are ignored.
   constant of 4 000 ms.
 * `CipherSuite.forId(int)` builds one of the standard suites 0 to 19 with the algorithms of the
   specification, for `createConnection()` without discovery.
+* `IpmiConnector.sendMessage(handle, command, resends)` sends a command with its own number of
+  resends when no reply comes or the BMC answers `C3h`, 0 for a command the BMC must not receive
+  twice.
+* `PowerCommand` has the three chassis controls 1.x left out: `PowerCycle` (`2h`),
+  `DiagnosticInterrupt` (`4h`) and `SoftShutdown` (`5h`); `parseInt()` accepts their codes. The new
+  `ChassisIdentify` command (IPMI 2.0 section 28.5) takes the interval in seconds and the "force
+  identify on" flag.
 * A wrong password or BMC key fails the handshake with
   `AuthenticationException` (`org.metricshub.ipmi.core.coding.commands.session`), a subclass of
   the `IllegalArgumentException` that 1.2.x threw with the same messages.
