@@ -24,18 +24,21 @@ package org.metricshub.ipmi.client;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 
 import org.metricshub.ipmi.core.coding.commands.sel.GetSelEntry;
 import org.metricshub.ipmi.core.coding.commands.sel.GetSelEntryResponseData;
 import org.metricshub.ipmi.core.coding.commands.sel.GetSelInfo;
 import org.metricshub.ipmi.core.coding.commands.sel.GetSelInfoResponseData;
 import org.metricshub.ipmi.core.coding.commands.sel.GetSelTimeUtcOffset;
+import org.metricshub.ipmi.core.coding.commands.sel.GetSelTimeUtcOffsetResponseData;
 import org.metricshub.ipmi.core.coding.commands.sel.ReserveSel;
 import org.metricshub.ipmi.core.coding.payload.CompletionCode;
 
 /**
- * Reads the System Event Log entry by entry (IPMI 2.0 section 31): Get SEL Info, Get SEL Time UTC Offset, then Get
- * SEL Entry from the first record ID (0000h) or the one given, following the next record IDs until FFFFh.
+ * Reads the System Event Log entry by entry (IPMI 2.0 section 31): Get SEL Time UTC Offset, Get SEL Info, then Get
+ * SEL Entry from the first record ID (0000h) or the one given, following the next record IDs until FFFFh, and Get
+ * SEL Info again to see whether the log was erased meanwhile.
  */
 final class SelReader {
 
@@ -44,6 +47,14 @@ final class SelReader {
 
 	/** Given as the next record ID by the last entry. */
 	static final int LAST_RECORD_ID = 0xFFFF;
+
+	/** The completion code of Get SEL Entry while a Clear SEL is in progress (IPMI 2.0 section 31.5). */
+	static final int SEL_ERASE_IN_PROGRESS = 0x81;
+
+	/** How long to wait for a Clear SEL in progress before asking again, and how many times. */
+	private static final long ERASE_WAIT_MS = 500;
+	private static final int ERASE_WAITS = 20;
+	private static final long MS_PER_SECOND = 1000;
 
 	private final Exchange exchange;
 	/** 0 until the BMC asks for a reservation: a whole entry is read without one (IPMI 2.0 section 31.5). */
@@ -68,19 +79,29 @@ final class SelReader {
 	static SelEntryList read(Exchange exchange, String host, int since, SelEntry sinceEntry) {
 		SelReader reader = new SelReader(exchange);
 		reader.utcOffsetMinutes = reader.utcOffset();
-		GetSelInfoResponseData info = reader.info();
-		List<SelEntry> entries = reader.walk(since, sinceEntry, info);
-		if (entries == null) {
+		GetSelInfoResponseData before = reader.info();
+		List<SelEntry> entries = reader.walk(since, sinceEntry, before);
+		GetSelInfoResponseData after = reader.info();
+		if (entries == null || erased(before, after)) {
 			// The log changed under the walk (an entry deleted, the log cleared): read it again, once, as it is now
-			info = reader.info();
-			entries = reader.walk(since, sinceEntry, info);
-			if (entries == null) {
+			before = after;
+			entries = reader.walk(since, sinceEntry, before);
+			after = reader.info();
+			if (entries == null || erased(before, after)) {
 				throw new IpmiClientException(
-						"The System Event Log of " + host
-								+ " changed twice while it was read: an entry named as the next one is not there any more");
+						"The System Event Log of " + host + " changed twice while it was read: it was erased, or an entry"
+								+ " named as the next one is not there any more");
 			}
 		}
-		return new SelEntryList(entries, info, reader.utcOffsetMinutes);
+		return new SelEntryList(entries, after, reader.utcOffsetMinutes);
+	}
+
+	/**
+	 * Tells whether the log was erased, in whole or in part, between two Get SEL Info: its IDs may have been reused
+	 * meanwhile, so what the walk read may mix two logs.
+	 */
+	private static boolean erased(GetSelInfoResponseData before, GetSelInfoResponseData after) {
+		return before != null && after != null && !Objects.equals(before.getEraseTimestamp(), after.getEraseTimestamp());
 	}
 
 	private GetSelInfoResponseData info() {
@@ -94,10 +115,17 @@ final class SelReader {
 
 	private int utcOffset() {
 		try {
-			return exchange.send(new GetSelTimeUtcOffset()).getOffsetMinutes();
+			GetSelTimeUtcOffsetResponseData offset = exchange.send(new GetSelTimeUtcOffset());
+			// 07FFh, unspecified: the SEL time is taken as UTC, the best there is
+			return offset.isUnspecified() ? 0 : offset.getOffsetMinutes();
 		} catch (IpmiCompletionCodeException e) {
-			// A BMC without the command (IPMI 2.0 revision 1.1) keeps its SEL time in UTC
-			return 0;
+			// A BMC without the command (IPMI 2.0 revision 1.1) keeps its SEL time in UTC. Any other refusal (privilege,
+			// busy) is the caller's to act on: the timestamps would be off by an unknown offset
+			if (e.completionCode() == CompletionCode.InvalidCommand
+					|| e.completionCode() == CompletionCode.CommandNotSupported) {
+				return 0;
+			}
+			throw e;
 		}
 	}
 
@@ -142,12 +170,24 @@ final class SelReader {
 	 */
 	private GetSelEntryResponseData entry(int recordId) {
 		boolean reserved = false;
+		int erasing = 0;
 		while (true) {
 			try {
 				return exchange.send(new GetSelEntry(reservationId, recordId));
 			} catch (IpmiCompletionCodeException e) {
 				if (e.completionCode() == CompletionCode.DataNotPresent) {
 					return null;
+				}
+				if (e.rawCompletionCode() == SEL_ERASE_IN_PROGRESS) {
+					// A Clear SEL is in progress: wait for its end, within the deadline of the operation
+					if (++erasing > ERASE_WAITS) {
+						throw new IpmiClientException(
+								"The System Event Log is still being erased after " + ERASE_WAITS * ERASE_WAIT_MS / MS_PER_SECOND
+										+ " s",
+								e);
+					}
+					pause();
+					continue;
 				}
 				// A BMC that wants a reservation for a whole entry, or canceled the one it gave (it does so when another
 				// session appears): take a new one and read the entry again, once
@@ -157,6 +197,16 @@ final class SelReader {
 				reserved = true;
 				reservationId = exchange.send(new ReserveSel()).getReservationId();
 			}
+		}
+	}
+
+	private static void pause() {
+		try {
+			Thread.sleep(ERASE_WAIT_MS);
+		} catch (InterruptedException e) {
+			// The caller gave up at its deadline
+			Thread.currentThread().interrupt();
+			throw new IpmiClientException("Interrupted while waiting for the end of a Clear SEL", e);
 		}
 	}
 }

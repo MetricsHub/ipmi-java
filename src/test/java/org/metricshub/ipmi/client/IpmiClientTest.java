@@ -179,7 +179,7 @@ class IpmiClientTest {
 			assertEquals(Instant.ofEpochSecond(SEL_RESET_TIME + 489), log.lastAddition().get());
 			assertFalse(log.lastErase().isPresent(), "FFFFFFFFh: never erased");
 			assertTrue(log.info().isPresent());
-			assertEquals(1, bmc.getCount(NETFN_STORAGE, GET_SEL_INFO));
+			assertEquals(2, bmc.getCount(NETFN_STORAGE, GET_SEL_INFO), "before and after the walk");
 			assertEquals(6, bmc.getCount(NETFN_STORAGE, GET_SEL_ENTRY), "one whole read per entry");
 			assertEquals(0, bmc.getCount(NETFN_STORAGE, RESERVE_SEL), "a whole read needs no reservation");
 
@@ -313,7 +313,7 @@ class IpmiClientTest {
 				// Entry 4, named as the next one by entry 3, is deleted between the two reads: the walk starts over
 				sel.vanishOnce(4);
 				assertEquals(6, client.sel().execute().size());
-				assertEquals(2, bmc.getCount(NETFN_STORAGE, GET_SEL_INFO), "Get SEL Info is read again with the log");
+				assertEquals(3, bmc.getCount(NETFN_STORAGE, GET_SEL_INFO), "before, after, and after the second walk");
 				assertEquals(3 + 1 + 6, bmc.getCount(NETFN_STORAGE, GET_SEL_ENTRY), "three entries, the missing one, then all");
 
 				sel.vanishOnce(4).vanishOnce(4);
@@ -326,6 +326,69 @@ class IpmiClientTest {
 						3,
 						client.sel().since(3).execute().size(),
 						"the second walk finds entry 3 again: the entries after it");
+			}
+		}
+	}
+
+	@Test
+	@Timeout(30)
+	void aLogClearedAndRefilledUnderTheWalkIsReadAgain() throws Exception {
+		try (FakeRmcpPlusBmc bmc = new FakeRmcpPlusBmc(SUITES, USER, utf8(PASSWORD), null)) {
+			FakeSel sel = Fixtures.sel();
+			sel.install(bmc);
+			// Between the reads of entries 1 and 2, the log is cleared and filled again with entries 1 to 6: entry 2
+			// exists again, so the walk alone would mix the old entry 1 with the new 2 to 6
+			sel.before(2, () -> {
+				sel.clear();
+				for (int id = 1; id <= 6; id++) {
+					sel
+							.add(
+									systemEvent(
+											id,
+											SEL_RESET_TIME + 2000 + id,
+											SensorType.Fan.getCode(),
+											FAN_SENSOR,
+											0x0a,
+											true,
+											0x01,
+											0xff,
+											0xff));
+				}
+			});
+			try (IpmiClient client = client(bmc).build()) {
+				SelEntryList log = client.sel().execute();
+				assertEquals(6, log.size());
+				assertTrue(log.stream().allMatch(entry -> entry.sensorType().get() == SensorType.Fan), "the new log only");
+				assertEquals(Instant.ofEpochSecond(SEL_RESET_TIME + 2001), log.get(0).timestamp().get());
+				assertTrue(log.lastErase().isPresent());
+				assertEquals(3, bmc.getCount(NETFN_STORAGE, GET_SEL_INFO), "the erase timestamp changed: read again");
+
+				// A Clear SEL in progress answers 81h: the read waits for its end
+				sel.eraseInProgressOnce(2);
+				assertEquals(6, client.sel().execute().size());
+			}
+		}
+	}
+
+	@Test
+	@Timeout(30)
+	void anUnspecifiedOrRefusedSelTimeUtcOffset() throws Exception {
+		try (FakeRmcpPlusBmc bmc = new FakeRmcpPlusBmc(SUITES, USER, utf8(PASSWORD), null)) {
+			FakeSel sel = Fixtures.sel().utcOffset(0x7ff);
+			sel.install(bmc);
+			try (IpmiClient client = client(bmc).build()) {
+				SelEntryList log = client.sel().execute();
+				assertEquals(0, log.utcOffsetMinutes(), "07FFh: unspecified, not 2047 minutes");
+				assertEquals(Instant.ofEpochSecond(SEL_RESET_TIME), log.get(0).timestamp().get());
+
+				sel.refuseUtcOffset(0xd5);
+				assertEquals(0, client.sel().execute().utcOffsetMinutes(), "not supported in the present state: UTC");
+
+				sel.refuseUtcOffset(0xd4);
+				IpmiCompletionCodeException refused = assertThrows(
+						IpmiCompletionCodeException.class,
+						() -> client.sel().execute());
+				assertEquals(CompletionCode.InsufficentPrivilege, refused.completionCode(), "a refusal the caller can act on");
 			}
 		}
 	}

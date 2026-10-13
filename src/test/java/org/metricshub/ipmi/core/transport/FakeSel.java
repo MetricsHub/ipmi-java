@@ -32,7 +32,47 @@ public final class FakeSel {
 	private final List<byte[]> records = new CopyOnWriteArrayList<>();
 	private final Map<Integer, Integer> cancelOnce = new ConcurrentHashMap<>();
 	private final Map<Integer, Integer> vanishOnce = new ConcurrentHashMap<>();
+	private final Map<Integer, Integer> erasingOnce = new ConcurrentHashMap<>();
+	private final Map<Integer, Runnable> before = new ConcurrentHashMap<>();
 	private volatile Integer utcOffsetMinutes;
+	private volatile int utcOffsetRefusal = 0xc1;
+
+	/**
+	 * Answers "SEL erase in progress" (81h) to the next Get SEL Entry of the given record.
+	 *
+	 * @param recordId the record ID
+	 * @return this log
+	 */
+	public FakeSel eraseInProgressOnce(int recordId) {
+		erasingOnce.merge(recordId, 1, Integer::sum);
+		return this;
+	}
+
+	/**
+	 * Runs an action once, right before the next Get SEL Entry of the given record is served: what another client
+	 * does to the log in the middle of a read.
+	 *
+	 * @param recordId the record ID
+	 * @param action the action
+	 * @return this log
+	 */
+	public FakeSel before(int recordId, Runnable action) {
+		before.put(recordId, action);
+		return this;
+	}
+
+	/**
+	 * Refuses Get SEL Time UTC Offset with the given completion code instead of C1h.
+	 *
+	 * @param completionCode the completion code
+	 * @return this log
+	 */
+	public FakeSel refuseUtcOffset(int completionCode) {
+		utcOffsetRefusal = completionCode;
+		utcOffsetMinutes = null;
+		return this;
+	}
+
 	private volatile boolean infoSupported = true;
 	private volatile int reservationId;
 	private volatile int additionTimestamp = UNSPECIFIED;
@@ -106,7 +146,7 @@ public final class FakeSel {
 	private byte[] utcOffset(byte[] data) {
 		Integer minutes = utcOffsetMinutes;
 		if (minutes == null) {
-			return new byte[] { (byte) 0xc1 };
+			return new byte[] { (byte) utcOffsetRefusal };
 		}
 		return new byte[] { 0x00, (byte) (int) minutes, (byte) (minutes >> 8) };
 	}
@@ -151,6 +191,13 @@ public final class FakeSel {
 		}
 		if (countDown(vanishOnce, recordId)) {
 			return new byte[] { (byte) 0xcb };
+		}
+		if (countDown(erasingOnce, recordId)) {
+			return new byte[] { (byte) 0x81 };
+		}
+		Runnable action = before.remove(recordId);
+		if (action != null) {
+			action.run();
 		}
 		int index = recordId == 0 ? 0 : recordId == LAST_RECORD_ID ? records.size() - 1 : indexOf(recordId);
 		if (index < 0 || index >= records.size()) {

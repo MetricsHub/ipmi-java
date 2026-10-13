@@ -40,7 +40,7 @@ sent with [`IpmiClient.send()`](low-level-api.html#sending-a-command-through-the
 | Get SEL Info | `GetSelInfo` | Storage / `40h` | `sel()` |
 | Reserve SEL | `ReserveSel` | Storage / `42h` | `sel()`, when the BMC asks for a reservation |
 | Get SEL Entry | `GetSelEntry` | Storage / `43h` | `sel()` |
-| Get SEL Time UTC Offset | `GetSelTimeUtcOffset` | Storage / `5Ch` | `sel()`: the SEL time of a BMC that keeps it as local time (IPMI 2.0 revision 1.1; `C1h` from the others) |
+| Get SEL Time UTC Offset | `GetSelTimeUtcOffset` | Storage / `5Ch` | `sel()`: the SEL time of a BMC that keeps it as local time (IPMI 2.0 revision 1.1; `C1h` from the others, `07FFh` when unspecified) |
 | **Payloads (Serial over LAN)** | | | |
 | Activate Payload (SOL) | `ActivateSolPayload` | App / `48h` | `sol()` |
 | Deactivate Payload | `DeactivatePayload` | App / `49h` | `sol()` |

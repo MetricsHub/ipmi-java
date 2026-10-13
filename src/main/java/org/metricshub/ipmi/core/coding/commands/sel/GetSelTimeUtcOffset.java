@@ -74,7 +74,7 @@ public class GetSelTimeUtcOffset extends IpmiCommandCoder<GetSelTimeUtcOffsetRes
 		}
 
 		GetSelTimeUtcOffsetResponseData responseData = new GetSelTimeUtcOffsetResponseData();
-		// A signed 16-bit number of minutes, LS byte first
+		// A signed 16-bit number of minutes, LS byte first; 07FFh when unspecified (as after Set SEL Time)
 		responseData.setOffsetMinutes((short) ((raw[0] & 0xff) | (raw[1] & 0xff) << 8));
 		return responseData;
 	}

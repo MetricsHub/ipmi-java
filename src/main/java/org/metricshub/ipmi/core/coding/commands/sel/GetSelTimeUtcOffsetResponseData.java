@@ -29,13 +29,24 @@ import org.metricshub.ipmi.core.coding.commands.ResponseData;
  */
 public class GetSelTimeUtcOffsetResponseData implements ResponseData {
 
+	/** 07FFh: the offset is unspecified (IPMI 2.0 revision 1.1 section 31.11a), as after a Set SEL Time. */
+	public static final int UNSPECIFIED = 0x07ff;
+
 	private int offsetMinutes;
 
 	/**
-	 * @return the offset from UTC of the SEL time, in minutes (-1440 to 1440): local time = UTC + offset
+	 * @return the offset from UTC of the SEL time, in minutes (-1440 to 1440): local time = UTC + offset; or
+	 *         {@link #UNSPECIFIED}
 	 */
 	public int getOffsetMinutes() {
 		return offsetMinutes;
+	}
+
+	/**
+	 * @return whether the BMC leaves the offset unspecified (07FFh): the SEL time is then as good as UTC
+	 */
+	public boolean isUnspecified() {
+		return offsetMinutes == UNSPECIFIED;
 	}
 
 	/**

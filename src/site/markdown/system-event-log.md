@@ -39,10 +39,12 @@ SEL entry 7 at 2024-05-15T09:24:15Z: VersionChange sensor 0, Firmware or softwar
    needed (IPMI 2.0, section 31.5); when a BMC asks for one anyway, or cancels the one it gave
    (`C5h`), the client takes a reservation with **Reserve SEL** and reads the entry again.
 
-When an entry named as the next one is not there any more (`CBh`: it was deleted, or the log
-was cleared, while the log was read), the read **starts over**, once, from what the log is now;
-a log that changes twice during a read fails it with `IpmiClientException` rather than return
-an incomplete list.
+Get SEL Info is sent again after the walk: when the log was **erased meanwhile** (its erase
+timestamp changed, after a Clear SEL or a Delete SEL Entry, whose record IDs may be reused), or
+when an entry named as the next one is not there any more (`CBh`), the read **starts over**,
+once, from what the log is now; a log that changes twice during a read fails it with
+`IpmiClientException` rather than return a list that mixes two logs. While a Clear SEL is in
+progress (`81h`), the read waits for its end, up to 10 s.
 
 Every record type is decoded: the system events, the OEM records with and without timestamp,
 and the reserved types, of which only the record ID is defined
@@ -96,7 +98,9 @@ which falls in that range: they are reported as `preInitSeconds()` of about 315 
 A BMC that keeps its SEL time as **local time** says so with the Get SEL Time UTC Offset command
 of IPMI 2.0 revision 1.1, and the client subtracts that offset from every timestamp it returns,
 so that `timestamp()`, `lastAddition()` and `lastErase()` are UTC instants; `utcOffsetMinutes()`
-gives the offset applied (0 when the BMC does not implement the command). The timestamps are
+gives the offset applied: 0 when the BMC does not implement the command (`C1h`, `D5h`) or leaves
+the offset unspecified (`07FFh`, as after a Set SEL Time), while any other refusal (`D4h`...)
+fails the read, as the timestamps would be off by an unknown offset. The timestamps are
 still only as good as the clock of the BMC: of the BMCs tested, a Supermicro keeps UTC, a Lenovo
 IMM reports an offset of 60 minutes, and a Dell iDRAC runs its SEL clock on the local time of
 its time zone setting *without* implementing the command, so its timestamps come out two hours
@@ -112,18 +116,20 @@ of the first byte announce (`01` in bits 7:6 for the reading, `01` in bits 5:4 f
 They are raw bytes: convert them with the `calcFormula()` of the sensor's
 [`FullSensorRecord`](apidocs/org/metricshub/ipmi/core/coding/commands/sdr/record/FullSensorRecord.html),
 found among `bmc.sensors().execute()` by its owner and number: a sensor number is unique for
-its owner only (the BMC at `0x20`, a satellite controller, the BIOS at `0xB1`...), and the low
-byte of `generatorId()` names the owner that logged the event.
+its owner only (the BMC, a satellite controller, the BIOS...). The low byte of `generatorId()`
+is the owner's address as the SEL encodes it, the 7-bit slave address or software ID shifted
+left by one (`0x20` for the BMC), while the SDR record gives the 7-bit value (`0x10`):
 
 ```java
 Map<Integer, Sensor> sensors = new HashMap<>();
 for (Sensor sensor : bmc.sensors().execute()) {
 	AbstractSensorRecord record = (AbstractSensorRecord) sensor.record();
-	sensors.put((record.getSensorOwnerId() & 0xFF) << 8 | sensor.number(), sensor);
+	sensors.put((record.getSensorOwnerId() & 0x7F) << 8 | sensor.number(), sensor);
 }
 for (SelEntry entry : bmc.sel().execute()) {
 	if (entry.eventType().orElse(0) == 0x01 && entry.direction().get() == EventDirection.Assertion) {
-		Sensor sensor = sensors.get((entry.generatorId().getAsInt() & 0xFF) << 8 | entry.sensorNumber().getAsInt());
+		int owner = (entry.generatorId().getAsInt() & 0xFF) >> 1;
+		Sensor sensor = sensors.get(owner << 8 | entry.sensorNumber().getAsInt());
 		byte[] data = entry.eventData();
 		if (sensor != null && (data[0] & 0xC0) == 0x40 && sensor.record() instanceof FullSensorRecord) {
 			FullSensorRecord record = (FullSensorRecord) sensor.record();
