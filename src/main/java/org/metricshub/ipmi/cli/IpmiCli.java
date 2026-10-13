@@ -52,6 +52,8 @@ import java.util.function.Supplier;
 
 import org.metricshub.ipmi.client.BmcCapabilities;
 import org.metricshub.ipmi.client.ChassisStatus;
+import org.metricshub.ipmi.client.DeviceFunction;
+import org.metricshub.ipmi.client.DeviceId;
 import org.metricshub.ipmi.client.Fru;
 import org.metricshub.ipmi.client.FruList;
 import org.metricshub.ipmi.client.FrusRequest;
@@ -253,6 +255,9 @@ public final class IpmiCli {
 		case PROBE:
 			probe(arguments, timed(arguments, err, "probe", client::capabilities), out);
 			return 0;
+		case INFO:
+			info(arguments, timed(arguments, err, "device id", client::deviceId), out);
+			return 0;
 		case CHASSIS:
 			chassis(arguments, timed(arguments, err, "chassis status", client::chassisStatus), out);
 			return 0;
@@ -388,6 +393,41 @@ public final class IpmiCli {
 				chosen == null ?
 						"none (preference " + join(preference) + ")" :
 						chosen.getId() + (problem == null ? "" : " (" + problem + ")"));
+	}
+
+	private static void info(CliArguments arguments, DeviceId device, PrintStream out) {
+		List<String> functions = new ArrayList<String>();
+		for (DeviceFunction function : device.functions()) {
+			functions.add(function.name());
+		}
+		byte[] auxiliary = device.auxiliaryFirmwareRevision();
+		if (arguments.json()) {
+			Map<String, Object> fields = new LinkedHashMap<String, Object>();
+			fields.put("id", device.id());
+			fields.put("revision", device.revision());
+			fields.put("firmwareRevision", device.firmwareRevision());
+			fields.put("ipmiVersion", device.ipmiVersion());
+			fields.put("manufacturerId", device.manufacturerId());
+			fields.put("productId", device.productId());
+			fields.put("available", device.available());
+			fields.put("providesDeviceSdrs", device.providesDeviceSdrs());
+			fields.put("functions", functions);
+			put(fields, "auxiliaryFirmwareRevision", auxiliary.length == 0 ? null : hex(auxiliary));
+			JsonLinesWriter.write(fields, out);
+			return;
+		}
+		line(out, "", LABEL_WIDTH, "Device ID", String.valueOf(device.id()));
+		line(out, "", LABEL_WIDTH, "Device revision", String.valueOf(device.revision()));
+		line(out, "", LABEL_WIDTH, "Firmware revision", device.firmwareRevision());
+		line(out, "", LABEL_WIDTH, "IPMI version", device.ipmiVersion());
+		line(out, "", LABEL_WIDTH, "Manufacturer ID", String.valueOf(device.manufacturerId()));
+		line(out, "", LABEL_WIDTH, "Product ID", String.valueOf(device.productId()));
+		line(out, "", LABEL_WIDTH, "Device available", yesNo(device.available()));
+		line(out, "", LABEL_WIDTH, "Provides device SDRs", yesNo(device.providesDeviceSdrs()));
+		line(out, "", LABEL_WIDTH, "Functions", functions.isEmpty() ? "none" : String.join(", ", functions));
+		if (auxiliary.length > 0) {
+			line(out, "", LABEL_WIDTH, "Aux firmware revision", hex(auxiliary));
+		}
 	}
 
 	private static void chassis(CliArguments arguments, ChassisStatus status, PrintStream out) {
@@ -1178,6 +1218,7 @@ public final class IpmiCli {
 	static String usage() {
 		String program = programName();
 		return "Usage:\n" + "  " + program + " -h <host> probe [--json]\n" + "  " + program
+				+ " -h <host> -u <user> [options] info [--json]\n" + "  " + program
 				+ " -h <host> -u <user> [options] chassis [--json]\n" + "  " + program
 				+ " -h <host> -u <user> [options] power status | on | off | cycle | reset | soft | diag\n" + "  " + program
 				+ " -h <host> -u <user> [options] identify [<seconds> | force | off]\n" + "  " + program
@@ -1203,7 +1244,7 @@ public final class IpmiCli {
 				+ "      --help                    Show this help\n"
 				+ "      --version                 Show the project version\n" + "\n"
 				+ "Subcommand options (after the subcommand, in any order with its arguments):\n"
-				+ "      --json                    probe, chassis, sensors, fru, sel: print JSON Lines instead of text\n"
+				+ "      --json                    probe, info, chassis, sensors, fru, sel: print JSON Lines instead of text\n"
 				+ "      --type <type>,...         sensors: only these sensor types (Temperature, Fan, Voltage, ...)\n"
 				+ "      --name <glob>,...         sensors: only the sensors whose name matches (* and ?, case-insensitive)\n"
 				+ "      --long                    sensors: add the number, the entity, the thresholds and the problem\n"
@@ -1211,7 +1252,8 @@ public final class IpmiCli {
 				+ "      --escape <char>           sol: the escape character (default: ~)\n"
 				+ "      --no-escape               sol: no escape sequences (binary transfers); end of input closes\n"
 				+ "                                (in the console, ~. at the start of a line closes it, ~? lists the sequences)\n"
-				+ "\n" + "Default privilege: user for chassis, power status, sensors, fru and sel; operator for the other\n"
+				+ "\n"
+				+ "Default privilege: user for info, chassis, power status, sensors, fru and sel; operator for the other\n"
 				+ "power actions and identify; administrator for sol.\n"
 				+ "If neither password option is given, the password is requested from the interactive console.\n" + "\n"
 				+ "Full manual - output formats, the SOL console, exit codes, ipmitool equivalents:\n"

@@ -25,6 +25,8 @@ sent with [`IpmiClient.send()`](low-level-api.html#sending-a-command-through-the
 | Set Session Privilege Level | `SetSessionPrivilegeLevel` | App / `3Bh` | `privilege(Operator)`, `privilege(Administrator)` |
 | Get Session Info | `GetSessionInfo` | App / `3Dh` | `sol()`: is the session that holds a SOL payload still there? |
 | Close Session | `CloseSession` | App / `3Ch` | `close()` |
+| **BMC** | | | |
+| Get Device ID | `GetDeviceId` | App / `01h` | `deviceId()`, and the [keep-alive](configuration.html#keep-alive) of every session |
 | **Chassis** | | | |
 | Get Chassis Status | `GetChassisStatus` | Chassis / `01h` | `chassisStatus()` |
 | Chassis Control | `ChassisControl` | Chassis / `02h` | `chassisControl()` |

@@ -140,6 +140,23 @@ class IpmiCliTest {
 
 	@Test
 	@Timeout(30)
+	void infoTextAndJson() throws Exception {
+		try (FakeRmcpPlusBmc bmc = Fixtures.bmc()) {
+			Result info = login(bmc, "info");
+			assertEquals(0, info.code, info.err);
+			assertEquals(golden("info.txt"), info.out);
+			assertEquals("", info.err);
+			assertEquals(golden("info-json.txt"), login(bmc, "info", "--json").out);
+
+			Result verbose = login(bmc, "-v", "info");
+			assertEquals(golden("info.txt"), verbose.out);
+			assertTrue(verbose.err.contains("with the User privilege"), verbose.err);
+			assertTrue(verbose.err.contains("ipmicli: device id: "), verbose.err);
+		}
+	}
+
+	@Test
+	@Timeout(30)
 	void chassisAndPowerStatus() throws Exception {
 		try (FakeRmcpPlusBmc bmc = Fixtures.bmc()) {
 			Result chassis = login(bmc, "chassis");

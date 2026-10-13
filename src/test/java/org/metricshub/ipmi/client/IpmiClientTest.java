@@ -48,6 +48,7 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.EnumSet;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -164,6 +165,19 @@ class IpmiClientTest {
 			assertEquals(PSU_FRU, psu.id());
 			assertEquals("PSU 1", psu.name());
 			assertEquals(EntityId.PowerSupply, psu.entity());
+
+			DeviceId device = client.deviceId();
+			assertEquals(32, device.id());
+			assertEquals(1, device.revision());
+			assertEquals("1.44", device.firmwareRevision());
+			assertEquals("2.0", device.ipmiVersion());
+			assertEquals(2, device.manufacturerId(), "IBM");
+			assertEquals(26, device.productId());
+			assertTrue(device.available());
+			assertFalse(device.providesDeviceSdrs());
+			assertEquals(EnumSet.complementOf(EnumSet.of(DeviceFunction.BRIDGE)), device.functions());
+			assertArrayEquals(new byte[] { 1, 2, 3, 4 }, device.auxiliaryFirmwareRevision());
+			assertFalse(device.toString().isEmpty());
 
 			assertTrue(client.sensors().execute().stream().allMatch(sensor -> sensor.record() != null));
 			assertFalse(sensors.toString().isEmpty());

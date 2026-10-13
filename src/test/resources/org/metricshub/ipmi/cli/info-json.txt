@@ -1,0 +1,1 @@
+{"id":32,"revision":1,"firmwareRevision":"1.44","ipmiVersion":"2.0","manufacturerId":2,"productId":26,"available":true,"providesDeviceSdrs":false,"functions":["SENSOR_DEVICE","SDR_REPOSITORY_DEVICE","SEL_DEVICE","FRU_INVENTORY_DEVICE","IPMB_EVENT_RECEIVER","IPMB_EVENT_GENERATOR","CHASSIS_DEVICE"],"auxiliaryFirmwareRevision":"01020304"}

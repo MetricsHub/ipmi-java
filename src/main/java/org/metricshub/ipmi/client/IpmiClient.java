@@ -52,6 +52,7 @@ import org.metricshub.ipmi.core.api.sync.IpmiConnector;
 import org.metricshub.ipmi.core.coding.commands.IpmiCommandCoder;
 import org.metricshub.ipmi.core.coding.commands.PrivilegeLevel;
 import org.metricshub.ipmi.core.coding.commands.ResponseData;
+import org.metricshub.ipmi.core.coding.commands.app.GetDeviceId;
 import org.metricshub.ipmi.core.coding.commands.chassis.ChassisControl;
 import org.metricshub.ipmi.core.coding.commands.chassis.ChassisIdentify;
 import org.metricshub.ipmi.core.coding.commands.chassis.GetChassisStatus;
@@ -93,6 +94,7 @@ import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
  * <pre>
  * IpmiClient.Builder builder = IpmiClient.builder("bmc.example.com").credentials("monitor", password);
  * try (IpmiClient bmc = builder.privilege(PrivilegeLevel.Operator).build()) {
+ * 	System.out.println(bmc.deviceId()); // manufacturer, product, firmware revision
  * 	ChassisStatus chassis = bmc.chassisStatus();
  * 	if (!chassis.powerOn()) {
  * 		bmc.chassisControl(PowerCommand.PowerUp); // the Operator privilege set above
@@ -250,6 +252,17 @@ public final class IpmiClient implements AutoCloseable {
 	 */
 	public ChassisStatus chassisStatus() {
 		return run("chassis status", timeout, true, true, () -> new ChassisStatus(link.send(new GetChassisStatus())));
+	}
+
+	/**
+	 * Reads the identity of the BMC: manufacturer and product IDs, firmware revision, IPMI version, functions (Get
+	 * Device ID). The first thing to read to tell the platform apart, before choosing the OEM decodings it needs.
+	 *
+	 * @return the device ID
+	 * @throws IpmiClientException when the session cannot be opened or the BMC does not answer
+	 */
+	public DeviceId deviceId() {
+		return run("device id", timeout, true, true, () -> new DeviceId(link.send(new GetDeviceId())));
 	}
 
 	/**

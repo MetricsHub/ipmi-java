@@ -1,4 +1,4 @@
-keywords: upgrade, migration, release notes, breaking changes, 2.0, fluent client, builder, ipmiclientexception, slf4j, ipmicli, standalone jar, sel, system event log, chassis control, chassis identify, protected fields, accessors, abstractsensorrecord, validateresponse, utf-8, bmc key, cipher suite, integrity, org.sentrysoftware
+keywords: upgrade, migration, release notes, breaking changes, 2.0, fluent client, builder, device id, ipmiclientexception, slf4j, ipmicli, standalone jar, sel, system event log, chassis control, chassis identify, protected fields, accessors, abstractsensorrecord, validateresponse, utf-8, bmc key, cipher suite, integrity, org.sentrysoftware
 description: What changes when upgrading the IPMI Java Client — from 1.x to 2.0.00 (the fluent client, the System Event Log), from 1.2.02, from 1.2.01, and from the org.sentrysoftware:ipmi artifact of 1.2.00 and earlier.
 
 # Upgrading
@@ -66,6 +66,8 @@ try (IpmiClient bmc = IpmiClient.builder(host)
 
 New in the client: [`capabilities()`](apidocs/org/metricshub/ipmi/client/BmcCapabilities.html)
 reads the cipher suites and authentication options of a BMC without credentials,
+[`deviceId()`](device-id.html) identifies the BMC (manufacturer and product IDs, firmware
+revision, IPMI version, functions),
 [`sel()`](system-event-log.html) reads the System Event Log as typed entries (the sensor, the
 event in the wording of `ipmiutil`, the direction, the timestamp, the OEM bytes), whole or since
 the last entry read,
@@ -109,6 +111,9 @@ reply) are ignored.
 * `IpmiConnector.sendMessage(handle, command, resends)` sends a command with its own number of
   resends when no reply comes or the BMC answers `C3h`, 0 for a command the BMC must not receive
   twice.
+* The new `GetDeviceId` command (`org.metricshub.ipmi.core.coding.commands.app`, IPMI 2.0
+  section 20.1) decodes the identity of the BMC into `GetDeviceIdResponseData`; it is also the
+  keep-alive the connection sends.
 * `PowerCommand` has the three chassis controls 1.x left out: `PowerCycle` (`2h`),
   `DiagnosticInterrupt` (`4h`) and `SoftShutdown` (`5h`); `parseInt()` accepts their codes. The new
   `ChassisIdentify` command (IPMI 2.0 section 28.5) takes the interval in seconds and the "force
