@@ -105,6 +105,11 @@ public final class CommandCodes {
 	public static final byte GET_SEL_ENTRY = 0x43;
 
 	/**
+	 * An IPMI code for Get SEL Time UTC Offset command (IPMI 2.0 revision 1.1)
+	 */
+	public static final byte GET_SEL_TIME_UTC_OFFSET = 0x5c;
+
+	/**
 	 * An IPMI code for Get Channel Payload Support command
 	 */
 	public static final byte GET_CHANNEL_PAYLOAD_SUPPORT = 0x4E;

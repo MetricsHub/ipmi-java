@@ -261,6 +261,95 @@ class IpmiClientTest {
 
 	@Test
 	@Timeout(30)
+	void aClearedLogIsReadWholeEvenWhenItsIdsAreReused() throws Exception {
+		try (FakeRmcpPlusBmc bmc = new FakeRmcpPlusBmc(SUITES, USER, utf8(PASSWORD), null)) {
+			FakeSel sel = Fixtures.sel();
+			sel.install(bmc);
+			try (IpmiClient client = client(bmc).build()) {
+				SelEntryList log = client.sel().execute();
+				SelEntry last = log.get(log.size() - 1);
+				assertTrue(client.sel().since(last).execute().isEmpty(), "nothing after the last entry");
+				assertEquals(
+						Arrays.asList(4, 5, 6),
+						client.sel().since(log.get(2)).execute().stream().map(SelEntry::id).collect(Collectors.toList()));
+
+				// The log is cleared and six other events are logged: the IDs 1 to 6 name other entries now
+				sel.clear();
+				for (int id = 1; id <= 6; id++) {
+					sel
+							.add(
+									systemEvent(
+											id,
+											SEL_RESET_TIME + 1000 + id,
+											SensorType.Fan.getCode(),
+											FAN_SENSOR,
+											0x0a,
+											true,
+											0x01,
+											0xff,
+											0xff));
+				}
+				SelEntryList afterClear = client.sel().since(last).execute();
+				assertEquals(6, afterClear.size(), "another entry under the ID of the last one read: the whole log");
+				assertTrue(afterClear.lastErase().isPresent());
+				assertFalse(afterClear.get(5).equals(last), "same ID, another record");
+				assertEquals(afterClear.get(5), client.sel().execute().get(5), "the same record read twice");
+				assertEquals(afterClear.get(5).hashCode(), client.sel().execute().get(5).hashCode());
+				assertTrue(client.sel().since(afterClear.get(5)).execute().isEmpty());
+
+				assertTrue(client.sel().since(6).execute().isEmpty(), "an ID alone cannot tell a reused ID apart");
+				assertEquals(6, client.sel().since(7).execute().size(), "an ID the log does not hold: the whole log");
+			}
+		}
+	}
+
+	@Test
+	@Timeout(30)
+	void aLogThatChangesUnderTheWalkIsReadAgainOnce() throws Exception {
+		try (FakeRmcpPlusBmc bmc = new FakeRmcpPlusBmc(SUITES, USER, utf8(PASSWORD), null)) {
+			FakeSel sel = Fixtures.sel();
+			sel.install(bmc);
+			try (IpmiClient client = client(bmc).build()) {
+				// Entry 4, named as the next one by entry 3, is deleted between the two reads: the walk starts over
+				sel.vanishOnce(4);
+				assertEquals(6, client.sel().execute().size());
+				assertEquals(2, bmc.getCount(NETFN_STORAGE, GET_SEL_INFO), "Get SEL Info is read again with the log");
+				assertEquals(3 + 1 + 6, bmc.getCount(NETFN_STORAGE, GET_SEL_ENTRY), "three entries, the missing one, then all");
+
+				sel.vanishOnce(4).vanishOnce(4);
+				IpmiClientException twice = assertThrows(IpmiClientException.class, () -> client.sel().execute());
+				assertTrue(twice.getMessage().contains("changed twice while it was read"), twice.getMessage());
+
+				// The entry after which to read is gone, then entry 4 under the whole-log walk: the second walk starts over
+				sel.vanishOnce(3).vanishOnce(4);
+				assertEquals(
+						3,
+						client.sel().since(3).execute().size(),
+						"the second walk finds entry 3 again: the entries after it");
+			}
+		}
+	}
+
+	@Test
+	@Timeout(30)
+	void theSelTimeUtcOffsetIsApplied() throws Exception {
+		try (FakeRmcpPlusBmc bmc = new FakeRmcpPlusBmc(SUITES, USER, utf8(PASSWORD), null)) {
+			FakeSel sel = Fixtures.sel().utcOffset(540);
+			sel.install(bmc);
+			try (IpmiClient client = client(bmc).build()) {
+				// The BMC keeps its SEL time as local time, 9 hours ahead of UTC
+				SelEntryList log = client.sel().execute();
+				assertEquals(540, log.utcOffsetMinutes());
+				assertEquals(Instant.ofEpochSecond(SEL_RESET_TIME - 9 * 3600), log.get(0).timestamp().get());
+				assertEquals(Instant.ofEpochSecond(SEL_RESET_TIME + 489 - 9 * 3600), log.lastAddition().get());
+				assertEquals(5, log.get(5).preInitSeconds().getAsLong(), "a pre-init timestamp is not a time of day");
+				assertEquals(1, bmc.getCount(NETFN_STORAGE, FakeSel.GET_SEL_TIME_UTC_OFFSET));
+			}
+		}
+	}
+
+	@Test
+	@Timeout(30)
 	void anEmptySelABmcWithoutGetSelInfoAndACanceledReservation() throws Exception {
 		try (FakeRmcpPlusBmc bmc = new FakeRmcpPlusBmc(SUITES, USER, utf8(PASSWORD), null)) {
 			FakeSel sel = new FakeSel();

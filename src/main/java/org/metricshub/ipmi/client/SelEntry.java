@@ -23,6 +23,8 @@ package org.metricshub.ipmi.client;
  */
 
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
+import java.util.Arrays;
 import java.util.Date;
 import java.util.Locale;
 import java.util.Optional;
@@ -62,13 +64,26 @@ public final class SelEntry {
 	private final SelRecord record;
 	private final String description;
 
+	private final int utcOffsetMinutes;
+
 	/**
-	 * Wraps a decoded record.
+	 * Wraps a decoded record of a BMC whose SEL time is UTC.
 	 *
 	 * @param record the record
 	 */
 	SelEntry(SelRecord record) {
+		this(record, 0);
+	}
+
+	/**
+	 * Wraps a decoded record.
+	 *
+	 * @param record the record
+	 * @param utcOffsetMinutes the offset from UTC of the SEL time (Get SEL Time UTC Offset), 0 when it is UTC
+	 */
+	SelEntry(SelRecord record, int utcOffsetMinutes) {
 		this.record = record;
+		this.utcOffsetMinutes = utcOffsetMinutes;
 		this.description = describe();
 	}
 
@@ -94,12 +109,13 @@ public final class SelEntry {
 	/**
 	 * Returns when the event was logged, for a system event or a timestamped OEM entry whose timestamp is a date:
 	 * empty for an entry without timestamp, an unspecified timestamp (FFFFFFFFh), and an event logged before the
-	 * BMC had the time ({@link #preInitSeconds()}).
+	 * BMC had the time ({@link #preInitSeconds()}). The offset from UTC that a BMC keeping its SEL time as local time
+	 * reports ({@link SelEntryList#utcOffsetMinutes()}) is applied.
 	 *
 	 * @return the timestamp
 	 */
 	public Optional<Instant> timestamp() {
-		return absolute(record.getTimestamp());
+		return absolute(record.getTimestamp(), utcOffsetMinutes);
 	}
 
 	/**
@@ -266,14 +282,31 @@ public final class SelEntry {
 	/**
 	 * Converts a timestamp of the protocol core (a {@link Date} holding the unsigned 32-bit value) to the date it
 	 * stands for: none when it is unspecified or relative to the initialization of the SEL device.
+	 *
+	 * @param timestamp the timestamp as the BMC sent it
+	 * @param utcOffsetMinutes the offset from UTC of the SEL time: local time = UTC + offset
 	 */
-	static Optional<Instant> absolute(Date timestamp) {
+	static Optional<Instant> absolute(Date timestamp, int utcOffsetMinutes) {
 		if (timestamp == null) {
 			return Optional.empty();
 		}
 		long seconds = seconds(timestamp);
 		return seconds <= LAST_PRE_INIT_TIMESTAMP || seconds == UNSPECIFIED_TIMESTAMP ?
-				Optional.<Instant>empty() : Optional.of(timestamp.toInstant());
+				Optional.<Instant>empty() : Optional.of(timestamp.toInstant().minus(utcOffsetMinutes, ChronoUnit.MINUTES));
+	}
+
+	/**
+	 * Two entries are equal when they are the same record: same ID and same 16 bytes. An entry read again after the
+	 * log was cleared and filled up to its ID again is another entry.
+	 */
+	@Override
+	public boolean equals(Object other) {
+		return other instanceof SelEntry && Arrays.equals(record.getRawData(), ((SelEntry) other).record.getRawData());
+	}
+
+	@Override
+	public int hashCode() {
+		return Arrays.hashCode(record.getRawData());
 	}
 
 	private static long seconds(Date timestamp) {

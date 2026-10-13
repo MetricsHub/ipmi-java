@@ -309,11 +309,14 @@ the [System Event Log](system-event-log.html), in the order of the log: the reco
 (UTC, ISO-8601; `pre-init <seconds>` for an event logged before the BMC had the time, like the
 `Pre-Init` of `ipmitool`; empty for an OEM entry without timestamp), the sensor type of a system
 event or the record type of an OEM one, the sensor number, the event in the wording of
-`ipmiutil` or the OEM bytes, and `assertion` or `deassertion`. `-v` adds to stderr what Get SEL
-Info says of the log: its number of entries and the time of the last addition and erase.
+`ipmiutil` or the OEM bytes, and `assertion` or `deassertion`. The times are UTC whatever the
+BMC keeps (it reports the offset of a local SEL time with Get SEL Time UTC Offset). `-v` adds to
+stderr what Get SEL Info says of the log: its number of entries, the time of the last addition
+and erase, and that offset.
 
 `--since <id>` prints only the entries after the given record ID, the ID of the last entry of a
-previous run (the whole log when the BMC does not hold that entry any more, as after a clear);
+previous run (the whole log when the BMC does not hold that entry any more, as after a clear;
+a log cleared and filled up to that ID again goes unnoticed: the `lastErase` time of `-v` tells);
 the header alone means no new entry. `--json` prints one object per entry with the fields of
 [`SelEntry`](system-event-log.html#the-selentry-object): `timestamp` only when it is a date,
 `preInitSeconds` only for a pre-init one, the system event fields (`sensorType`, `sensorNumber`,

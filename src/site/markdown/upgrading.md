@@ -32,7 +32,7 @@ methods and `IpmiClientConfiguration` are gone.
 | `IpmiClient.getChassisStatus(config)` | `bmc.chassisStatus()`, a [`ChassisStatus`](chassis-status.html) (`data()` gives the `GetChassisStatusResponseData`) |
 | `IpmiClient.getSensors(config)` | `bmc.sensors().execute()`, a [`SensorList`](sensors.html) of typed [`Sensor`](apidocs/org/metricshub/ipmi/client/Sensor.html)s; `types()` and `names()` select sensors before their readings are requested |
 | `IpmiClient.getFrus(config)` | `bmc.frus().execute()`, a [`FruList`](fru-inventory.html) of typed [`Fru`](apidocs/org/metricshub/ipmi/client/Fru.html)s; `ids()` selects FRUs |
-| `GetSelInfo`, `GetSelEntry` sent by hand | `bmc.sel().execute()`, a [`SelEntryList`](system-event-log.html) of typed [`SelEntry`](apidocs/org/metricshub/ipmi/client/SelEntry.html)s; `since(id)` reads the entries added after one already read |
+| `GetSelInfo`, `GetSelEntry` sent by hand | `bmc.sel().execute()`, a [`SelEntryList`](system-event-log.html) of typed [`SelEntry`](apidocs/org/metricshub/ipmi/client/SelEntry.html)s; `since(entry)` reads the entries added after one already read |
 | `IpmiClient.getChassisStatusAsStringResult(config)` | `bmc.chassisStatus().powerOn()`; the `System power state is up` text is produced by the MetricsHub IPMI extension |
 | `IpmiClient.getFrusAndSensorsAsStringResult(config)` | `bmc.frus().execute()` and `bmc.sensors().execute()`, one session and one SDR walk instead of two; the text lines are produced by the MetricsHub IPMI extension, which took `IpmiResultConverter` over |
 | A new session per call | One session per client, serialized operations, [reopened](timeouts-and-errors.html#session-recovery) when the BMC loses it |
@@ -111,9 +111,10 @@ reply) are ignored.
 * The decoders no longer log the values they do not model: they return the same defaults as
   before (`Other`, `Unknown`, `Unspecified`, `Oem`).
 * `SelRecord` decodes the generator ID, the event/reading type and the three event data bytes of
-  a system event (`getGeneratorId()`, `getEventType()`, `getEventData()`), and refuses a record
-  shorter than 16 bytes with `IllegalArgumentException` instead of
-  `ArrayIndexOutOfBoundsException`. `TypeConverter.decodeDate()` decodes the IPMI timestamps as
+  a system event (`getGeneratorId()`, `getEventType()`, `getEventData()`), keeps the 16 bytes of
+  the record (`getRawData()`), and refuses a record shorter than 16 bytes with
+  `IllegalArgumentException` instead of `ArrayIndexOutOfBoundsException`. The new
+  `GetSelTimeUtcOffset` command reads the UTC offset of a local SEL time (IPMI 2.0 revision 1.1). `TypeConverter.decodeDate()` decodes the IPMI timestamps as
   unsigned (IPMI 2.0 section 37.1): the dates from 2038 on, and the `FFFFFFFFh` marker of an
   unspecified timestamp, were negative dates in 1.x. It is used by the SEL and SDR repository
   timestamps.

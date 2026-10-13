@@ -632,7 +632,8 @@ public final class IpmiCli {
 					err,
 					"SEL: " + entries.totalEntries().getAsInt() + " entries, last addition "
 							+ entries.lastAddition().map(Instant::toString).orElse("unknown") + ", last erase "
-							+ entries.lastErase().map(Instant::toString).orElse("unknown"));
+							+ entries.lastErase().map(Instant::toString).orElse("unknown") + ", SEL time UTC offset "
+							+ entries.utcOffsetMinutes() + " min");
 		}
 		if (arguments.json()) {
 			for (SelEntry entry : entries) {

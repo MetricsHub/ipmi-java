@@ -267,8 +267,8 @@ public final class IpmiClient implements AutoCloseable {
 	}
 
 	/**
-	 * Reads the System Event Log (SEL): {@code sel().execute()} for every entry, with {@link SelRequest#since} for the
-	 * entries added after one already read.
+	 * Reads the System Event Log (SEL): {@code sel().execute()} for every entry, with
+	 * {@link SelRequest#since(SelEntry)} for the entries added after one already read.
 	 *
 	 * @return the request to complete
 	 */
@@ -398,8 +398,8 @@ public final class IpmiClient implements AutoCloseable {
 		});
 	}
 
-	SelEntryList readSel(int since, Duration deadline) {
-		return run("SEL", deadline, true, true, () -> SelReader.read(link, since));
+	SelEntryList readSel(int since, SelEntry sinceEntry, Duration deadline) {
+		return run("SEL", deadline, true, true, () -> SelReader.read(link, host, since, sinceEntry));
 	}
 
 	SolConsole openSol(Duration deadline) {

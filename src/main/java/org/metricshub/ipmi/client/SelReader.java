@@ -29,12 +29,13 @@ import org.metricshub.ipmi.core.coding.commands.sel.GetSelEntry;
 import org.metricshub.ipmi.core.coding.commands.sel.GetSelEntryResponseData;
 import org.metricshub.ipmi.core.coding.commands.sel.GetSelInfo;
 import org.metricshub.ipmi.core.coding.commands.sel.GetSelInfoResponseData;
+import org.metricshub.ipmi.core.coding.commands.sel.GetSelTimeUtcOffset;
 import org.metricshub.ipmi.core.coding.commands.sel.ReserveSel;
 import org.metricshub.ipmi.core.coding.payload.CompletionCode;
 
 /**
- * Reads the System Event Log entry by entry (IPMI 2.0 section 31): Get SEL Info, then Get SEL Entry from the first
- * record ID (0000h) or the one given, following the next record IDs until FFFFh.
+ * Reads the System Event Log entry by entry (IPMI 2.0 section 31): Get SEL Info, Get SEL Time UTC Offset, then Get
+ * SEL Entry from the first record ID (0000h) or the one given, following the next record IDs until FFFFh.
  */
 final class SelReader {
 
@@ -47,6 +48,7 @@ final class SelReader {
 	private final Exchange exchange;
 	/** 0 until the BMC asks for a reservation: a whole entry is read without one (IPMI 2.0 section 31.5). */
 	private int reservationId;
+	private int utcOffsetMinutes;
 
 	private SelReader(Exchange exchange) {
 		this.exchange = exchange;
@@ -56,42 +58,81 @@ final class SelReader {
 	 * Reads the log.
 	 *
 	 * @param exchange the session to read it from
-	 * @param since the record ID of the entry after which to read, or -1 for the whole log
+	 * @param host the BMC, for the messages
+	 * @param since the record ID of the entry after which to read, -1 for the whole log
+	 * @param sinceEntry the entry after which to read, null when the ID alone is given or for the whole log
 	 * @return the entries
-	 * @throws IpmiClientException when an entry cannot be read at all: the BMC does not answer, refuses it, or
-	 *         returns a malformed one
+	 * @throws IpmiClientException when an entry cannot be read at all: the BMC does not answer, refuses it, returns
+	 *         a malformed one, or keeps changing the log while it is read
 	 */
-	static SelEntryList read(Exchange exchange, int since) {
-		GetSelInfoResponseData info;
-		try {
-			info = exchange.send(new GetSelInfo());
-		} catch (IpmiCompletionCodeException e) {
-			// A BMC that refuses Get SEL Info: an empty log then answers "not present" to the first Get SEL Entry
-			info = null;
+	static SelEntryList read(Exchange exchange, String host, int since, SelEntry sinceEntry) {
+		SelReader reader = new SelReader(exchange);
+		reader.utcOffsetMinutes = reader.utcOffset();
+		GetSelInfoResponseData info = reader.info();
+		List<SelEntry> entries = reader.walk(since, sinceEntry, info);
+		if (entries == null) {
+			// The log changed under the walk (an entry deleted, the log cleared): read it again, once, as it is now
+			info = reader.info();
+			entries = reader.walk(since, sinceEntry, info);
+			if (entries == null) {
+				throw new IpmiClientException(
+						"The System Event Log of " + host
+								+ " changed twice while it was read: an entry named as the next one is not there any more");
+			}
 		}
-		List<SelEntry> entries = new ArrayList<SelEntry>();
-		if (info == null || info.getEntriesCount() > 0) {
-			new SelReader(exchange).walk(since, entries);
-		}
-		return new SelEntryList(entries, info);
+		return new SelEntryList(entries, info, reader.utcOffsetMinutes);
 	}
 
-	private void walk(int since, List<SelEntry> entries) {
+	private GetSelInfoResponseData info() {
+		try {
+			return exchange.send(new GetSelInfo());
+		} catch (IpmiCompletionCodeException e) {
+			// A BMC that refuses Get SEL Info: an empty log then answers "not present" to the first Get SEL Entry
+			return null;
+		}
+	}
+
+	private int utcOffset() {
+		try {
+			return exchange.send(new GetSelTimeUtcOffset()).getOffsetMinutes();
+		} catch (IpmiCompletionCodeException e) {
+			// A BMC without the command (IPMI 2.0 revision 1.1) keeps its SEL time in UTC
+			return 0;
+		}
+	}
+
+	/**
+	 * Walks the log.
+	 *
+	 * @return the entries, or null when an entry named as the next one is not there any more: the log changed under
+	 *         the walk
+	 */
+	private List<SelEntry> walk(int since, SelEntry sinceEntry, GetSelInfoResponseData info) {
+		List<SelEntry> entries = new ArrayList<SelEntry>();
+		if (info != null && info.getEntriesCount() == 0) {
+			return entries;
+		}
 		int next = FIRST_RECORD_ID;
-		if (since >= 0) {
-			// The entry read last gives the next one; when the log does not hold it any more, it was cleared
-			GetSelEntryResponseData last = entry(since);
-			next = last == null ? FIRST_RECORD_ID : last.getNextRecordId();
+		int sinceId = sinceEntry != null ? sinceEntry.id() : since;
+		if (sinceId >= 0) {
+			// The entry read last gives the next one. When the log does not hold it any more, or holds another entry
+			// under its ID (the log was cleared and its IDs started over), the whole log is read
+			GetSelEntryResponseData last = entry(sinceId);
+			if (last != null && (sinceEntry == null || sinceEntry.equals(new SelEntry(last.getSelRecord())))) {
+				next = last.getNextRecordId();
+			}
 		}
 		while (next != LAST_RECORD_ID) {
 			GetSelEntryResponseData reply = entry(next);
 			if (reply == null) {
-				// An empty log, or one cleared while it was read: the entries read so far are what there is
-				break;
+				// Nothing at the first record: an empty log (of a BMC that refuses Get SEL Info, or cleared just now).
+				// Nothing at a record another entry named as the next one: the log changed under the walk
+				return next == FIRST_RECORD_ID && entries.isEmpty() ? entries : null;
 			}
-			entries.add(new SelEntry(reply.getSelRecord()));
+			entries.add(new SelEntry(reply.getSelRecord(), utcOffsetMinutes));
 			next = reply.getNextRecordId();
 		}
+		return entries;
 	}
 
 	/**

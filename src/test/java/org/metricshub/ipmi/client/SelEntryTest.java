@@ -41,7 +41,7 @@ class SelEntryTest {
 		SelEntry entry = entry(systemEvent(1, 0x20000000L, SensorType.Fan.getCode(), 1, 0x0a, true, 0x01, 0xff, 0xff));
 		assertFalse(entry.timestamp().isPresent());
 		assertEquals(0x20000000L, entry.preInitSeconds().getAsLong());
-		assertEquals(Instant.ofEpochSecond(0x20000001L), SelEntry.absolute(new Date(0x20000001L * 1000)).get());
+		assertEquals(Instant.ofEpochSecond(0x20000001L), SelEntry.absolute(new Date(0x20000001L * 1000), 0).get());
 	}
 
 	@Test
@@ -73,6 +73,16 @@ class SelEntryTest {
 		SelEntry entry = entry(systemEvent(1, 0xffffffffL, SensorType.Fan.getCode(), 1, 0x0a, true, 0x01, 0xff, 0xff));
 		entry.eventData()[0] = 0x7f;
 		assertEquals(0x01, entry.eventData()[0]);
+	}
+
+	@Test
+	void entriesAreEqualWhenTheirRecordsAre() {
+		byte[] record = systemEvent(1, 0xffffffffL, SensorType.Fan.getCode(), 1, 0x0a, true, 0x01, 0xff, 0xff);
+		assertEquals(entry(record), entry(record.clone()));
+		assertEquals(entry(record).hashCode(), entry(record.clone()).hashCode());
+		assertFalse(
+				entry(record).equals(entry(systemEvent(1, 5, SensorType.Fan.getCode(), 1, 0x0a, true, 0x01, 0xff, 0xff))));
+		assertFalse(entry(record).equals("not an entry"));
 	}
 
 	@Test

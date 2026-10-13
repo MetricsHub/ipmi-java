@@ -227,7 +227,9 @@ class IpmiCliTest {
 							+ "6   pre-init 5s  Processor          2       IERR                                             assertion\n",
 					since.out);
 			assertTrue(
-					since.err.contains("ipmicli: SEL: 6 entries, last addition 2024-05-15T09:23:34Z, last erase unknown\n"),
+					since.err
+							.contains(
+									"ipmicli: SEL: 6 entries, last addition 2024-05-15T09:23:34Z, last erase unknown, SEL time UTC offset 0 min\n"),
 					since.err);
 			assertEquals(
 					"ID  Time  Type  Sensor  Event  Direction\n",

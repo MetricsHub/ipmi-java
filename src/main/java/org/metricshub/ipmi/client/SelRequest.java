@@ -23,10 +23,11 @@ package org.metricshub.ipmi.client;
  */
 
 import java.time.Duration;
+import java.util.Objects;
 
 /**
- * Reads the System Event Log: {@code bmc.sel().execute()} for every entry, {@code bmc.sel().since(id).execute()}
- * for the entries added after the one with the given ID.
+ * Reads the System Event Log: {@code bmc.sel().execute()} for every entry, {@code bmc.sel().since(entry).execute()}
+ * for the entries added after one already read.
  */
 public final class SelRequest {
 
@@ -35,6 +36,7 @@ public final class SelRequest {
 
 	private final IpmiClient client;
 	private int since = -1;
+	private SelEntry sinceEntry;
 	private Duration timeout;
 
 	SelRequest(IpmiClient client) {
@@ -42,10 +44,25 @@ public final class SelRequest {
 	}
 
 	/**
+	 * Reads only the entries added after the given one, the last entry of a previous read: it is read again to find
+	 * the next one and left out. When the log holds another entry under its ID, or none (the log was cleared since,
+	 * and its IDs started over), the whole log is read.
+	 *
+	 * @param entry the last entry already read
+	 * @return this request
+	 */
+	public SelRequest since(SelEntry entry) {
+		this.sinceEntry = Objects.requireNonNull(entry, "entry");
+		this.since = -1;
+		return this;
+	}
+
+	/**
 	 * Reads only the entries added after the one with the given record ID, the {@link SelEntry#id() ID} of the last
-	 * entry of a previous read: that entry is read to find the next and left out. When the log does not hold it any
-	 * more (the log was cleared since, and its IDs started over), the whole log is read:
-	 * {@link SelEntryList#lastErase()} tells.
+	 * entry of a previous read, when that entry itself is not at hand (a cursor kept across restarts). When the log
+	 * does not hold the ID any more (the log was cleared since), the whole log is read; but a log cleared and filled
+	 * again up to that ID goes unnoticed, which {@link #since(SelEntry)} catches: compare
+	 * {@link SelEntryList#lastErase()} with the previous read to tell.
 	 *
 	 * @param recordId the record ID of the last entry already read, 1 to 65534
 	 * @return this request
@@ -55,6 +72,7 @@ public final class SelRequest {
 			throw new IllegalArgumentException("A SEL record ID is between 1 and " + LAST_ENTRY_ID + ": " + recordId);
 		}
 		this.since = recordId;
+		this.sinceEntry = null;
 		return this;
 	}
 
@@ -70,14 +88,15 @@ public final class SelRequest {
 	}
 
 	/**
-	 * Reads the entries: Get SEL Info, then one Get SEL Entry per entry, each read whole (so without a reservation,
-	 * IPMI 2.0 section 31.5; one is taken when the BMC asks for it).
+	 * Reads the entries: Get SEL Info, Get SEL Time UTC Offset, then one Get SEL Entry per entry, each read whole (so
+	 * without a reservation, IPMI 2.0 section 31.5; one is taken when the BMC asks for it). A log that changes while
+	 * it is read (an entry deleted, the log cleared) is read again from the start, once.
 	 *
 	 * @return the entries, in the order of the log
-	 * @throws IpmiClientException when the log cannot be read: the BMC does not answer, refuses an entry, or
-	 *         returns a malformed one
+	 * @throws IpmiClientException when the log cannot be read: the BMC does not answer, refuses an entry, returns a
+	 *         malformed one, or changed the log twice during the read
 	 */
 	public SelEntryList execute() {
-		return client.readSel(since, timeout);
+		return client.readSel(since, sinceEntry, timeout);
 	}
 }

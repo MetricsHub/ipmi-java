@@ -40,16 +40,30 @@ public final class SelEntryList extends AbstractList<SelEntry> {
 
 	private final List<SelEntry> entries;
 	private final GetSelInfoResponseData info;
+	private final int utcOffsetMinutes;
 
 	/**
 	 * Creates the list.
 	 *
 	 * @param entries the entries, in the order of the log
 	 * @param info the Get SEL Info reply, null when the BMC refused the command
+	 * @param utcOffsetMinutes the offset from UTC of the SEL time, 0 when the BMC keeps it in UTC
 	 */
-	SelEntryList(List<SelEntry> entries, GetSelInfoResponseData info) {
+	SelEntryList(List<SelEntry> entries, GetSelInfoResponseData info, int utcOffsetMinutes) {
 		this.entries = Collections.unmodifiableList(new ArrayList<SelEntry>(entries));
 		this.info = info;
+		this.utcOffsetMinutes = utcOffsetMinutes;
+	}
+
+	/**
+	 * Returns the offset from UTC of the SEL time, which a BMC that keeps its SEL time as local time reports with
+	 * Get SEL Time UTC Offset (IPMI 2.0 revision 1.1): already applied to every timestamp of the list and its
+	 * entries. 0 for a BMC without the command, whose SEL time is UTC.
+	 *
+	 * @return the offset in minutes, local time = UTC + offset
+	 */
+	public int utcOffsetMinutes() {
+		return utcOffsetMinutes;
 	}
 
 	@Override
@@ -78,7 +92,8 @@ public final class SelEntryList extends AbstractList<SelEntry> {
 	 * @return the time of the most recent addition, empty when the BMC refused Get SEL Info or reports none
 	 */
 	public Optional<Instant> lastAddition() {
-		return info == null ? Optional.<Instant>empty() : SelEntry.absolute(info.getAdditionTimestamp());
+		return info == null ?
+				Optional.<Instant>empty() : SelEntry.absolute(info.getAdditionTimestamp(), utcOffsetMinutes);
 	}
 
 	/**
@@ -88,7 +103,7 @@ public final class SelEntryList extends AbstractList<SelEntry> {
 	 * @return the time of the most recent erase, empty when the BMC refused Get SEL Info or reports none
 	 */
 	public Optional<Instant> lastErase() {
-		return info == null ? Optional.<Instant>empty() : SelEntry.absolute(info.getEraseTimestamp());
+		return info == null ? Optional.<Instant>empty() : SelEntry.absolute(info.getEraseTimestamp(), utcOffsetMinutes);
 	}
 
 	/**

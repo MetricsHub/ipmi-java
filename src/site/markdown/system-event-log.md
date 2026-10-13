@@ -30,12 +30,19 @@ SEL entry 7 at 2024-05-15T09:24:15Z: VersionChange sensor 0, Firmware or softwar
 
 [`sel().execute()`](apidocs/org/metricshub/ipmi/client/SelRequest.html):
 
-1. sends **Get SEL Info**, for the number of entries and the time of the last addition and erase
-   (an empty log is not read: Get SEL Entry fails on it);
+1. sends **Get SEL Time UTC Offset**, for a BMC that keeps its SEL time as local time (IPMI 2.0
+   revision 1.1; a BMC without the command keeps it in UTC), and **Get SEL Info**, for the number
+   of entries and the time of the last addition and erase (an empty log is not read: Get SEL
+   Entry fails on it);
 2. sends **Get SEL Entry** for the first entry (record ID `0000h`), then for the *next record ID*
    each reply gives, until that ID is `FFFFh`. Each entry is read whole, so no reservation is
    needed (IPMI 2.0, section 31.5); when a BMC asks for one anyway, or cancels the one it gave
    (`C5h`), the client takes a reservation with **Reserve SEL** and reads the entry again.
+
+When an entry named as the next one is not there any more (`CBh`: it was deleted, or the log
+was cleared, while the log was read), the read **starts over**, once, from what the log is now;
+a log that changes twice during a read fails it with `IpmiClientException` rather than return
+an incomplete list.
 
 Every record type is decoded: the system events, the OEM records with and without timestamp,
 and the reserved types, of which only the record ID is defined
@@ -53,7 +60,7 @@ Each [`SelEntry`](apidocs/org/metricshub/ipmi/client/SelEntry.html) is immutable
 
 | Method | Content |
 | --- | --- |
-| `id()` | The record ID, 1 to 65534, unique until the log is cleared: what `since()` takes |
+| `id()` | The record ID, 1 to 65534, unique until the log is cleared |
 | `type()` | [`SelRecordType`](apidocs/org/metricshub/ipmi/core/coding/commands/sel/SelRecordType.html): `System` for a system event, `OemTimestamped` (`C0h`–`DFh`), `OemNonTimestamped` (`E0h`–`FFh`) or `Reserved` |
 | `timestamp()` | When the event was logged (`Optional<Instant>`), for a system event or a timestamped OEM entry whose timestamp is a date ([below](#timestamps)) |
 | `preInitSeconds()` | For an event logged before the BMC had the time: the seconds since the initialization of the SEL device (`OptionalLong`) |
@@ -70,11 +77,12 @@ Each [`SelEntry`](apidocs/org/metricshub/ipmi/client/SelEntry.html) is immutable
 
 The accessors of a system event (`sensorType()`, `event()`, ...) are empty for the OEM and reserved
 entries, and `manufacturerId()` and `oemData()` for the system events: `type()` tells which.
+Two entries are `equals()` when they are the same record (same ID, same 16 bytes).
 
 [`SelEntryList`](apidocs/org/metricshub/ipmi/client/SelEntryList.html), the result of
 `execute()`, is an unmodifiable `List<SelEntry>` that also gives what Get SEL Info says of the
 whole log: `totalEntries()`, `lastAddition()` and `lastErase()` (`Optional`: a BMC that never
-erased its log reports no erase time).
+erased its log reports no erase time), and the `utcOffsetMinutes()` of the SEL time.
 
 ### Timestamps
 
@@ -85,6 +93,16 @@ timestamp. `timestamp()` is empty in both cases; `preInitSeconds()` gives the fo
 `Pre-Init` of `ipmitool`. A Lenovo IMM logs the events of its first boot with its clock at 1980,
 which falls in that range: they are reported as `preInitSeconds()` of about 315 million.
 
+A BMC that keeps its SEL time as **local time** says so with the Get SEL Time UTC Offset command
+of IPMI 2.0 revision 1.1, and the client subtracts that offset from every timestamp it returns,
+so that `timestamp()`, `lastAddition()` and `lastErase()` are UTC instants; `utcOffsetMinutes()`
+gives the offset applied (0 when the BMC does not implement the command). The timestamps are
+still only as good as the clock of the BMC: of the BMCs tested, a Supermicro keeps UTC, a Lenovo
+IMM reports an offset of 60 minutes, and a Dell iDRAC runs its SEL clock on the local time of
+its time zone setting *without* implementing the command, so its timestamps come out two hours
+ahead of UTC in summer and nothing in the protocol says so. Compare the SEL time of the BMC
+(`ipmitool sel time get`) with the wall clock when the hour of an event matters.
+
 ### Threshold events
 
 A threshold event (`eventType()` = `0x01`) says which threshold was crossed in which direction
@@ -93,16 +111,19 @@ the raw reading that triggered it (second byte) and the threshold (third byte), 
 of the first byte announce (`01` in bits 7:6 for the reading, `01` in bits 5:4 for the threshold).
 They are raw bytes: convert them with the `calcFormula()` of the sensor's
 [`FullSensorRecord`](apidocs/org/metricshub/ipmi/core/coding/commands/sdr/record/FullSensorRecord.html),
-found by `sensorNumber()` among `bmc.sensors().execute()`.
+found among `bmc.sensors().execute()` by its owner and number: a sensor number is unique for
+its owner only (the BMC at `0x20`, a satellite controller, the BIOS at `0xB1`...), and the low
+byte of `generatorId()` names the owner that logged the event.
 
 ```java
 Map<Integer, Sensor> sensors = new HashMap<>();
 for (Sensor sensor : bmc.sensors().execute()) {
-	sensors.put(sensor.number(), sensor);
+	AbstractSensorRecord record = (AbstractSensorRecord) sensor.record();
+	sensors.put((record.getSensorOwnerId() & 0xFF) << 8 | sensor.number(), sensor);
 }
 for (SelEntry entry : bmc.sel().execute()) {
 	if (entry.eventType().orElse(0) == 0x01 && entry.direction().get() == EventDirection.Assertion) {
-		Sensor sensor = sensors.get(entry.sensorNumber().getAsInt());
+		Sensor sensor = sensors.get((entry.generatorId().getAsInt() & 0xFF) << 8 | entry.sensorNumber().getAsInt());
 		byte[] data = entry.eventData();
 		if (sensor != null && (data[0] & 0xC0) == 0x40 && sensor.record() instanceof FullSensorRecord) {
 			FullSensorRecord record = (FullSensorRecord) sensor.record();
@@ -124,26 +145,27 @@ gives the codes.
 
 ## Polling for new entries
 
-Reading the whole log at every poll costs one round trip per entry. `since(id)` reads only the
-entries added after the one with the given record ID, the `id()` of the last entry of the
-previous read: that entry is read to find the next one and left out.
+Reading the whole log at every poll costs one round trip per entry. `since(entry)` reads only the
+entries added after the given one, the last entry of the previous read: that entry is read
+again to find the next one and left out.
 
 ```java
-int lastSeen = -1;
+SelEntry lastSeen = null;
 while (true) {
-	SelEntryList entries = lastSeen < 0 ? bmc.sel().execute() : bmc.sel().since(lastSeen).execute();
+	SelEntryList entries = lastSeen == null ? bmc.sel().execute() : bmc.sel().since(lastSeen).execute();
 	for (SelEntry entry : entries) {
 		alert(entry);
-		lastSeen = entry.id();
+		lastSeen = entry;
 	}
 	Thread.sleep(60_000);
 }
 ```
 
-When the log was cleared since (`lastErase()` is more recent than the previous read), the BMC
-does not hold the entry any more and the **whole log** is read: the record IDs start over after a
-clear, so an ID seen before names another entry. A clear in the middle of a read ends it with
-the entries read so far.
+When the log was cleared since, the record IDs started over: the BMC holds **another entry**
+under the ID of the last one seen, or none, and the **whole log** is read (`lastErase()` is then
+more recent than the previous read). `since(int recordId)` does the same with the ID alone, for a
+cursor kept across restarts, but cannot tell a log cleared and filled up to that ID again from
+the one it read before: compare `lastErase()` with the previous read when using it.
 
 The log has a fixed capacity (hundreds to a few thousand entries); when it is full, most BMCs
 stop logging (`SelFull`, `SelAlmostFull` events of the `EventLoggingDisabled` sensor type announce

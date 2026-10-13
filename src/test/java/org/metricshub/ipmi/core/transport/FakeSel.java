@@ -18,6 +18,7 @@ public final class FakeSel {
 	public static final int GET_SEL_INFO = 0x40;
 	public static final int RESERVE_SEL = 0x42;
 	public static final int GET_SEL_ENTRY = 0x43;
+	public static final int GET_SEL_TIME_UTC_OFFSET = 0x5c;
 
 	/** The generator ID of the events: the BMC itself (slave address 20h, LUN 0). */
 	public static final int GENERATOR_BMC = 0x0020;
@@ -30,6 +31,8 @@ public final class FakeSel {
 
 	private final List<byte[]> records = new CopyOnWriteArrayList<>();
 	private final Map<Integer, Integer> cancelOnce = new ConcurrentHashMap<>();
+	private final Map<Integer, Integer> vanishOnce = new ConcurrentHashMap<>();
+	private volatile Integer utcOffsetMinutes;
 	private volatile boolean infoSupported = true;
 	private volatile int reservationId;
 	private volatile int additionTimestamp = UNSPECIFIED;
@@ -44,6 +47,7 @@ public final class FakeSel {
 		bmc.handle(NETFN_STORAGE, GET_SEL_INFO, this::info);
 		bmc.handle(NETFN_STORAGE, RESERVE_SEL, this::reserve);
 		bmc.handle(NETFN_STORAGE, GET_SEL_ENTRY, this::entry);
+		bmc.handle(NETFN_STORAGE, GET_SEL_TIME_UTC_OFFSET, this::utcOffset);
 	}
 
 	/**
@@ -73,6 +77,38 @@ public final class FakeSel {
 	/** Refuses Get SEL Info with C1h from now on. */
 	public void unsupportedInfo() {
 		infoSupported = false;
+	}
+
+	/**
+	 * Answers "requested record not present" (CBh) to the next Get SEL Entry of the given record, as a BMC does once
+	 * the entry was deleted; the record stays in the log.
+	 *
+	 * @param recordId the record ID
+	 * @return this log
+	 */
+	public FakeSel vanishOnce(int recordId) {
+		vanishOnce.merge(recordId, 1, Integer::sum);
+		return this;
+	}
+
+	/**
+	 * Keeps the SEL time as local time: Get SEL Time UTC Offset reports the given offset (IPMI 2.0 revision 1.1). The
+	 * command is unsupported (C1h) until this is called.
+	 *
+	 * @param minutes the offset from UTC, in minutes
+	 * @return this log
+	 */
+	public FakeSel utcOffset(int minutes) {
+		utcOffsetMinutes = minutes;
+		return this;
+	}
+
+	private byte[] utcOffset(byte[] data) {
+		Integer minutes = utcOffsetMinutes;
+		if (minutes == null) {
+			return new byte[] { (byte) 0xc1 };
+		}
+		return new byte[] { 0x00, (byte) (int) minutes, (byte) (minutes >> 8) };
 	}
 
 	/**
@@ -110,14 +146,11 @@ public final class FakeSel {
 
 	private byte[] entry(byte[] data) {
 		int recordId = (data[2] & 0xff) | (data[3] & 0xff) << 8;
-		Integer pending = cancelOnce.get(recordId);
-		if (pending != null) {
-			if (pending > 1) {
-				cancelOnce.put(recordId, pending - 1);
-			} else {
-				cancelOnce.remove(recordId);
-			}
+		if (countDown(cancelOnce, recordId)) {
 			return new byte[] { (byte) 0xc5 };
+		}
+		if (countDown(vanishOnce, recordId)) {
+			return new byte[] { (byte) 0xcb };
 		}
 		int index = recordId == 0 ? 0 : recordId == LAST_RECORD_ID ? records.size() - 1 : indexOf(recordId);
 		if (index < 0 || index >= records.size()) {
@@ -131,6 +164,20 @@ public final class FakeSel {
 				.putShort((short) next)
 				.put(records.get(index))
 				.array();
+	}
+
+	/** Consumes one pending fault of the record, if any. */
+	private static boolean countDown(Map<Integer, Integer> pending, int recordId) {
+		Integer count = pending.get(recordId);
+		if (count == null) {
+			return false;
+		}
+		if (count > 1) {
+			pending.put(recordId, count - 1);
+		} else {
+			pending.remove(recordId);
+		}
+		return true;
 	}
 
 	private int indexOf(int recordId) {

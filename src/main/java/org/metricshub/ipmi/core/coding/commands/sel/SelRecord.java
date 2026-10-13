@@ -85,6 +85,23 @@ public class SelRecord {
 
 	private byte[] oemData;
 
+	/** The 16 bytes of the record as the BMC sent them */
+	private byte[] rawData;
+
+	/**
+	 * @return the 16 bytes of the record as the BMC sent them, null for a record built by hand
+	 */
+	public byte[] getRawData() {
+		return rawData;
+	}
+
+	/**
+	 * @param rawData the 16 bytes of the record as the BMC sent them
+	 */
+	public void setRawData(byte[] rawData) {
+		this.rawData = rawData;
+	}
+
 	/**
 	 * Decodes a SEL record (IPMI 2.0 section 32).
 	 *
@@ -100,6 +117,8 @@ public class SelRecord {
 		}
 
 		SelRecord record = new SelRecord();
+
+		record.setRawData(Arrays.copyOf(data, RECORD_SIZE));
 
 		byte[] buffer = new byte[4];
 
