@@ -62,6 +62,8 @@ final class SelReader {
 	/** 0 until the BMC asks for a reservation: a whole entry is read without one (IPMI 2.0 section 31.5). */
 	private int reservationId;
 	private int utcOffsetMinutes;
+	/** The first entry the walk read, or the entry after which it read when it read none, to read again after it. */
+	private SelEntry anchor;
 
 	private SelReader(Exchange exchange) {
 		this.exchange = exchange;
@@ -83,14 +85,18 @@ final class SelReader {
 		reader.utcOffsetMinutes = reader.utcOffset();
 		GetSelInfoResponseData before = reader.info();
 		List<SelEntry> entries = reader.walk(since, sinceEntry, before);
+		// The anchor is read again before Get SEL Info, so that a change seen by either leaves the info read after it
+		// as the baseline of the second walk
+		boolean changed = entries == null || reader.changed();
 		GetSelInfoResponseData after = reader.info();
-		if (entries == null || erased(before, after) || reader.changed(entries)) {
+		if (changed || erased(before, after)) {
 			// The log changed under the walk (an entry deleted, the log cleared): read it again, once, as it is now, and
 			// whole: the entry after which to read may be another one by now
 			before = after;
 			entries = reader.walk(-1, null, before);
+			changed = entries == null || reader.changed();
 			after = reader.info();
-			if (entries == null || erased(before, after) || reader.changed(entries)) {
+			if (changed || erased(before, after)) {
 				throw new IpmiClientException(
 						"The System Event Log of " + host + " changed twice while it was read: it was erased, or an entry"
 								+ " named as the next one is not there any more");
@@ -108,16 +114,16 @@ final class SelReader {
 	}
 
 	/**
-	 * Tells whether the first entry read is still the first entry of the log, byte for byte: a log cleared and filled
-	 * again while it was walked holds another entry under its ID, even when two erases within a second left the erase
-	 * timestamp unchanged.
+	 * Tells whether the anchor of the walk (the first entry it read, or the entry after which it read when it read
+	 * none) is still in the log, byte for byte: a log cleared and filled again while it was walked holds another
+	 * entry under its ID, even when two erases within a second left the erase timestamp unchanged.
 	 */
-	private boolean changed(List<SelEntry> entries) {
-		if (entries.isEmpty()) {
+	private boolean changed() {
+		if (anchor == null) {
 			return false;
 		}
-		GetSelEntryResponseData first = entry(entries.get(0).id());
-		return first == null || !entries.get(0).equals(new SelEntry(first.getSelRecord()));
+		GetSelEntryResponseData now = entry(anchor.id());
+		return now == null || !anchor.equals(new SelEntry(now.getSelRecord()));
 	}
 
 	private GetSelInfoResponseData info() {
@@ -182,6 +188,7 @@ final class SelReader {
 	 */
 	private List<SelEntry> walk(int since, SelEntry sinceEntry, GetSelInfoResponseData info) {
 		List<SelEntry> entries = new ArrayList<SelEntry>();
+		anchor = null;
 		if (info != null && info.getEntriesCount() == 0) {
 			return entries;
 		}
@@ -195,6 +202,7 @@ final class SelReader {
 					&& last.getSelRecord().getRecordId() == sinceId
 					&& (sinceEntry == null || sinceEntry.equals(new SelEntry(last.getSelRecord())))) {
 				next = last.getNextRecordId();
+				anchor = new SelEntry(last.getSelRecord());
 			}
 		}
 		Set<Integer> read = new HashSet<Integer>();
@@ -207,10 +215,18 @@ final class SelReader {
 				return next == FIRST_RECORD_ID && entries.isEmpty() ? entries : null;
 			}
 			SelEntry entry = new SelEntry(reply.getSelRecord(), utcOffsetMinutes);
+			if (entry.id() <= FIRST_RECORD_ID || entry.id() >= LAST_RECORD_ID) {
+				// 0000h and FFFFh are selectors, not the IDs of entries (IPMI 2.0 section 31.6)
+				throw new IpmiClientException(
+						String.format("The System Event Log answered an entry whose record ID is %04Xh", entry.id()));
+			}
 			if (next != FIRST_RECORD_ID && entry.id() != next) {
 				// A malformed reply: following it would skip the entry asked for
 				throw new IpmiClientException(
 						String.format("The System Event Log answered entry %04Xh when asked for entry %04Xh", entry.id(), next));
+			}
+			if (anchor == null) {
+				anchor = entry;
 			}
 			boolean self = reply.getNextRecordId() == entry.id();
 			if (!read.add(entry.id()) || self) {

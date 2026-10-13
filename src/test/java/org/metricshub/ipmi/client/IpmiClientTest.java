@@ -472,6 +472,88 @@ class IpmiClientTest {
 
 	@Test
 	@Timeout(30)
+	void aSinceWalkThatReadsNothingChecksItsCursorAgain() throws Exception {
+		try (FakeRmcpPlusBmc bmc = new FakeRmcpPlusBmc(SUITES, USER, utf8(PASSWORD), null)) {
+			FakeSel sel = Fixtures.sel();
+			sel.install(bmc);
+			try (IpmiClient client = client(bmc).build()) {
+				SelEntryList log = client.sel().execute();
+				SelEntry last = log.get(5);
+				// The cursor lookup finds entry 6 unchanged and the walk reads nothing; then, before entry 6 is read
+				// again, the log is cleared and filled up to six entries without the erase timestamp moving
+				sel.before(6, () -> sel.before(6, () -> {
+					sel.clearWithoutErase();
+					for (int id = 1; id <= 6; id++) {
+						sel
+								.add(
+										systemEvent(
+												id,
+												SEL_RESET_TIME + 5000 + id,
+												SensorType.Fan.getCode(),
+												FAN_SENSOR,
+												0x0a,
+												true,
+												0x01,
+												0xff,
+												0xff));
+					}
+				}));
+				SelEntryList refilled = client.sel().since(last).execute();
+				assertEquals(6, refilled.size(), "the cursor is another entry now: the whole new log");
+				assertTrue(refilled.stream().allMatch(entry -> entry.sensorType().get() == SensorType.Fan));
+			}
+		}
+	}
+
+	@Test
+	@Timeout(30)
+	void aChangeSeenByTheAnchorAloneGetsItsRetry() throws Exception {
+		try (FakeRmcpPlusBmc bmc = new FakeRmcpPlusBmc(SUITES, USER, utf8(PASSWORD), null)) {
+			FakeSel sel = Fixtures.sel();
+			sel.install(bmc);
+			// The walk asks for record 0000h: the first request for entry 1 by its ID is the check after the walk, and
+			// the log is cleared and filled again right before it
+			sel.before(1, () -> {
+				sel.clear();
+				for (int id = 1; id <= 3; id++) {
+					sel
+							.add(
+									systemEvent(
+											id,
+											SEL_RESET_TIME + 6000 + id,
+											SensorType.Fan.getCode(),
+											FAN_SENSOR,
+											0x0a,
+											true,
+											0x01,
+											0xff,
+											0xff));
+				}
+			});
+			try (IpmiClient client = client(bmc).build()) {
+				SelEntryList log = client.sel().execute();
+				assertEquals(3, log.size(), "one change, one retry");
+				assertTrue(log.lastErase().isPresent());
+			}
+		}
+	}
+
+	@Test
+	@Timeout(30)
+	void anEntryWithASelectorAsRecordIdIsRejected() throws Exception {
+		try (FakeRmcpPlusBmc bmc = new FakeRmcpPlusBmc(SUITES, USER, utf8(PASSWORD), null)) {
+			new FakeSel()
+					.add(systemEvent(0, SEL_RESET_TIME, SensorType.Fan.getCode(), FAN_SENSOR, 0x0a, true, 0x01, 0xff, 0xff))
+					.install(bmc);
+			try (IpmiClient client = client(bmc).build()) {
+				IpmiClientException selector = assertThrows(IpmiClientException.class, () -> client.sel().execute());
+				assertEquals("The System Event Log answered an entry whose record ID is 0000h", selector.getMessage());
+			}
+		}
+	}
+
+	@Test
+	@Timeout(30)
 	void anotherEntryThanTheOneAskedForIsRejected() throws Exception {
 		try (FakeRmcpPlusBmc bmc = new FakeRmcpPlusBmc(SUITES, USER, utf8(PASSWORD), null)) {
 			FakeSel sel = Fixtures.sel().serveInsteadOnce(3, 5);

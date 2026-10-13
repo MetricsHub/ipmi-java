@@ -39,7 +39,8 @@ SEL entry 7 at 2024-05-15T09:24:15Z: VersionChange sensor 0, Firmware or softwar
    needed (IPMI 2.0, section 31.5); when a BMC asks for one anyway, or cancels the one it gave
    (`C5h`), the client takes a reservation with **Reserve SEL** and reads the entry again.
 
-Get SEL Info is sent again after the walk, and so is the first entry read: when the log was
+The first entry read (or the entry given to `since()`, when nothing follows it) is read again
+after the walk, and so is Get SEL Info: when the log was
 **erased meanwhile** (its erase timestamp changed, after a Clear SEL or a Delete SEL Entry, whose
 record IDs may be reused; or the first entry is another one, as two erases within a second
 leave the timestamp unchanged), or when an entry named as the next one is not there any more
