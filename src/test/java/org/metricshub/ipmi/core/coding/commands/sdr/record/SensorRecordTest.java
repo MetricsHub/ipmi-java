@@ -224,6 +224,8 @@ class SensorRecordTest {
 
 		assertEquals(SensorType.Temperature, compact.getSensorType());
 		assertEquals("", compact.getName());
+		compact.setName(null);
+		assertEquals("", compact.getName(), "the name is never null");
 	}
 
 	@Test
