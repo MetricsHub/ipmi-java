@@ -24,7 +24,7 @@ package org.metricshub.ipmi.core.coding.commands.sdr.record;
 
 import org.metricshub.ipmi.core.common.TypeConverter;
 
-import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 
 /**
  * Wrapper for SDR entry.
@@ -172,26 +172,38 @@ public abstract class SensorRecord {
 	}
 
 	/**
-	 * Decodes name encoded in one of the available formats.
+	 * Decodes an ID string by its type/length byte (IPMI 2.0 section 43.15). Bits 7:6 give the encoding: Unicode (the
+	 * specification names no encoding: it is decoded as UTF-8), BCD plus, 6-bit packed ASCII, or 8-bit ASCII + Latin
+	 * 1; bits 4:0 give the length in characters, one per byte for 8-bit ASCII and Unicode. The bytes after the string
+	 * are ignored, as BMCs with fixed-length records pad them ("Bytes beyond the ID string bytes are unspecified and
+	 * should be ignored", table 43-1), a string longer than the record is cut at its end, and the string ends at its
+	 * first NUL character, as ipmitool prints it.
 	 *
 	 * @param codingType
-	 *        - byte containing Sensor 'ID' String Type
+	 *        - the ID string type/length byte
 	 * @param name
-	 *        - Sensor ID String bytes
-	 * @return decoded name
+	 *        - the bytes after the type/length byte, to the end of the record
+	 * @return the decoded name, empty when the type/length byte announces none
 	 */
 	protected String decodeName(byte codingType, byte[] name) {
-		switch ((TypeConverter.byteToInt(codingType) & 0xc0) >> 6) {
-		case 0: // unicode
-			return new String(name, Charset.forName("UTF-8"));
-		case 1: // BCD plus
-			return TypeConverter.decodeBcdPlus(name);
-		case 2: // 6-bit packed ASCII
-			return TypeConverter.decode6bitAscii(name);
-		case 3: // 8-bit ASCII + Latin 1
-			return new String(name, Charset.forName("ISO-8859-1"));
-		default:
-			throw new IllegalArgumentException("Invalid coding type.");
+		int typeLength = TypeConverter.byteToInt(codingType);
+		int length = typeLength & 0x1f;
+		String decoded;
+		switch (typeLength >> 6) {
+		case 0: // Unicode, of no specified encoding: UTF-8 also reads the ASCII that BMCs send with this type
+			decoded = new String(name, 0, Math.min(length, name.length), StandardCharsets.UTF_8);
+			break;
+		case 1: // BCD plus, 2 characters per byte
+			decoded = TypeConverter.decodeBcdPlus(name).substring(0, Math.min(length, name.length * 2));
+			break;
+		case 2: // 6-bit packed ASCII, 4 characters per 3 bytes: only the complete characters
+			decoded = TypeConverter.decode6bitAscii(name).substring(0, Math.min(length, name.length * 8 / 6));
+			break;
+		default: // 8-bit ASCII + Latin 1
+			decoded = new String(name, 0, Math.min(length, name.length), StandardCharsets.ISO_8859_1);
+			break;
 		}
+		int nul = decoded.indexOf('\0');
+		return nul < 0 ? decoded : decoded.substring(0, nul);
 	}
 }

@@ -148,7 +148,8 @@ public abstract class AbstractSensorRecord extends SensorRecord {
 	}
 
 	/**
-	 * Decodes the sensor ID string, which runs to the end of the record.
+	 * Decodes the sensor ID string, from its type/length byte to the end of the record (see
+	 * {@link #decodeName(byte, byte[])}).
 	 *
 	 * @param recordData
 	 *        - raw data containing the whole record

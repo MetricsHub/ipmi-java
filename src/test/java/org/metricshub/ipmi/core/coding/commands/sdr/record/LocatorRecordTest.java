@@ -61,4 +61,32 @@ class LocatorRecordTest {
 		assertEquals(7, locator.getAddressSpan());
 		assertEquals("NAME", locator.getName());
 	}
+
+	@Test
+	void theNamesOfTheLocatorsAreDecodedAsLongAsTheirTypeLengthByteSays() {
+		// @formatter:off
+		// Padded after the name, and shorter than the declared length (Table 43-7)
+		byte[] paddedFru = record(0x11, 0x40, 0x03, 0x8a, 0x10, 0x00, 0x10, 0x00, 0x07, 0x01, 0x00, 0xc3, 'F', 'R', 'U', 0, 0, 0, 0);
+		byte[] shortFru = record(0x11, 0x40, 0x03, 0x8a, 0x10, 0x00, 0x10, 0x00, 0x07, 0x01, 0x00, 0xc8, 'F', 'R', 'U');
+		// Table 43-10
+		byte[] paddedGeneric = record(0x10, 0x40, 0x42, 0x0d, 0x07, 0x00, 0x10, 0x00, 0x07, 0x01, 0x00, 0xc4, 'N', 'A', 'M', 'E', 0, 0);
+		// Table 43-9: slave address 20h, channel 0, power state, capabilities, reserved, entity, instance, OEM
+		byte[] paddedController = record(0x12, 0x20, 0x00, 0x00, 0xff, 0x00, 0x00, 0x00, 0x2e, 0x01, 0x00, 0xc3, 'B', 'M', 'C', 0, 0);
+		// @formatter:on
+		assertEquals(
+				"FRU",
+				assertInstanceOf(FruDeviceLocatorRecord.class, SensorRecord.populateSensorRecord(paddedFru)).getName());
+		assertEquals(
+				"FRU",
+				assertInstanceOf(FruDeviceLocatorRecord.class, SensorRecord.populateSensorRecord(shortFru)).getName());
+		assertEquals(
+				"NAME",
+				assertInstanceOf(GenericDeviceLocatorRecord.class, SensorRecord.populateSensorRecord(paddedGeneric))
+						.getName());
+		assertEquals(
+				"BMC",
+				assertInstanceOf(
+						ManagementControllerDeviceLocatorRecord.class,
+						SensorRecord.populateSensorRecord(paddedController)).getName());
+	}
 }

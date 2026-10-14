@@ -13,7 +13,8 @@ same. It also adds a command-line client, `ipmicli`, in a standalone jar
 ([Command-Line Client](cli.html)); `CipherSuite` gains `getAuthenticationAlgorithmCode()`,
 `getIntegrityAlgorithmCode()` and `getConfidentialityAlgorithmCode()` for it. The semicolon-separated text output of 1.x (`IpmiResultConverter`) is MetricsHub's format,
 and moves to the [MetricsHub IPMI extension](https://github.com/MetricsHub/metricshub-community/issues/1391),
-where it stays byte-identical to 1.2.x for the same BMC data.
+where it stays byte-identical to 1.2.x for the same BMC data, except for the sensor and FRU names
+that 1.x padded with NUL characters (see [The low-level API](#the-low-level-api)).
 
 ### The client
 
@@ -152,6 +153,11 @@ reply) are ignored.
   one-argument form keeps decoding what it can, silently.
 * The decoders no longer log the values they do not model: they return the same defaults as
   before (`Other`, `Unknown`, `Unspecified`, `Oem`).
+* The ID string of the SDR records (`getName()` of the sensor and locator records, so
+  `Sensor.name()`, `Fru.name()` and the `names()` globs of `sensors()`) is decoded as long as its
+  type/length byte says (IPMI 2.0 section 43.15) and ends at its first NUL character. 1.x decoded
+  the rest of the record as well: on Fujitsu iRMC S5, HPE iLO 5 and Supermicro BMCs, the names
+  ended with NUL characters (`Fan 1\0\0...`), which `names("Fan 1")` did not match.
 * `SelRecord` decodes the generator ID, the event/reading type and the three event data bytes of
   a system event (`getGeneratorId()`, `getEventType()`, `getEventData()`), keeps the 16 bytes of
   the record (`getRawData()`), and refuses a record shorter than 16 bytes with

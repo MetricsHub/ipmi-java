@@ -95,6 +95,12 @@ Full, Compact and Event-Only records share
 [`AbstractSensorRecord`](apidocs/org/metricshub/ipmi/core/coding/commands/sdr/record/AbstractSensorRecord.html)
 (owner, entity, sensor type, event/reading type, units, name...).
 
+The name of a sensor or locator record is its ID string, decoded as its type/length byte says
+(IPMI 2.0 section 43.15): bits 7:6 give the encoding (8-bit ASCII + Latin 1, 6-bit packed ASCII,
+BCD plus, or Unicode, whose encoding the specification does not name and which the library reads
+as UTF-8), bits 4:0 the length in characters. The bytes after the string, which BMCs with
+fixed-length records fill with padding, are ignored, and the name ends at its first NUL character.
+
 ### OEM and unknown records
 
 IPMI 2.0 reserves the record types `C0h` to `FFh` for OEM use, and vendors do use them: a
