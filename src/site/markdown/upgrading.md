@@ -122,6 +122,19 @@ reply) are ignored.
   An `IpmiLanRequest` subclass that set the protected `networkFunction` field of 1.2.x to such a
   code must be replaced with this constructor and override, or its replies are ignored and its
   requests time out.
+* `IpmiConnector.openSession()` and `IpmiAsyncConnector.openSession()` raise the session to the
+  requested privilege with Set Session Privilege Level right after the handshake when it is
+  `Operator` or `Administrator` (IPMI 2.0 section 22.18). In 1.x the session stayed at User on the
+  BMCs that follow the specification (iDRAC 7 and 8, iLO 5, XCC, Cisco IMC), where its Operator
+  and Administrator commands failed with `D4h`. A BMC that refuses the level now fails
+  `openSession()` with `SessionException` (whose cause is the `IPMIException` of the completion
+  code) after closing the session, where 1.x returned a session running at a lower level: request
+  the level the commands need. A `SetSessionPrivilegeLevel` sent after `openSession()` is now
+  redundant and harmless. The `SerialOverLan` constructors that open their own session request
+  Administrator, and now fail with `SessionException` for an account not allowed Administrator:
+  open the session at the level the payload needs and pass it to `SerialOverLan(connector,
+  session)`; the console raises a session itself only when it was opened with
+  `MaximumAvailable`.
 * `IpmiConnector.sendMessage(handle, command, resends)` sends a command with its own number of
   resends when no reply comes or the BMC answers `C3h`, 0 for a command the BMC must not receive
   twice.

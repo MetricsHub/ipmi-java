@@ -948,6 +948,25 @@ class IpmiClientTest {
 
 	@Test
 	@Timeout(30)
+	void aPrivilegeRefusedOnTheSolPayloadPortIsAnAuthenticationFailure() throws Exception {
+		try (
+				FakeRmcpPlusBmc bmc = bmc();
+				FakeRmcpPlusBmc solPort = new FakeRmcpPlusBmc(SUITES, USER, utf8(PASSWORD), null)) {
+			solPort.enableSol(solPort.getPort(), 255, ADMINISTRATOR);
+			bmc.enableSol(solPort.getPort(), 255, ADMINISTRATOR);
+			solPort.handle(NETFN_APP, SET_SESSION_PRIVILEGE_LEVEL, data -> new byte[] { (byte) 0x81 });
+			try (IpmiClient client = client(bmc).privilege(PrivilegeLevel.Administrator).build()) {
+				IpmiAuthenticationException refused = assertThrows(
+						IpmiAuthenticationException.class,
+						() -> client.sol().open());
+				assertTrue(refused.getMessage().contains("(completion code 81h)"), refused.getMessage());
+				assertFalse(solPort.isSolActive());
+			}
+		}
+	}
+
+	@Test
+	@Timeout(30)
 	void aLostSessionIsReopenedAndAReadIsRetriedButNotASend() throws Exception {
 		try (FakeRmcpPlusBmc bmc = bmc(); IpmiClient client = client(bmc).build()) {
 			client.chassisStatus();
@@ -1160,6 +1179,39 @@ class IpmiClientTest {
 			}
 			assertEquals(discoveries, bmc.getCount(NETFN_APP, GET_CHANNEL_CIPHER_SUITES), "no discovery with a fixed suite");
 			awaitClose(bmc);
+			assertEquals(Collections.emptyList(), bmc.getErrors());
+		}
+	}
+
+	@Test
+	@Timeout(30)
+	void aBusyBmcThatCannotRaiseTheSessionIsNotAnAuthenticationFailure() throws Exception {
+		try (FakeRmcpPlusBmc bmc = bmc()) {
+			bmc.handle(NETFN_APP, SET_SESSION_PRIVILEGE_LEVEL, data -> new byte[] { (byte) 0xc0 });
+			try (IpmiClient client = client(bmc).privilege(PrivilegeLevel.Operator).build()) {
+				IpmiClientException busy = assertThrows(IpmiClientException.class, client::chassisStatus);
+				assertEquals(IpmiClientException.class, busy.getClass());
+				assertTrue(busy.getMessage().contains("could not raise the session"), busy.getMessage());
+				assertTrue(busy.getMessage().contains("(completion code C0h)"), busy.getMessage());
+				assertEquals(2, bmc.getCount(NETFN_APP, SET_SESSION_PRIVILEGE_LEVEL), "busy is sent again");
+			}
+		}
+	}
+
+	@Test
+	@Timeout(30)
+	void aPrivilegeTheBmcRefusesFailsTheOperation() throws Exception {
+		try (FakeRmcpPlusBmc bmc = bmc()) {
+			bmc.handle(NETFN_APP, SET_SESSION_PRIVILEGE_LEVEL, data -> new byte[] { (byte) 0x81 });
+			try (IpmiClient client = client(bmc).privilege(PrivilegeLevel.Administrator).build()) {
+				IpmiAuthenticationException refused = assertThrows(IpmiAuthenticationException.class, client::chassisStatus);
+				assertEquals(CompletionCode.Unknown, refused.statusCode());
+				assertTrue(refused.getMessage().contains("refused the Administrator privilege to admin"), refused.getMessage());
+				assertTrue(refused.getMessage().contains("(completion code 81h)"), refused.getMessage());
+				assertEquals(1, bmc.getCount(OPEN_SESSION_REQUEST), "not replayed");
+				assertEquals(1, bmc.getCount(NETFN_APP, SET_SESSION_PRIVILEGE_LEVEL), "the refusal is not sent again");
+				awaitClose(bmc);
+			}
 			assertEquals(Collections.emptyList(), bmc.getErrors());
 		}
 	}

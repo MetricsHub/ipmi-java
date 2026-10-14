@@ -247,11 +247,20 @@ connector.openSession(handle, "monitor", "the-password", null);
 The [`PrivilegeLevel`](apidocs/org/metricshub/ipmi/core/coding/commands/PrivilegeLevel.html)
 requested in `getChannelAuthenticationCapabilities()` (or `createConnection()`) is the maximum
 level of the session: `User` for reading, `Operator` for most control commands (chassis control,
-setting the boot device), `Administrator` for configuration commands and Serial over LAN. The
-account must be allowed that level on the LAN channel, or the handshake fails. Every session
-starts at the User level (IPMI 2.0, section 22.18): send
+setting the boot device), `Administrator` for configuration commands and Serial over LAN. Every
+session starts at the User level whatever that maximum (IPMI 2.0, section 22.18), so for
+`Operator` and `Administrator`, `openSession()` raises it with
 [`SetSessionPrivilegeLevel`](apidocs/org/metricshub/ipmi/core/coding/commands/session/SetSessionPrivilegeLevel.html)
-after `openSession()` to raise it, as `IpmiClient` does.
+right after the handshake, as `IpmiClient` and `ipmitool` do: the session it returns runs at the
+requested level.
+
+An account (or a cipher suite) limited to a lower level may still log in, the BMC capping the
+session at its limit, but it refuses the raise: `80h` (the level is not available for this
+user), `81h` (it exceeds the privilege limit of the channel or of the user), or another
+completion code. `openSession()` then closes the session and throws `SessionException`, whose
+cause is the `IPMIException` of the completion code: request the level the commands need. A
+`User` session is not raised, nor one requested with `MaximumAvailable`, which names no level:
+send `SetSessionPrivilegeLevel` yourself for the latter.
 
 ### Timeouts
 
@@ -279,7 +288,7 @@ request one plus one: any other reply is ignored, and a request whose reply neve
 
 ```java
 GetSelInfoResponseData info = connector.sendMessage(handle, new GetSelInfo());
-connector.sendMessage(handle, new ChassisControl(PowerCommand.PowerUp));
+connector.sendMessage(handle, new ChassisControl(PowerCommand.PowerUp)); // a session opened at Operator
 ```
 
 ### Writing your own command
@@ -402,4 +411,6 @@ int tag = asyncConnector.sendMessage(handle, new GetChassisStatus(), false);
 ```
 
 The listener is called from the library's own threads: return quickly. The synchronous
-`IpmiConnector` is built on this API.
+`IpmiConnector` is built on this API. `openSession()` blocks until the session is open and
+raised: a listener registered before it also receives the reply to its Set Session Privilege
+Level, under a tag that `sendMessage()` did not return.

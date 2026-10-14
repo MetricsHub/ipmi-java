@@ -525,6 +525,10 @@ public final class IpmiClient implements AutoCloseable {
 				}
 				throw new IpmiClientException("Cannot open the SOL console of " + host + ": " + e.getMessage(), e);
 			} catch (SessionException e) {
+				if (e.getCause() instanceof SessionException) {
+					// The BMC refused to raise the session of the SOL payload port to the privilege of the client
+					throw translateHandshake((SessionException) e.getCause());
+				}
 				throw new IpmiConnectionException(
 						"Cannot open the session of the SOL payload port of " + host + ": " + e.getMessage(),
 						e);
@@ -777,6 +781,25 @@ public final class IpmiClient implements AutoCloseable {
 					"The BMC " + host + " refused the login of " + user + ": wrong password or BMC key (" + e.getMessage() + ")",
 					e);
 		}
+		if (e instanceof SessionException && e.getCause() instanceof IPMIException) {
+			// openSession() logged in, then closed the session the BMC would not raise to the requested privilege
+			IPMIException refusal = (IPMIException) e.getCause();
+			int code = refusal.getRawCode();
+			if (code == SetSessionPrivilegeLevel.LEVEL_NOT_AVAILABLE
+					|| code == SetSessionPrivilegeLevel.LEVEL_ABOVE_LIMIT
+					|| isAuthenticationCode(refusal.getCompletionCode())) {
+				return new IpmiAuthenticationException(
+						"The BMC " + host + " refused the " + privilege + " privilege to " + user + ": "
+								+ SetSessionPrivilegeLevel.describeRefusal(refusal),
+						refusal.getCompletionCode(),
+						e);
+			}
+			// A busy BMC, or another failure than a refusal of the level
+			return new IpmiClientException(
+					"The BMC " + host + " could not raise the session to the " + privilege + " privilege: "
+							+ SetSessionPrivilegeLevel.describeRefusal(refusal),
+					e);
+		}
 		if (e instanceof IPMIException) {
 			CompletionCode code = ((IPMIException) e).getCompletionCode();
 			if (isAuthenticationCode(code)) {
@@ -892,12 +915,12 @@ public final class IpmiClient implements AutoCloseable {
 
 		/**
 		 * Opens the session: cipher suite discovery unless the builder fixed the suite, Get Channel Authentication
-		 * Capabilities, Open Session, RAKP 1 to 4, then Set Session Privilege Level when the builder asked for more
-		 * than User (IPMI 2.0 section 22.18: every session starts at User).
+		 * Capabilities, then {@link IpmiConnector#openSession(ConnectionHandle, String, byte[], byte[])}: Open Session,
+		 * RAKP 1 to 4 and, when the builder asked for more than User, Set Session Privilege Level (IPMI 2.0 section
+		 * 22.18: every session starts at User).
 		 */
 		static Link open(IpmiClient client, IpmiConnector connector, InetAddress address) {
 			ConnectionHandle handle = null;
-			Session session = null;
 			try {
 				if (client.discoverCipherSuite) {
 					handle = connector.createConnection(address, client.port);
@@ -910,17 +933,10 @@ public final class IpmiClient implements AutoCloseable {
 					handle = connector
 							.createConnection(address, client.port, CipherSuite.forId(client.cipherSuites[0]), client.privilege);
 				}
-				session = connector.openSession(handle, client.user, encode(client.password), client.bmcKey);
-				Link link = new Link(connector, handle, session, client.host, client.retries + 1);
-				if (client.privilege == PrivilegeLevel.Operator || client.privilege == PrivilegeLevel.Administrator) {
-					link.raisePrivilege(client.privilege);
-				}
-				return link;
+				Session session = connector.openSession(handle, client.user, encode(client.password), client.bmcKey);
+				return new Link(connector, handle, session, client.host, client.retries + 1);
 			} catch (Exception e) {
 				if (handle != null) {
-					if (session != null) {
-						closeQuietly(connector, handle);
-					}
 					connector.closeConnection(handle);
 				}
 				throw client.translateHandshake(e);
@@ -933,28 +949,6 @@ public final class IpmiClient implements AutoCloseable {
 				return true;
 			} catch (IllegalStateException e) {
 				return false;
-			}
-		}
-
-		private void raisePrivilege(PrivilegeLevel privilege) {
-			try {
-				send(new SetSessionPrivilegeLevel(privilege));
-			} catch (IpmiCompletionCodeException e) {
-				throw new IpmiAuthenticationException(
-						"The BMC " + host + " refused the " + privilege + " privilege: " + e.completionCode().getMessage(),
-						e.completionCode(),
-						e);
-			}
-		}
-
-		private static void closeQuietly(IpmiConnector connector, ConnectionHandle handle) {
-			try {
-				connector.closeSession(handle);
-			} catch (Exception e) {
-				// Best effort: the session that could not be used is left to expire
-				if (e instanceof InterruptedException) {
-					Thread.currentThread().interrupt();
-				}
 			}
 		}
 

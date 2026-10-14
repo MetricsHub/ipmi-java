@@ -66,7 +66,9 @@ ipmitool channel setaccess 1 3 link=on ipmi=on callin=on privilege=2
 > can log in to the web interface is not necessarily allowed to log in over IPMI.
 
 If the BMC enforces a maximum privilege per cipher suite (`Cipher Suite Priv Max` in
-`ipmitool lan print 1`), make sure the suite the client uses allows at least `USER`.
+`ipmitool lan print 1`), make sure the suite the client uses allows at least the level the
+client requests: `USER`, or `OPERATOR` and `ADMINISTRATOR` for the control operations and Serial
+over LAN.
 
 ## Cipher suites
 

@@ -60,7 +60,7 @@ public class SessionManager {
 	}
 
 	/**
-	 * Opens a new connection and session, at the Administrator privilege level.
+	 * Opens a new connection and session, at the Administrator privilege level, raised to it right after the login.
 	 *
 	 * @param connector the connector of the connection
 	 * @param remoteHost the address of the BMC
@@ -69,7 +69,8 @@ public class SessionManager {
 	 * @param password the password, sent in UTF-8
 	 * @param cipherSuiteSelectionHandler chooses the cipher suite among those the BMC offers
 	 * @return the new session
-	 * @throws SessionException when the session cannot be opened
+	 * @throws SessionException when the session cannot be opened, or the account is not allowed the Administrator
+	 *         privilege
 	 */
 	public static Session establishSession(
 			IpmiConnector connector,
@@ -90,7 +91,7 @@ public class SessionManager {
 	}
 
 	/**
-	 * Opens a new connection and session, at the Administrator privilege level.
+	 * Opens a new connection and session, at the Administrator privilege level, raised to it right after the login.
 	 *
 	 * @param connector the connector of the connection
 	 * @param remoteHost the address of the BMC
@@ -100,7 +101,8 @@ public class SessionManager {
 	 * @param bmcKey the BMC key (Kg) for a two-key login, or null
 	 * @param cipherSuiteSelectionHandler chooses the cipher suite among those the BMC offers
 	 * @return the new session
-	 * @throws SessionException when the session cannot be opened
+	 * @throws SessionException when the session cannot be opened, or the account is not allowed the Administrator
+	 *         privilege
 	 */
 	public static Session establishSession(
 			IpmiConnector connector,
@@ -129,7 +131,41 @@ public class SessionManager {
 		} catch (Exception e) {
 			closeConnection(connector, handle);
 
-			throw new SessionException("Cannot create new session due to exception", e);
+			throw new SessionException("Cannot create new session: " + e.getMessage(), e);
+		}
+	}
+
+	/**
+	 * Opens a new connection and session on another UDP port of the BMC of the given connection (the port of a
+	 * payload, IPMI 2.0 section 24.1), with its user name, password, BMC key and privilege level, and a copy of its
+	 * cipher suite: opening the session keys the algorithms of its suite.
+	 *
+	 * @param connector the connector of the connection
+	 * @param connectionHandle the connection whose credentials, cipher suite and privilege level the session takes
+	 * @param remotePort the UDP port of the BMC
+	 * @return the new session
+	 * @throws SessionException when the session cannot be opened, or the account is not allowed the privilege level
+	 */
+	public static Session establishSession(IpmiConnector connector, ConnectionHandle connectionHandle, int remotePort)
+			throws SessionException {
+		ConnectionHandle handle = null;
+		try {
+			handle = connector.createConnection(connectionHandle.getRemoteAddress(), remotePort);
+			connector.getAvailableCipherSuites(handle);
+			connector
+					.getChannelAuthenticationCapabilities(
+							handle,
+							connectionHandle.getCipherSuite().copy(),
+							connectionHandle.getPrivilegeLevel());
+			return connector
+					.openSession(
+							handle,
+							connectionHandle.getUser(),
+							connectionHandle.getPasswordBytes(),
+							connectionHandle.getBmcKey());
+		} catch (Exception e) {
+			closeConnection(connector, handle);
+			throw new SessionException("Cannot create new session: " + e.getMessage(), e);
 		}
 	}
 

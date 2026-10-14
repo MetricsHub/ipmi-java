@@ -25,10 +25,12 @@ package org.metricshub.ipmi.core.api.async;
 import org.metricshub.ipmi.core.api.async.messages.IpmiError;
 import org.metricshub.ipmi.core.api.async.messages.IpmiResponse;
 import org.metricshub.ipmi.core.api.async.messages.IpmiResponseData;
+import org.metricshub.ipmi.core.api.sync.MessageListener;
 import org.metricshub.ipmi.core.coding.PayloadCoder;
 import org.metricshub.ipmi.core.coding.commands.PrivilegeLevel;
 import org.metricshub.ipmi.core.coding.commands.ResponseData;
 import org.metricshub.ipmi.core.coding.commands.session.GetChannelAuthenticationCapabilitiesResponseData;
+import org.metricshub.ipmi.core.coding.commands.session.SetSessionPrivilegeLevel;
 import org.metricshub.ipmi.core.coding.payload.IpmiPayload;
 import org.metricshub.ipmi.core.coding.payload.lan.IPMIException;
 import org.metricshub.ipmi.core.coding.protocol.PayloadType;
@@ -38,6 +40,7 @@ import org.metricshub.ipmi.core.connection.ConnectionException;
 import org.metricshub.ipmi.core.connection.ConnectionListener;
 import org.metricshub.ipmi.core.connection.ConnectionManager;
 import org.metricshub.ipmi.core.connection.Session;
+import org.metricshub.ipmi.core.connection.SessionException;
 import org.metricshub.ipmi.core.connection.SessionManager;
 
 import java.io.IOException;
@@ -64,7 +67,8 @@ import java.util.concurrent.TimeUnit;
  * {@link #getChannelAuthenticationCapabilities(ConnectionHandle, CipherSuite, PrivilegeLevel)}</li>
  * <li>Provide username, password and (if the BMC needs it) the BMC Kg key and
  * start session via
- * {@link #openSession(ConnectionHandle, String, String, byte[])}</li>
+ * {@link #openSession(ConnectionHandle, String, String, byte[])}, which also raises it to the requested Operator or
+ * Administrator privilege</li>
  * </ul>
  * <br>
  * <p>
@@ -298,7 +302,8 @@ public class IpmiAsyncConnector implements ConnectionListener {
 	}
 
 	/**
-	 * Establishes the session with the remote host.
+	 * Establishes the session with the remote host, and raises it to the requested privilege when that is Operator or
+	 * Administrator (Set Session Privilege Level, IPMI 2.0 section 22.18: every session starts at User).
 	 *
 	 * @param connectionHandle
 	 *        - {@link ConnectionHandle} associated with the remote host.
@@ -309,9 +314,13 @@ public class IpmiAsyncConnector implements ConnectionListener {
 	 * @param bmcKey
 	 *        - the key that should be provided if the two-key
 	 *        authentication is enabled, null otherwise.
+	 * @return object representing newly created {@link Session}
 	 * @throws ConnectionException
 	 *         when connection is in the state that does not allow to
-	 *         perform this operation.
+	 *         perform this operation, or no reply came after all the tries
+	 * @throws SessionException
+	 *         when the BMC refuses to raise the session to the requested privilege: the session is closed, and the
+	 *         cause is the {@link IPMIException} of the completion code
 	 * @throws Exception
 	 *         when sending message to the managed system or initializing
 	 *         one of the cipherSuite's algorithms fails
@@ -331,7 +340,9 @@ public class IpmiAsyncConnector implements ConnectionListener {
 
 	/**
 	 * Establishes the session with the remote host, with the password as bytes: the caller can then clear them
-	 * once the session is open, which an immutable {@link String} does not allow.
+	 * once the session is open, which an immutable {@link String} does not allow. When the requested privilege is
+	 * Operator or Administrator, the session is raised to it with Set Session Privilege Level right after the
+	 * handshake (IPMI 2.0 section 22.18: every session starts at User); a refusal closes the session.
 	 *
 	 * @param connectionHandle
 	 *        - {@link ConnectionHandle} associated with the remote host.
@@ -345,7 +356,10 @@ public class IpmiAsyncConnector implements ConnectionListener {
 	 * @return object representing newly created {@link Session}
 	 * @throws ConnectionException
 	 *         when connection is in the state that does not allow to
-	 *         perform this operation.
+	 *         perform this operation, or no reply came after all the tries
+	 * @throws SessionException
+	 *         when the BMC refuses to raise the session to the requested privilege: the session is closed, and the
+	 *         cause is the {@link IPMIException} of the completion code
 	 * @throws Exception
 	 *         when sending message to the managed system or initializing
 	 *         one of the cipherSuite's algorithms fails
@@ -356,7 +370,7 @@ public class IpmiAsyncConnector implements ConnectionListener {
 			byte[] password,
 			byte[] bmcKey)
 			throws Exception {
-		Session session = null;
+		int sessionId = 0;
 		int tries = 0;
 		boolean succeded = false;
 
@@ -367,7 +381,7 @@ public class IpmiAsyncConnector implements ConnectionListener {
 		while (tries <= retries && !succeded) {
 			try {
 				++tries;
-				int sessionId = connectionManager
+				sessionId = connectionManager
 						.startSession(
 								connectionHandle.getHandle(),
 								connectionHandle.getCipherSuite(),
@@ -375,13 +389,6 @@ public class IpmiAsyncConnector implements ConnectionListener {
 								username,
 								password,
 								bmcKey);
-
-				session = sessionManager
-						.registerSession(
-								sessionId,
-								connectionManager.getConnection(connectionHandle.getHandle()).getManagedSystemSessionId(),
-								connectionHandle);
-
 				succeded = true;
 			} catch (Exception e) {
 				if (tries > retries || !isRetriable(e)) {
@@ -390,7 +397,67 @@ public class IpmiAsyncConnector implements ConnectionListener {
 			}
 		}
 
-		return session;
+		// Registered once raised: a session the BMC would not raise is closed, and must not be found as an open one
+		raisePrivilege(connectionHandle);
+
+		return sessionManager
+				.registerSession(
+						sessionId,
+						connectionManager.getConnection(connectionHandle.getHandle()).getManagedSystemSessionId(),
+						connectionHandle);
+	}
+
+	/**
+	 * Raises the new session to the privilege requested for it when that is Operator or Administrator: the BMC starts
+	 * every session at User whatever the maximum requested in RAKP Message 1 (IPMI 2.0 section 22.18). Sent again, like
+	 * a handshake step, when no reply comes or the BMC is busy; any failure closes the session.
+	 *
+	 * @throws SessionException when the BMC answers with an error completion code, with the {@link IPMIException} as
+	 *         cause
+	 */
+	private void raisePrivilege(ConnectionHandle connectionHandle) throws Exception {
+		PrivilegeLevel level = connectionHandle.getPrivilegeLevel();
+		if (level != PrivilegeLevel.Operator && level != PrivilegeLevel.Administrator) {
+			// User: nothing to raise. Callback cannot be changed (section 22.18), MaximumAvailable names no level
+			return;
+		}
+		MessageListener listener = new MessageListener(connectionHandle);
+		registerListener(listener);
+		try {
+			int tries = 0;
+			boolean raised = false;
+			while (!raised) {
+				try {
+					++tries;
+					listener.waitForAnswer(sendMessage(connectionHandle, new SetSessionPrivilegeLevel(level), false));
+					raised = true;
+				} catch (Exception e) {
+					if (tries > retries || !isRetriable(e)) {
+						throw e;
+					}
+				}
+			}
+		} catch (Exception e) {
+			closeSessionQuietly(connectionHandle);
+			if (e instanceof IPMIException) {
+				throw new SessionException(
+						"The BMC refused to raise the session to the " + level + " privilege: "
+								+ SetSessionPrivilegeLevel.describeRefusal((IPMIException) e),
+						e);
+			}
+			throw e;
+		} finally {
+			unregisterListener(listener);
+		}
+	}
+
+	private void closeSessionQuietly(ConnectionHandle connectionHandle) {
+		try {
+			closeSession(connectionHandle);
+		} catch (Exception e) {
+			// Best effort: the failure to raise the session is what the caller needs, and the BMC expires a session it
+			// was not told to close
+		}
 	}
 
 	/**

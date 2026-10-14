@@ -52,14 +52,17 @@ when every try in a row gets no reply.
 
 ## `IpmiAuthenticationException`
 
-The RAKP handshake (the login) failed and the session could not be opened. The credentials are
-sent once; `statusCode()` says why:
+The RAKP handshake (the login) failed, or the BMC refused to raise the session to the requested
+privilege right after it (`80h`, `81h`: a BMC that is busy then is an `IpmiClientException`), and
+the session could not be opened. The credentials are sent once;
+`statusCode()` says why:
 
 | `statusCode()` | Meaning |
 | --- | --- |
 | `null` (`... wrong password or BMC key (Authentication check failed)`) | The BMC's proof does not match the password: **wrong password** (or wrong [BMC key](configuration.html#bmc-key)). |
 | `UnauthorizedName` | **Unknown user**, or a user not allowed to log in over the LAN channel. |
-| `UnauthorizedRole`, `InvalidRole`, `InsufficentPrivilege` | The account is not allowed the requested [privilege level](configuration.html#privilege-level) on the LAN channel, or the BMC refused to raise the session to it. |
+| `UnauthorizedRole`, `InvalidRole`, `InsufficentPrivilege` | The account is not allowed the requested [privilege level](configuration.html#privilege-level) on the LAN channel. |
+| `Unknown` (`... refused the Operator privilege to <user>: the level exceeds the privilege limit of the channel or of the user (completion code 81h)`, or `80h`, the level is not available for this user) | The login worked, but the account, the LAN channel or the cipher suite (`Cipher Suite Priv Max` in `ipmitool lan print 1`) is limited to a lower level, and the BMC refused to raise the session (Set Session Privilege Level). Request a lower [privilege](configuration.html#privilege-level) (`-L` with `ipmicli`), or allow the level to the account. |
 | `InvalidIntegrityCheckValue` | The BMC rejected the integrity check value of RAKP Message 3: wrong password or BMC key on a BMC that checks it first. |
 
 An `IllegalArgumentException` from `build()` (`Password is too long. ...`, `Username is too
@@ -74,8 +77,9 @@ Check the account with `ipmitool -I lanplus ... -L USER chassis status`: `ipmito
 
 ## `IpmiCompletionCodeException` with `InsufficentPrivilege` (`D4h`)
 
-The BMC refused a command at the session's privilege level. The default **User** level is enough
-for everything the client reads; `send()` of a control command (Chassis Control, chassis
+The BMC refused a command at the session's privilege level, which the client requests at login
+and sets right after it: the command needs a higher level than the requested one. The default
+**User** level is enough for everything the client reads; `send()` of a control command (Chassis Control, chassis
 identify) needs `privilege(PrivilegeLevel.Operator)` on the builder, and Serial over LAN
 `Administrator` on most BMCs. If a BMC refuses a read command at the User level, check:
 

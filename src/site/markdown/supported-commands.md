@@ -24,7 +24,7 @@ included), or sent as bytes with [`raw()`](low-level-api.html#raw-requests).
 | Get Channel Cipher Suites | `GetChannelCipherSuites` | App / `54h` | every session (unless `cipherSuite(id)`), `capabilities()` |
 | RMCP+ Open Session | `OpenSession` | (payload) | every session |
 | RAKP Message 1 / 3 | `Rakp1`, `Rakp3` | (payload) | every session |
-| Set Session Privilege Level | `SetSessionPrivilegeLevel` | App / `3Bh` | `privilege(Operator)`, `privilege(Administrator)` |
+| Set Session Privilege Level | `SetSessionPrivilegeLevel` | App / `3Bh` | every session opened at `privilege(Operator)` or `privilege(Administrator)`, right after RAKP 4 (sent by `IpmiConnector.openSession()`) |
 | Get Session Info | `GetSessionInfo` | App / `3Dh` | `sol()`: is the session that holds a SOL payload still there? |
 | Close Session | `CloseSession` | App / `3Ch` | `close()` |
 | **BMC** | | | |
@@ -55,7 +55,9 @@ included), or sent as bytes with [`raw()`](low-level-api.html#raw-requests).
 
 The read operations of `IpmiClient` need nothing above the **User** privilege; Chassis Control
 and Chassis Identify need **Operator**, the payload commands and Serial over LAN **Administrator**
-([Privilege level](configuration.html#privilege-level)). Any command is sent in the session of the
+([Privilege level](configuration.html#privilege-level)). The level is requested at login and set
+right after it with Set Session Privilege Level, by `IpmiClient` and `IpmiConnector.openSession()`
+alike (IPMI 2.0 section 22.18). Any command is sent in the session of the
 client with [`send()`](low-level-api.html#sending-a-command-through-the-client), or as bytes with
 [`raw()`](low-level-api.html#raw-requests).
 

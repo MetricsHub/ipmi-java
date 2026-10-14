@@ -95,8 +95,9 @@ MetricsHub command-line clients; `ipmitool` uses the reverse (see the
 
 ### Default privilege per subcommand
 
-A session asks for its maximum privilege level at login, and a BMC refuses the login when the
-account is not allowed that level. So the CLI asks for the **least** privilege that works (unlike
+A session asks for its maximum privilege level at login and is raised to it right after, and a
+BMC refuses the login, or the raise, when the account is not allowed that level. So the CLI asks
+for the **least** privilege that works (unlike
 `ipmitool`, which asks for Administrator and fails with read-only accounts unless given
 `-L USER`):
 

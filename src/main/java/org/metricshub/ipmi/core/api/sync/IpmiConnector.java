@@ -39,6 +39,7 @@ import org.metricshub.ipmi.core.connection.Connection;
 import org.metricshub.ipmi.core.connection.ConnectionException;
 import org.metricshub.ipmi.core.connection.ConnectionManager;
 import org.metricshub.ipmi.core.connection.Session;
+import org.metricshub.ipmi.core.connection.SessionException;
 
 import java.io.IOException;
 import java.net.InetAddress;
@@ -62,7 +63,8 @@ import java.util.Random;
  * {@link #getChannelAuthenticationCapabilities(ConnectionHandle, CipherSuite, PrivilegeLevel)}</li>
  * <li>Provide username,
  * password and (if the BMC needs it) the BMC Kg key and start session via
- * {@link #openSession(ConnectionHandle, String, String, byte[])}</li>
+ * {@link #openSession(ConnectionHandle, String, String, byte[])}, which also raises it to the requested Operator or
+ * Administrator privilege</li>
  * </ul>
  * <br>
  * <p>
@@ -241,7 +243,8 @@ public class IpmiConnector {
 	}
 
 	/**
-	 * Establishes the session with the remote host.
+	 * Establishes the session with the remote host, and raises it to the requested privilege when that is Operator or
+	 * Administrator (Set Session Privilege Level, IPMI 2.0 section 22.18: every session starts at User).
 	 *
 	 * @param connectionHandle
 	 *        - {@link ConnectionHandle} associated with the remote host.
@@ -253,7 +256,11 @@ public class IpmiConnector {
 	 *        - the key that should be provided if the two-key authentication is enabled, null otherwise.
 	 * @return object representing newly created {@link Session}
 	 * @throws ConnectionException
-	 *         when connection is in the state that does not allow to perform this operation.
+	 *         when connection is in the state that does not allow to perform this operation, or no reply came after
+	 *         all the tries
+	 * @throws SessionException
+	 *         when the BMC refuses to raise the session to the requested privilege: the session is closed, and the
+	 *         cause is the {@link IPMIException} of the completion code
 	 * @throws Exception
 	 *         when sending message to the managed system or initializing one of the cipherSuite's algorithms fails
 	 */
@@ -264,7 +271,9 @@ public class IpmiConnector {
 
 	/**
 	 * Establishes the session with the remote host, with the password as bytes: the caller can then clear them
-	 * once the session is open, which an immutable {@link String} does not allow.
+	 * once the session is open, which an immutable {@link String} does not allow. When the requested privilege is
+	 * Operator or Administrator, the session is raised to it with Set Session Privilege Level right after the
+	 * handshake (IPMI 2.0 section 22.18: every session starts at User); a refusal closes the session.
 	 *
 	 * @param connectionHandle
 	 *        - {@link ConnectionHandle} associated with the remote host.
@@ -276,7 +285,11 @@ public class IpmiConnector {
 	 *        - the key that should be provided if the two-key authentication is enabled, null otherwise.
 	 * @return object representing newly created {@link Session}
 	 * @throws ConnectionException
-	 *         when connection is in the state that does not allow to perform this operation.
+	 *         when connection is in the state that does not allow to perform this operation, or no reply came after
+	 *         all the tries
+	 * @throws SessionException
+	 *         when the BMC refuses to raise the session to the requested privilege: the session is closed, and the
+	 *         cause is the {@link IPMIException} of the completion code
 	 * @throws Exception
 	 *         when sending message to the managed system or initializing one of the cipherSuite's algorithms fails
 	 */
