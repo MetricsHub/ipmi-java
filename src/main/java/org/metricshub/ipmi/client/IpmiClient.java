@@ -81,6 +81,7 @@ import org.metricshub.ipmi.core.coding.security.CipherSuite;
 import org.metricshub.ipmi.core.common.Constants;
 import org.metricshub.ipmi.core.common.TypeConverter;
 import org.metricshub.ipmi.core.connection.ConnectionException;
+import org.metricshub.ipmi.core.connection.Ipmi20UnsupportedException;
 import org.metricshub.ipmi.core.connection.Session;
 import org.metricshub.ipmi.core.connection.SessionException;
 
@@ -232,13 +233,12 @@ public final class IpmiClient implements AutoCloseable {
 	}
 
 	/**
-	 * Reads what the BMC supports before any login: the cipher suites it offers and its authentication options
-	 * (Get Channel Cipher Suites and Get Channel Authentication Capabilities). Needs no credentials and opens no
-	 * session.
+	 * Reads what the BMC supports before any login: its authentication options and the cipher suites it offers (Get
+	 * Channel Authentication Capabilities and Get Channel Cipher Suites). Needs no credentials and opens no session.
 	 *
 	 * @return the capabilities
 	 * @throws IpmiConnectionException when the BMC does not answer
-	 * @throws IpmiClientException when the replies cannot be decoded
+	 * @throws IpmiClientException when the BMC does not support IPMI 2.0 (RMCP+), or the replies cannot be decoded
 	 */
 	public BmcCapabilities capabilities() {
 		return run("capabilities", timeout, false, false, this::readCapabilities);
@@ -810,6 +810,13 @@ public final class IpmiClient implements AutoCloseable {
 			}
 			return new IpmiClientException("The BMC " + host + " refused the session: " + code.getMessage(), e);
 		}
+		if (e instanceof Ipmi20UnsupportedException) {
+			// The BMC answered: not a network failure
+			return new IpmiClientException(
+					"The BMC " + host + " does not support IPMI 2.0 / RMCP+: its reply to Get Channel Authentication "
+							+ "Capabilities reports no IPMI v2.0 connections",
+					e);
+		}
 		if (e instanceof ConnectionException) {
 			return new IpmiConnectionException(
 					"No reply from " + host + ":" + port + " to the session setup after " + (retries + 1)
@@ -1105,7 +1112,9 @@ public final class IpmiClient implements AutoCloseable {
 
 		/**
 		 * Uses exactly the given cipher suite, without asking the BMC which ones it offers: saves the Get Channel
-		 * Cipher Suites round trips with a BMC known to support it.
+		 * Authentication Capabilities and Get Channel Cipher Suites round trips with a BMC known to support it. An
+		 * IPMI 1.5-only BMC then fails with {@link IpmiConnectionException} (no reply to Open Session) instead of
+		 * {@link IpmiClientException}.
 		 *
 		 * @param id the suite ID (IPMI 2.0 table 22-20), one with integrity
 		 * @return this builder

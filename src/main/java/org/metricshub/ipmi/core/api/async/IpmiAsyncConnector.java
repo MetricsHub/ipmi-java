@@ -39,6 +39,7 @@ import org.metricshub.ipmi.core.connection.Connection;
 import org.metricshub.ipmi.core.connection.ConnectionException;
 import org.metricshub.ipmi.core.connection.ConnectionListener;
 import org.metricshub.ipmi.core.connection.ConnectionManager;
+import org.metricshub.ipmi.core.connection.Ipmi20UnsupportedException;
 import org.metricshub.ipmi.core.connection.Session;
 import org.metricshub.ipmi.core.connection.SessionException;
 import org.metricshub.ipmi.core.connection.SessionManager;
@@ -236,6 +237,9 @@ public class IpmiAsyncConnector implements ConnectionListener {
 	 * @see #createConnection(InetAddress, int)
 	 * @return list of the {@link CipherSuite}s that are allowed during the
 	 *         connection
+	 * @throws Ipmi20UnsupportedException
+	 *         when the BMC does not support IPMI 2.0 (RMCP+): Get Channel Authentication Capabilities, sent first in
+	 *         the IPMI v1.5 format, reports no IPMI v2.0 connections
 	 * @throws Exception
 	 *         when sending message to the managed system fails
 	 */
@@ -259,8 +263,9 @@ public class IpmiAsyncConnector implements ConnectionListener {
 	}
 
 	/**
-	 * Gets the authentication capabilities for the connection with the remote
-	 * host.
+	 * Declares the cipher suite and the privilege of the session, and returns the authentication capabilities of the
+	 * remote host that {@link #getAvailableCipherSuites(ConnectionHandle)} read (requested at the User level): sends
+	 * nothing.
 	 *
 	 * @param connectionHandle
 	 *        - {@link ConnectionHandle} associated with the host
@@ -273,31 +278,17 @@ public class IpmiAsyncConnector implements ConnectionListener {
 	 *         when connection is in the state that does not allow to
 	 *         perform this operation.
 	 * @throws Exception
-	 *         when sending message to the managed system fails
+	 *         when the state machine fails
 	 */
 	public GetChannelAuthenticationCapabilitiesResponseData getChannelAuthenticationCapabilities(
 			ConnectionHandle connectionHandle,
 			CipherSuite cipherSuite,
 			PrivilegeLevel requestedPrivilegeLevel)
 			throws Exception {
-		int tries = 0;
-		GetChannelAuthenticationCapabilitiesResponseData result = null;
-		while (tries <= retries && result == null) {
-			try {
-				++tries;
-				result = connectionManager
-						.getChannelAuthenticationCapabilities(
-								connectionHandle.getHandle(),
-								cipherSuite,
-								requestedPrivilegeLevel);
-				connectionHandle.setCipherSuite(cipherSuite);
-				connectionHandle.setPrivilegeLevel(requestedPrivilegeLevel);
-			} catch (Exception e) {
-				if (tries > retries || !isRetriable(e)) {
-					throw e;
-				}
-			}
-		}
+		GetChannelAuthenticationCapabilitiesResponseData result = connectionManager
+				.getChannelAuthenticationCapabilities(connectionHandle.getHandle(), cipherSuite, requestedPrivilegeLevel);
+		connectionHandle.setCipherSuite(cipherSuite);
+		connectionHandle.setPrivilegeLevel(requestedPrivilegeLevel);
 		return result;
 	}
 
@@ -722,11 +713,11 @@ public class IpmiAsyncConnector implements ConnectionListener {
 
 	/**
 	 * Tells whether a failed handshake step is worth sending again: when no reply came, or when the BMC answered
-	 * with a transient completion code. Any other answer (wrong credentials, unknown user, refused cipher suite...)
-	 * would be the same the next time, and resending the credentials trips account lockouts.
+	 * with a transient completion code. Any other answer (wrong credentials, unknown user, refused cipher suite, no
+	 * IPMI 2.0...) would be the same the next time, and resending the credentials trips account lockouts.
 	 */
 	private static boolean isRetriable(Exception e) {
-		return e instanceof ConnectionException
+		return (e instanceof ConnectionException && !(e instanceof Ipmi20UnsupportedException))
 				|| (e instanceof IPMIException && ((IPMIException) e).getCompletionCode().isTransient());
 	}
 

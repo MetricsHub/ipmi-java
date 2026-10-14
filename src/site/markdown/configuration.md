@@ -106,7 +106,9 @@ the same without encryption. A BMC that offers none of the listed suites fails t
 with `IpmiClientException: The BMC ... offers none of the cipher suites ...`.
 
 `cipherSuite(int)` uses exactly that suite without asking the BMC, which saves the Get Channel
-Cipher Suites round trips with a BMC known to support it.
+Authentication Capabilities and Get Channel Cipher Suites round trips with a BMC known to support
+it; an IPMI 1.5-only BMC then fails with `IpmiConnectionException` (no reply to Open Session)
+instead of `IpmiClientException` (does not support IPMI 2.0 / RMCP+).
 
 The suites without integrity (0, 1, 6 and 15) are refused by the builder: the list of suites the
 BMC sends is not authenticated, so falling back to them would let an attacker downgrade the

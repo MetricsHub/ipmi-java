@@ -38,6 +38,7 @@ import org.metricshub.ipmi.core.common.Constants;
 import org.metricshub.ipmi.core.connection.Connection;
 import org.metricshub.ipmi.core.connection.ConnectionException;
 import org.metricshub.ipmi.core.connection.ConnectionManager;
+import org.metricshub.ipmi.core.connection.Ipmi20UnsupportedException;
 import org.metricshub.ipmi.core.connection.Session;
 import org.metricshub.ipmi.core.connection.SessionException;
 
@@ -208,6 +209,9 @@ public class IpmiConnector {
 	 *        {@link ConnectionHandle} to the connection created before
 	 * @see #createConnection(InetAddress)
 	 * @return list of the {@link CipherSuite}s that are allowed during the connection
+	 * @throws Ipmi20UnsupportedException
+	 *         when the BMC does not support IPMI 2.0 (RMCP+): Get Channel Authentication Capabilities, sent first in
+	 *         the IPMI v1.5 format, reports no IPMI v2.0 connections
 	 * @throws Exception
 	 *         when sending message to the managed system fails
 	 */
@@ -216,7 +220,9 @@ public class IpmiConnector {
 	}
 
 	/**
-	 * Gets the authentication capabilities for the connection with the remote host.
+	 * Declares the cipher suite and the privilege of the session, and returns the authentication capabilities of the
+	 * remote host that {@link #getAvailableCipherSuites(ConnectionHandle)} read (requested at the User level): sends
+	 * nothing.
 	 *
 	 * @param connectionHandle
 	 *        - {@link ConnectionHandle} associated with the host
@@ -228,7 +234,7 @@ public class IpmiConnector {
 	 * @throws ConnectionException
 	 *         when connection is in the state that does not allow to perform this operation.
 	 * @throws Exception
-	 *         when sending message to the managed system fails
+	 *         when the state machine fails
 	 */
 	public GetChannelAuthenticationCapabilitiesResponseData getChannelAuthenticationCapabilities(
 			ConnectionHandle connectionHandle,

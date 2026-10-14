@@ -136,6 +136,15 @@ reply) are ignored.
   open the session at the level the payload needs and pass it to `SerialOverLan(connector,
   session)`; the console raises a session itself only when it was opened with
   `MaximumAvailable`.
+* `getAvailableCipherSuites()` first sends Get Channel Authentication Capabilities in the IPMI
+  v1.5 format (IPMI 2.0 section 13.13), and sends the RMCP+ Get Channel Cipher Suites only when the
+  reply reports IPMI v2.0 connections (table 22-15). An IPMI 1.5-only BMC fails at once with the
+  new `Ipmi20UnsupportedException`, a `ConnectionException` that is not sent again
+  (`IpmiClientException` from `IpmiClient`, exit code 70 from `ipmicli`), where 1.x sent Get
+  Channel Cipher Suites until all the tries timed out (`ConnectionException: Command timed out`).
+  `getChannelAuthenticationCapabilities()` no longer sends anything: it returns that reply,
+  requested at the User level, and declares the cipher suite and the privilege of the session.
+  The handshake sends as many messages as before.
 * `IpmiConnector.sendMessage(handle, command, resends)` sends a command with its own number of
   resends when no reply comes or the BMC answers `C3h`, 0 for a command the BMC must not receive
   twice.
@@ -202,7 +211,7 @@ The `IpmiClient` API is unchanged, and the client is more tolerant of real-world
 * a failed login fails at once with its actual cause (`IllegalArgumentException: Authentication
   check failed`, `IPMIException: Unauthorized name.`), where 1.2.02 sent the credentials four
   times and threw `ConnectionException: Illegal connection state: Rakp1Waiting`
-  ([Troubleshooting](troubleshooting.html#the-login-fails)); only a handshake step that got no
+  ([Troubleshooting](troubleshooting.html#ipmiauthenticationexception)); only a handshake step that got no
   reply is sent again;
 * the [keep-alive](configuration.html#keep-alive) is actually sent: with the default `pingPeriod`
   (`-1`) 1.2.02 sent no keep-alive at all, so a session could expire during a long collection; the

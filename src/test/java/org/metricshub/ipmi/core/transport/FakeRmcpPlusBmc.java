@@ -99,6 +99,8 @@ public class FakeRmcpPlusBmc implements AutoCloseable {
 
 	/** RMCP+ payload type of the Open Session Request (IPMI 2.0 table 13-16). */
 	public static final int OPEN_SESSION_REQUEST = 0x10;
+	/** RMCP+ payload type of an IPMI message (IPMI 2.0 table 13-16). */
+	public static final int IPMI_MESSAGE = 0x00;
 	/** RMCP+ payload type of the RAKP Message 1. */
 	public static final int RAKP_1 = 0x12;
 	/** RMCP+ payload type of the RAKP Message 3. */
@@ -161,7 +163,12 @@ public class FakeRmcpPlusBmc implements AutoCloseable {
 		/** Reply signed with the session sequence number of the previous packet of the BMC, received already. */
 		REUSED_SEQUENCE_NUMBER,
 		/** No reply. */
-		DROP
+		DROP,
+		/**
+		 * An IPMI v1.5-only BMC: Get Channel Authentication Capabilities reports IPMI v1.5 connections only (extended
+		 * capabilities 01h, IPMI 2.0 table 22-15), and the RMCP+ packets are counted and dropped without a word.
+		 */
+		IPMI_1_5_ONLY
 	}
 
 	private static final byte[] RMCP_HEADER = { 0x06, 0x00, (byte) 0xff, 0x07 };
@@ -341,7 +348,7 @@ public class FakeRmcpPlusBmc implements AutoCloseable {
 	/**
 	 * Injects a handshake fault in every handshake from now on.
 	 *
-	 * @param fault one of the {@code OPEN_SESSION_*} and {@code RAKP_*} faults
+	 * @param fault one of the {@code OPEN_SESSION_*} and {@code RAKP_*} faults, or {@link Fault#IPMI_1_5_ONLY}
 	 */
 	public void inject(Fault fault) {
 		handshakeFaults.add(fault);
@@ -358,8 +365,8 @@ public class FakeRmcpPlusBmc implements AutoCloseable {
 	}
 
 	/**
-	 * @param payloadType {@link #OPEN_SESSION_REQUEST}, {@link #RAKP_1} or {@link #RAKP_3}
-	 * @return how many messages of this payload type were received
+	 * @param payloadType {@link #IPMI_MESSAGE}, {@link #OPEN_SESSION_REQUEST}, {@link #RAKP_1} or {@link #RAKP_3}
+	 * @return how many session-less RMCP+ messages of this payload type were received
 	 */
 	public int getCount(int payloadType) {
 		AtomicInteger count = counts.get(payloadType);
@@ -634,6 +641,9 @@ public class FakeRmcpPlusBmc implements AutoCloseable {
 		int payloadType = datagram[5] & 0xff;
 		byte[] payload = Arrays.copyOfRange(datagram, 16, 16 + (in.getShort(14) & 0xffff));
 		count(payloadType);
+		if (has(Fault.IPMI_1_5_ONLY)) {
+			return null; // an IPMI v1.5 BMC does not know the RMCP+ format (authentication type 06h)
+		}
 		switch (payloadType) {
 		case 0x00:
 			byte[] response = respond(payload);
@@ -1137,11 +1147,23 @@ public class FakeRmcpPlusBmc implements AutoCloseable {
 	}
 
 	/**
-	 * Get Channel Authentication Capabilities (IPMI 2.0 table 22-15): extended capabilities, MD5 and straight
-	 * password, Kg status, non-null user names, IPMI v1.5 and v2.0 connections, no OEM.
+	 * Get Channel Authentication Capabilities (IPMI 2.0 table 22-15): extended capabilities when the request asks for
+	 * the IPMI v2.0+ extended data (bit 7 of byte 1), MD5 and straight password, Kg status, non-null user names, IPMI
+	 * v1.5 and v2.0 connections (v1.5 only with {@link Fault#IPMI_1_5_ONLY}), no OEM.
 	 */
 	private byte[] getChannelAuthenticationCapabilities(byte[] data) {
-		return new byte[] { 0x00, CHANNEL, (byte) 0x94, (byte) (kg == null ? 0x04 : 0x24), 0x03, 0x00, 0x00, 0x00, 0x00 };
+		boolean extended = (data[0] & 0x80) != 0;
+		boolean rmcpPlus = extended && !has(Fault.IPMI_1_5_ONLY);
+		return new byte[] {
+				0x00,
+				CHANNEL,
+				(byte) (extended ? 0x94 : 0x14),
+				(byte) (rmcpPlus && kg != null ? 0x24 : 0x04),
+				(byte) (rmcpPlus ? 0x03 : extended ? 0x01 : 0x00),
+				0x00,
+				0x00,
+				0x00,
+				0x00 };
 	}
 
 	/**

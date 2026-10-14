@@ -19,6 +19,7 @@ import static org.metricshub.ipmi.client.Fixtures.USER;
 import static org.metricshub.ipmi.client.Fixtures.bmc;
 import static org.metricshub.ipmi.client.Fixtures.utf8;
 import static org.metricshub.ipmi.core.transport.FakeRmcpPlusBmc.ADMINISTRATOR;
+import static org.metricshub.ipmi.core.transport.FakeRmcpPlusBmc.GET_CHANNEL_AUTHENTICATION_CAPABILITIES;
 import static org.metricshub.ipmi.core.transport.FakeRmcpPlusBmc.GET_CHANNEL_CIPHER_SUITES;
 import static org.metricshub.ipmi.core.transport.FakeRmcpPlusBmc.GET_CHASSIS_STATUS;
 import static org.metricshub.ipmi.core.transport.FakeRmcpPlusBmc.CHASSIS_CONTROL;
@@ -1195,6 +1196,30 @@ class IpmiClientTest {
 				assertTrue(busy.getMessage().contains("(completion code C0h)"), busy.getMessage());
 				assertEquals(2, bmc.getCount(NETFN_APP, SET_SESSION_PRIVILEGE_LEVEL), "busy is sent again");
 			}
+		}
+	}
+
+	@Test
+	@Timeout(30)
+	void anIpmi15OnlyBmcFailsWithAClientExceptionAtOnce() throws Exception {
+		try (FakeRmcpPlusBmc bmc = bmc()) {
+			bmc.inject(FakeRmcpPlusBmc.Fault.IPMI_1_5_ONLY);
+			try (IpmiClient client = client(bmc).build()) {
+				IpmiClientException refused = assertThrows(IpmiClientException.class, client::chassisStatus);
+				assertEquals(IpmiClientException.class, refused.getClass(), "the BMC answered: not a connection failure");
+				assertTrue(refused.getMessage().contains("does not support IPMI 2.0"), refused.getMessage());
+				assertEquals(
+						IpmiClientException.class,
+						assertThrows(IpmiClientException.class, client::capabilities).getClass());
+				assertEquals(2, bmc.getCount(NETFN_APP, GET_CHANNEL_AUTHENTICATION_CAPABILITIES), "once per operation");
+				assertEquals(0, bmc.getCount(FakeRmcpPlusBmc.IPMI_MESSAGE), "no RMCP+ request");
+			}
+			// Without discovery, the client does not ask: Open Session gets no reply
+			try (IpmiClient client = client(bmc).cipherSuite(17).build()) {
+				assertThrows(IpmiConnectionException.class, client::chassisStatus);
+				assertEquals(2, bmc.getCount(OPEN_SESSION_REQUEST));
+			}
+			assertEquals(Collections.emptyList(), bmc.getErrors());
 		}
 	}
 

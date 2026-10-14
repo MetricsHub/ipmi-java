@@ -20,7 +20,7 @@ included), or sent as bytes with [`raw()`](low-level-api.html#raw-requests).
 | Command | Class | NetFn / Cmd | Used by `IpmiClient` |
 | --- | --- | --- | --- |
 | **Session** | | | |
-| Get Channel Authentication Capabilities | `GetChannelAuthenticationCapabilities` | App / `38h` | every session, `capabilities()` |
+| Get Channel Authentication Capabilities | `GetChannelAuthenticationCapabilities` | App / `38h` | every session (unless `cipherSuite(id)`), first and in the IPMI v1.5 format; `capabilities()` |
 | Get Channel Cipher Suites | `GetChannelCipherSuites` | App / `54h` | every session (unless `cipherSuite(id)`), `capabilities()` |
 | RMCP+ Open Session | `OpenSession` | (payload) | every session |
 | RAKP Message 1 / 3 | `Rakp1`, `Rakp3` | (payload) | every session |

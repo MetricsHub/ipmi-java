@@ -23,7 +23,10 @@ package org.metricshub.ipmi.core.sm.states;
  */
 
 import org.metricshub.ipmi.core.coding.Encoder;
+import org.metricshub.ipmi.core.coding.commands.IpmiVersion;
+import org.metricshub.ipmi.core.coding.commands.session.GetChannelAuthenticationCapabilities;
 import org.metricshub.ipmi.core.coding.commands.session.GetChannelCipherSuites;
+import org.metricshub.ipmi.core.coding.protocol.encoder.Protocolv15Encoder;
 import org.metricshub.ipmi.core.coding.protocol.encoder.Protocolv20Encoder;
 import org.metricshub.ipmi.core.coding.rmcp.RmcpMessage;
 import org.metricshub.ipmi.core.common.TypeConverter;
@@ -34,8 +37,8 @@ import org.metricshub.ipmi.core.sm.events.GetChannelCipherSuitesPending;
 import org.metricshub.ipmi.core.sm.events.StateMachineEvent;
 
 /**
- * The initial state. Transits to {@link CiphersWaiting} on
- * {@link GetChannelCipherSuitesPending}.
+ * The initial state. Transits to {@link AuthcapWaiting} on {@link Default}, sending Get Channel Authentication
+ * Capabilities in the IPMI v1.5 format, and to {@link CiphersWaiting} on {@link GetChannelCipherSuitesPending}.
  */
 public class Uninitialized extends State {
 
@@ -65,6 +68,24 @@ public class Uninitialized extends State {
 												event.getSequenceNumber(),
 												0,
 												0));
+			} catch (Exception e) {
+				stateMachine.setCurrent(this);
+				stateMachine.doExternalAction(new ErrorAction(e));
+			}
+		} else if (machineEvent instanceof Default) {
+			// IPMI 2.0 section 13.13: Get Channel Authentication Capabilities in the IPMI v1.5 format, which every BMC
+			// answers, with the IPMI v2.0+ extended data (table 22-15), before any RMCP+ packet
+			Default event = (Default) machineEvent;
+			GetChannelAuthenticationCapabilities authCap = new GetChannelAuthenticationCapabilities(
+					IpmiVersion.V15,
+					IpmiVersion.V20,
+					event.getCipherSuite(),
+					event.getPrivilegeLevel(),
+					TypeConverter.intToByte(0xe));
+			try {
+				stateMachine.setCurrent(new AuthcapWaiting(event.getSequenceNumber()));
+				stateMachine
+						.sendMessage(Encoder.encode(new Protocolv15Encoder(), authCap, event.getSequenceNumber(), 0, 0));
 			} catch (Exception e) {
 				stateMachine.setCurrent(this);
 				stateMachine.doExternalAction(new ErrorAction(e));

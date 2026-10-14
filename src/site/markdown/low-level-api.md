@@ -180,7 +180,13 @@ public class LowLevelExample {
 
 The four steps before the first command are mandatory and must come in this order:
 `createConnection()`, `getAvailableCipherSuites()`, `getChannelAuthenticationCapabilities()`,
-`openSession()`. Calling them out of order fails with
+`openSession()`. `getAvailableCipherSuites()` first sends Get Channel Authentication Capabilities,
+in the IPMI v1.5 format at the User level, and sends the RMCP+ Get Channel Cipher Suites only when
+the reply reports IPMI v2.0 connections (IPMI 2.0 section 13.13, table 22-15): an IPMI 1.5-only
+BMC fails at once with
+[`Ipmi20UnsupportedException`](apidocs/org/metricshub/ipmi/core/connection/Ipmi20UnsupportedException.html),
+a `ConnectionException` that is not sent again. `getChannelAuthenticationCapabilities()` sends
+nothing: it declares the cipher suite and the privilege of the session, and returns that reply. Calling them out of order fails with
 `ConnectionException: Illegal connection state: ...`. Close the session in a `finally` block:
 `tearDown()` only releases the local resources and does not log out, so a session left open
 holds one of the BMC's few session slots until the BMC expires it.
@@ -234,7 +240,8 @@ out), including suites the library does not implement. Choose one it implements,
 algorithms of a suite, and a suite with an xRC4 or MD5-128 algorithm fails when the session is
 opened. Do not fall back to a suite without integrity (0, 1, 6, 15) just because the BMC lists
 nothing else: the list is not authenticated. To skip the discovery when you already know the
-suite, build it with `CipherSuite.forId()` and pass it to `createConnection()`:
+suite, build it with `CipherSuite.forId()` and pass it to `createConnection()` (Get Channel
+Authentication Capabilities is not sent either: an IPMI 1.5-only BMC then just does not answer):
 
 ```java
 // Suite 17: RAKP-HMAC-SHA256, HMAC-SHA256-128, AES-CBC-128

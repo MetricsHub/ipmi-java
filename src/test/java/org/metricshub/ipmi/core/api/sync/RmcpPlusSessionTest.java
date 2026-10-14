@@ -4,7 +4,10 @@ import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.metricshub.ipmi.core.transport.FakeRmcpPlusBmc.GET_CHANNEL_AUTHENTICATION_CAPABILITIES;
+import static org.metricshub.ipmi.core.transport.FakeRmcpPlusBmc.GET_CHANNEL_CIPHER_SUITES;
 import static org.metricshub.ipmi.core.transport.FakeRmcpPlusBmc.GET_CHASSIS_STATUS;
+import static org.metricshub.ipmi.core.transport.FakeRmcpPlusBmc.IPMI_MESSAGE;
 import static org.metricshub.ipmi.core.transport.FakeRmcpPlusBmc.NETFN_APP;
 import static org.metricshub.ipmi.core.transport.FakeRmcpPlusBmc.NETFN_CHASSIS;
 import static org.metricshub.ipmi.core.transport.FakeRmcpPlusBmc.SET_SESSION_PRIVILEGE_LEVEL;
@@ -28,6 +31,7 @@ import org.metricshub.ipmi.core.coding.commands.session.GetSessionInfo;
 import org.metricshub.ipmi.core.coding.payload.CompletionCode;
 import org.metricshub.ipmi.core.coding.payload.lan.IPMIException;
 import org.metricshub.ipmi.core.coding.security.CipherSuite;
+import org.metricshub.ipmi.core.connection.Ipmi20UnsupportedException;
 import org.metricshub.ipmi.core.connection.SessionException;
 import org.metricshub.ipmi.core.transport.FakeRmcpPlusBmc;
 import org.metricshub.ipmi.core.transport.FakeRmcpPlusBmc.Fault;
@@ -323,6 +327,7 @@ class RmcpPlusSessionTest {
 				connector.openSession(handle, USER, PASSWORD, null);
 				assertChassisStatus(getChassisStatus(connector, handle));
 				assertEquals(4, bmc.getCount(FakeRmcpPlusBmc.NETFN_CHASSIS, FakeRmcpPlusBmc.GET_CHASSIS_STATUS));
+				assertEquals(1, bmc.getCount(NETFN_APP, GET_CHANNEL_AUTHENTICATION_CAPABILITIES), "one per discovery");
 				assertEquals(Collections.emptyList(), bmc.getErrors());
 			} finally {
 				connector.tearDown();
@@ -414,6 +419,52 @@ class RmcpPlusSessionTest {
 				ConnectionHandle handle = openSession(connector, bmc, 17, PASSWORD, null, PrivilegeLevel.Operator);
 				assertEquals(2, bmc.getCount(NETFN_APP, SET_SESSION_PRIVILEGE_LEVEL));
 				connector.sendMessage(handle, new ChassisIdentify(0, false));
+				assertEquals(Collections.emptyList(), bmc.getErrors());
+			} finally {
+				connector.tearDown();
+			}
+		}
+	}
+
+	@Test
+	@Timeout(30)
+	void anIpmi15OnlyBmcIsRefusedWithoutAnyRmcpPlusPacket() throws Exception {
+		try (FakeRmcpPlusBmc bmc = new FakeRmcpPlusBmc(XCC_SUITES, USER, utf8(PASSWORD), null)) {
+			bmc.inject(Fault.IPMI_1_5_ONLY);
+			IpmiConnector connector = new IpmiConnector(0, 0);
+			try {
+				ConnectionHandle handle = connector.createConnection(bmc.getAddress(), bmc.getPort());
+				connector.setTimeout(handle, TIMEOUT_MS);
+				for (int call = 1; call <= 2; call++) {
+					Ipmi20UnsupportedException refused = assertThrows(
+							Ipmi20UnsupportedException.class,
+							() -> connector.getAvailableCipherSuites(handle));
+					assertTrue(refused.getMessage().contains("does not support IPMI 2.0"), refused.getMessage());
+					// The answer is not sent again, and the state was rolled back for another try
+					assertEquals(call, bmc.getCount(NETFN_APP, GET_CHANNEL_AUTHENTICATION_CAPABILITIES));
+				}
+				assertEquals(0, bmc.getCount(IPMI_MESSAGE), "no RMCP+ request");
+				assertEquals(Collections.emptyList(), bmc.getErrors());
+			} finally {
+				connector.tearDown();
+			}
+		}
+	}
+
+	@Test
+	@Timeout(30)
+	void aRefusedCipherSuiteListFailsAtOnceAndLeavesTheStepRetriable() throws Exception {
+		try (FakeRmcpPlusBmc bmc = new FakeRmcpPlusBmc(XCC_SUITES, USER, utf8(PASSWORD), null)) {
+			bmc.handle(NETFN_APP, GET_CHANNEL_CIPHER_SUITES, data -> new byte[] { (byte) 0xc1 });
+			IpmiConnector connector = new IpmiConnector(0, 0);
+			try {
+				ConnectionHandle handle = connector.createConnection(bmc.getAddress(), bmc.getPort());
+				connector.setTimeout(handle, TIMEOUT_MS);
+				for (int call = 1; call <= 2; call++) {
+					assertThrows(IPMIException.class, () -> connector.getAvailableCipherSuites(handle));
+					assertEquals(call, bmc.getCount(NETFN_APP, GET_CHANNEL_CIPHER_SUITES), "C1h is not sent again");
+					assertEquals(call, bmc.getCount(NETFN_APP, GET_CHANNEL_AUTHENTICATION_CAPABILITIES));
+				}
 				assertEquals(Collections.emptyList(), bmc.getErrors());
 			} finally {
 				connector.tearDown();

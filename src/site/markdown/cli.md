@@ -162,7 +162,7 @@ The last line is the suite a login with the same `-C` option would use: the firs
 preference that the BMC offers, or the single suite of a one-ID `-C`, which is used without
 discovery. When that suite is one the library does not implement, or one the BMC does not offer,
 the line says so and that the login would fail; `none` means a login would fail with
-*offers none of the cipher suites* ([Troubleshooting](troubleshooting.html#ipmiclientexception-the-bmc-offers-none-of-the-cipher-suites)).
+*offers none of the cipher suites* ([Troubleshooting](troubleshooting.html#ipmiclientexception-3a-the-bmc-offers-none-of-the-cipher-suites)).
 `--json` prints one object with the same fields and the suites as an array:
 
 ```json
@@ -476,7 +476,7 @@ The sysexits values of the MetricsHub command-line clients:
 | `64` | Invalid usage, including an unreadable password or key file, and a setting the client refuses (a cipher suite without integrity, a password longer than 20 bytes). |
 | `66` | `fru <id>`: no such FRU. |
 | `69` | BMC unreachable: unknown host, socket error, no reply to the session setup (wrong host, UDP port 623 filtered, IPMI over LAN disabled). |
-| `70` | IPMI failure: an error completion code (also in the reply to `raw`), no common cipher suite, a malformed reply, the SOL console deactivated by the BMC. |
+| `70` | IPMI failure: an error completion code (also in the reply to `raw`), no common cipher suite, a BMC without IPMI 2.0 (RMCP+), a malformed reply, the SOL console deactivated by the BMC. |
 | `74` | Local I/O failure (stdout closed). |
 | `77` | Authentication or authorization failure: unknown user, wrong password or BMC key, privilege level refused at login, insufficient privilege (`D4h`, with the `-L` hint). |
 | `124` | Timeout: the deadline of the subcommand expired, or a message of the session got no reply after all the tries. |

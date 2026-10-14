@@ -49,7 +49,7 @@ import org.metricshub.ipmi.core.coding.payload.sol.SolMessage;
 import org.metricshub.ipmi.core.coding.sol.SolCoder;
 import org.metricshub.ipmi.core.connection.queue.MessageQueue;
 import org.metricshub.ipmi.core.connection.queue.QueueElement;
-import org.metricshub.ipmi.core.coding.commands.session.GetChannelCipherSuitesResponseData;
+import org.metricshub.ipmi.core.coding.commands.session.GetChannelAuthenticationCapabilitiesResponseData;
 import org.metricshub.ipmi.core.sm.actions.ResponseAction;
 
 class ConnectionTest {
@@ -655,9 +655,8 @@ class ConnectionTest {
 					Thread.sleep(TIMEOUT_MS / 2);
 					synchronized (machine) {
 						Thread.sleep(2 * TIMEOUT_MS);
-						GetChannelCipherSuitesResponseData data = new GetChannelCipherSuitesResponseData();
-						data.setCipherSuiteData(new byte[0]);
-						connection.notify(new ResponseAction(data));
+						// The first step: the capabilities of a BMC without IPMI 2.0
+						connection.notify(new ResponseAction(new GetChannelAuthenticationCapabilitiesResponseData()));
 						published.countDown();
 					}
 				} catch (Throwable t) {
@@ -666,12 +665,12 @@ class ConnectionTest {
 			});
 			publisher.start();
 
-			List<CipherSuite> suites = connection.getAvailableCipherSuites(1);
+			// The reply, not a timeout (a ConnectionException "Command timed out"), ends the step
+			assertThrows(Ipmi20UnsupportedException.class, () -> connection.getAvailableCipherSuites(1));
 
 			publisher.join(5000);
 			assertEquals(null, publisherFailure.get());
 			assertEquals(0, published.getCount(), "the reply was published before the waiter could proceed");
-			assertTrue(suites.isEmpty(), "the reply, not a timeout, ends the step");
 		} finally {
 			connection.disconnect();
 		}

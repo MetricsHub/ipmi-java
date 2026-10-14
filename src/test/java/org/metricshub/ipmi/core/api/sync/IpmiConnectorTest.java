@@ -29,15 +29,15 @@ import org.metricshub.ipmi.core.transport.FakeBmc;
 class IpmiConnectorTest {
 
 	/**
-	 * RMCP header, then an RMCP+ sessionless, unauthenticated IPMI message that announces an 80-byte payload the
-	 * datagram does not carry: it passes the filters of the cipher-suites step and fails to decode.
+	 * RMCP header, then an IPMI v1.5 session-less message (authentication type none, sequence number and session ID 0)
+	 * that announces an 80-byte message the datagram does not carry: it passes the filters of the first step, Get
+	 * Channel Authentication Capabilities, and fails to decode.
 	 */
 	private static final byte[] TRUNCATED_REPLY = {
 			0x06,
 			0x00,
 			(byte) 0xff,
 			0x07,
-			0x06,
 			0x00,
 			0x00,
 			0x00,
@@ -47,8 +47,7 @@ class IpmiConnectorTest {
 			0x00,
 			0x00,
 			0x00,
-			0x50,
-			0x00 };
+			0x50 };
 
 	private static final int TIMEOUT_MS = 500;
 

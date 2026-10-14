@@ -101,6 +101,8 @@ public class Connection extends TimerTask implements MachineObserver {
 	private volatile int sessionId;
 	private volatile int managedSystemSessionId;
 	private volatile byte[] sik;
+	/** The reply to Get Channel Authentication Capabilities that {@link #getAvailableCipherSuites(int)} read. */
+	private volatile GetChannelAuthenticationCapabilitiesResponseData authenticationCapabilities;
 
 	private int handle;
 
@@ -257,11 +259,15 @@ public class Connection extends TimerTask implements MachineObserver {
 
 	/**
 	 * Gets from the managed system supported {@link CipherSuite}s. Should be
-	 * performed only immediately after {@link #connect(InetAddress, int, int)}.
+	 * performed only immediately after {@link #connect(InetAddress, int, int)}. Sends Get Channel Authentication
+	 * Capabilities first, in the IPMI v1.5 format at the User level (IPMI 2.0 section 13.13), and Get Channel Cipher
+	 * Suites, an RMCP+ request, only when its reply reports IPMI v2.0 connections (table 22-15).
 	 *
 	 * @param tag
 	 *        - the integer from range 0-63 to match request with response
 	 * @return list of the {@link CipherSuite}s supported by the managed system.
+	 * @throws Ipmi20UnsupportedException
+	 *         when the BMC does not support IPMI 2.0 (RMCP+)
 	 * @throws ConnectionException
 	 *         when connection is in the state that does not allow to
 	 *         perform this operation.
@@ -273,6 +279,25 @@ public class Connection extends TimerTask implements MachineObserver {
 		if (stateMachine.getCurrent().getClass() != Uninitialized.class) {
 			throw new ConnectionException(
 					ILLEGAL_CONNECTION_STATE_MESSAGE + stateMachine.getCurrent().getClass().getSimpleName());
+		}
+
+		// A BMC without IPMI v2.0 connections drops the RMCP+ requests: ask in the IPMI v1.5 format first
+		lastAction = null;
+		stateMachine.doTransition(new Default(CipherSuite.getEmpty(), tag, PrivilegeLevel.User));
+		waitForResponse();
+		ResponseAction capabilitiesAction = (ResponseAction) lastAction;
+		if (!(capabilitiesAction.getIpmiResponseData() instanceof GetChannelAuthenticationCapabilitiesResponseData)) {
+			stateMachine.doTransition(new Timeout());
+			throw new ConnectionException("Response data not matching Get Channel Authentication Capabilities command.");
+		}
+		GetChannelAuthenticationCapabilitiesResponseData capabilities = (GetChannelAuthenticationCapabilitiesResponseData) capabilitiesAction
+				.getIpmiResponseData();
+		// Back to Uninitialized: Get Channel Cipher Suites, or another try
+		stateMachine.doTransition(new DefaultAck());
+		if (!capabilities.isIpmiv20Support()) {
+			throw new Ipmi20UnsupportedException(
+					"The BMC does not support IPMI 2.0 / RMCP+: its reply to Get Channel Authentication Capabilities "
+							+ "reports no IPMI v2.0 connections");
 		}
 
 		boolean process = true;
@@ -306,6 +331,7 @@ public class Connection extends TimerTask implements MachineObserver {
 		}
 
 		stateMachine.doTransition(new DefaultAck());
+		authenticationCapabilities = capabilities;
 
 		int length = 0;
 
@@ -369,21 +395,21 @@ public class Connection extends TimerTask implements MachineObserver {
 	}
 
 	/**
-	 * Queries the managed system for the details of the authentification
-	 * process. Must be performed after {@link #getAvailableCipherSuites(int)}
+	 * Declares the cipher suite and the privilege of the session, and returns the authentication capabilities of the
+	 * managed system that {@link #getAvailableCipherSuites(int)}, which must be performed first, read. Sends nothing.
 	 *
 	 * @param tag
-	 *        - the integer from range 0-63 to match request with response
+	 *        - unused: the reply was read by {@link #getAvailableCipherSuites(int)}
 	 * @param cipherSuite
 	 *        - {@link CipherSuite} requested for the session
 	 * @param requestedPrivilegeLevel
 	 *        - {@link PrivilegeLevel} requested for the session
-	 * @return {@link GetChannelAuthenticationCapabilitiesResponseData}
+	 * @return {@link GetChannelAuthenticationCapabilitiesResponseData}, requested at the User level
 	 * @throws ConnectionException
 	 *         when connection is in the state that does not allow to
 	 *         perform this operation.
 	 * @throws Exception
-	 *         when sending message to the managed system fails
+	 *         when the state machine fails
 	 */
 	public GetChannelAuthenticationCapabilitiesResponseData getChannelAuthenticationCapabilities(
 			int tag,
@@ -397,28 +423,6 @@ public class Connection extends TimerTask implements MachineObserver {
 							+ stateMachine.getCurrent().getClass().getSimpleName());
 		}
 
-		lastAction = null;
-
-		stateMachine
-				.doTransition(
-						new Default(
-								cipherSuite,
-								tag,
-								requestedPrivilegeLevel));
-
-		waitForResponse();
-
-		ResponseAction action = (ResponseAction) lastAction;
-
-		if (!(action.getIpmiResponseData() instanceof GetChannelAuthenticationCapabilitiesResponseData)) {
-			stateMachine.doTransition(new Timeout());
-			throw new ConnectionException(
-					"Response data not matching Get Channel Authentication Capabilities command.");
-		}
-
-		GetChannelAuthenticationCapabilitiesResponseData responseData = (GetChannelAuthenticationCapabilitiesResponseData) action
-				.getIpmiResponseData();
-
 		sessionId = SessionManager.generateSessionId();
 
 		stateMachine
@@ -427,7 +431,7 @@ public class Connection extends TimerTask implements MachineObserver {
 								sessionId,
 								requestedPrivilegeLevel));
 
-		return responseData;
+		return authenticationCapabilities;
 	}
 
 	/**

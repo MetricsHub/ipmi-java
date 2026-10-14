@@ -1,4 +1,4 @@
-keywords: troubleshooting, timeout, no reply, login, authentication, unauthorized name, insufficient privilege, 0xd4, serial over lan, ipmitool, ipmiutil, ipmicli, probe
+keywords: troubleshooting, timeout, no reply, login, authentication, unauthorized name, insufficient privilege, 0xd4, set session privilege level, ipmi 1.5, rmcp+, serial over lan, ipmitool, ipmiutil, ipmicli, probe
 description: Diagnose the usual failures of the IPMI Java Client — no reply, authentication errors, insufficient privilege, missing sensors or FRUs — and compare with ipmitool and ipmiutil.
 
 # Troubleshooting
@@ -33,7 +33,7 @@ The BMC did not answer the session setup after all the tries (4 tries of 5 s by 
 | Wrong address: the server's operating system instead of its BMC | The BMC has its own IP address (`ipmitool lan print 1` on the server). |
 | IPMI over LAN disabled on the BMC | [Enabling IPMI over LAN](preparing-the-bmc.html#enabling-ipmi-over-lan) |
 | UDP port 623 filtered | [Firewall](preparing-the-bmc.html#firewall) |
-| An IPMI 1.5-only BMC | Such BMCs never answer the RMCP+ requests of the client, starting with Get Channel Cipher Suites ([#154](https://github.com/metricshub/ipmi-java/issues/154)). |
+| An IPMI 1.5-only BMC, with `cipherSuite(id)` (`-C` with one ID) | Without the cipher suite discovery, the client does not ask the BMC which IPMI versions it supports, and an IPMI 1.5-only BMC never answers the RMCP+ Open Session. With the discovery, it fails at once ([below](#ipmiclientexception-3a-the-bmc-does-not-support-ipmi-2-0-2f-rmcp-2b)). |
 | Several sessions to the same BMC at the same time | BMCs drop replies under concurrent sessions: use one client per BMC, which [serializes its operations](configuration.html#thread-safety). |
 
 ## `IpmiTimeoutException`
@@ -93,6 +93,16 @@ what happens when another client deletes the sessions, for example a management 
 as an administrator; the revocation shows at a whole minute of the session's age (60 s, 120 s,
 ...). Close the client and open a new one, or wait for the next operation: a session whose
 messages get no reply is reopened, but one that answers `D4h` is not.
+
+## `IpmiClientException: The BMC ... does not support IPMI 2.0 / RMCP+ ...`
+
+Before any RMCP+ request, the client sends Get Channel Authentication Capabilities in the IPMI
+v1.5 format, which every BMC answers (IPMI 2.0, section 13.13), and its reply reports no IPMI v2.0
+connections (table 22-15): the BMC is IPMI 1.5-only (MD2, MD5 or straight password
+authentication), or IPMI 2.0 is disabled on its LAN channel. The client only opens RMCP+
+sessions ([What this client needs](preparing-the-bmc.html#what-this-client-needs)), like
+`ipmitool -I lanplus`, which refuses such a BMC too ("This BMC does not support IPMI v2 /
+RMCP+"). `ipmicli probe` exits with 70 the same way.
 
 ## `IpmiClientException: The BMC ... offers none of the cipher suites ...`
 
