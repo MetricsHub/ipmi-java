@@ -237,7 +237,8 @@ public final class Sensor {
 
 	/**
 	 * Returns the asserted states of a discrete sensor, in the wording of {@code ipmiutil} ("Present", "Device
-	 * Absent", "Power Supply Failure detected"...), each once. The states of a threshold sensor are the thresholds
+	 * Absent", "Power Supply Failure detected"...; of {@code ipmitool} for the few states {@code ipmiutil} does not
+	 * name), each once. The states of a threshold sensor are the thresholds
 	 * its reading is at or beyond. For an OEM event/reading type, the single state is the hexadecimal state bytes.
 	 *
 	 * @return the states, empty when none is asserted, when the reading is unavailable, or when the library does

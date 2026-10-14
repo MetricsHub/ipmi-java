@@ -200,7 +200,8 @@ public final class SelEntry {
 
 	/**
 	 * Returns a description of the entry: the {@link #event() event} of a system event in the wording of
-	 * {@code ipmiutil} ({@code Upper Critical Going High}, {@code Failure detected}, {@code Log area reset/cleared}),
+	 * {@code ipmiutil} ({@code Upper Critical Going High}, {@code Failure detected}, {@code Log area reset/cleared}; of
+	 * {@code ipmitool} for the few events {@code ipmiutil} does not name, such as {@code Installation started}),
 	 * with its event/reading type and offset when the specification does not define it, the OEM bytes of an OEM
 	 * entry in hexadecimal, or the record type of a reserved entry.
 	 *
@@ -281,7 +282,7 @@ public final class SelEntry {
 		if (known != null) {
 			return known;
 		}
-		// The threshold events and the states ipmiutil does not name: the name of the ReadingType, spaced out
+		// The threshold events and the states that have no wording: the name of the ReadingType, spaced out
 		return event.name().replaceAll("(?<=[a-z])(?=[A-Z])", " ");
 	}
 

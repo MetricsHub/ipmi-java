@@ -14,7 +14,8 @@ same. It also adds a command-line client, `ipmicli`, in a standalone jar
 `getIntegrityAlgorithmCode()` and `getConfidentialityAlgorithmCode()` for it. The semicolon-separated text output of 1.x (`IpmiResultConverter`) is MetricsHub's format,
 and moves to the [MetricsHub IPMI extension](https://github.com/MetricsHub/metricshub-community/issues/1391),
 where it stays byte-identical to 1.2.x for the same BMC data, except for the sensor and FRU names
-that 1.x padded with NUL characters (see [The low-level API](#the-low-level-api)).
+that 1.x padded with NUL characters and the OS Boot states that `ReadingType` now names (see
+[The low-level API](#the-low-level-api)).
 
 ### The client
 
@@ -175,6 +176,12 @@ reply) are ignored.
   unsigned (IPMI 2.0 section 37.1): the dates from 2038 on, and the `FFFFFFFFh` marker of an
   unspecified timestamp, were negative dates in 1.x. It is used by the SEL and SDR repository
   timestamps.
+* `ReadingType` has the four offsets that IPMI 2.0 revision 1.1 adds to the OS Boot sensor type
+  (`1Fh`, Base OS/Hypervisor installation, `07h` to `0Ah`): `BaseOsInstallationStarted`,
+  `BaseOsInstallationCompleted`, `BaseOsInstallationAborted` and `BaseOsInstallationFailed`, which
+  `parseInt()`, and so the SEL entries and the sensor states, reported as `Unknown` in 1.x;
+  `Sensor.states()` and `SelEntry.description()` say `Installation started`, `Installation
+  completed`, `Installation aborted` and `Installation failed`, as `ipmitool` does.
 
 ## Upgrading from 1.2.02
 

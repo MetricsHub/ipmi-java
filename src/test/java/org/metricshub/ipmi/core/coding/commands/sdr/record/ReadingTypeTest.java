@@ -23,6 +23,17 @@ class ReadingTypeTest {
 	}
 
 	@Test
+	void osBootHasTheInstallationOffsetsOfRevision11() {
+		// IPMI 2.0 rev 1.1 table 42-3, sensor type 1Fh, offsets 07h-0Ah (a Dell iDRAC logs 07h)
+		assertEquals(ReadingType.BootCompleted, ReadingType.parseInt(SensorType.OsBoot, 0x6f, 6));
+		assertEquals(ReadingType.BaseOsInstallationStarted, ReadingType.parseInt(SensorType.OsBoot, 0x6f, 7));
+		assertEquals(ReadingType.BaseOsInstallationCompleted, ReadingType.parseInt(SensorType.OsBoot, 0x6f, 8));
+		assertEquals(ReadingType.BaseOsInstallationAborted, ReadingType.parseInt(SensorType.OsBoot, 0x6f, 9));
+		assertEquals(ReadingType.BaseOsInstallationFailed, ReadingType.parseInt(SensorType.OsBoot, 0x6f, 0x0a));
+		assertEquals(ReadingType.Unknown, ReadingType.parseInt(SensorType.OsBoot, 0x6f, 0x0b));
+	}
+
+	@Test
 	void anUndefinedStateIsUnknown() {
 		// HP iLO asserts state 6 of the Device Present reading type (08h), which defines states 0 and 1
 		assertEquals(ReadingType.Unknown, ReadingType.parseInt(SensorType.Fan, 0x08, 6));
