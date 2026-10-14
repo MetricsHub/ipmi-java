@@ -2,6 +2,7 @@ package org.metricshub.ipmi.core.connection.queue;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -69,13 +70,13 @@ class MessageQueueTest {
 			connection.registerListener(recorder());
 
 			int tag = queue.add(request());
-			assertTrue(queue.containsId(tag));
+			assertNotNull(queue.getElement(tag));
 
 			Thread.sleep(TIMEOUT_MS + 50);
 			queue.run();
 
 			assertEquals(Collections.singletonList(tag + ":Message timed out"), reported);
-			assertFalse(queue.containsId(tag), "a timed-out message must not linger in the queue");
+			assertNull(queue.getElement(tag), "a timed-out message must not linger in the queue");
 
 			// The window is free: a full window of new messages is accepted without waiting
 			for (int i = 0; i < WINDOW_SIZE; i++) {
@@ -145,7 +146,7 @@ class MessageQueueTest {
 			int oneWay = queue.add(request(), true);
 			int request = queue.add(request());
 			Thread.sleep(TIMER_TICK_MS);
-			assertFalse(queue.containsId(oneWay), "the one-way message must leave the queue");
+			assertNull(queue.getElement(oneWay), "the one-way message must leave the queue");
 			assertEquals(Collections.singletonList(request + ":Message timed out"), reported);
 		} finally {
 			queue.tearDown();
@@ -165,7 +166,7 @@ class MessageQueueTest {
 			queue.run();
 			// The other request timed out, behind the retried one, which has a new timeout
 			assertEquals(Collections.singletonList(other + ":Message timed out"), reported);
-			assertTrue(queue.containsId(retried));
+			assertNotNull(queue.getElement(retried));
 		} finally {
 			queue.tearDown();
 		}
@@ -205,7 +206,7 @@ class MessageQueueTest {
 			// The same tag again, for a request sent again
 			assertEquals(tag, queue.add(request(), false, tag));
 			queue.remove(first);
-			assertTrue(queue.containsId(tag), "removing the first element must leave the second one");
+			assertNotNull(queue.getElement(tag), "removing the first element must leave the second one");
 		} finally {
 			queue.tearDown();
 		}

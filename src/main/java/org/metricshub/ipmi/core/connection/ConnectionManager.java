@@ -237,26 +237,6 @@ public class ConnectionManager {
 	}
 
 	/**
-	 * Returns first {@link Connection} associated with the address
-	 *
-	 * @param address
-	 *        - {@link InetAddress} of the remote host to get connection
-	 *        with.
-	 * @return First {@link Connection} to the address or null if none found
-	 */
-	public Connection getConnection(InetAddress address, int port) {
-		for (Connection connection : connections) {
-			if (connection != null
-					&& connection.isActive()
-					&& connection.getRemoteMachineAddress().equals(address)
-					&& connection.getRemoteMachinePort() == port) {
-				return connection;
-			}
-		}
-		return null;
-	}
-
-	/**
 	 * Creates and initiates {@link Connection} to the remote host.
 	 *
 	 * @param address

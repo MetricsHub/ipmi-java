@@ -182,6 +182,16 @@ reply) are ignored.
   `parseInt()`, and so the SEL entries and the sensor states, reported as `Unknown` in 1.x;
   `Sensor.states()` and `SelEntry.description()` say `Installation started`, `Installation
   completed`, `Installation aborted` and `Installation failed`, as `ipmitool` does.
+* The unused leftovers of the protocol core are removed: the `UdpNotifier` and `SessionUpkeep`
+  classes (the keep-alive is a Get Device ID sent by the connection),
+  `StateMachine.isSessionChallenging()`, `ConnectionManager.getConnection(InetAddress, int)`,
+  `UdpMessenger.getBufferSize()` and `setBufferSize(int)` (which the receiver ignored), the
+  `MessageQueue` methods `removeAt(int)`, `containsId(int)` (use `getElement(tag) != null`),
+  `getMessageFromQueue(int)`, `getMessageIndexFromQueue(int)`, `getMessageRetries(int)` and
+  `getMessageSequenceNumber(int)`, and the `QueueElement(int, PayloadCoder)` constructor, `setId()`,
+  `getRetries()`, `setRetries()`, `getResponse()` and `setResponse()`. `UdpMessenger` receives
+  datagrams of any size, where 1.x truncated them at 512 bytes, and sends without pausing 1 ms
+  after each datagram.
 
 ## Upgrading from 1.2.02
 

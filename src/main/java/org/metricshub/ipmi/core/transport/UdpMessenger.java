@@ -45,12 +45,9 @@ public class UdpMessenger extends Thread implements Messenger {
 	private volatile boolean closing = false;
 
 	/**
-	 * Size of the message data buffer. Default
-	 * {@link UdpMessenger#DEFAULTBUFFERSIZE}.
+	 * The largest UDP payload: a datagram is never truncated, whatever the command and the BMC.
 	 */
-	private volatile int bufferSize;
-
-	private static final int DEFAULTBUFFERSIZE = 512;
+	private static final int MAX_DATAGRAM_SIZE = 65535;
 
 	public int getPort() {
 		return port;
@@ -86,33 +83,20 @@ public class UdpMessenger extends Thread implements Messenger {
 	public UdpMessenger(int port, InetAddress address) throws SocketException {
 		this.port = port;
 		listeners = new ArrayList<UdpListener>();
-		bufferSize = DEFAULTBUFFERSIZE;
 		socket = new DatagramSocket(this.port, address);
 		socket.setSoTimeout(0);
 		setDaemon(true);
 		this.start();
 	}
 
-	/**
-	 * Sets message data buffer size to bufferSize.
-	 */
-	public void setBufferSize(int bufferSize) {
-		this.bufferSize = bufferSize;
-	}
-
-	/**
-	 * @return Size of the message data buffer
-	 */
-	public int getBufferSize() {
-		return bufferSize;
-	}
-
 	@Override
 	public void run() {
 		boolean run = true;
+		// Reused: each datagram is copied out before the listeners see it
+		byte[] receiveBuffer = new byte[MAX_DATAGRAM_SIZE];
 
 		while (run) {
-			DatagramPacket response = new DatagramPacket(new byte[512], 512);
+			DatagramPacket response = new DatagramPacket(receiveBuffer, receiveBuffer.length);
 
 			try {
 				socket.receive(response);
@@ -204,10 +188,5 @@ public class UdpMessenger extends Thread implements Messenger {
 				message.getAddress(),
 				message.getPort());
 		socket.send(packet);
-		try {
-			sleep(1);
-		} catch (InterruptedException e) {
-			currentThread().interrupt();
-		}
 	}
 }

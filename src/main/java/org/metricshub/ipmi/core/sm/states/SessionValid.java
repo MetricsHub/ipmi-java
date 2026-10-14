@@ -25,9 +25,7 @@ package org.metricshub.ipmi.core.sm.states;
 import org.metricshub.ipmi.core.coding.Encoder;
 import org.metricshub.ipmi.core.coding.PayloadCoder;
 import org.metricshub.ipmi.core.coding.commands.IpmiVersion;
-import org.metricshub.ipmi.core.coding.commands.PrivilegeLevel;
 import org.metricshub.ipmi.core.coding.commands.session.CloseSession;
-import org.metricshub.ipmi.core.coding.commands.session.GetChannelAuthenticationCapabilities;
 import org.metricshub.ipmi.core.coding.protocol.AuthenticationType;
 import org.metricshub.ipmi.core.coding.protocol.Ipmiv20Message;
 import org.metricshub.ipmi.core.coding.protocol.PayloadType;
@@ -36,12 +34,10 @@ import org.metricshub.ipmi.core.coding.protocol.decoder.Protocolv20Decoder;
 import org.metricshub.ipmi.core.coding.protocol.encoder.Protocolv20Encoder;
 import org.metricshub.ipmi.core.coding.rmcp.RmcpMessage;
 import org.metricshub.ipmi.core.coding.security.CipherSuite;
-import org.metricshub.ipmi.core.common.TypeConverter;
 import org.metricshub.ipmi.core.sm.StateMachine;
 import org.metricshub.ipmi.core.sm.actions.ErrorAction;
 import org.metricshub.ipmi.core.sm.actions.MessageAction;
 import org.metricshub.ipmi.core.sm.events.Sendv20Message;
-import org.metricshub.ipmi.core.sm.events.SessionUpkeep;
 import org.metricshub.ipmi.core.sm.events.StateMachineEvent;
 import org.metricshub.ipmi.core.sm.events.Timeout;
 
@@ -51,8 +47,6 @@ import org.metricshub.ipmi.core.sm.events.Timeout;
  * <ul>
  * <li>Sends an IPMI v2.0 message on
  * {@link Sendv20Message}
- * <li>Sends {@link GetChannelAuthenticationCapabilities}
- * message to keep the session form timing out on {@link SessionUpkeep}</li>
  * <li>Transits to {@link Authcap} on {@link Timeout}
  * <li>Sends {@link CloseSession}
  * and transits to {@link Authcap} on {@link org.metricshub.ipmi.core.coding.commands.session.CloseSession}</li>
@@ -87,26 +81,6 @@ public class SessionValid extends State {
 			Sendv20Message event = (Sendv20Message) machineEvent;
 			try {
 				stateMachine.sendMessage(encode(event));
-			} catch (Exception e) {
-				stateMachine.doExternalAction(new ErrorAction(e));
-			}
-		} else if (machineEvent instanceof SessionUpkeep) {
-			SessionUpkeep event = (SessionUpkeep) machineEvent;
-			try {
-				stateMachine
-						.sendMessage(
-								Encoder
-										.encode(
-												new Protocolv20Encoder(),
-												new GetChannelAuthenticationCapabilities(
-														IpmiVersion.V20,
-														IpmiVersion.V20,
-														cipherSuite,
-														PrivilegeLevel.Callback,
-														TypeConverter.intToByte(0xe)),
-												event.getMessageSequenceNumber(),
-												event.getSessionSequenceNumber(),
-												event.getSessionId()));
 			} catch (Exception e) {
 				stateMachine.doExternalAction(new ErrorAction(e));
 			}
