@@ -25,3 +25,27 @@ jobs:
       autoRelease: false
       jdkVersion: "17"
     secrets: inherit
+
+  # The shared release workflow uploads the versioned jars only. The version-less alias gives the installers of the
+  # documentation site (src/site/resources/get and get.ps1) a stable download URL
+  # (releases/latest/download/ipmi-java-standalone.jar), and the .sha256 files let them verify the download.
+  standalone-assets:
+    name: Upload the standalone jar alias and checksums
+    needs: release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Upload ipmi-java-standalone.jar and the SHA-256 checksums to v${{ inputs.releaseVersion }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_VERSION: ${{ inputs.releaseVersion }}
+        run: |
+          jar="ipmi-java-${RELEASE_VERSION}-standalone.jar"
+          gh release download "v${RELEASE_VERSION}" --pattern "${jar}"
+          cp "${jar}" ipmi-java-standalone.jar
+          sha256sum "${jar}" > "${jar}.sha256"
+          sha256sum ipmi-java-standalone.jar > ipmi-java-standalone.jar.sha256
+          gh release upload "v${RELEASE_VERSION}" --clobber \
+            ipmi-java-standalone.jar "${jar}.sha256" ipmi-java-standalone.jar.sha256

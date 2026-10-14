@@ -33,29 +33,36 @@ A client owns one RMCP+ session, opened by the first operation and closed by `cl
 
 ## Command-line client
 
-Every build also produces a self-contained executable jar with a command-line client, `ipmicli`, that exposes the same operations ([download the latest](https://github.com/metricshub/ipmi-java/releases/latest), Java 8 or later, no other file needed):
+The library comes with a command-line client, `ipmicli`, that exposes the same operations. Install it with one command (Java 8 or later required):
 
-```text
-target/ipmi-java-<version>.jar
-target/ipmi-java-<version>-standalone.jar
+```shell
+curl -fsSL https://metricshub.org/ipmi-java/get | sh
 ```
+
+On Windows (PowerShell):
+
+```powershell
+irm https://metricshub.org/ipmi-java/get.ps1 | iex
+```
+
+See the [installation page](https://metricshub.org/ipmi-java/installation.html#command-line-client) for details. The client is a self-contained executable jar (`target/ipmi-java-<version>-standalone.jar`, also on the [releases page](https://github.com/metricshub/ipmi-java/releases/latest)), which `java -jar` runs as well.
 
 What the BMC offers, before any login:
 
 ```bash
-java -jar ipmi-java-<version>-standalone.jar -h bmc.example.com probe
+ipmicli -h bmc.example.com probe
 ```
 
 The sensors, with the password read from a file:
 
 ```bash
-java -jar ipmi-java-<version>-standalone.jar -h bmc.example.com -u monitor -pf password.txt sensors
+ipmicli -h bmc.example.com -u monitor -pf password.txt sensors
 ```
 
 The FRU inventory as JSON Lines:
 
 ```bash
-java -jar ipmi-java-<version>-standalone.jar -h bmc.example.com -u monitor -pf password.txt fru --json
+ipmicli -h bmc.example.com -u monitor -pf password.txt fru --json
 ```
 
 Subcommands: `probe`, `info` (the identity of the BMC), `chassis`, `power status|on|off|cycle|reset|soft|diag`, `identify`, `sensors`, `fru`, `sel` (the System Event Log, `--since <id>` for the new entries), `sol` (an interactive Serial over LAN console) and `raw` (any request, like `ipmitool raw`: `raw 0x2c 0x01 0xdc 0x01`). Diagnostics go to stderr, the exit code says what failed (77 authentication, 69 unreachable, 124 timeout...). See the [Command-Line Client](https://metricshub.org/ipmi-java/cli.html) page for the options, the output formats and the `ipmitool` equivalents.
@@ -108,6 +115,8 @@ It is strongly recommended to only use [GitHub Actions "Release to Maven Central
 
 * Manually trigger the "Release to Maven Central" workflow
 * Specify the version being released and the next version number (SNAPSHOT)
+* The workflow creates the GitHub release, then adds the `ipmi-java-standalone.jar` alias and the `.sha256` checksums
+  that the `ipmicli` installers download (if that last job fails, re-run it: the installers fail until it succeeds)
 * Publish the pending deployment on the [Central Portal](https://central.sonatype.com/publishing/deployments)
   (the workflow uploads and validates it, but does not publish it automatically)
 * Merge the PR that has been created to prepare the next version

@@ -1,0 +1,179 @@
+#!/bin/sh
+# ipmicli installer for Linux and macOS — https://metricshub.org/ipmi-java
+#
+# Copyright 2023 MetricsHub
+# Distributed under the GNU Lesser General Public License, version 3 or
+# later (LGPL-3.0-or-later); see <http://www.gnu.org/licenses/lgpl-3.0.html>.
+#
+# Usage:
+#   curl -fsSL https://metricshub.org/ipmi-java/get | sh
+#
+# Environment variables:
+#   IPMICLI_VERSION      Pin a specific release (e.g. "2.0.00"); default: latest.
+#   IPMICLI_INSTALL_DIR  Directory for the ipmicli launcher; default: ~/.local/bin.
+#
+# The installer downloads the standalone jar of the requested IPMI Java Client
+# release from GitHub, verifies its SHA-256 checksum, and writes a small
+# `ipmicli` launcher script that locates a JRE (Java 8 or later) at run time.
+# The jar goes to $XDG_DATA_HOME/ipmicli (default: ~/.local/share/ipmicli).
+
+set -eu
+
+RELEASES_URL="https://github.com/metricshub/ipmi-java/releases"
+VERSION="${IPMICLI_VERSION:-latest}"
+BIN_DIR="${IPMICLI_INSTALL_DIR:-${HOME}/.local/bin}"
+DATA_DIR="${XDG_DATA_HOME:-${HOME}/.local/share}/ipmicli"
+
+info() { printf '%s\n' "$*"; }
+fail() { printf 'ERROR: %s\n' "$*" >&2; exit 1; }
+
+if command -v curl >/dev/null 2>&1; then
+	fetch() { curl -fsSL -o "$2" "$1"; }
+elif command -v wget >/dev/null 2>&1; then
+	fetch() { wget -qO "$2" "$1"; }
+else
+	fail "Neither curl nor wget is available; install one of them and re-run."
+fi
+
+# --- Resolve the download URL -----------------------------------------------
+
+# Releases publish a version-less "ipmi-java-standalone.jar" alias, which
+# makes "latest" resolvable without any API call.
+if [ "${VERSION}" = "latest" ]; then
+	JAR_URL="${RELEASES_URL}/latest/download/ipmi-java-standalone.jar"
+else
+	JAR_URL="${RELEASES_URL}/download/v${VERSION}/ipmi-java-${VERSION}-standalone.jar"
+fi
+
+# --- Download the jar and verify its checksum --------------------------------
+
+# Everything is downloaded and verified in a temporary directory first, so a
+# failure leaves an existing installation untouched.
+TMP_DIR="$(mktemp -d)"
+trap 'rm -rf "${TMP_DIR}"' EXIT
+TMP_JAR="${TMP_DIR}/ipmi-java-standalone.jar"
+
+info "Downloading ${JAR_URL} ..."
+fetch "${JAR_URL}" "${TMP_JAR}" \
+	|| fail "Download failed: check that you are online and that the release exists (the command-line client ships with 2.0.00 and later)."
+fetch "${JAR_URL}.sha256" "${TMP_JAR}.sha256" \
+	|| fail "Could not download ${JAR_URL}.sha256 to verify the jar."
+
+EXPECTED_SUM="$(awk '{ print tolower($1); exit }' "${TMP_JAR}.sha256")"
+if command -v sha256sum >/dev/null 2>&1; then
+	ACTUAL_SUM="$(sha256sum "${TMP_JAR}" | awk '{ print tolower($1) }')"
+elif command -v shasum >/dev/null 2>&1; then
+	ACTUAL_SUM="$(shasum -a 256 "${TMP_JAR}" | awk '{ print tolower($1) }')"
+else
+	fail "Neither sha256sum nor shasum is available to verify the jar; install one of them and re-run."
+fi
+[ "${ACTUAL_SUM}" = "${EXPECTED_SUM}" ] \
+	|| fail "Checksum mismatch: expected ${EXPECTED_SUM}, got ${ACTUAL_SUM}. Aborting."
+info "Checksum verified."
+
+# --- Install the jar and the launcher ----------------------------------------
+
+mkdir -p "${DATA_DIR}" "${BIN_DIR}"
+
+# Resolve the directories to absolute paths: the launcher must find the jar
+# from any working directory, even when the overrides were given relative.
+DATA_DIR="$(cd "${DATA_DIR}" && pwd)"
+BIN_DIR="$(cd "${BIN_DIR}" && pwd)"
+JAR_PATH="${DATA_DIR}/ipmi-java-standalone.jar"
+LAUNCHER_PATH="${BIN_DIR}/ipmicli"
+
+mv "${TMP_JAR}" "${JAR_PATH}"
+
+# Serializes a value as a single-quoted shell literal, so paths containing
+# $, backticks, or double quotes stay inert in generated or printed shell code.
+shell_quote() { printf "'%s'" "$(printf '%s' "$1" | sed "s/'/'\\\\''/g")"; }
+
+JAR_PATH_SQ="$(shell_quote "${JAR_PATH}")"
+
+cat > "${LAUNCHER_PATH}" <<LAUNCHER
+#!/bin/sh
+# ipmicli launcher — https://metricshub.org/ipmi-java
+# Locates a JRE (Java 8 or later) and runs the IPMI Java Client standalone jar.
+# Set IPMICLI_JAVA_HOME to force a specific Java installation.
+
+IPMICLI_JAR=${JAR_PATH_SQ}
+
+# Pass the launcher's own invocation name so the CLI's help names the
+# command the user actually typed instead of "java -jar ...".
+IPMICLI_PROGRAM_NAME="\${0##*/}"
+export IPMICLI_PROGRAM_NAME
+
+if [ ! -f "\${IPMICLI_JAR}" ]; then
+	echo "ERROR: \${IPMICLI_JAR} not found; re-run the installer:" >&2
+	echo "  curl -fsSL https://metricshub.org/ipmi-java/get | sh" >&2
+	exit 127
+fi
+
+# A candidate qualifies if it is executable and reports version 8 or later
+# ("1.8.x" in the legacy version scheme).
+java_ok() {
+	[ -x "\$1" ] || return 1
+	_v="\$("\$1" -version 2>&1 | awk -F '"' '/ version /{ print \$2; exit }')"
+	case "\${_v}" in
+		1.[89]*) return 0 ;;
+		1.*) return 1 ;;
+		[0-9]*) [ "\${_v%%.*}" -ge 8 ] 2>/dev/null ;;
+		*) return 1 ;;
+	esac
+}
+
+JAVA=""
+for _candidate in \\
+	"\${IPMICLI_JAVA_HOME:+\${IPMICLI_JAVA_HOME}/bin/java}" \\
+	"\${JAVA_HOME:+\${JAVA_HOME}/bin/java}" \\
+	"\$(command -v java 2>/dev/null)"; do
+	if [ -n "\${_candidate}" ] && java_ok "\${_candidate}"; then
+		JAVA="\${_candidate}"
+		break
+	fi
+done
+
+# macOS: ask the system locator for the best JDK.
+if [ -z "\${JAVA}" ] && [ -x /usr/libexec/java_home ]; then
+	_home="\$(/usr/libexec/java_home 2>/dev/null)" \\
+		&& java_ok "\${_home}/bin/java" && JAVA="\${_home}/bin/java"
+fi
+
+# Well-known installation roots (Linux distributions, sdkman).
+if [ -z "\${JAVA}" ]; then
+	for _home in "\${HOME}/.sdkman/candidates/java/current" /usr/lib/jvm/*; do
+		if java_ok "\${_home}/bin/java"; then
+			JAVA="\${_home}/bin/java"
+			break
+		fi
+	done
+fi
+
+if [ -z "\${JAVA}" ]; then
+	echo "ERROR: no suitable Java Runtime Environment found (ipmicli requires Java 8 or later)." >&2
+	echo "Install one from https://adoptium.net and re-run, or set IPMICLI_JAVA_HOME." >&2
+	exit 127
+fi
+
+exec "\${JAVA}" -jar "\${IPMICLI_JAR}" "\$@"
+LAUNCHER
+chmod +x "${LAUNCHER_PATH}"
+
+info "Installed the IPMI Java Client jar to ${JAR_PATH}"
+info "Installed the ipmicli launcher to ${LAUNCHER_PATH}"
+
+# --- PATH check ----------------------------------------------------------------
+
+case ":${PATH}:" in
+	*":${BIN_DIR}:"*)
+		info "Run 'ipmicli --help' to get started."
+		;;
+	*)
+		info ""
+		info "NOTE: ${BIN_DIR} is not on your PATH. Add it with:"
+		info ""
+		info "  export PATH=$(shell_quote "${BIN_DIR}"):\"\${PATH}\""
+		info ""
+		info "and append that line to your shell profile (e.g. ~/.bashrc or ~/.zshrc)."
+		;;
+esac

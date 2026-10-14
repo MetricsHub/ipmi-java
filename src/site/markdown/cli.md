@@ -6,19 +6,31 @@ description: Manual of the ipmicli command-line client of the IPMI Java Client -
 <!-- MACRO{toc|fromDepth=2|toDepth=3|id=toc} -->
 
 Every release ships a self-contained executable jar that bundles the library and a command-line
-client: download `${project.artifactId}-${project.version}-standalone.jar` from the
-[latest release](https://github.com/metricshub/ipmi-java/releases/latest) and run it with Java 8
-or later. This page is its manual.
+client, **`ipmicli`**. This page is its manual. Install it with one command (Java 8 or later is
+required):
+
+> [!TABS]
+> * Linux / macOS
+>   ```shell-session
+>   $ curl -fsSL https://metricshub.org/ipmi-java/get | sh
+>   ```
+> * Windows (PowerShell)
+>   ```powershell
+>   irm https://metricshub.org/ipmi-java/get.ps1 | iex
+>   ```
+
+The installer verifies the checksum of the jar and puts an `ipmicli` launcher on the `PATH`; see
+[Installation](installation.html#command-line-client) to inspect the script first, pin a version
+or change the directories.
 
 ```text
-java -jar ${project.artifactId}-${project.version}-standalone.jar [options] <subcommand> [subcommand options]
+ipmicli [options] <subcommand> [subcommand options]
 ```
 
-The command is called **`ipmicli`** in this page and in its own usage. Give it that name with a
-shell alias (`alias ipmicli='java -jar /path/to/${project.artifactId}-${project.version}-standalone.jar'`,
-or a `doskey ipmicli=java -jar ... $*` macro on Windows) until the one-command installer
-([#163](https://github.com/metricshub/ipmi-java/issues/163)) puts a launcher on the `PATH`. The
-jar needs no other file: the library has no dependency.
+Without the installer, download `${project.artifactId}-${project.version}-standalone.jar` from the
+[latest release](https://github.com/metricshub/ipmi-java/releases/latest) and run it with
+`java -jar ${project.artifactId}-${project.version}-standalone.jar` wherever this page says
+`ipmicli`. The jar needs no other file: the library has no dependency.
 
 The CLI is a thin layer over the [`IpmiClient`](index.html#quick-start) API: every subcommand is
 one operation of the client, with the same defaults, the same
@@ -481,6 +493,7 @@ The sysexits values of the MetricsHub command-line clients:
 | `74` | Local I/O failure (stdout closed). |
 | `77` | Authentication or authorization failure: unknown user, wrong password or BMC key, privilege level refused at login, insufficient privilege (`D4h`, with the `-L` hint). |
 | `124` | Timeout: the deadline of the subcommand expired, or a message of the session got no reply after all the tries. |
+| `127` | The launcher of the [installer](installation.html#command-line-client) found no Java 8 or later (install one from [Adoptium](https://adoptium.net), or set `IPMICLI_JAVA_HOME`), or no jar (run the installer again). |
 
 The mapping follows the [exceptions](timeouts-and-errors.html#exceptions) of the client:
 `IpmiConnectionException` 69, `IpmiAuthenticationException` 77, `IpmiTimeoutException` 124,

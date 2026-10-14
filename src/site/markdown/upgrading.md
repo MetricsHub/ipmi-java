@@ -10,7 +10,8 @@ description: What changes when upgrading the IPMI Java Client — from 1.x to 2.
 Version 2.0.00 replaces the client API of 1.x with a fluent client, removes the SLF4J
 dependency, and simplifies the low-level commands. The protocol core and the decoders are the
 same. It also adds a command-line client, `ipmicli`, in a standalone jar
-([Command-Line Client](cli.html)); `CipherSuite` gains `getAuthenticationAlgorithmCode()`,
+([Command-Line Client](cli.html)), with one-command installers for Linux, macOS and Windows
+([Installation](installation.html#command-line-client)); `CipherSuite` gains `getAuthenticationAlgorithmCode()`,
 `getIntegrityAlgorithmCode()` and `getConfidentialityAlgorithmCode()` for it. The semicolon-separated text output of 1.x (`IpmiResultConverter`) is MetricsHub's format,
 and moves to the [MetricsHub IPMI extension](https://github.com/MetricsHub/metricshub-community/issues/1391),
 where it stays byte-identical to 1.2.x for the same BMC data, except for the sensor and FRU names
