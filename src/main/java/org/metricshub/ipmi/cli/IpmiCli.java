@@ -64,6 +64,7 @@ import org.metricshub.ipmi.client.IpmiCompletionCodeException;
 import org.metricshub.ipmi.client.IpmiConnectionException;
 import org.metricshub.ipmi.client.IpmiTimeoutException;
 import org.metricshub.ipmi.client.PowerEvent;
+import org.metricshub.ipmi.client.RawResponse;
 import org.metricshub.ipmi.client.SelEntry;
 import org.metricshub.ipmi.client.SelEntryList;
 import org.metricshub.ipmi.client.SelRequest;
@@ -72,12 +73,14 @@ import org.metricshub.ipmi.client.SensorList;
 import org.metricshub.ipmi.client.SensorsRequest;
 import org.metricshub.ipmi.client.SkippedRecord;
 import org.metricshub.ipmi.client.SolConsole;
+import org.metricshub.ipmi.core.coding.commands.PrivilegeLevel;
 import org.metricshub.ipmi.core.coding.commands.sdr.record.SensorType;
 import org.metricshub.ipmi.core.coding.commands.sdr.record.SensorUnit;
 import org.metricshub.ipmi.core.coding.commands.fru.record.BoardInfo;
 import org.metricshub.ipmi.core.coding.commands.fru.record.ChassisInfo;
 import org.metricshub.ipmi.core.coding.commands.fru.record.ProductInfo;
 import org.metricshub.ipmi.core.coding.payload.CompletionCode;
+import org.metricshub.ipmi.core.coding.payload.lan.IPMIException;
 import org.metricshub.ipmi.core.coding.security.CipherSuite;
 import org.metricshub.ipmi.core.coding.security.SecurityConstants;
 
@@ -106,6 +109,7 @@ public final class IpmiCli {
 	private static final long NANOS_PER_MILLI = 1_000_000L;
 	private static final long KEY_READER_START_MS = 500L;
 	private static final int DECIMALS = 3;
+	private static final int RAW_BYTES_PER_LINE = 16;
 
 	private IpmiCli() {}
 
@@ -168,6 +172,8 @@ public final class IpmiCli {
 			try (IpmiClient open = client) {
 				int code = execute(arguments, open, out, err, stdin, terminal);
 				return out.checkError() ? outputFailed(err) : code;
+			} catch (IpmiCompletionCodeException e) {
+				return completionCodeFailure(e, err, arguments.privilege());
 			}
 		} catch (CliUsageException e) {
 			diagnostic(err, e.getMessage());
@@ -176,8 +182,6 @@ public final class IpmiCli {
 		} catch (IpmiAuthenticationException e) {
 			diagnostic(err, e.getMessage());
 			return EXIT_AUTHENTICATION;
-		} catch (IpmiCompletionCodeException e) {
-			return completionCodeFailure(e, err);
 		} catch (IpmiConnectionException e) {
 			diagnostic(err, e.getMessage());
 			return EXIT_CONNECTION;
@@ -194,15 +198,21 @@ public final class IpmiCli {
 		}
 	}
 
-	private static int completionCodeFailure(IpmiCompletionCodeException e, PrintStream err) {
+	/**
+	 * Reports an error completion code: exit code 77 for {@code D4h}, with the {@code -L} to use above the privilege of
+	 * the session, or none at the Administrator level, where the BMC restricts the command; 70 for the others.
+	 */
+	private static int completionCodeFailure(IpmiCompletionCodeException e, PrintStream err, PrivilegeLevel privilege) {
 		String message = e.getMessage();
 		if (e.completionCode() == CompletionCode.InsufficentPrivilege) {
 			// The message of the library ends with a hint for Java callers: replace it with the CLI's
 			int hint = message.indexOf(". The command requires");
 			diagnostic(
 					err,
-					(hint > 0 ? message.substring(0, hint) : message)
-							+ ": the session has not the privilege the command needs, use -L operator or -L administrator");
+					(hint > 0 ? message.substring(0, hint) : message) + (privilege == PrivilegeLevel.Administrator ?
+							": the BMC refuses the command even at the Administrator level (it restricts or disables it)" :
+							": the session has not the privilege the command needs, use "
+									+ (privilege == PrivilegeLevel.Operator ? "" : "-L operator or ") + "-L administrator"));
 			return EXIT_AUTHENTICATION;
 		}
 		diagnostic(err, message);
@@ -290,6 +300,8 @@ public final class IpmiCli {
 			return sel(arguments, client, out, err);
 		case SOL:
 			return sol(arguments, client, out, err, stdin, terminal);
+		case RAW:
+			return raw(arguments, client, out, err);
 		default:
 			throw new IllegalStateException("Unexpected subcommand " + arguments.subcommand());
 		}
@@ -428,6 +440,39 @@ public final class IpmiCli {
 		if (auxiliary.length > 0) {
 			line(out, "", LABEL_WIDTH, "Aux firmware revision", hex(auxiliary));
 		}
+	}
+
+	private static int raw(CliArguments arguments, IpmiClient client, PrintStream out, PrintStream err) {
+		RawResponse response = timed(
+				arguments,
+				err,
+				"raw",
+				() -> client.raw(arguments.rawNetworkFunction(), arguments.rawCommand()).data(arguments.rawData()).execute());
+		byte[] data = response.data();
+		if (arguments.json()) {
+			Map<String, Object> fields = new LinkedHashMap<String, Object>();
+			fields.put("completionCode", response.rawCompletionCode());
+			put(fields, "data", hex(data));
+			JsonLinesWriter.write(fields, out);
+		} else {
+			for (int start = 0; start < data.length; start += RAW_BYTES_PER_LINE) {
+				StringBuilder line = new StringBuilder();
+				for (int i = start; i < Math.min(start + RAW_BYTES_PER_LINE, data.length); i++) {
+					line.append(i == start ? "" : " ").append(String.format("%02x", data[i]));
+				}
+				out.println(line);
+			}
+		}
+		if (response.rawCompletionCode() == 0) {
+			return 0;
+		}
+		// An error completion code is part of the reply of raw(), not an exception: it exits like one
+		return completionCodeFailure(
+				new IpmiCompletionCodeException(
+						String.format("raw %02Xh %02Xh", arguments.rawNetworkFunction(), arguments.rawCommand()),
+						new IPMIException(response.completionCode(), response.rawCompletionCode())),
+				err,
+				arguments.privilege());
 	}
 
 	private static void chassis(CliArguments arguments, ChassisStatus status, PrintStream out) {
@@ -1226,6 +1271,7 @@ public final class IpmiCli {
 				+ "  " + program + " -h <host> -u <user> [options] fru [<id>...] [--json]\n" + "  " + program
 				+ " -h <host> -u <user> [options] sel [--since <id>] [--json]\n" + "  " + program
 				+ " -h <host> -u <user> [options] sol [--escape <char> | --no-escape]\n" + "  " + program
+				+ " -h <host> -u <user> [options] raw <netfn> <command> [<data byte>...] [--json]\n" + "  " + program
 				+ " --help | --version\n" + "\n" + "Connection options (before the subcommand):\n"
 				+ "  -h, --hostname <host>         BMC host name or IP address (required)\n"
 				+ "  -u, --username <user>         User name (required, except for probe); \"\" is the null user\n"
@@ -1244,7 +1290,7 @@ public final class IpmiCli {
 				+ "      --help                    Show this help\n"
 				+ "      --version                 Show the project version\n" + "\n"
 				+ "Subcommand options (after the subcommand, in any order with its arguments):\n"
-				+ "      --json                    probe, info, chassis, sensors, fru, sel: print JSON Lines instead of text\n"
+				+ "      --json                    probe, info, chassis, sensors, fru, sel, raw: print JSON Lines instead of text\n"
 				+ "      --type <type>,...         sensors: only these sensor types (Temperature, Fan, Voltage, ...)\n"
 				+ "      --name <glob>,...         sensors: only the sensors whose name matches (* and ?, case-insensitive)\n"
 				+ "      --long                    sensors: add the number, the entity, the thresholds and the problem\n"
@@ -1254,7 +1300,8 @@ public final class IpmiCli {
 				+ "                                (in the console, ~. at the start of a line closes it, ~? lists the sequences)\n"
 				+ "\n"
 				+ "Default privilege: user for info, chassis, power status, sensors, fru and sel; operator for the other\n"
-				+ "power actions and identify; administrator for sol.\n"
+				+ "power actions and identify; administrator for sol and raw.\n"
+				+ "raw takes bytes in hexadecimal, 0x optional: raw 0x06 0x01 is Get Device ID.\n"
 				+ "If neither password option is given, the password is requested from the interactive console.\n" + "\n"
 				+ "Full manual - output formats, the SOL console, exit codes, ipmitool equivalents:\n"
 				+ "  https://metricshub.org/ipmi-java/cli.html\n";

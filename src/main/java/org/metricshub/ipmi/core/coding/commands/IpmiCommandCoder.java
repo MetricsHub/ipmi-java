@@ -145,10 +145,25 @@ public abstract class IpmiCommandCoder<R extends ResponseData> extends PayloadCo
 	 * Retrieves network function specific for command represented by this
 	 * class.
 	 *
-	 * @return network function
+	 * @return network function, or null for a command of a network function {@link NetworkFunction} does not list,
+	 *         which overrides {@link #getNetworkFunctionCode()} instead
 	 * @see NetworkFunction
 	 */
 	public abstract NetworkFunction getNetworkFunction();
+
+	/**
+	 * Returns the network function code of the request (6 bits, IPMI 2.0 table 5-1): the code of
+	 * {@link #getNetworkFunction()} by default. A command of a network function {@link NetworkFunction} does not list
+	 * (Transport 0Ch, Group Extension 2Ch such as DCMI, OEM/Group 2Eh, controller-specific OEM 30h-3Eh) overrides it
+	 * and builds its request with
+	 * {@link org.metricshub.ipmi.core.coding.payload.lan.IpmiLanRequest#IpmiLanRequest(int, byte, byte[], byte)}: its
+	 * reply is the one under this code plus one.
+	 *
+	 * @return the network function code of the request, 00h to 3Fh
+	 */
+	public int getNetworkFunctionCode() {
+		return getNetworkFunction().getCode();
+	}
 
 	/**
 	 * Used in several derived classes - converts {@link PrivilegeLevel} to

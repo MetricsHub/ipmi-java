@@ -51,6 +51,7 @@ BMC replies with a *transient* completion code are retried too: the request is s
 a random pause of up to 4 seconds when the BMC says it is busy (node busy, out of resources,
 initialization in progress), and at once after a timeout on the BMC side (`C3h`), where the BMC
 already waited for the device it could not reach. Any other error completion code fails at once.
+`raw()` retries none of them: it returns every completion code as the BMC sent it.
 
 With the defaults, a lost reply costs 5 seconds, then the request is sent again; a BMC that never
 answers fails the handshake after 4 tries, about 20 seconds into the first operation. A
@@ -72,8 +73,8 @@ The client keeps its session open between operations with its
 [keep-alive](configuration.html#keep-alive) messages. When the session is lost all the same (the
 BMC rebooted, expired it, or another client deleted it), the next operation opens a new one. A
 **read** operation (`chassisStatus()`, `sensors()`, `frus()`, `sel()`) that fails because the session was
-lost while it ran is retried **once** on a new session; `send()` and the control operations are
-never replayed, as a chassis control sent twice is not the same as sent once.
+lost while it ran is retried **once** on a new session; `send()`, `raw()` and the control
+operations are never replayed, as a chassis control sent twice is not the same as sent once.
 
 A session is considered lost when a message of the session got no reply after all its tries, when
 the connection was closed, or when the deadline of an operation expired.

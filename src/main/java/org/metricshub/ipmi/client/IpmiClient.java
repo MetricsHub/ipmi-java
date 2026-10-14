@@ -117,7 +117,7 @@ import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
  * <p>
  * <b>Session recovery</b>: when the session is lost (the BMC rebooted or expired it), the next operation opens a new
  * one. A read operation that fails because the session was lost while it ran is retried once on a new session;
- * {@link #send(IpmiCommandCoder)} and the control operations are never replayed.
+ * {@link #send(IpmiCommandCoder)}, {@link #raw(int, int)} and the control operations are never replayed.
  * </p>
  * <p>
  * <b>Threads</b>: a client can be shared between threads; its operations are serialized. A BMC drops replies under
@@ -373,8 +373,33 @@ public final class IpmiClient implements AutoCloseable {
 	 * @throws IpmiClientException when the session cannot be opened or the BMC does not answer
 	 */
 	public <R extends ResponseData> R send(IpmiCommandCoder<R> command) {
+		return send(command, null);
+	}
+
+	/** Sends a command under the given deadline (the client's when null), never replayed on a new session. */
+	<R extends ResponseData> R send(IpmiCommandCoder<R> command, Duration deadline) {
 		Objects.requireNonNull(command, "command");
-		return run(command.getClass().getSimpleName(), timeout, true, false, () -> link.send(command));
+		return run(command.getClass().getSimpleName(), deadline, true, false, () -> link.send(command));
+	}
+
+	/**
+	 * Sends any request in the session, like {@code ipmitool raw}, and returns its reply whatever its completion code:
+	 * {@code bmc.raw(0x2C, 0x01).data(0xDC, 0x01).execute()} is Get DCMI Capabilities Info. Any request network
+	 * function is accepted, the extension and OEM ones included (Group Extension 2Ch, whose first data byte is the
+	 * defining body, DCh for DCMI; OEM/Group 2Eh, whose first three are an IANA enterprise number; controller-specific
+	 * OEM 30h-3Eh). An error completion code is returned, not thrown, and not retried, a busy one ({@code C0h}) or
+	 * {@code C3h} included. Like {@link #send(IpmiCommandCoder)}, the request is sent again when its reply is lost
+	 * (the retries of the builder) and never replayed on a new session: a control request sent raw has none of the
+	 * safeguards of {@link #chassisControl(PowerCommand)}.
+	 *
+	 * @param networkFunction the network function of the request: an even number from 00h to 3Eh (the odd ones are
+	 *        those of the responses, IPMI 2.0 section 5.1)
+	 * @param command the command code, 00h to FFh
+	 * @return the request to complete
+	 * @throws IllegalArgumentException when the network function or the command is out of range
+	 */
+	public RawRequest raw(int networkFunction, int command) {
+		return new RawRequest(this, networkFunction, command);
 	}
 
 	/**

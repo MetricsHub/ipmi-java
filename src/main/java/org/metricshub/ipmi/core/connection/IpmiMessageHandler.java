@@ -47,18 +47,13 @@ public class IpmiMessageHandler extends MessageHandler {
 
 	/**
 	 * Tells whether the reply answers the request: the same command code, under the response network function of
-	 * the request (the request one plus one, IPMI 2.0 section 5.1). A reply whose network function the library does
-	 * not know answers nothing.
+	 * the request (the request one plus one, IPMI 2.0 section 5.1). The codes are compared as numbers, so that the
+	 * reply to a request of a network function {@code NetworkFunction} does not list (Transport 0Ch, Group Extension
+	 * 2Ch, OEM 30h-3Eh) is matched like any other.
 	 */
-	private static boolean answers(IpmiCommandCoder request, IpmiLanMessage reply) {
-		if (request.getCommandCode() != reply.getCommand()) {
-			return false;
-		}
-		try {
-			return request.getNetworkFunction().getCode() + 1 == reply.getNetworkFunction().getCode();
-		} catch (IllegalArgumentException e) {
-			return false;
-		}
+	private static boolean answers(IpmiCommandCoder<?> request, IpmiLanMessage reply) {
+		return request.getCommandCode() == reply.getCommand()
+				&& request.getNetworkFunctionCode() + 1 == reply.getNetworkFunctionCode();
 	}
 
 	/**

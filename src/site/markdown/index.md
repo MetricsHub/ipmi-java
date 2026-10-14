@@ -25,7 +25,8 @@ boards) over **IPMI 2.0 over LAN (RMCP+)**, on UDP port 623. It lets a Java appl
   ([System Event Log](system-event-log.html)),
 * open a **Serial over LAN** console on the server's serial port ([Serial over LAN](serial-over-lan.html)),
   and
-* send **any IPMI command** in the same session or through the low-level connector
+* send **any IPMI command** in the same session, as a command class or as raw bytes (DCMI and
+  OEM network functions included), or through the low-level connector
   ([Low-Level API](low-level-api.html)).
 
 The same operations are available from the command line with the **`ipmicli`** client of the

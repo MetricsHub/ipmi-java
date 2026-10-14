@@ -11,7 +11,9 @@ commands below. Each command is a class of
 sent with [`IpmiClient.send()`](low-level-api.html#sending-a-command-through-the-client) or the
 [low-level API](low-level-api.html#sending-commands); the last column shows which operations of
 `IpmiClient` use them. A command not listed here can be added by
-[extending `IpmiCommandCoder`](low-level-api.html#writing-your-own-command).
+[extending `IpmiCommandCoder`](low-level-api.html#writing-your-own-command) (any network
+function, the [extension and OEM ones](low-level-api.html#extension-and-oem-network-functions)
+included), or sent as bytes with [`raw()`](low-level-api.html#raw-requests).
 
 ## Commands
 
@@ -54,7 +56,8 @@ sent with [`IpmiClient.send()`](low-level-api.html#sending-a-command-through-the
 The read operations of `IpmiClient` need nothing above the **User** privilege; Chassis Control
 and Chassis Identify need **Operator**, the payload commands and Serial over LAN **Administrator**
 ([Privilege level](configuration.html#privilege-level)). Any command is sent in the session of the
-client with [`send()`](low-level-api.html#sending-a-command-through-the-client).
+client with [`send()`](low-level-api.html#sending-a-command-through-the-client), or as bytes with
+[`raw()`](low-level-api.html#raw-requests).
 
 ## Cipher suites
 

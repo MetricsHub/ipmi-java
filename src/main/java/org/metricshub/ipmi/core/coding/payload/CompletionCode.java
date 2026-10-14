@@ -444,7 +444,7 @@ public enum CompletionCode {
 		case LENGTHLIMITEXCEEDED:
 			return "Request data field length limit exceeded.";
 		case PARAMETEROUTOFRANGE:
-			return "Parameter out of range. One or more parameters in the data field of the Request are out of range. This is different from {@link #InvalidData} (CCh) code in that it indicates that the erroneous field(s) has a contiguous range of possible values.";
+			return "Parameter out of range. One or more parameters in the data field of the Request are out of range. This is different from the Invalid data field (CCh) code in that it indicates that the erroneous field(s) has a contiguous range of possible values.";
 		case CANNOTRESPOND:
 			return "Cannot return number of requested data bytes.";
 		case DATANOTPRESENT:

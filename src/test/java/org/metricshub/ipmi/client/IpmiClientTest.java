@@ -962,6 +962,51 @@ class IpmiClientTest {
 
 			assertTrue(client.chassisStatus().powerOn(), "the next operation opens a new session");
 			assertEquals(3, bmc.getCount(OPEN_SESSION_REQUEST));
+
+			bmc.expireSession();
+			assertThrows(IpmiTimeoutException.class, () -> client.raw(0x06, 0x01).execute());
+			assertEquals(3, bmc.getCount(OPEN_SESSION_REQUEST), "a raw request is never replayed");
+		}
+	}
+
+	@Test
+	@Timeout(30)
+	void rawRequestsOfAnyNetworkFunction() throws Exception {
+		try (FakeRmcpPlusBmc bmc = bmc(); IpmiClient client = client(bmc).build()) {
+			// Get DCMI Capabilities Info (Group Extension 2Ch), answered under 2Dh
+			List<byte[]> requests = new ArrayList<>();
+			bmc.handle(0x2c, 0x01, data -> {
+				requests.add(data);
+				return Fixtures.bytes("00 dc 01 05 02 00 01 07");
+			});
+			RawResponse dcmi = client.raw(0x2C, 0x01).data(0xDC, 0x01).execute();
+			assertEquals(CompletionCode.Ok, dcmi.completionCode());
+			assertEquals(0, dcmi.rawCompletionCode());
+			assertArrayEquals(Fixtures.bytes("dc 01 05 02 00 01 07"), dcmi.data());
+			assertEquals("completion code 00h, data DC 01 05 02 00 01 07", dcmi.toString());
+			assertEquals(1, requests.size());
+			assertArrayEquals(Fixtures.bytes("dc 01"), requests.get(0));
+
+			assertArrayEquals(FakeRmcpPlusBmc.DEVICE_ID, client.raw(0x06, 0x01).execute().data());
+
+			// An error completion code is returned, not thrown
+			RawResponse unknown = client.raw(0x30, 0x42).execute();
+			assertEquals(CompletionCode.InvalidCommand, unknown.completionCode());
+			assertEquals(0xc1, unknown.rawCompletionCode());
+			assertEquals(0, unknown.data().length);
+			assertEquals("completion code C1h", unknown.toString());
+			bmc.handle(0x2e, 0x01, data -> new byte[] { (byte) 0x80 });
+			RawResponse specific = client.raw(0x2e, 0x01).execute();
+			assertEquals(CompletionCode.Unknown, specific.completionCode());
+			assertEquals(0x80, specific.rawCompletionCode());
+
+			assertThrows(IllegalArgumentException.class, () -> client.raw(0x07, 1), "a response network function");
+			assertThrows(IllegalArgumentException.class, () -> client.raw(0x40, 1));
+			assertThrows(IllegalArgumentException.class, () -> client.raw(-2, 1));
+			assertThrows(IllegalArgumentException.class, () -> client.raw(6, 0x100));
+			assertThrows(IllegalArgumentException.class, () -> client.raw(6, 1).data(0x100));
+			assertThrows(IllegalArgumentException.class, () -> client.raw(6, 1).data(-1));
+			assertTrue(bmc.getErrors().isEmpty(), bmc.getErrors().toString());
 		}
 	}
 

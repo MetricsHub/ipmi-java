@@ -27,7 +27,10 @@ import org.metricshub.ipmi.core.coding.commands.PrivilegeLevel;
 import org.metricshub.ipmi.core.coding.commands.ResponseData;
 import org.metricshub.ipmi.core.coding.commands.session.GetChannelAuthenticationCapabilities;
 import org.metricshub.ipmi.core.coding.payload.IpmiPayload;
+import org.metricshub.ipmi.core.coding.payload.lan.IpmiLanMessage;
+import org.metricshub.ipmi.core.coding.payload.lan.IpmiLanRequest;
 import org.metricshub.ipmi.core.coding.payload.lan.IpmiLanResponse;
+import org.metricshub.ipmi.core.coding.protocol.IpmiMessage;
 import org.metricshub.ipmi.core.coding.protocol.Ipmiv20Message;
 import org.metricshub.ipmi.core.coding.protocol.PayloadType;
 import org.metricshub.ipmi.core.coding.security.CipherSuite;
@@ -531,12 +534,70 @@ class ConnectionTest {
 			// Command 38h under the Chassis response network function (01h): not the Application 38h queued
 			connection.notify(new MessageAction(reply(tag, (byte) 0x01, (byte) 0x38)));
 			assertEquals(-1, notifiedTag.get(), "a reply under another network function must not answer the request");
-			// An unknown network function (0Fh) answers nothing either
+			// 0Fh is not 06h + 1 either: the codes are compared as numbers
 			connection.notify(new MessageAction(reply(tag, (byte) 0x0f, (byte) 0x38)));
 			assertEquals(-1, notifiedTag.get());
 
 			connection.notify(new MessageAction(reply(tag, (byte) 0x38)));
 			assertEquals(tag, notifiedTag.get(), "the request is still queued and gets its own reply");
+		} finally {
+			connection.disconnect();
+		}
+	}
+
+	@Test
+	void aReplyUnderAnExtensionNetworkFunctionAnswersItsRequest() throws Exception {
+		Connection connection = connect(TIMEOUT_MS);
+		try {
+			openSession(connection);
+			AtomicInteger notifiedTag = new AtomicInteger(-1);
+			connection.registerListener(new ConnectionListener() {
+				@Override
+				public void processResponse(ResponseData responseData, int handle, int tag, Exception exception) {
+					notifiedTag.set(tag);
+				}
+
+				@Override
+				public void processRequest(IpmiPayload payload, int handle) {
+					// not expected
+				}
+			});
+			// Get DCMI Capabilities Info: Group Extension (2Ch), which NetworkFunction does not list
+			IpmiCommandCoder<ResponseData> dcmi = new IpmiCommandCoder<ResponseData>() {
+				@Override
+				public byte getCommandCode() {
+					return 0x01;
+				}
+
+				@Override
+				public NetworkFunction getNetworkFunction() {
+					return null;
+				}
+
+				@Override
+				public int getNetworkFunctionCode() {
+					return 0x2c;
+				}
+
+				@Override
+				protected IpmiLanMessage preparePayload(int sequenceNumber) {
+					return new IpmiLanRequest(0x2c, (byte) 0x01, new byte[] { (byte) 0xdc, 0x01 }, (byte) sequenceNumber);
+				}
+
+				@Override
+				public ResponseData getResponseData(IpmiMessage message) {
+					return new ResponseData() {};
+				}
+			};
+			int tag = connection.sendMessage(dcmi, false);
+
+			connection.notify(new MessageAction(reply(tag, (byte) 0x07, (byte) 0x01)));
+			assertEquals(-1, notifiedTag.get(), "an Application reply does not answer a DCMI request");
+			connection.notify(new MessageAction(reply(tag, (byte) 0x2f, (byte) 0x01)));
+			assertEquals(-1, notifiedTag.get(), "nor an OEM/Group one");
+
+			connection.notify(new MessageAction(reply(tag, (byte) 0x2d, (byte) 0x01)));
+			assertEquals(tag, notifiedTag.get(), "the Group Extension reply answers the DCMI request");
 		} finally {
 			connection.disconnect();
 		}

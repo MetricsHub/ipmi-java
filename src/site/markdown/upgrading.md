@@ -1,4 +1,4 @@
-keywords: upgrade, migration, release notes, breaking changes, 2.0, fluent client, builder, device id, ipmiclientexception, slf4j, ipmicli, standalone jar, sel, system event log, chassis control, chassis identify, protected fields, accessors, abstractsensorrecord, validateresponse, utf-8, bmc key, cipher suite, integrity, org.sentrysoftware
+keywords: upgrade, migration, release notes, breaking changes, 2.0, fluent client, builder, device id, raw, dcmi, network function, ipmiclientexception, slf4j, ipmicli, standalone jar, sel, system event log, chassis control, chassis identify, protected fields, accessors, abstractsensorrecord, validateresponse, utf-8, bmc key, cipher suite, integrity, org.sentrysoftware
 description: What changes when upgrading the IPMI Java Client — from 1.x to 2.0.00 (the fluent client, the System Event Log), from 1.2.02, from 1.2.01, and from the org.sentrysoftware:ipmi artifact of 1.2.00 and earlier.
 
 # Upgrading
@@ -74,7 +74,10 @@ the last entry read,
 [`chassisControl(PowerCommand)`](chassis-status.html#controlling-the-power) powers the system
 on or off, cycles or resets it, and `chassisIdentify(seconds)` blinks the identify LED,
 [`send(command)`](low-level-api.html#sending-a-command-through-the-client) sends any command of
-the core in the session, [`sol().open()`](serial-over-lan.html#with-ipmiclient) opens a Serial
+the core in the session, [`raw(netFn, command)`](low-level-api.html#raw-requests) sends any
+request as bytes, the extension and OEM network functions included (DCMI `2Ch`, OEM `30h`-`3Eh`),
+and returns its completion code and data without throwing (`ipmicli raw` is its subcommand),
+[`sol().open()`](serial-over-lan.html#with-ipmiclient) opens a Serial
 over LAN console as streams, `privilege(PrivilegeLevel)` opens the session at the Operator or
 Administrator level (raised with Set Session Privilege Level after the handshake, as every session
 starts at User), and the [SDR cache](configuration.html#sdr-cache) makes `frus()` and
@@ -108,6 +111,17 @@ reply) are ignored.
   constant of 4 000 ms.
 * `CipherSuite.forId(int)` builds one of the standard suites 0 to 19 with the algorithms of the
   specification, for `createConnection()` without discovery.
+* A reply is matched to its request by its command code **and** its network function, the request
+  one plus one (IPMI 2.0 section 5.1), where 1.2.x used the tag and the command code only.
+  `IpmiCommandCoder.getNetworkFunctionCode()` gives the code of the request, by default that of
+  `getNetworkFunction()`. A command of a network function `NetworkFunction` does not list
+  (Transport `0Ch`, DCMI `2Ch`, OEM `2Eh`, `30h`-`3Eh`) returns `null` from
+  `getNetworkFunction()`, overrides `getNetworkFunctionCode()`, and builds its request with the
+  new `IpmiLanRequest(int networkFunctionCode, byte command, byte[] data, byte sequenceNumber)`
+  ([Extension and OEM network functions](low-level-api.html#extension-and-oem-network-functions)).
+  An `IpmiLanRequest` subclass that set the protected `networkFunction` field of 1.2.x to such a
+  code must be replaced with this constructor and override, or its replies are ignored and its
+  requests time out.
 * `IpmiConnector.sendMessage(handle, command, resends)` sends a command with its own number of
   resends when no reply comes or the BMC answers `C3h`, 0 for a command the BMC must not receive
   twice.
@@ -359,7 +373,7 @@ with the new `protected` accessors:
 | `MessageHandler` | `messageQueue` | `getMessageQueue()` |
 | `MessageHandler` | `connection` | `getConnection()` |
 | `MessageHandler` | `lastReceivedSequenceNumber` | None: the sequence-number window is private |
-| `IpmiLanMessage` | `networkFunction` | `getNetworkFunctionCode()`, `setNetworkFunctionCode(byte)` |
+| `IpmiLanMessage` | `networkFunction` | `getNetworkFunctionCode()` (public), `setNetworkFunctionCode(byte)` |
 | `ConfidentialityAlgorithm` | `sik` | `getSik()` |
 | `IntegrityAlgorithm` | `sik` | `getSik()`, `setSik(byte[])` |
 

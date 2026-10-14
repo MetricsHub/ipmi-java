@@ -1,13 +1,13 @@
-keywords: low-level api, ipmiconnector, ipmiasyncconnector, session, cipher suite, privilege level, sendmessage, send, ipmi command, sel, system event log, chassis control, custom command
-description: Send any IPMI command in the session of IpmiClient with send(), or open RMCP+ sessions yourself with IpmiConnector — choosing the cipher suite and privilege level, timeouts, reading the System Event Log, controlling the power, the asynchronous connector, and writing your own commands.
+keywords: low-level api, ipmiconnector, ipmiasyncconnector, session, cipher suite, privilege level, sendmessage, send, raw, ipmi command, sel, system event log, chassis control, custom command, dcmi, extension network function, oem network function
+description: Send any IPMI command in the session of IpmiClient with send() or as bytes with raw(), or open RMCP+ sessions yourself with IpmiConnector — choosing the cipher suite and privilege level, timeouts, reading the System Event Log, controlling the power, the asynchronous connector, and writing your own commands, DCMI and OEM ones included.
 
 # Low-Level API
 
 <!-- MACRO{toc|fromDepth=2|toDepth=3|id=toc} -->
 
 [`IpmiClient`](apidocs/org/metricshub/ipmi/client/IpmiClient.html) wraps what monitoring needs.
-Every other command goes through `send()`, in the session of the client, or through the protocol
-layer of the `org.metricshub.ipmi.core` packages, which `IpmiClient` itself uses:
+Every other command goes through `send()` or `raw()`, in the session of the client, or through
+the protocol layer of the `org.metricshub.ipmi.core` packages, which `IpmiClient` itself uses:
 
 | Class | Role |
 | --- | --- |
@@ -80,7 +80,7 @@ yourself, on a client built with the `Operator` or `Administrator`
 operations: it sends the command again after a lost reply or a `C3h`, with the configured
 [retries](timeouts-and-errors.html#message-timeout-and-retries), so a reset or a power cycle can
 reach the BMC twice, and it does not refuse a `PowerCycle` of a system that is off. Prefer the
-operations for the power commands; a raw send is for the commands the client does not wrap:
+operations for the power commands; `send()` is for the commands the client does not wrap:
 
 ```java
 bmc.send(new ChassisControl(PowerCommand.PowerUp)); // chassisControl(PowerCommand.PowerUp) is safer
@@ -90,6 +90,37 @@ bmc.send(new ChassisIdentify(15, false)); // 15 seconds; (0, false) turns it off
 `PowerCommand` has the six controls of the specification: `PowerUp`, `PowerDown` (immediate,
 without shutting down the operating system), `PowerCycle`, `HardReset`, `SoftShutdown` and
 `DiagnosticInterrupt`.
+
+### Raw requests
+
+[`raw()`](apidocs/org/metricshub/ipmi/client/IpmiClient.html#raw(int,int)) sends any request as
+bytes, like `ipmitool raw`, and returns its reply whatever its completion code: a
+[`RawResponse`](apidocs/org/metricshub/ipmi/client/RawResponse.html) with `completionCode()`,
+`rawCompletionCode()` and `data()`, the response data after the completion code. Get DCMI
+Capabilities Info, under the Group Extension network function (`2Ch`), whose first data byte is
+the defining body (`DCh` for DCMI), with the parameter `01h`:
+
+```java
+RawResponse dcmi = bmc.raw(0x2C, 0x01).data(0xDC, 0x01).execute();
+System.out.println(dcmi);
+if (dcmi.completionCode() == CompletionCode.Ok) {
+	byte[] data = dcmi.data(); // DCh, then the DCMI version: 01h 05h is DCMI 1.5
+}
+```
+
+```text
+completion code 00h, data DC 01 05 02 00 01 07
+```
+
+Any request network function is accepted, `00h` to `3Eh`: the standard ones, Transport (`0Ch`),
+Group Extension (`2Ch`), OEM/Group (`2Eh`, whose first three data bytes are an IANA enterprise
+number) and the controller-specific OEM ones (`30h` to `3Eh`). The odd codes are those of the
+responses (IPMI 2.0, section 5.1) and fail with `IllegalArgumentException`, like a command or a
+data byte out of the 0-255 range. An error completion code is returned, not thrown, and not
+retried, a busy one (`C0h`) or a `C3h` included. Like `send()`, the request is sent again when its
+reply is lost and never replayed on a new session, and it has none of the safeguards of the power
+operations. It runs at the privilege level of the session: a request that needs Operator gets
+`D4h` from a client built at User.
 
 ## A complete session with `IpmiConnector`
 
@@ -240,7 +271,11 @@ response type the command declares, or throws:
   `getRawCode()`),
 * `ConnectionException` when no reply came after all the tries, or the connection is not in a
   state that allows sending,
-* `IllegalArgumentException` when the response does not match the request.
+* `IllegalArgumentException` when the response is malformed.
+
+A reply is matched to its request by its tag, its command code and its network function, the
+request one plus one: any other reply is ignored, and a request whose reply never comes fails with
+`ConnectionException`.
 
 ```java
 GetSelInfoResponseData info = connector.sendMessage(handle, new GetSelInfo());
@@ -292,6 +327,58 @@ GetSelfTestResultsResponseData results = bmc.send(new GetSelfTestResults());
 Get Device ID itself is implemented
 ([`GetDeviceId`](apidocs/org/metricshub/ipmi/core/coding/commands/app/GetDeviceId.html), the
 command behind [`deviceId()`](device-id.html)).
+
+### Extension and OEM network functions
+
+[`NetworkFunction`](apidocs/org/metricshub/ipmi/core/coding/payload/lan/NetworkFunction.html)
+lists the standard network functions, `00h` to `0Bh`. A command of another one, Transport
+(`0Ch`), Group Extension (`2Ch`, DCMI), OEM/Group (`2Eh`) or a controller-specific OEM network
+function (`30h` to `3Eh`), returns `null` from `getNetworkFunction()`, overrides
+`getNetworkFunctionCode()`, and builds its request with the `IpmiLanRequest` constructor that
+takes the code; its reply is the one under that code plus one. Get DCMI Capabilities Info:
+
+```java
+public class GetDcmiCapabilitiesInfo extends IpmiCommandCoder<DcmiCapabilitiesResponseData> {
+
+	private final int parameter;
+
+	public GetDcmiCapabilitiesInfo(int parameter) {
+		this.parameter = parameter; // 01h: the supported DCMI capabilities
+	}
+
+	@Override
+	public NetworkFunction getNetworkFunction() {
+		return null; // not in the enumeration: getNetworkFunctionCode() is what is sent
+	}
+
+	@Override
+	public int getNetworkFunctionCode() {
+		return 0x2C; // Group Extension
+	}
+
+	@Override
+	public byte getCommandCode() {
+		return 0x01; // Get DCMI Capabilities Info
+	}
+
+	@Override
+	protected IpmiLanMessage preparePayload(int sequenceNumber) {
+		// The DCMI group extension identification (DCh), then the parameter selector
+		byte[] data = { (byte) 0xDC, (byte) parameter };
+		return new IpmiLanRequest(getNetworkFunctionCode(), getCommandCode(), data,
+				TypeConverter.intToByte(sequenceNumber));
+	}
+
+	@Override
+	public DcmiCapabilitiesResponseData getResponseData(IpmiMessage message) throws IPMIException {
+		return new DcmiCapabilitiesResponseData(validateResponse(message)); // your own ResponseData
+	}
+}
+```
+
+When the BMC answers it with an error completion code, the `IpmiCompletionCodeException` of
+`send()` has a `null` `networkFunction()`. To send such a request once, without writing a class,
+use [`raw()`](#raw-requests).
 
 ## Asynchronous API
 
