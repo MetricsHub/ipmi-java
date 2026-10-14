@@ -1,9 +1,16 @@
 keywords: upgrade, migration, release notes, breaking changes, 2.0, fluent client, builder, device id, raw, dcmi, network function, ipmiclientexception, slf4j, ipmicli, standalone jar, sel, system event log, chassis control, chassis identify, protected fields, accessors, abstractsensorrecord, validateresponse, utf-8, bmc key, cipher suite, integrity, org.sentrysoftware
-description: What changes when upgrading the IPMI Java Client — from 1.x to 2.0.00 (the fluent client, the System Event Log), from 1.2.02, from 1.2.01, and from the org.sentrysoftware:ipmi artifact of 1.2.00 and earlier.
+description: What changes when upgrading the IPMI Java Client — from 2.0.00, from 1.x to 2.0.00 (the fluent client, the System Event Log), from 1.2.02, from 1.2.01, and from the org.sentrysoftware:ipmi artifact of 1.2.00 and earlier.
 
 # Upgrading
 
 <!-- MACRO{toc|fromDepth=2|toDepth=3|id=toc} -->
+
+## Upgrading from 2.0.00
+
+* `Sensor.name()` (and `getName()` of the Full, Compact and Event-Only sensor records) is never
+  `null`: a Compact record that ends before its ID string gives the empty name, as an ID string of
+  length 0 does. 2.0.00 returned `null`, which made `ipmicli sensors` fail with a
+  `NullPointerException` and `ipmicli sensors --json` print `"name":null`.
 
 ## Upgrading from 1.x to 2.0.00
 

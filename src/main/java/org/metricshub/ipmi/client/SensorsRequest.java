@@ -107,7 +107,7 @@ public final class SensorsRequest {
 		if (names == null) {
 			return true;
 		}
-		String name = record.getName() == null ? "" : record.getName();
+		String name = record.getName();
 		for (Pattern pattern : names) {
 			if (pattern.matcher(name).matches()) {
 				return true;

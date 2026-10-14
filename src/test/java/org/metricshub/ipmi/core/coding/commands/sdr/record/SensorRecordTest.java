@@ -4,7 +4,6 @@ import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
-import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -215,7 +214,7 @@ class SensorRecordTest {
 	}
 
 	@Test
-	void compactSensorRecordWithoutIdStringHasNoName() {
+	void compactSensorRecordWithoutIdStringHasAnEmptyName() {
 		byte[] truncated = new byte[31];
 		System.arraycopy(COMPACT_SENSOR_RECORD, 0, truncated, 0, truncated.length);
 
@@ -224,7 +223,9 @@ class SensorRecordTest {
 				SensorRecord.populateSensorRecord(truncated));
 
 		assertEquals(SensorType.Temperature, compact.getSensorType());
-		assertNull(compact.getName());
+		assertEquals("", compact.getName());
+		compact.setName(null);
+		assertEquals("", compact.getName(), "the name is never null");
 	}
 
 	@Test

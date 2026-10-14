@@ -11,7 +11,10 @@ import static org.metricshub.ipmi.core.transport.FakeRmcpPlusBmc.OPEN_SESSION_RE
 import static org.metricshub.ipmi.core.transport.FakeRmcpPlusBmc.SOL_DEACTIVATED;
 import static org.metricshub.ipmi.core.transport.FakeSdrRepository.GET_SENSOR_READING;
 import static org.metricshub.ipmi.core.transport.FakeSdrRepository.NETFN_SENSOR;
+import static org.metricshub.ipmi.core.transport.FakeSdrRepository.COMPACT_SENSOR_RECORD;
+import static org.metricshub.ipmi.core.transport.FakeSdrRepository.compactSensorRecord;
 import static org.metricshub.ipmi.core.transport.FakeSdrRepository.fruDeviceLocatorRecord;
+import static org.metricshub.ipmi.core.transport.FakeSdrRepository.record;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
@@ -296,6 +299,23 @@ class IpmiCliTest {
 			Result selected = login(bmc, "sensors", "--type", "fan,TEMPERATURE", "--name", "fan*");
 			assertEquals("Name   Type  Reading  Unit  Status\nFan 1  Fan                  Device Present\n", selected.out);
 			assertEquals(readings + 1, bmc.getCount(NETFN_SENSOR, GET_SENSOR_READING), "selected before the readings");
+		}
+	}
+
+	@Test
+	@Timeout(30)
+	void aCompactRecordWithoutIdStringGivesAnEmptyName() throws Exception {
+		try (FakeRmcpPlusBmc bmc = Fixtures.bmc()) {
+			// A Compact record cut at 31 bytes, before its ID string type/length byte
+			byte[] full = compactSensorRecord(2, Fixtures.FAN_SENSOR, EntityId.Fan.getCode(), 1, 0x04, 0x08, "");
+			new FakeSdrRepository()
+					.add(record(2, COMPACT_SENSOR_RECORD, Arrays.copyOfRange(full, 5, 31)))
+					.reading(Fixtures.FAN_SENSOR, 0x00, 0x40, 0x02)
+					.install(bmc);
+			Result sensors = login(bmc, "sensors");
+			assertEquals(0, sensors.code, sensors.err);
+			assertEquals("Name  Type  Reading  Unit  Status\n      Fan                  Device Present\n", sensors.out);
+			assertTrue(login(bmc, "sensors", "--json").out.startsWith("{\"name\":\"\",\"number\":16,"));
 		}
 	}
 

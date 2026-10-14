@@ -72,7 +72,7 @@ public abstract class AbstractSensorRecord extends SensorRecord {
 
 	private SensorDirection sensorDirection;
 
-	private String name;
+	private String name = "";
 
 	private InstanceModifierType idInstanceModifierType;
 
@@ -416,7 +416,7 @@ public abstract class AbstractSensorRecord extends SensorRecord {
 	}
 
 	/**
-	 * @return the sensor ID string
+	 * @return the sensor ID string, empty when the record has none
 	 */
 	public String getName() {
 		return name;
@@ -424,10 +424,10 @@ public abstract class AbstractSensorRecord extends SensorRecord {
 
 	/**
 	 * @param name
-	 *        - the sensor ID string
+	 *        - the sensor ID string, {@code null} for none (stored as the empty string)
 	 */
 	public void setName(String name) {
-		this.name = name;
+		this.name = name == null ? "" : name;
 	}
 
 	/**
