@@ -146,6 +146,15 @@ public final class ReadingTypeDescription {
 		map.put(BootSourceSelectionTimeout, "Timeout waiting for selection");
 		map.put(PowerSupplyConfigurationError, "Config Error");
 		map.put(TransitionToOffLine, "Transition to Off Line");
+		// Watchdog 1 (11h), which ipmiutil does not name: in the wording of ipmitool
+		map.put(BiosWatchdogReset, "BIOS Reset");
+		map.put(OsWatchdogReset, "OS Reset");
+		map.put(OsWatchdogShutDown, "OS Shut Down");
+		map.put(OsWatchdogPowerDown, "OS Power Down");
+		map.put(OsWatchdogPowerCycle, "OS Power Cycle");
+		map.put(OsWatchdogNmiDiagnosticInterrupt, "OS NMI/Diag Interrupt");
+		map.put(OsWatchdogExpired, "OS Expired");
+		map.put(OsWatchdogPreTimeoutInterrupt, "OS pre-timeout Interrupt");
 		map.put(TimerExpired, "Timer expired");
 		map.put(RomBootCompleted, "ROM boot completed");
 		map.put(TransitionToOffDuty, "Transition to Off Duty");
