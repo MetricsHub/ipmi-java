@@ -12,7 +12,9 @@ description: What changes when upgrading the IPMI Java Client — from 2.0.00, f
   length 0 does. 2.0.00 returned `null`, which made `ipmicli sensors` fail with a
   `NullPointerException` and `ipmicli sensors --json` print `"name":null`.
 * `FullSensorRecord.getSensorResolution()` returns `|M x 10^R|`, the step between two successive
-  raw readings (IPMI 2.0 section 36.4.2); 2.0.00 returned half of it.
+  raw readings of a linear sensor (IPMI 2.0 section 36.4.2), and `NaN` for a linearizable or
+  non-linear sensor, whose resolution varies with the reading; 2.0.00 returned half of `|M x 10^R|`
+  whatever the linearization.
 
 ## Upgrading from 1.x to 2.0.00
 

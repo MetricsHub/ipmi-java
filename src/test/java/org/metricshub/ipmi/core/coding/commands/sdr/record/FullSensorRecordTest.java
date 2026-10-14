@@ -246,6 +246,16 @@ class FullSensorRecordTest {
 	}
 
 	@Test
+	void onlyALinearSensorHasAConstantResolution() {
+		// IPMI 2.0 section 36.4a: the steps of e^x vary with the reading
+		FullSensorRecord record = (FullSensorRecord) SensorRecord.populateSensorRecord(EXPONENTIAL_TEMPERATURE);
+		assertTrue(Double.isNaN(record.getSensorResolution()));
+
+		record = (FullSensorRecord) SensorRecord.populateSensorRecord(conversionRecord(0x00, 0x00));
+		assertEquals(1, record.getSensorResolution(), DELTA); // M=1, R exponent 0
+	}
+
+	@Test
 	void accuracyExponentAndToleranceAreDecoded() {
 		FullSensorRecord record = (FullSensorRecord) SensorRecord.populateSensorRecord(EXPONENTIAL_TEMPERATURE);
 
