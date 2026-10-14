@@ -242,6 +242,38 @@ public enum ReadingType {
 	PowerSupplyConfigurationError(
 			ReadingType.POWERSUPPLYCONFIGURATIONERROR),
 	TransitionToOffLine(ReadingType.TRANSITIONTOOFFLINE),
+	/**
+	 * BIOS Watchdog Reset: Watchdog 1 (sensor type 11h, deprecated since IPMI 1.5 in favour of Watchdog 2, 23h).
+	 */
+	BiosWatchdogReset(ReadingType.BIOSWATCHDOGRESET),
+	/**
+	 * OS Watchdog Reset (Watchdog 1).
+	 */
+	OsWatchdogReset(ReadingType.OSWATCHDOGRESET),
+	/**
+	 * OS Watchdog Shut Down (Watchdog 1).
+	 */
+	OsWatchdogShutDown(ReadingType.OSWATCHDOGSHUTDOWN),
+	/**
+	 * OS Watchdog Power Down (Watchdog 1).
+	 */
+	OsWatchdogPowerDown(ReadingType.OSWATCHDOGPOWERDOWN),
+	/**
+	 * OS Watchdog Power Cycle (Watchdog 1).
+	 */
+	OsWatchdogPowerCycle(ReadingType.OSWATCHDOGPOWERCYCLE),
+	/**
+	 * OS Watchdog NMI / Diagnostic Interrupt (Watchdog 1).
+	 */
+	OsWatchdogNmiDiagnosticInterrupt(ReadingType.OSWATCHDOGNMIDIAGNOSTICINTERRUPT),
+	/**
+	 * OS Watchdog Expired, status only (Watchdog 1).
+	 */
+	OsWatchdogExpired(ReadingType.OSWATCHDOGEXPIRED),
+	/**
+	 * OS Watchdog pre-timeout Interrupt, non-NMI (Watchdog 1).
+	 */
+	OsWatchdogPreTimeoutInterrupt(ReadingType.OSWATCHDOGPRETIMEOUTINTERRUPT),
 	TimerExpired(
 			ReadingType.TIMEREXPIRED),
 	RomBootCompleted(ReadingType.ROMBOOTCOMPLETED),
@@ -805,6 +837,22 @@ public enum ReadingType {
 	private static final int POWERSUPPLYCONFIGURATIONERROR = 552710;
 
 	private static final int TRANSITIONTOOFFLINE = 2564;
+
+	private static final int BIOSWATCHDOGRESET = 1142528;
+
+	private static final int OSWATCHDOGRESET = 1142529;
+
+	private static final int OSWATCHDOGSHUTDOWN = 1142530;
+
+	private static final int OSWATCHDOGPOWERDOWN = 1142531;
+
+	private static final int OSWATCHDOGPOWERCYCLE = 1142532;
+
+	private static final int OSWATCHDOGNMIDIAGNOSTICINTERRUPT = 1142533;
+
+	private static final int OSWATCHDOGEXPIRED = 1142534;
+
+	private static final int OSWATCHDOGPRETIMEOUTINTERRUPT = 1142535;
 
 	private static final int TIMEREXPIRED = 2322176;
 
@@ -1391,6 +1439,22 @@ public enum ReadingType {
 			return PowerSupplyConfigurationError;
 		case TRANSITIONTOOFFLINE:
 			return TransitionToOffLine;
+		case BIOSWATCHDOGRESET:
+			return BiosWatchdogReset;
+		case OSWATCHDOGRESET:
+			return OsWatchdogReset;
+		case OSWATCHDOGSHUTDOWN:
+			return OsWatchdogShutDown;
+		case OSWATCHDOGPOWERDOWN:
+			return OsWatchdogPowerDown;
+		case OSWATCHDOGPOWERCYCLE:
+			return OsWatchdogPowerCycle;
+		case OSWATCHDOGNMIDIAGNOSTICINTERRUPT:
+			return OsWatchdogNmiDiagnosticInterrupt;
+		case OSWATCHDOGEXPIRED:
+			return OsWatchdogExpired;
+		case OSWATCHDOGPRETIMEOUTINTERRUPT:
+			return OsWatchdogPreTimeoutInterrupt;
 		case TIMEREXPIRED:
 			return TimerExpired;
 		case ROMBOOTCOMPLETED:

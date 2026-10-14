@@ -189,7 +189,14 @@ reply) are ignored.
   `BaseOsInstallationCompleted`, `BaseOsInstallationAborted` and `BaseOsInstallationFailed`, which
   `parseInt()`, and so the SEL entries and the sensor states, reported as `Unknown` in 1.x;
   `Sensor.states()` and `SelEntry.description()` say `Installation started`, `Installation
-  completed`, `Installation aborted` and `Installation failed`, as `ipmitool` does.
+  completed`, `Installation aborted` and `Installation failed`, as `ipmitool` does. It also has
+  the eight offsets of the Watchdog 1 sensor type (`11h`, deprecated since IPMI 1.5 in favour of
+  Watchdog 2 but still emitted by older BMCs): `BiosWatchdogReset`, `OsWatchdogReset`,
+  `OsWatchdogShutDown`, `OsWatchdogPowerDown`, `OsWatchdogPowerCycle`,
+  `OsWatchdogNmiDiagnosticInterrupt`, `OsWatchdogExpired` and `OsWatchdogPreTimeoutInterrupt`,
+  all `Unknown` in 1.x, which `Sensor.states()` and `SelEntry.description()` describe as `BIOS
+  Reset`, `OS Reset`, `OS Shut Down`, `OS Power Down`, `OS Power Cycle`, `OS NMI/Diag Interrupt`,
+  `OS Expired` and `OS pre-timeout Interrupt`, as `ipmitool` does.
 * The unused leftovers of the protocol core are removed: the `UdpNotifier` and `SessionUpkeep`
   classes (the keep-alive is a Get Device ID sent by the connection),
   `StateMachine.isSessionChallenging()`, `ConnectionManager.getConnection(InetAddress, int)`,

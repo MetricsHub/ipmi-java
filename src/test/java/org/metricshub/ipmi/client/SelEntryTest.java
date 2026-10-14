@@ -60,6 +60,25 @@ class SelEntryTest {
 	}
 
 	@Test
+	void theWatchdog1EventsAreNamed() {
+		// IPMI 2.0 table 42-3, sensor type 11h, offsets 00h-07h, in the wording of ipmitool
+		String[] descriptions = {
+				"BIOS Reset",
+				"OS Reset",
+				"OS Shut Down",
+				"OS Power Down",
+				"OS Power Cycle",
+				"OS NMI/Diag Interrupt",
+				"OS Expired",
+				"OS pre-timeout Interrupt" };
+		for (int offset = 0; offset < descriptions.length; offset++) {
+			SelEntry entry = entry(
+					systemEvent(5, 0xffffffffL, SensorType.Watchdog1.getCode(), 0, 0x6f, true, offset, 0xff, 0xff));
+			assertEquals(descriptions[offset], entry.description());
+		}
+	}
+
+	@Test
 	void eventsTheSpecificationDoesNotNameAreDescribedByTheirCodes() {
 		SelEntry unknown = entry(systemEvent(1, 0xffffffffL, SensorType.Fan.getCode(), 1, 0x01, true, 0x0f, 0xff, 0xff));
 		assertEquals(ReadingType.Unknown, unknown.event().get());

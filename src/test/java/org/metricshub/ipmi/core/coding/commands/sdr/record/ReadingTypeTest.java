@@ -34,6 +34,27 @@ class ReadingTypeTest {
 	}
 
 	@Test
+	void watchdog1HasTheEightOffsetsOfTable423() {
+		// IPMI 2.0 table 42-3, sensor type 11h (Watchdog 1), offsets 00h-07h
+		ReadingType[] states = {
+				ReadingType.BiosWatchdogReset,
+				ReadingType.OsWatchdogReset,
+				ReadingType.OsWatchdogShutDown,
+				ReadingType.OsWatchdogPowerDown,
+				ReadingType.OsWatchdogPowerCycle,
+				ReadingType.OsWatchdogNmiDiagnosticInterrupt,
+				ReadingType.OsWatchdogExpired,
+				ReadingType.OsWatchdogPreTimeoutInterrupt };
+		for (int offset = 0; offset < states.length; offset++) {
+			assertEquals(states[offset], ReadingType.parseInt(SensorType.Watchdog1, 0x6f, offset));
+			assertEquals(0x116f00 | offset, states[offset].getCode());
+		}
+		assertEquals(ReadingType.Unknown, ReadingType.parseInt(SensorType.Watchdog1, 0x6f, 8));
+		// Watchdog 2 (23h) is unchanged
+		assertEquals(ReadingType.TimerExpired, ReadingType.parseInt(SensorType.Watchdog2, 0x6f, 0));
+	}
+
+	@Test
 	void anUndefinedStateIsUnknown() {
 		// HP iLO asserts state 6 of the Device Present reading type (08h), which defines states 0 and 1
 		assertEquals(ReadingType.Unknown, ReadingType.parseInt(SensorType.Fan, 0x08, 6));
