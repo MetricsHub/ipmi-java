@@ -5,6 +5,8 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.metricshub.ipmi.core.transport.FakeRmcpPlusBmc.ADMINISTRATOR;
+import static org.metricshub.ipmi.core.transport.FakeRmcpPlusBmc.GET_CHASSIS_STATUS;
+import static org.metricshub.ipmi.core.transport.FakeRmcpPlusBmc.NETFN_CHASSIS;
 import static org.metricshub.ipmi.core.transport.FakeRmcpPlusBmc.OPEN_SESSION_REQUEST;
 import static org.metricshub.ipmi.core.transport.FakeRmcpPlusBmc.SOL_DEACTIVATED;
 import static org.metricshub.ipmi.core.transport.FakeSdrRepository.GET_SENSOR_READING;
@@ -384,6 +386,8 @@ class IpmiCliTest {
 			assertEquals(0, prompted.code, prompted.err);
 			assertEquals("on\n", prompted.out);
 
+			// No reply: a loopback request can complete within the 1 ms deadline
+			bmc.handle(NETFN_CHASSIS, GET_CHASSIS_STATUS, data -> null);
 			Result deadline = run(bmc, NO_PROMPT, "-u", "admin", "-p", "secret", "-t", "1", "-v", "chassis");
 			assertEquals(IpmiCli.EXIT_TIMEOUT, deadline.code);
 			assertTrue(deadline.err.contains("did not complete within"), deadline.err);

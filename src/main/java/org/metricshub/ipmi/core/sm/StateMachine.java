@@ -35,7 +35,6 @@ import org.metricshub.ipmi.core.common.Constants;
 import org.metricshub.ipmi.core.sm.actions.MessageAction;
 import org.metricshub.ipmi.core.sm.actions.StateMachineAction;
 import org.metricshub.ipmi.core.sm.events.StateMachineEvent;
-import org.metricshub.ipmi.core.sm.states.SessionValid;
 import org.metricshub.ipmi.core.sm.states.State;
 import org.metricshub.ipmi.core.sm.states.Uninitialized;
 import org.metricshub.ipmi.core.transport.Messenger;
@@ -240,13 +239,5 @@ public class StateMachine implements UdpListener {
 	 */
 	public void register(MachineObserver observer) {
 		observers.add(observer);
-	}
-
-	/**
-	 * @return true if {@link StateMachine} is at the point when it acquires
-	 *         session and will send sessionless messages
-	 */
-	public boolean isSessionChallenging() {
-		return !initialized || getCurrent().getClass() == SessionValid.class;
 	}
 }

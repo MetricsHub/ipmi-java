@@ -23,26 +23,14 @@ package org.metricshub.ipmi.core.connection.queue;
  */
 
 import org.metricshub.ipmi.core.coding.PayloadCoder;
-import org.metricshub.ipmi.core.coding.commands.ResponseData;
 
 import java.util.Date;
 
 public class QueueElement {
-	private int id;
-	/**
-	 * @deprecated retries on message level are deprecated
-	 */
-	@Deprecated
-	private int retries;
-
+	private final int id;
 	private PayloadCoder request;
-	private ResponseData response;
 	private Date timestamp;
 	private final boolean oneWay;
-
-	public QueueElement(int id, PayloadCoder request) {
-		this(id, request, false);
-	}
 
 	/**
 	 * @param id the tag of the request
@@ -54,7 +42,6 @@ public class QueueElement {
 		this.request = request;
 		this.oneWay = oneWay;
 		timestamp = new Date();
-		retries = 0;
 	}
 
 	/**
@@ -75,40 +62,12 @@ public class QueueElement {
 		return id;
 	}
 
-	public void setId(int id) {
-		this.id = id;
-	}
-
-	/**
-	 * @deprecated retries on message level are deprecated
-	 */
-	@Deprecated
-	public int getRetries() {
-		return retries;
-	}
-
-	/**
-	 * @deprecated retries on message level are deprecated
-	 */
-	@Deprecated
-	public void setRetries(int retries) {
-		this.retries = retries;
-	}
-
 	public PayloadCoder getRequest() {
 		return request;
 	}
 
 	public void setRequest(PayloadCoder request) {
 		this.request = request;
-	}
-
-	public ResponseData getResponse() {
-		return response;
-	}
-
-	public void setResponse(ResponseData response) {
-		this.response = response;
 	}
 
 	public Date getTimestamp() {

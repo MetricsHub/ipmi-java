@@ -309,38 +309,6 @@ public class MessageQueue extends TimerTask {
 	}
 
 	/**
-	 * Removes message from queue at given index.
-	 *
-	 * @param index
-	 */
-	public void removeAt(int index) {
-		if (index >= queue.size()) {
-			throw new IndexOutOfBoundsException(
-					"Index out of bounds : "
-							+ index);
-		}
-
-		remove(queue.get(index).getId());
-	}
-
-	/**
-	 * Checks if queue contains message with the given sequence number.
-	 */
-	public boolean containsId(int sequenceNumber) {
-		synchronized (queue) {
-
-			for (QueueElement element : queue) {
-				if (element.getId() == sequenceNumber
-						&& element.getRequest() != null) {
-					return true;
-				}
-			}
-
-		}
-		return false;
-	}
-
-	/**
 	 * Returns a sequence number for a message sent outside the queue (the Close Session request): it skips the tags of
 	 * the queued requests.
 	 *
@@ -372,74 +340,6 @@ public class MessageQueue extends TimerTask {
 			}
 		}
 		return null;
-	}
-
-	/**
-	 * Returns message with the given sequence number from the queue or null if
-	 * no message with the given tag is currently in the queue.
-	 */
-	public PayloadCoder getMessageFromQueue(int tag) {
-		synchronized (queue) {
-			for (QueueElement element : queue) {
-				if (element.getId() == tag && element.getRequest() != null) {
-					return element.getRequest();
-				}
-			}
-		}
-		return null;
-	}
-
-	/**
-	 * Returns index of the message with the given sequence number from the
-	 * queue or -1 if no message with the given tag is currently in the queue.
-	 */
-	public int getMessageIndexFromQueue(int tag) {
-		synchronized (queue) {
-			int i = 0;
-			for (QueueElement element : queue) {
-				if (element.getId() == tag && element.getRequest() != null) {
-					return i;
-				}
-				++i;
-			}
-		}
-		return -1;
-	}
-
-	/**
-	 * Returns number of retries that were performed on message tagged with tag
-	 * or -1 if no such message can be found in the queue.
-	 *
-	 * @deprecated retries are no longer supported on the message level
-	 */
-	@Deprecated
-	public int getMessageRetries(int tag) {
-		synchronized (queue) {
-			for (QueueElement element : queue) {
-				if (element.getId() == tag && element.getRequest() != null) {
-					return element.getRetries();
-				}
-			}
-		}
-		return -1;
-	}
-
-	/**
-	 * Returns the ID of the {@link QueueElement} in the queue with the given
-	 * tag.
-	 *
-	 * @param tag
-	 *        Tag of the message to find
-	 */
-	public int getMessageSequenceNumber(int tag) {
-		synchronized (queue) {
-			for (QueueElement element : queue) {
-				if (element.getId() == tag && element.getRequest() != null) {
-					return element.getId();
-				}
-			}
-		}
-		return -1;
 	}
 
 	/**
