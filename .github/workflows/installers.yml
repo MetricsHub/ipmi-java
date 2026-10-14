@@ -1,0 +1,208 @@
+name: Installer Smoke Tests
+
+# Exercises the one-command installers served from the documentation site
+# (src/site/resources/get and get.ps1) against the real latest GitHub release.
+# The weekly run also guards against GitHub-side changes (release asset URL
+# behavior) that the installers depend on.
+
+on:
+  pull_request:
+    branches: [ "main" ]
+    paths:
+      - src/site/resources/get
+      - src/site/resources/get.ps1
+      - .github/workflows/installers.yml
+  push:
+    branches: [ "main" ]
+    paths:
+      - src/site/resources/get
+      - src/site/resources/get.ps1
+      - .github/workflows/installers.yml
+  schedule:
+    # Weekly, Monday 06:37 UTC
+    - cron: "37 6 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    name: Probe the latest release
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.release.outputs.version }}
+      available: ${{ steps.release.outputs.available }}
+    steps:
+      - name: Look for the standalone jar alias in the latest release
+        id: release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          release_json="$(gh api repos/${{ github.repository }}/releases/latest)"
+          version="$(printf '%s' "${release_json}" | jq -r '.tag_name | ltrimstr("v")')"
+          available="$(printf '%s' "${release_json}" | jq -r '[.assets[].name] | index("ipmi-java-standalone.jar") != null')"
+          echo "Latest release: ${version} (publishes ipmi-java-standalone.jar: ${available})"
+          if [ "${available}" != "true" ]; then
+            echo "::notice::Release v${version} publishes no ipmi-java-standalone.jar (the command-line client ships with 2.0.00 and later): skipping the installer smoke tests."
+          fi
+          echo "version=${version}" >> "${GITHUB_OUTPUT}"
+          echo "available=${available}" >> "${GITHUB_OUTPUT}"
+
+  posix:
+    name: POSIX installer on ubuntu-latest
+    needs: probe
+    if: needs.probe.outputs.available == 'true'
+    runs-on: ubuntu-latest
+    env:
+      VERSION: ${{ needs.probe.outputs.version }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Set up Temurin JDK 17
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Install the latest release
+        run: |
+          sh src/site/resources/get 2>&1 | tee install.log
+          test -x "${HOME}/.local/bin/ipmicli" || { echo "ERROR: the launcher was not installed at ~/.local/bin/ipmicli" >&2; exit 1; }
+          grep -Fq 'Checksum verified.' install.log || { echo "ERROR: the installer did not verify the checksum." >&2; exit 1; }
+
+      - name: Check the version and help output of the launcher
+        run: |
+          out="$("${HOME}/.local/bin/ipmicli" --version)"
+          [ "${out}" = "ipmi-java ${VERSION}" ] || { echo "ERROR: expected 'ipmi-java ${VERSION}' but got '${out}'." >&2; exit 1; }
+          # The launcher exports IPMICLI_PROGRAM_NAME so the usage names the
+          # ipmicli command instead of "java -jar ...".
+          help="$("${HOME}/.local/bin/ipmicli" --help)"
+          printf '%s\n' "${help}" | grep -q '^  ipmicli -h <host> probe' \
+            || { echo "ERROR: the help output does not name the ipmicli launcher." >&2; exit 1; }
+          if printf '%s\n' "${help}" | grep -Fq 'java -jar'; then
+            echo "ERROR: the help of the installed launcher mentions 'java -jar'." >&2
+            exit 1
+          fi
+
+      - name: Reinstall in place a pinned version with IPMICLI_VERSION
+        run: |
+          IPMICLI_VERSION="${VERSION}" sh src/site/resources/get
+          out="$("${HOME}/.local/bin/ipmicli" --version)"
+          [ "${out}" = "ipmi-java ${VERSION}" ] || { echo "ERROR: expected 'ipmi-java ${VERSION}' but got '${out}'." >&2; exit 1; }
+
+      - name: Exit 127 with the Adoptium message when no JRE is findable
+        run: |
+          # Hide every JRE the launcher can discover: IPMICLI_JAVA_HOME/JAVA_HOME
+          # and PATH go away with env -i, ~/.sdkman with a fake HOME, and the
+          # /usr/lib/jvm well-known root is moved aside for the duration.
+          mkdir -p "${RUNNER_TEMP}/nohome"
+          if [ -d /usr/lib/jvm ]; then sudo mv /usr/lib/jvm /usr/lib/jvm.hidden; fi
+          set +e
+          err="$(env -i HOME="${RUNNER_TEMP}/nohome" PATH=/nonexistent /bin/sh "${HOME}/.local/bin/ipmicli" --version 2>&1 >/dev/null)"
+          rc=$?
+          set -e
+          if [ -d /usr/lib/jvm.hidden ]; then sudo mv /usr/lib/jvm.hidden /usr/lib/jvm; fi
+          printf '%s\n' "${err}"
+          [ "${rc}" -eq 127 ] || { echo "ERROR: expected exit code 127 but got ${rc}." >&2; exit 1; }
+          printf '%s\n' "${err}" | grep -Fq 'adoptium.net' \
+            || { echo "ERROR: the error message does not point to adoptium.net." >&2; exit 1; }
+
+  windows:
+    name: Windows installer with ${{ matrix.shell }}
+    needs: probe
+    if: needs.probe.outputs.available == 'true'
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # powershell is Windows PowerShell 5.1, pwsh is PowerShell 7.
+        shell: [ powershell, pwsh ]
+    defaults:
+      run:
+        shell: ${{ matrix.shell }}
+    env:
+      VERSION: ${{ needs.probe.outputs.version }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Set up Temurin JDK 17
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Install the latest release
+        run: |
+          iex (Get-Content -Raw src/site/resources/get.ps1)
+          $jarPath = Join-Path $env:LOCALAPPDATA 'ipmicli\ipmi-java-standalone.jar'
+          if (-not (Test-Path $jarPath)) { throw "The jar was not installed at $jarPath." }
+          $shimPath = Join-Path $env:LOCALAPPDATA 'ipmicli\bin\ipmicli.cmd'
+          if (-not (Test-Path $shimPath)) { throw "The ipmicli.cmd shim was not installed at $shimPath." }
+          $binDir = Join-Path $env:LOCALAPPDATA 'ipmicli\bin'
+          $userPath = [Environment]::GetEnvironmentVariable('Path', 'User')
+          if (-not (($userPath -split ';') -contains $binDir)) { throw "$binDir was not added to the user PATH." }
+
+      - name: Check the version and help output of the shim
+        run: |
+          $shim = Join-Path $env:LOCALAPPDATA 'ipmicli\bin\ipmicli.cmd'
+          $out = & $shim --version
+          if ($LASTEXITCODE -ne 0) { throw "ipmicli.cmd --version exited with $LASTEXITCODE." }
+          if ("$out" -ne "ipmi-java $env:VERSION") { throw "Expected 'ipmi-java $env:VERSION' but got '$out'." }
+          # The shim sets IPMICLI_PROGRAM_NAME so the usage names the ipmicli
+          # command instead of "java -jar ...".
+          $help = & $shim --help | ForEach-Object { "$_" }
+          if ($LASTEXITCODE -ne 0) { throw "ipmicli.cmd --help exited with $LASTEXITCODE." }
+          if (-not ($help | Where-Object { $_ -match '^  ipmicli -h <host> probe' })) { throw 'The help output does not name the ipmicli launcher.' }
+          if (($help -join "`n") -match 'java -jar') { throw "The help of the installed shim mentions 'java -jar'." }
+
+      - name: Honor IPMICLI_JAVA_HOME when no other JRE is findable
+        run: |
+          $shim = Join-Path $env:LOCALAPPDATA 'ipmicli\bin\ipmicli.cmd'
+          $realJavaHome = $env:JAVA_HOME
+          Remove-Item Env:JAVA_HOME -ErrorAction SilentlyContinue
+          $env:Path = "$env:SystemRoot\System32;$env:SystemRoot"
+          $ErrorActionPreference = 'Continue'
+          # Without any JRE hint the shim must fail with the Adoptium message...
+          $lines = & $shim --version 2>&1 | ForEach-Object { "$_" }
+          if ($LASTEXITCODE -ne 127) { throw "Expected exit code 127 without a JRE but got $LASTEXITCODE." }
+          if (($lines -join "`n") -notmatch 'adoptium\.net') { throw "The error message does not point to adoptium.net." }
+          # ...and must succeed through IPMICLI_JAVA_HOME alone.
+          $env:IPMICLI_JAVA_HOME = $realJavaHome
+          $out = & $shim --version
+          if ($LASTEXITCODE -ne 0) { throw "ipmicli.cmd exited with $LASTEXITCODE despite IPMICLI_JAVA_HOME." }
+          if ("$out" -ne "ipmi-java $env:VERSION") { throw "Expected 'ipmi-java $env:VERSION' through IPMICLI_JAVA_HOME but got '$out'." }
+          exit 0
+
+      - name: Reject a pre-8 JRE
+        run: |
+          # Compile a fake java.exe that reports version 1.7, the newest version
+          # the shim must reject.
+          $fakeHome = Join-Path $env:RUNNER_TEMP 'fake-java7'
+          New-Item -ItemType Directory -Force -Path (Join-Path $fakeHome 'bin') | Out-Null
+          $source = @'
+          using System;
+          class FakeJava {
+              static int Main(string[] args) {
+                  Console.Error.WriteLine("java version \"1.7.0_80\"");
+                  Console.Error.WriteLine("Java(TM) SE Runtime Environment (build 1.7.0_80-b15)");
+                  return 0;
+              }
+          }
+          '@
+          $sourcePath = Join-Path $fakeHome 'FakeJava.cs'
+          Set-Content -Path $sourcePath -Value $source
+          & "$env:SystemRoot\Microsoft.NET\Framework64\v4.0.30319\csc.exe" /nologo /out:"$fakeHome\bin\java.exe" $sourcePath
+          if ($LASTEXITCODE -ne 0) { throw "Could not compile the fake java.exe." }
+
+          $shim = Join-Path $env:LOCALAPPDATA 'ipmicli\bin\ipmicli.cmd'
+          Remove-Item Env:JAVA_HOME -ErrorAction SilentlyContinue
+          $env:Path = "$env:SystemRoot\System32;$env:SystemRoot"
+          $env:IPMICLI_JAVA_HOME = $fakeHome
+          $ErrorActionPreference = 'Continue'
+          $lines = & $shim --version 2>&1 | ForEach-Object { "$_" }
+          if ($LASTEXITCODE -ne 127) { throw "Expected exit code 127 with a Java 7 IPMICLI_JAVA_HOME but got $LASTEXITCODE." }
+          if (($lines -join "`n") -notmatch 'adoptium\.net') { throw "The error message does not point to adoptium.net." }
+          exit 0

@@ -29,11 +29,12 @@ boards) over **IPMI 2.0 over LAN (RMCP+)**, on UDP port 623. It lets a Java appl
   OEM network functions included), or through the low-level connector
   ([Low-Level API](low-level-api.html)).
 
-The same operations are available from the command line with the **`ipmicli`** client of the
-standalone jar ([Command-Line Client](cli.html)):
+The same operations are available from the command line with the **`ipmicli`** client
+([Command-Line Client](cli.html)), installed with `curl -fsSL https://metricshub.org/ipmi-java/get | sh`
+(`irm https://metricshub.org/ipmi-java/get.ps1 | iex` on Windows, see [Installation](installation.html#command-line-client)):
 
 ```text
-java -jar ipmi-java-${project.version}-standalone.jar -h bmc.example.com -u monitor -pf pw.txt sensors
+ipmicli -h bmc.example.com -u monitor -pf pw.txt sensors
 ```
 
 The library is the IPMI engine of [MetricsHub](https://metricshub.com) hardware monitoring: its
