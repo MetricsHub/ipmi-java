@@ -23,10 +23,9 @@ package org.metricshub.ipmi.core.connection;
  */
 
 import org.metricshub.ipmi.core.coding.PayloadCoder;
-import org.metricshub.ipmi.core.coding.commands.CommandCodes;
-import org.metricshub.ipmi.core.coding.commands.IpmiCommandCoder;
 import org.metricshub.ipmi.core.coding.commands.PrivilegeLevel;
 import org.metricshub.ipmi.core.coding.commands.ResponseData;
+import org.metricshub.ipmi.core.coding.commands.app.GetDeviceId;
 import org.metricshub.ipmi.core.coding.commands.session.GetChannelAuthenticationCapabilitiesResponseData;
 import org.metricshub.ipmi.core.coding.commands.session.GetChannelCipherSuitesResponseData;
 import org.metricshub.ipmi.core.coding.commands.session.OpenSessionResponseData;
@@ -34,11 +33,6 @@ import org.metricshub.ipmi.core.coding.commands.session.Rakp1;
 import org.metricshub.ipmi.core.coding.commands.session.Rakp1ResponseData;
 import org.metricshub.ipmi.core.coding.commands.session.Rakp3ResponseData;
 import org.metricshub.ipmi.core.coding.payload.IpmiPayload;
-import org.metricshub.ipmi.core.coding.payload.lan.IPMIException;
-import org.metricshub.ipmi.core.coding.payload.lan.IpmiLanMessage;
-import org.metricshub.ipmi.core.coding.payload.lan.IpmiLanRequest;
-import org.metricshub.ipmi.core.coding.payload.lan.NetworkFunction;
-import org.metricshub.ipmi.core.coding.protocol.IpmiMessage;
 import org.metricshub.ipmi.core.coding.protocol.Ipmiv20Message;
 import org.metricshub.ipmi.core.coding.protocol.PayloadType;
 import org.metricshub.ipmi.core.coding.security.AuthenticationRakpHmacSha1;
@@ -46,7 +40,6 @@ import org.metricshub.ipmi.core.coding.security.CipherSuite;
 import org.metricshub.ipmi.core.coding.security.ConfidentialityAesCbc128;
 import org.metricshub.ipmi.core.coding.security.IntegrityHmacSha1_96;
 import org.metricshub.ipmi.core.common.Constants;
-import org.metricshub.ipmi.core.common.TypeConverter;
 import org.metricshub.ipmi.core.sm.MachineObserver;
 import org.metricshub.ipmi.core.sm.StateMachine;
 import org.metricshub.ipmi.core.sm.actions.ErrorAction;
@@ -744,39 +737,9 @@ public class Connection extends TimerTask implements MachineObserver {
 	}
 
 	/**
-	 * The keep-alive request: a Get Device ID, as ipmitool sends.
-	 */
-	private static final class KeepAlive extends IpmiCommandCoder<ResponseData> {
-
-		@Override
-		public byte getCommandCode() {
-			return CommandCodes.GET_DEVICE_ID;
-		}
-
-		@Override
-		public NetworkFunction getNetworkFunction() {
-			return NetworkFunction.ApplicationRequest;
-		}
-
-		@Override
-		protected IpmiLanMessage preparePayload(int sequenceNumber) {
-			return new IpmiLanRequest(getNetworkFunction(), getCommandCode(), null, TypeConverter.intToByte(sequenceNumber));
-		}
-
-		/**
-		 * Never called: the keep-alive is sent one-way, its reply is discarded unread.
-		 */
-		@Override
-		public ResponseData getResponseData(IpmiMessage message) throws IPMIException {
-			validateResponse(message);
-			return null;
-		}
-	}
-
-	/**
-	 * {@link TimerTask} runner - periodically sends a no-op message to keep the session up: a Get Device ID sent
-	 * one-way, whose reply and timeout are not reported to the listeners. When the message queue is full, the
-	 * keep-alive of this period is skipped.
+	 * {@link TimerTask} runner - periodically sends a no-op message to keep the session up: a Get Device ID (as
+	 * ipmitool sends) sent one-way, whose reply is discarded unread and whose timeout is not reported to the
+	 * listeners. When the message queue is full, the keep-alive of this period is skipped.
 	 */
 	@Override
 	public void run() {
@@ -785,7 +748,7 @@ public class Connection extends TimerTask implements MachineObserver {
 			return;
 		}
 		try {
-			sendMessage(new KeepAlive(), true);
+			sendMessage(new GetDeviceId(), true);
 		} catch (Exception e) {
 			// Best effort: a keep-alive that cannot be sent is sent again at the next period
 		}

@@ -39,10 +39,11 @@ import javax.crypto.spec.SecretKeySpec;
  * Channel Authentication Capabilities (IPMI v1.5 session-less, section 22.13), opens the sessions of cipher suites 3
  * (RAKP-HMAC-SHA1, HMAC-SHA1-96, AES-CBC-128) and 17 (RAKP-HMAC-SHA256, HMAC-SHA256-128, AES-CBC-128) for one user,
  * with an optional Kg (sections 13.17 to 13.23, 13.31 and 13.32), and answers the IPMI requests of the session (section
- * 13.6, AES-CBC-128 per section 13.29): Get Chassis Status, Close Session, Set Session Privilege Level (sessions
- * start at the User level, section 22.18) and the commands registered with {@link #handle(int, int, Function)}. With
- * {@link #enableSol(int, int, int)}, it also serves one instance of the Serial over LAN payload (sections 15.9 to
- * 15.11 and 24.1 to 24.4). What the console sends that a BMC would reject is listed by {@link #getErrors()}.
+ * 13.6, AES-CBC-128 per section 13.29): Get Device ID, Get Chassis Status, Close Session, Set Session Privilege Level
+ * (sessions start at the User level, section 22.18) and the commands registered with
+ * {@link #handle(int, int, Function)}. With {@link #enableSol(int, int, int)}, it also serves one instance of the
+ * Serial over LAN payload (sections 15.9 to 15.11 and 24.1 to 24.4). What the console sends that a BMC would reject is
+ * listed by {@link #getErrors()}.
  * </p>
  */
 public class FakeRmcpPlusBmc implements AutoCloseable {
@@ -57,6 +58,8 @@ public class FakeRmcpPlusBmc implements AutoCloseable {
 	public static final int CHASSIS_CONTROL = 0x02;
 	/** Chassis Identify (NetFn Chassis). */
 	public static final int CHASSIS_IDENTIFY = 0x04;
+	/** Get Device ID (NetFn App). */
+	public static final int GET_DEVICE_ID = 0x01;
 	/** Get Channel Authentication Capabilities (NetFn App). */
 	public static final int GET_CHANNEL_AUTHENTICATION_CAPABILITIES = 0x38;
 	/** Set Session Privilege Level (NetFn App). */
@@ -103,6 +106,28 @@ public class FakeRmcpPlusBmc implements AutoCloseable {
 
 	/** Get Chassis Status response data the BMC answers by default: power on, no power event, no chassis flag. */
 	public static final byte[] CHASSIS_STATUS = { 0x01, 0x00, 0x00 };
+
+	/**
+	 * Get Device ID response data the BMC answers (IPMI 2.0 table 20-2): device 20h revision 1 without Device SDRs,
+	 * available, firmware 1.44, IPMI 2.0, every function but bridge, manufacturer 2 (IBM), product 001Ah, auxiliary
+	 * firmware revision 01 02 03 04.
+	 */
+	public static final byte[] DEVICE_ID = {
+			0x20,
+			0x01,
+			0x01,
+			0x44,
+			0x02,
+			(byte) 0xbf,
+			0x02,
+			0x00,
+			0x00,
+			0x1a,
+			0x00,
+			0x01,
+			0x02,
+			0x03,
+			0x04 };
 
 	/**
 	 * Faults the BMC injects: the handshake ones in every handshake ({@link #inject(Fault)}), the others in the reply to
@@ -278,6 +303,7 @@ public class FakeRmcpPlusBmc implements AutoCloseable {
 		handle(NETFN_APP, CLOSE_SESSION, this::closeSession);
 		handle(NETFN_APP, SET_SESSION_PRIVILEGE_LEVEL, this::setSessionPrivilegeLevel);
 		handle(NETFN_APP, GET_SESSION_INFO, this::getSessionInfo);
+		handle(NETFN_APP, GET_DEVICE_ID, data -> concat(new byte[1], DEVICE_ID));
 		handle(NETFN_CHASSIS, GET_CHASSIS_STATUS, this::getChassisStatus);
 		handle(NETFN_CHASSIS, CHASSIS_CONTROL, this::chassisControl);
 		handle(NETFN_CHASSIS, CHASSIS_IDENTIFY, this::chassisIdentify);

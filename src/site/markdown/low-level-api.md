@@ -254,10 +254,11 @@ A command the library does not implement is a subclass of
 where `R` is the type of its response: return its network function and command code, build the
 request data in `preparePayload()`, and decode the response in `getResponseData()`, where
 `validateResponse()` checks the response and the completion code and returns the response data
-bytes. A minimal Get Device ID:
+bytes. A minimal Get Self Test Results (IPMI 2.0, section 20.4), whose two response bytes say
+whether the BMC passed its self test:
 
 ```java
-public class GetDeviceId extends IpmiCommandCoder<GetDeviceIdResponseData> {
+public class GetSelfTestResults extends IpmiCommandCoder<GetSelfTestResultsResponseData> {
 
 	@Override
 	public NetworkFunction getNetworkFunction() {
@@ -266,7 +267,7 @@ public class GetDeviceId extends IpmiCommandCoder<GetDeviceIdResponseData> {
 
 	@Override
 	public byte getCommandCode() {
-		return 0x01; // Get Device ID (IPMI 2.0, section 20.1)
+		return 0x04; // Get Self Test Results (IPMI 2.0, section 20.4)
 	}
 
 	@Override
@@ -277,16 +278,20 @@ public class GetDeviceId extends IpmiCommandCoder<GetDeviceIdResponseData> {
 	}
 
 	@Override
-	public GetDeviceIdResponseData getResponseData(IpmiMessage message) throws IPMIException {
+	public GetSelfTestResultsResponseData getResponseData(IpmiMessage message) throws IPMIException {
 		byte[] data = validateResponse(message); // throws IPMIException on an error completion code
-		return new GetDeviceIdResponseData(data); // your own ResponseData implementation
+		return new GetSelfTestResultsResponseData(data); // your own ResponseData implementation
 	}
 }
 ```
 
 ```java
-GetDeviceIdResponseData id = bmc.send(new GetDeviceId());
+GetSelfTestResultsResponseData results = bmc.send(new GetSelfTestResults());
 ```
+
+Get Device ID itself is implemented
+([`GetDeviceId`](apidocs/org/metricshub/ipmi/core/coding/commands/app/GetDeviceId.html), the
+command behind [`deviceId()`](device-id.html)).
 
 ## Asynchronous API
 

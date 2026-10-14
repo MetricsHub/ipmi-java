@@ -110,6 +110,7 @@ class CliArgumentsTest {
 	@Test
 	void thePrivilegeDefaultsToTheLowestTheSubcommandNeeds() throws Exception {
 		assertEquals(PrivilegeLevel.User, parse("chassis").privilege());
+		assertEquals(PrivilegeLevel.User, parse("info").privilege());
 		assertEquals(PrivilegeLevel.User, parse("power", "status").privilege());
 		assertEquals(PrivilegeLevel.Operator, parse("power", "on").privilege());
 		assertEquals(PrivilegeLevel.Operator, parse("identify").privilege());
@@ -172,7 +173,7 @@ class CliArgumentsTest {
 		assertEquals("--escape requires a single printable ASCII character", usageError(login("sol", "--escape", "é")));
 		assertEquals("--escape requires a single printable ASCII character", usageError(login("sol", "--escape", " ")));
 		assertEquals(
-				"--json requires the probe or chassis or sensors or fru or sel subcommand",
+				"--json requires the probe or info or chassis or sensors or fru or sel subcommand",
 				usageError(login("sol", "--json")));
 		assertEquals("--type requires the sensors subcommand", usageError(login("fru", "--type", "Fan")));
 		assertEquals("--long requires the sensors subcommand", usageError(login("chassis", "--long")));

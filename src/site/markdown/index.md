@@ -122,11 +122,13 @@ completion code, or the operation outlived its deadline
 ## Where to go next
 
 * [Installation](installation.html) — coordinates, supported JDKs and requirements
-* [Command-Line Client](cli.html) — `ipmicli`: the chassis status, the power control, the
-  sensors, the FRUs, the System Event Log and a Serial over LAN console from the command line,
-  with the standalone jar
+* [Command-Line Client](cli.html) — `ipmicli`: the identity of the BMC, the chassis status, the
+  power control, the sensors, the FRUs, the System Event Log and a Serial over LAN console from
+  the command line, with the standalone jar
 * [Preparing the BMC](preparing-the-bmc.html) — enabling IPMI over LAN, the account, privilege
   level and cipher suites, the firewall
+* [Device ID](device-id.html) — manufacturer, product and firmware revision of the BMC, the
+  functions it provides
 * [Chassis Status](chassis-status.html) — power state and chassis flags, power control, identify
   LED
 * [FRU Inventory](fru-inventory.html) — how FRUs are read and which fields are reported

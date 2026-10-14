@@ -57,6 +57,7 @@ final class CliArguments implements AutoCloseable {
 		HELP,
 		VERSION,
 		PROBE,
+		INFO,
 		CHASSIS,
 		POWER,
 		IDENTIFY,
@@ -72,7 +73,7 @@ final class CliArguments implements AutoCloseable {
 	/** The preference of the client, repeated here for the usage text and the {@code probe} output. */
 	static final int[] DEFAULT_CIPHER_SUITES = { 17, 3, 8, 16, 2, 7 };
 	static final char DEFAULT_ESCAPE = '~';
-	static final String SUBCOMMANDS = "probe, chassis, power, identify, sensors, fru, sel or sol";
+	static final String SUBCOMMANDS = "probe, info, chassis, power, identify, sensors, fru, sel or sol";
 	static final String POWER_ACTIONS = "status, on, off, cycle, reset, soft or diag";
 	/** The identify interval of {@code identify} without argument: the default of the specification (section 28.5). */
 	static final int DEFAULT_IDENTIFY_SECONDS = 15;
@@ -240,6 +241,9 @@ final class CliArguments implements AutoCloseable {
 		case "probe":
 			subcommand = Subcommand.PROBE;
 			break;
+		case "info":
+			subcommand = Subcommand.INFO;
+			break;
 		case "chassis":
 			subcommand = Subcommand.CHASSIS;
 			break;
@@ -315,6 +319,7 @@ final class CliArguments implements AutoCloseable {
 			requireSubcommand(
 					option,
 					Subcommand.PROBE,
+					Subcommand.INFO,
 					Subcommand.CHASSIS,
 					Subcommand.SENSORS,
 					Subcommand.FRU,

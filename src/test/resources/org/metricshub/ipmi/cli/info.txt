@@ -1,0 +1,10 @@
+Device ID                   32
+Device revision             1
+Firmware revision           1.44
+IPMI version                2.0
+Manufacturer ID             2
+Product ID                  26
+Device available            yes
+Provides device SDRs        no
+Functions                   SENSOR_DEVICE, SDR_REPOSITORY_DEVICE, SEL_DEVICE, FRU_INVENTORY_DEVICE, IPMB_EVENT_RECEIVER, IPMB_EVENT_GENERATOR, CHASSIS_DEVICE
+Aux firmware revision       01020304

@@ -55,6 +55,7 @@
 		</menu>
 
 		<menu name="Usage">
+			<item name="Device ID" href="device-id.html" />
 			<item name="Chassis Status" href="chassis-status.html" />
 			<item name="FRU Inventory" href="fru-inventory.html" />
 			<item name="Sensors" href="sensors.html" />
