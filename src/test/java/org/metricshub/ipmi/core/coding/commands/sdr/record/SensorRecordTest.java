@@ -179,7 +179,8 @@ class SensorRecordTest {
 		assertEquals(2.5, full.getLowerNonRecoverableThreshold(), 1e-9);
 		assertEquals(3.5, full.getLowerCriticalThreshold(), 1e-9);
 		assertEquals(4.5, full.getLowerNonCriticalThreshold(), 1e-9);
-		assertEquals(0.05, full.getSensorResolution(), 1e-9);
+		// IPMI 2.0 section 36.4.2: |M * 10^Rexp|, the step between two raw readings
+		assertEquals(0.1, full.getSensorResolution(), 1e-9);
 	}
 
 	@Test

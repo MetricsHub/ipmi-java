@@ -408,7 +408,13 @@ public class FullSensorRecord extends AbstractSensorRecord {
 		}
 	}
 
+	/**
+	 * Returns the resolution: the difference in units between two successive raw readings, {@code |M x 10^R|}
+	 * (IPMI 2.0 section 36.4.2).
+	 *
+	 * @return the resolution
+	 */
 	public double getSensorResolution() {
-		return Math.abs(getM() / 2.0 * Math.pow(10, getrExp()));
+		return Math.abs(getM() * Math.pow(10, getrExp()));
 	}
 }
