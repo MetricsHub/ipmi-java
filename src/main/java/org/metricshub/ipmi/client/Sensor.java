@@ -125,7 +125,7 @@ public final class Sensor {
 	/**
 	 * Returns the name of the sensor, from the ID string of its record.
 	 *
-	 * @return the name
+	 * @return the name, empty (never {@code null}) when the record has no ID string
 	 */
 	public String name() {
 		return record.getName();

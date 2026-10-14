@@ -72,7 +72,7 @@ public abstract class AbstractSensorRecord extends SensorRecord {
 
 	private SensorDirection sensorDirection;
 
-	private String name;
+	private String name = "";
 
 	private InstanceModifierType idInstanceModifierType;
 
@@ -416,7 +416,7 @@ public abstract class AbstractSensorRecord extends SensorRecord {
 	}
 
 	/**
-	 * @return the sensor ID string
+	 * @return the sensor ID string, empty when the record has none
 	 */
 	public String getName() {
 		return name;
