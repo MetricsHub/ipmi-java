@@ -1,4 +1,4 @@
-keywords: upgrade, migration, release notes, breaking changes, 2.0, fluent client, builder, device id, ipmiclientexception, slf4j, ipmicli, standalone jar, sel, system event log, chassis control, chassis identify, protected fields, accessors, abstractsensorrecord, validateresponse, utf-8, bmc key, cipher suite, integrity, org.sentrysoftware
+keywords: upgrade, migration, release notes, breaking changes, 2.0, fluent client, builder, device id, raw, dcmi, network function, ipmiclientexception, slf4j, ipmicli, standalone jar, sel, system event log, chassis control, chassis identify, protected fields, accessors, abstractsensorrecord, validateresponse, utf-8, bmc key, cipher suite, integrity, org.sentrysoftware
 description: What changes when upgrading the IPMI Java Client — from 1.x to 2.0.00 (the fluent client, the System Event Log), from 1.2.02, from 1.2.01, and from the org.sentrysoftware:ipmi artifact of 1.2.00 and earlier.
 
 # Upgrading
@@ -13,7 +13,9 @@ same. It also adds a command-line client, `ipmicli`, in a standalone jar
 ([Command-Line Client](cli.html)); `CipherSuite` gains `getAuthenticationAlgorithmCode()`,
 `getIntegrityAlgorithmCode()` and `getConfidentialityAlgorithmCode()` for it. The semicolon-separated text output of 1.x (`IpmiResultConverter`) is MetricsHub's format,
 and moves to the [MetricsHub IPMI extension](https://github.com/MetricsHub/metricshub-community/issues/1391),
-where it stays byte-identical to 1.2.x for the same BMC data.
+where it stays byte-identical to 1.2.x for the same BMC data, except for the sensor and FRU names
+that 1.x padded with NUL characters and the OS Boot states that `ReadingType` now names (see
+[The low-level API](#the-low-level-api)).
 
 ### The client
 
@@ -74,7 +76,10 @@ the last entry read,
 [`chassisControl(PowerCommand)`](chassis-status.html#controlling-the-power) powers the system
 on or off, cycles or resets it, and `chassisIdentify(seconds)` blinks the identify LED,
 [`send(command)`](low-level-api.html#sending-a-command-through-the-client) sends any command of
-the core in the session, [`sol().open()`](serial-over-lan.html#with-ipmiclient) opens a Serial
+the core in the session, [`raw(netFn, command)`](low-level-api.html#raw-requests) sends any
+request as bytes, the extension and OEM network functions included (DCMI `2Ch`, OEM `30h`-`3Eh`),
+and returns its completion code and data without throwing (`ipmicli raw` is its subcommand),
+[`sol().open()`](serial-over-lan.html#with-ipmiclient) opens a Serial
 over LAN console as streams, `privilege(PrivilegeLevel)` opens the session at the Operator or
 Administrator level (raised with Set Session Privilege Level after the handshake, as every session
 starts at User), and the [SDR cache](configuration.html#sdr-cache) makes `frus()` and
@@ -108,6 +113,39 @@ reply) are ignored.
   constant of 4 000 ms.
 * `CipherSuite.forId(int)` builds one of the standard suites 0 to 19 with the algorithms of the
   specification, for `createConnection()` without discovery.
+* A reply is matched to its request by its command code **and** its network function, the request
+  one plus one (IPMI 2.0 section 5.1), where 1.2.x used the tag and the command code only.
+  `IpmiCommandCoder.getNetworkFunctionCode()` gives the code of the request, by default that of
+  `getNetworkFunction()`. A command of a network function `NetworkFunction` does not list
+  (Transport `0Ch`, DCMI `2Ch`, OEM `2Eh`, `30h`-`3Eh`) returns `null` from
+  `getNetworkFunction()`, overrides `getNetworkFunctionCode()`, and builds its request with the
+  new `IpmiLanRequest(int networkFunctionCode, byte command, byte[] data, byte sequenceNumber)`
+  ([Extension and OEM network functions](low-level-api.html#extension-and-oem-network-functions)).
+  An `IpmiLanRequest` subclass that set the protected `networkFunction` field of 1.2.x to such a
+  code must be replaced with this constructor and override, or its replies are ignored and its
+  requests time out.
+* `IpmiConnector.openSession()` and `IpmiAsyncConnector.openSession()` raise the session to the
+  requested privilege with Set Session Privilege Level right after the handshake when it is
+  `Operator` or `Administrator` (IPMI 2.0 section 22.18). In 1.x the session stayed at User on the
+  BMCs that follow the specification (iDRAC 7 and 8, iLO 5, XCC, Cisco IMC), where its Operator
+  and Administrator commands failed with `D4h`. A BMC that refuses the level now fails
+  `openSession()` with `SessionException` (whose cause is the `IPMIException` of the completion
+  code) after closing the session, where 1.x returned a session running at a lower level: request
+  the level the commands need. A `SetSessionPrivilegeLevel` sent after `openSession()` is now
+  redundant and harmless. The `SerialOverLan` constructors that open their own session request
+  Administrator, and now fail with `SessionException` for an account not allowed Administrator:
+  open the session at the level the payload needs and pass it to `SerialOverLan(connector,
+  session)`; the console raises a session itself only when it was opened with
+  `MaximumAvailable`.
+* `getAvailableCipherSuites()` first sends Get Channel Authentication Capabilities in the IPMI
+  v1.5 format (IPMI 2.0 section 13.13), and sends the RMCP+ Get Channel Cipher Suites only when the
+  reply reports IPMI v2.0 connections (table 22-15). An IPMI 1.5-only BMC fails at once with the
+  new `Ipmi20UnsupportedException`, a `ConnectionException` that is not sent again
+  (`IpmiClientException` from `IpmiClient`, exit code 70 from `ipmicli`), where 1.x sent Get
+  Channel Cipher Suites until all the tries timed out (`ConnectionException: Command timed out`).
+  `getChannelAuthenticationCapabilities()` no longer sends anything: it returns that reply,
+  requested at the User level, and declares the cipher suite and the privilege of the session.
+  The handshake sends as many messages as before.
 * `IpmiConnector.sendMessage(handle, command, resends)` sends a command with its own number of
   resends when no reply comes or the BMC answers `C3h`, 0 for a command the BMC must not receive
   twice.
@@ -125,6 +163,11 @@ reply) are ignored.
   one-argument form keeps decoding what it can, silently.
 * The decoders no longer log the values they do not model: they return the same defaults as
   before (`Other`, `Unknown`, `Unspecified`, `Oem`).
+* The ID string of the SDR records (`getName()` of the sensor and locator records, so
+  `Sensor.name()`, `Fru.name()` and the `names()` globs of `sensors()`) is decoded as long as its
+  type/length byte says (IPMI 2.0 section 43.15) and ends at its first NUL character. 1.x decoded
+  the rest of the record as well: on Fujitsu iRMC S5, HPE iLO 5 and Supermicro BMCs, the names
+  ended with NUL characters (`Fan 1\0\0...`), which `names("Fan 1")` did not match.
 * `SelRecord` decodes the generator ID, the event/reading type and the three event data bytes of
   a system event (`getGeneratorId()`, `getEventType()`, `getEventData()`), keeps the 16 bytes of
   the record (`getRawData()`), and refuses a record shorter than 16 bytes with
@@ -133,6 +176,12 @@ reply) are ignored.
   unsigned (IPMI 2.0 section 37.1): the dates from 2038 on, and the `FFFFFFFFh` marker of an
   unspecified timestamp, were negative dates in 1.x. It is used by the SEL and SDR repository
   timestamps.
+* `ReadingType` has the four offsets that IPMI 2.0 revision 1.1 adds to the OS Boot sensor type
+  (`1Fh`, Base OS/Hypervisor installation, `07h` to `0Ah`): `BaseOsInstallationStarted`,
+  `BaseOsInstallationCompleted`, `BaseOsInstallationAborted` and `BaseOsInstallationFailed`, which
+  `parseInt()`, and so the SEL entries and the sensor states, reported as `Unknown` in 1.x;
+  `Sensor.states()` and `SelEntry.description()` say `Installation started`, `Installation
+  completed`, `Installation aborted` and `Installation failed`, as `ipmitool` does.
 
 ## Upgrading from 1.2.02
 
@@ -169,7 +218,7 @@ The `IpmiClient` API is unchanged, and the client is more tolerant of real-world
 * a failed login fails at once with its actual cause (`IllegalArgumentException: Authentication
   check failed`, `IPMIException: Unauthorized name.`), where 1.2.02 sent the credentials four
   times and threw `ConnectionException: Illegal connection state: Rakp1Waiting`
-  ([Troubleshooting](troubleshooting.html#the-login-fails)); only a handshake step that got no
+  ([Troubleshooting](troubleshooting.html#ipmiauthenticationexception)); only a handshake step that got no
   reply is sent again;
 * the [keep-alive](configuration.html#keep-alive) is actually sent: with the default `pingPeriod`
   (`-1`) 1.2.02 sent no keep-alive at all, so a session could expire during a long collection; the
@@ -359,7 +408,7 @@ with the new `protected` accessors:
 | `MessageHandler` | `messageQueue` | `getMessageQueue()` |
 | `MessageHandler` | `connection` | `getConnection()` |
 | `MessageHandler` | `lastReceivedSequenceNumber` | None: the sequence-number window is private |
-| `IpmiLanMessage` | `networkFunction` | `getNetworkFunctionCode()`, `setNetworkFunctionCode(byte)` |
+| `IpmiLanMessage` | `networkFunction` | `getNetworkFunctionCode()` (public), `setNetworkFunctionCode(byte)` |
 | `ConfidentialityAlgorithm` | `sik` | `getSik()` |
 | `IntegrityAlgorithm` | `sik` | `getSik()`, `setSik(byte[])` |
 

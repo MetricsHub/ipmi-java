@@ -8,6 +8,8 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.util.Arrays;
+
 import org.junit.jupiter.api.Test;
 
 class SensorRecordTest {
@@ -248,6 +250,61 @@ class SensorRecordTest {
 		assertFalse(eventOnly.isEntityInstanceIncrements());
 		assertEquals(17, eventOnly.getIdInstanceModifierOffset());
 		assertEquals("BIOS", eventOnly.getName());
+	}
+
+	/** Decodes an ID string the way every SDR record does. */
+	private static String decode(int typeLength, int... data) {
+		return new EventOnlyRecord().decodeName((byte) typeLength, bytes(data));
+	}
+
+	/** The record with its ID string replaced from the type/length byte on, and its record length fixed. */
+	private static byte[] withIdString(byte[] record, int typeIndex, int... idString) {
+		byte[] raw = Arrays.copyOf(record, typeIndex + idString.length);
+		for (int i = 0; i < idString.length; i++) {
+			raw[typeIndex + i] = (byte) idString[i];
+		}
+		raw[4] = (byte) (raw.length - 5);
+		return raw;
+	}
+
+	@Test
+	void theIdStringIsDecodedAsLongAsItsTypeLengthByteSays() {
+		// A fixed-length record padded with NULs after the name (Fujitsu iRMC S5, HPE iLO 5, Supermicro)
+		assertEquals(
+				"Vcore",
+				((AbstractSensorRecord) SensorRecord
+						.populateSensorRecord(
+								withIdString(FULL_SENSOR_RECORD, 47, 0xc5, 'V', 'c', 'o', 'r', 'e', 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)))
+						.getName());
+		// Bytes after the declared length that are not NULs
+		assertEquals(
+				"Temp",
+				((AbstractSensorRecord) SensorRecord
+						.populateSensorRecord(withIdString(COMPACT_SENSOR_RECORD, 31, 0xc4, 'T', 'e', 'm', 'p', 'X', 'Y')))
+						.getName());
+		// A record shorter than the declared length
+		assertEquals(
+				"BIOS",
+				((AbstractSensorRecord) SensorRecord
+						.populateSensorRecord(withIdString(EVENT_ONLY_RECORD, 16, 0xc8, 'B', 'I', 'O', 'S'))).getName());
+	}
+
+	@Test
+	void theIdStringHonorsItsTypeAndEndsAtItsFirstNul() {
+		assertEquals("", decode(0xc0, 'B', 'I', 'O', 'S'), "length 0: none following");
+		assertEquals("", decode(0xc5), "no bytes at all");
+		assertEquals("Fan 1", decode(0xd0, 'F', 'a', 'n', ' ', '1', 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0), "NULs in the length");
+		assertEquals("A", decode(0xc2, 'A', 0), "one character, padded to the two bytes the type requires");
+		assertEquals("ét", decode(0xc2, 0xe9, 't'), "Latin 1");
+		assertEquals("BIOS", decode(0x04, 'B', 'I', 'O', 'S', 0), "Unicode carrying ASCII");
+		// 6-bit packed ASCII: the example of section 43.16, the length in characters
+		assertEquals("IPMI", decode(0x84, 0x29, 0xdc, 0xa6, 0, 0));
+		assertEquals("IP", decode(0x84, 0x29, 0xdc), "only the complete characters of a short record");
+		assertEquals("AB", decode(0x82, 0xa1, 0x08));
+		// BCD plus, 2 characters per byte
+		assertEquals("01.2", decode(0x44, 0x01, 0xc2, 0));
+		assertEquals("01.", decode(0x43, 0x01, 0xc0), "an odd length drops the last nibble");
+		assertEquals("AB", decode(0xdf, 'A', 'B'), "the reserved length 1Fh, bounded by the record");
 	}
 
 	@Test

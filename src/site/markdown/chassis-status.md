@@ -48,8 +48,10 @@ in the specification, and a BMC that does not implement them reports `false`.
 
 `chassisControl(PowerCommand)` sends the **Chassis Control** command (IPMI 2.0, section 28.3).
 It needs a client built with the **Operator** or **Administrator**
-[privilege](configuration.html#privilege-level): at the default User level the BMC refuses it
-with `D4h`.
+[privilege](configuration.html#privilege-level), which the client requests at login and sets
+right after it (Set Session Privilege Level): at the default User level the BMC refuses the
+command with `D4h`, and an account not allowed Operator fails the first operation with
+`IpmiAuthenticationException`.
 
 ```java
 try (IpmiClient bmc = IpmiClient.builder(host).credentials(user, password)

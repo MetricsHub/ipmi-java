@@ -81,6 +81,7 @@ import org.metricshub.ipmi.core.coding.security.CipherSuite;
 import org.metricshub.ipmi.core.common.Constants;
 import org.metricshub.ipmi.core.common.TypeConverter;
 import org.metricshub.ipmi.core.connection.ConnectionException;
+import org.metricshub.ipmi.core.connection.Ipmi20UnsupportedException;
 import org.metricshub.ipmi.core.connection.Session;
 import org.metricshub.ipmi.core.connection.SessionException;
 
@@ -117,7 +118,7 @@ import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
  * <p>
  * <b>Session recovery</b>: when the session is lost (the BMC rebooted or expired it), the next operation opens a new
  * one. A read operation that fails because the session was lost while it ran is retried once on a new session;
- * {@link #send(IpmiCommandCoder)} and the control operations are never replayed.
+ * {@link #send(IpmiCommandCoder)}, {@link #raw(int, int)} and the control operations are never replayed.
  * </p>
  * <p>
  * <b>Threads</b>: a client can be shared between threads; its operations are serialized. A BMC drops replies under
@@ -232,13 +233,12 @@ public final class IpmiClient implements AutoCloseable {
 	}
 
 	/**
-	 * Reads what the BMC supports before any login: the cipher suites it offers and its authentication options
-	 * (Get Channel Cipher Suites and Get Channel Authentication Capabilities). Needs no credentials and opens no
-	 * session.
+	 * Reads what the BMC supports before any login: its authentication options and the cipher suites it offers (Get
+	 * Channel Authentication Capabilities and Get Channel Cipher Suites). Needs no credentials and opens no session.
 	 *
 	 * @return the capabilities
 	 * @throws IpmiConnectionException when the BMC does not answer
-	 * @throws IpmiClientException when the replies cannot be decoded
+	 * @throws IpmiClientException when the BMC does not support IPMI 2.0 (RMCP+), or the replies cannot be decoded
 	 */
 	public BmcCapabilities capabilities() {
 		return run("capabilities", timeout, false, false, this::readCapabilities);
@@ -373,8 +373,33 @@ public final class IpmiClient implements AutoCloseable {
 	 * @throws IpmiClientException when the session cannot be opened or the BMC does not answer
 	 */
 	public <R extends ResponseData> R send(IpmiCommandCoder<R> command) {
+		return send(command, null);
+	}
+
+	/** Sends a command under the given deadline (the client's when null), never replayed on a new session. */
+	<R extends ResponseData> R send(IpmiCommandCoder<R> command, Duration deadline) {
 		Objects.requireNonNull(command, "command");
-		return run(command.getClass().getSimpleName(), timeout, true, false, () -> link.send(command));
+		return run(command.getClass().getSimpleName(), deadline, true, false, () -> link.send(command));
+	}
+
+	/**
+	 * Sends any request in the session, like {@code ipmitool raw}, and returns its reply whatever its completion code:
+	 * {@code bmc.raw(0x2C, 0x01).data(0xDC, 0x01).execute()} is Get DCMI Capabilities Info. Any request network
+	 * function is accepted, the extension and OEM ones included (Group Extension 2Ch, whose first data byte is the
+	 * defining body, DCh for DCMI; OEM/Group 2Eh, whose first three are an IANA enterprise number; controller-specific
+	 * OEM 30h-3Eh). An error completion code is returned, not thrown, and not retried, a busy one ({@code C0h}) or
+	 * {@code C3h} included. Like {@link #send(IpmiCommandCoder)}, the request is sent again when its reply is lost
+	 * (the retries of the builder) and never replayed on a new session: a control request sent raw has none of the
+	 * safeguards of {@link #chassisControl(PowerCommand)}.
+	 *
+	 * @param networkFunction the network function of the request: an even number from 00h to 3Eh (the odd ones are
+	 *        those of the responses, IPMI 2.0 section 5.1)
+	 * @param command the command code, 00h to FFh
+	 * @return the request to complete
+	 * @throws IllegalArgumentException when the network function or the command is out of range
+	 */
+	public RawRequest raw(int networkFunction, int command) {
+		return new RawRequest(this, networkFunction, command);
 	}
 
 	/**
@@ -500,6 +525,10 @@ public final class IpmiClient implements AutoCloseable {
 				}
 				throw new IpmiClientException("Cannot open the SOL console of " + host + ": " + e.getMessage(), e);
 			} catch (SessionException e) {
+				if (e.getCause() instanceof SessionException) {
+					// The BMC refused to raise the session of the SOL payload port to the privilege of the client
+					throw translateHandshake((SessionException) e.getCause());
+				}
 				throw new IpmiConnectionException(
 						"Cannot open the session of the SOL payload port of " + host + ": " + e.getMessage(),
 						e);
@@ -752,6 +781,25 @@ public final class IpmiClient implements AutoCloseable {
 					"The BMC " + host + " refused the login of " + user + ": wrong password or BMC key (" + e.getMessage() + ")",
 					e);
 		}
+		if (e instanceof SessionException && e.getCause() instanceof IPMIException) {
+			// openSession() logged in, then closed the session the BMC would not raise to the requested privilege
+			IPMIException refusal = (IPMIException) e.getCause();
+			int code = refusal.getRawCode();
+			if (code == SetSessionPrivilegeLevel.LEVEL_NOT_AVAILABLE
+					|| code == SetSessionPrivilegeLevel.LEVEL_ABOVE_LIMIT
+					|| isAuthenticationCode(refusal.getCompletionCode())) {
+				return new IpmiAuthenticationException(
+						"The BMC " + host + " refused the " + privilege + " privilege to " + user + ": "
+								+ SetSessionPrivilegeLevel.describeRefusal(refusal),
+						refusal.getCompletionCode(),
+						e);
+			}
+			// A busy BMC, or another failure than a refusal of the level
+			return new IpmiClientException(
+					"The BMC " + host + " could not raise the session to the " + privilege + " privilege: "
+							+ SetSessionPrivilegeLevel.describeRefusal(refusal),
+					e);
+		}
 		if (e instanceof IPMIException) {
 			CompletionCode code = ((IPMIException) e).getCompletionCode();
 			if (isAuthenticationCode(code)) {
@@ -761,6 +809,13 @@ public final class IpmiClient implements AutoCloseable {
 						e);
 			}
 			return new IpmiClientException("The BMC " + host + " refused the session: " + code.getMessage(), e);
+		}
+		if (e instanceof Ipmi20UnsupportedException) {
+			// The BMC answered: not a network failure
+			return new IpmiClientException(
+					"The BMC " + host + " does not support IPMI 2.0 / RMCP+: its reply to Get Channel Authentication "
+							+ "Capabilities reports no IPMI v2.0 connections",
+					e);
 		}
 		if (e instanceof ConnectionException) {
 			return new IpmiConnectionException(
@@ -867,12 +922,12 @@ public final class IpmiClient implements AutoCloseable {
 
 		/**
 		 * Opens the session: cipher suite discovery unless the builder fixed the suite, Get Channel Authentication
-		 * Capabilities, Open Session, RAKP 1 to 4, then Set Session Privilege Level when the builder asked for more
-		 * than User (IPMI 2.0 section 22.18: every session starts at User).
+		 * Capabilities, then {@link IpmiConnector#openSession(ConnectionHandle, String, byte[], byte[])}: Open Session,
+		 * RAKP 1 to 4 and, when the builder asked for more than User, Set Session Privilege Level (IPMI 2.0 section
+		 * 22.18: every session starts at User).
 		 */
 		static Link open(IpmiClient client, IpmiConnector connector, InetAddress address) {
 			ConnectionHandle handle = null;
-			Session session = null;
 			try {
 				if (client.discoverCipherSuite) {
 					handle = connector.createConnection(address, client.port);
@@ -885,17 +940,10 @@ public final class IpmiClient implements AutoCloseable {
 					handle = connector
 							.createConnection(address, client.port, CipherSuite.forId(client.cipherSuites[0]), client.privilege);
 				}
-				session = connector.openSession(handle, client.user, encode(client.password), client.bmcKey);
-				Link link = new Link(connector, handle, session, client.host, client.retries + 1);
-				if (client.privilege == PrivilegeLevel.Operator || client.privilege == PrivilegeLevel.Administrator) {
-					link.raisePrivilege(client.privilege);
-				}
-				return link;
+				Session session = connector.openSession(handle, client.user, encode(client.password), client.bmcKey);
+				return new Link(connector, handle, session, client.host, client.retries + 1);
 			} catch (Exception e) {
 				if (handle != null) {
-					if (session != null) {
-						closeQuietly(connector, handle);
-					}
 					connector.closeConnection(handle);
 				}
 				throw client.translateHandshake(e);
@@ -908,28 +956,6 @@ public final class IpmiClient implements AutoCloseable {
 				return true;
 			} catch (IllegalStateException e) {
 				return false;
-			}
-		}
-
-		private void raisePrivilege(PrivilegeLevel privilege) {
-			try {
-				send(new SetSessionPrivilegeLevel(privilege));
-			} catch (IpmiCompletionCodeException e) {
-				throw new IpmiAuthenticationException(
-						"The BMC " + host + " refused the " + privilege + " privilege: " + e.completionCode().getMessage(),
-						e.completionCode(),
-						e);
-			}
-		}
-
-		private static void closeQuietly(IpmiConnector connector, ConnectionHandle handle) {
-			try {
-				connector.closeSession(handle);
-			} catch (Exception e) {
-				// Best effort: the session that could not be used is left to expire
-				if (e instanceof InterruptedException) {
-					Thread.currentThread().interrupt();
-				}
 			}
 		}
 
@@ -1086,7 +1112,9 @@ public final class IpmiClient implements AutoCloseable {
 
 		/**
 		 * Uses exactly the given cipher suite, without asking the BMC which ones it offers: saves the Get Channel
-		 * Cipher Suites round trips with a BMC known to support it.
+		 * Authentication Capabilities and Get Channel Cipher Suites round trips with a BMC known to support it. An
+		 * IPMI 1.5-only BMC then fails with {@link IpmiConnectionException} (no reply to Open Session) instead of
+		 * {@link IpmiClientException}.
 		 *
 		 * @param id the suite ID (IPMI 2.0 table 22-20), one with integrity
 		 * @return this builder

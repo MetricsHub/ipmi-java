@@ -64,7 +64,8 @@ final class CliArguments implements AutoCloseable {
 		SENSORS,
 		FRU,
 		SEL,
-		SOL
+		SOL,
+		RAW
 	}
 
 	static final long DEFAULT_TIMEOUT_MS = 120_000L;
@@ -73,7 +74,7 @@ final class CliArguments implements AutoCloseable {
 	/** The preference of the client, repeated here for the usage text and the {@code probe} output. */
 	static final int[] DEFAULT_CIPHER_SUITES = { 17, 3, 8, 16, 2, 7 };
 	static final char DEFAULT_ESCAPE = '~';
-	static final String SUBCOMMANDS = "probe, info, chassis, power, identify, sensors, fru, sel or sol";
+	static final String SUBCOMMANDS = "probe, info, chassis, power, identify, sensors, fru, sel, sol or raw";
 	static final String POWER_ACTIONS = "status, on, off, cycle, reset, soft or diag";
 	/** The identify interval of {@code identify} without argument: the default of the specification (section 28.5). */
 	static final int DEFAULT_IDENTIFY_SECONDS = 15;
@@ -85,6 +86,8 @@ final class CliArguments implements AutoCloseable {
 	private static final int MAX_SEL_RECORD_ID = 0xfffe;
 	private static final int LAST_STANDARD_SUITE = 19;
 	private static final int HEX_RADIX = 16;
+	/** The last request network function: the odd codes are those of the responses (IPMI 2.0 section 5.1). */
+	private static final int LAST_NETWORK_FUNCTION = 0x3e;
 	private static final char DELETE = 0x7f;
 
 	private Subcommand subcommand;
@@ -108,6 +111,9 @@ final class CliArguments implements AutoCloseable {
 	private PowerCommand powerCommand;
 	private int identifySeconds = DEFAULT_IDENTIFY_SECONDS;
 	private boolean identifyForever;
+	private int rawNetworkFunction;
+	private int rawCommand;
+	private int[] rawData = new int[0];
 	private int escape = DEFAULT_ESCAPE;
 	private boolean escapeGiven;
 	private boolean noEscape;
@@ -265,6 +271,9 @@ final class CliArguments implements AutoCloseable {
 		case "sol":
 			subcommand = Subcommand.SOL;
 			break;
+		case "raw":
+			subcommand = Subcommand.RAW;
+			break;
 		default:
 			throw new CliUsageException("unknown subcommand '" + name + "' (" + SUBCOMMANDS + ")");
 		}
@@ -300,6 +309,9 @@ final class CliArguments implements AutoCloseable {
 				fruIds.add((int) parseNumber(id, "fru <id>", 0, MAX_FRU_ID));
 			}
 			break;
+		case RAW:
+			parseRaw(positional);
+			break;
 		default:
 			if (!positional.isEmpty()) {
 				throw new CliUsageException(name + " takes no argument");
@@ -323,7 +335,8 @@ final class CliArguments implements AutoCloseable {
 					Subcommand.CHASSIS,
 					Subcommand.SENSORS,
 					Subcommand.FRU,
-					Subcommand.SEL);
+					Subcommand.SEL,
+					Subcommand.RAW);
 			json = true;
 			return flag(argument, option, index);
 		case "--since":
@@ -414,6 +427,30 @@ final class CliArguments implements AutoCloseable {
 		}
 	}
 
+	private void parseRaw(List<String> positional) throws CliUsageException {
+		if (positional.size() < 2) {
+			throw new CliUsageException("raw requires <netfn> <command> [<data byte>...]");
+		}
+		rawNetworkFunction = parseHexByte(positional.get(0), "raw <netfn>");
+		if (rawNetworkFunction > LAST_NETWORK_FUNCTION || rawNetworkFunction % 2 != 0) {
+			throw new CliUsageException("raw <netfn> must be a request network function: an even byte from 00 to 3e");
+		}
+		rawCommand = parseHexByte(positional.get(1), "raw <command>");
+		rawData = new int[positional.size() - 2];
+		for (int i = 0; i < rawData.length; i++) {
+			rawData[i] = parseHexByte(positional.get(i + 2), "raw <data byte>");
+		}
+	}
+
+	/** A byte in hexadecimal, {@code 0x} optional: {@code 06}, {@code 0x06} and {@code 6} are the same byte. */
+	private static int parseHexByte(String value, String what) throws CliUsageException {
+		String digits = value.startsWith("0x") || value.startsWith("0X") ? value.substring(2) : value;
+		if (!digits.matches("[0-9A-Fa-f]{1,2}")) {
+			throw new CliUsageException(what + " must be a byte in hexadecimal (06, 0x06 or 6)");
+		}
+		return Integer.parseInt(digits, HEX_RADIX);
+	}
+
 	private void requireSubcommand(String option, Subcommand... allowed) throws CliUsageException {
 		if (!Arrays.asList(allowed).contains(subcommand)) {
 			StringBuilder list = new StringBuilder();
@@ -435,7 +472,7 @@ final class CliArguments implements AutoCloseable {
 			throw new CliUsageException("--escape and --no-escape are mutually exclusive");
 		}
 		if (privilege == null) {
-			privilege = subcommand == Subcommand.SOL ?
+			privilege = subcommand == Subcommand.SOL || subcommand == Subcommand.RAW ?
 					PrivilegeLevel.Administrator :
 					subcommand == Subcommand.IDENTIFY || powerCommand != null ? PrivilegeLevel.Operator : PrivilegeLevel.User;
 		}
@@ -708,6 +745,21 @@ final class CliArguments implements AutoCloseable {
 	/** @return whether {@code identify force} was asked */
 	boolean identifyForever() {
 		return identifyForever;
+	}
+
+	/** @return the network function of {@code raw} */
+	int rawNetworkFunction() {
+		return rawNetworkFunction;
+	}
+
+	/** @return the command code of {@code raw} */
+	int rawCommand() {
+		return rawCommand;
+	}
+
+	/** @return the data bytes of {@code raw}, each 0 to 255 */
+	int[] rawData() {
+		return rawData.clone();
 	}
 
 	/** @return the escape character of the SOL console, {@code -1} with {@code --no-escape} */

@@ -29,6 +29,10 @@ import org.metricshub.ipmi.core.common.TypeConverter;
  * A wrapper class for IPMB LAN message
  */
 public class IpmiLanRequest extends IpmiLanMessage {
+
+	/** The network function is a 6-bit field (IPMI 2.0 section 5.1). */
+	private static final int MAX_NETWORK_FUNCTION_CODE = 0x3f;
+
 	/**
 	 * Builds IpmiLanRequest addressed at LUN 0.
 	 *
@@ -67,11 +71,37 @@ public class IpmiLanRequest extends IpmiLanMessage {
 	 */
 	public IpmiLanRequest(NetworkFunction networkFunction, byte commandCode,
 			byte[] requestData, byte sequenceNumber, byte lun) {
+		this(networkFunction.getCode(), commandCode, requestData, sequenceNumber, lun);
+	}
+
+	/**
+	 * Builds IpmiLanRequest addressed at LUN 0, under a network function given by its code, which may be one
+	 * {@link NetworkFunction} does not list: Transport (0Ch), Group Extension (2Ch: DCMI, PICMG), OEM/Group (2Eh),
+	 * controller-specific OEM (30h-3Eh), IPMI 2.0 table 5-1.
+	 *
+	 * @param networkFunctionCode
+	 *        - the network function code of the request, 00h to 3Fh
+	 * @param commandCode
+	 *        - the command code
+	 * @param requestData
+	 *        - command specific payload, null for none
+	 * @param sequenceNumber
+	 *        - used to match request and response - must be in range [0-63]
+	 * @throws IllegalArgumentException when the code does not fit in 6 bits
+	 */
+	public IpmiLanRequest(int networkFunctionCode, byte commandCode, byte[] requestData, byte sequenceNumber) {
+		this(networkFunctionCode, commandCode, requestData, sequenceNumber, TypeConverter.intToByte(0));
+	}
+
+	private IpmiLanRequest(int networkFunctionCode, byte commandCode, byte[] requestData, byte sequenceNumber, byte lun) {
+		if (networkFunctionCode < 0 || networkFunctionCode > MAX_NETWORK_FUNCTION_CODE) {
+			throw new IllegalArgumentException("Invalid network function code: " + networkFunctionCode);
+		}
 		if (lun < 0 || lun > 3) {
 			throw new IllegalArgumentException("Invalid LUN");
 		}
 		setResponderAddress(IpmiLanConstants.BMC_ADDRESS);
-		setNetworkFunction(networkFunction);
+		setNetworkFunctionCode(TypeConverter.intToByte(networkFunctionCode));
 		setResponderLogicalUnitNumber(TypeConverter.intToByte(lun));
 		setRequesterAddress(IpmiLanConstants.REMOTE_CONSOLE_ADDRESS);
 		setRequesterLogicalUnitNumber(TypeConverter.intToByte(0));

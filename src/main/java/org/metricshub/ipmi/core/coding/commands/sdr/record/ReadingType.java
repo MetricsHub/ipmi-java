@@ -252,6 +252,23 @@ public enum ReadingType {
 	 * Boot device not specified.
 	 */
 	BootCompleted(ReadingType.BOOTCOMPLETED),
+	/**
+	 * Base OS/Hypervisor installation started (IPMI 2.0 revision 1.1): the installation of the operating system or
+	 * hypervisor of the system, not the installation or provisioning of a virtual machine.
+	 */
+	BaseOsInstallationStarted(ReadingType.BASEOSINSTALLATIONSTARTED),
+	/**
+	 * Base OS/Hypervisor installation completed (IPMI 2.0 revision 1.1).
+	 */
+	BaseOsInstallationCompleted(ReadingType.BASEOSINSTALLATIONCOMPLETED),
+	/**
+	 * Base OS/Hypervisor installation aborted (IPMI 2.0 revision 1.1).
+	 */
+	BaseOsInstallationAborted(ReadingType.BASEOSINSTALLATIONABORTED),
+	/**
+	 * Base OS/Hypervisor installation failed (IPMI 2.0 revision 1.1).
+	 */
+	BaseOsInstallationFailed(ReadingType.BASEOSINSTALLATIONFAILED),
 	PredictiveFailureDeasserted(ReadingType.PREDICTIVEFAILUREDEASSERTED),
 	TransitionToDegraded(
 			ReadingType.TRANSITIONTODEGRADED),
@@ -798,6 +815,14 @@ public enum ReadingType {
 	private static final int TIMERHARDRESET = 2322177;
 
 	private static final int BOOTCOMPLETED = 2060038;
+
+	private static final int BASEOSINSTALLATIONSTARTED = 2060039;
+
+	private static final int BASEOSINSTALLATIONCOMPLETED = 2060040;
+
+	private static final int BASEOSINSTALLATIONABORTED = 2060041;
+
+	private static final int BASEOSINSTALLATIONFAILED = 2060042;
 
 	private static final int PREDICTIVEFAILUREDEASSERTED = 1024;
 
@@ -1376,6 +1401,14 @@ public enum ReadingType {
 			return TimerHardReset;
 		case BOOTCOMPLETED:
 			return BootCompleted;
+		case BASEOSINSTALLATIONSTARTED:
+			return BaseOsInstallationStarted;
+		case BASEOSINSTALLATIONCOMPLETED:
+			return BaseOsInstallationCompleted;
+		case BASEOSINSTALLATIONABORTED:
+			return BaseOsInstallationAborted;
+		case BASEOSINSTALLATIONFAILED:
+			return BaseOsInstallationFailed;
 		case PREDICTIVEFAILUREDEASSERTED:
 			return PredictiveFailureDeasserted;
 		case TRANSITIONTODEGRADED:

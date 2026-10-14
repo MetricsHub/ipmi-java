@@ -45,6 +45,21 @@ class SelEntryTest {
 	}
 
 	@Test
+	void theOsInstallationEventsOfRevision11AreNamed() {
+		// IPMI 2.0 rev 1.1 table 42-3, sensor type 1Fh, offsets 07h-0Ah, in the wording of ipmitool
+		String[] descriptions = {
+				"Installation started",
+				"Installation completed",
+				"Installation aborted",
+				"Installation failed" };
+		for (int offset = 0x07; offset <= 0x0a; offset++) {
+			SelEntry entry = entry(
+					systemEvent(4, 0xffffffffL, SensorType.OsBoot.getCode(), 0, 0x6f, true, offset, 0xff, 0xff));
+			assertEquals(descriptions[offset - 0x07], entry.description());
+		}
+	}
+
+	@Test
 	void eventsTheSpecificationDoesNotNameAreDescribedByTheirCodes() {
 		SelEntry unknown = entry(systemEvent(1, 0xffffffffL, SensorType.Fan.getCode(), 1, 0x01, true, 0x0f, 0xff, 0xff));
 		assertEquals(ReadingType.Unknown, unknown.event().get());

@@ -58,6 +58,13 @@ public abstract class IpmiLanMessage extends IpmiPayload {
 		this.networkFunction = TypeConverter.intToByte(networkFunction.getCode());
 	}
 
+	/**
+	 * Returns the network function, when it is one {@link NetworkFunction} lists.
+	 *
+	 * @return the network function
+	 * @throws IllegalArgumentException when the code is one {@link NetworkFunction} does not list: see
+	 *         {@link #getNetworkFunctionCode()}
+	 */
 	public NetworkFunction getNetworkFunction() {
 		return NetworkFunction.parseInt(TypeConverter.byteToInt(networkFunction));
 	}
@@ -72,11 +79,12 @@ public abstract class IpmiLanMessage extends IpmiPayload {
 	}
 
 	/**
-	 * Returns the raw network function code (6 bits).
+	 * Returns the raw network function code (6 bits), which may be one {@link NetworkFunction} does not list:
+	 * Transport (0Ch), Group Extension (2Ch), OEM/Group (2Eh), controller-specific OEM (30h-3Fh), IPMI 2.0 table 5-1.
 	 *
 	 * @return the network function code
 	 */
-	protected byte getNetworkFunctionCode() {
+	public byte getNetworkFunctionCode() {
 		return networkFunction;
 	}
 

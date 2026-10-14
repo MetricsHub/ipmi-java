@@ -349,6 +349,9 @@ public class ConnectionManager {
 	 * @param connection
 	 *        - index of the connection to get available Cipher Suites from
 	 * @return list of the {@link CipherSuite}s supported by the managed system.
+	 * @throws Ipmi20UnsupportedException
+	 *         when the BMC does not support IPMI 2.0 (RMCP+): Get Channel Authentication Capabilities, sent first in
+	 *         the IPMI v1.5 format, reports no IPMI v2.0 connections
 	 * @throws ConnectionException
 	 *         when connection is in the state that does not allow to
 	 *         perform this operation.
@@ -370,8 +373,9 @@ public class ConnectionManager {
 	}
 
 	/**
-	 * Queries the managed system for the details of the authentification
-	 * process. Must be performed after {@link #getAvailableCipherSuites(int)}
+	 * Declares the cipher suite and the privilege of the session, and returns the authentication capabilities of the
+	 * managed system that {@link #getAvailableCipherSuites(int)}, which must be performed first, read (requested at the
+	 * User level). Sends nothing.
 	 *
 	 * @param connection
 	 *        - index of the connection to get Channel Authentication
@@ -385,27 +389,15 @@ public class ConnectionManager {
 	 *         when connection is in the state that does not allow to
 	 *         perform this operation.
 	 * @throws Exception
-	 *         when sending message to the managed system fails
+	 *         when the state machine fails
 	 */
 	public GetChannelAuthenticationCapabilitiesResponseData getChannelAuthenticationCapabilities(
 			int connection,
 			CipherSuite cipherSuite,
 			PrivilegeLevel requestedPrivilegeLevel)
 			throws Exception {
-		int tag = generateSessionlessTag();
-		GetChannelAuthenticationCapabilitiesResponseData responseData;
-		try {
-			responseData = getConnection(connection)
-					.getChannelAuthenticationCapabilities(
-							tag,
-							cipherSuite,
-							requestedPrivilegeLevel);
-		} catch (Exception e) {
-			freeTag(tag);
-			throw e;
-		}
-		freeTag(tag);
-		return responseData;
+		// Nothing is sent: no tag to reserve
+		return getConnection(connection).getChannelAuthenticationCapabilities(0, cipherSuite, requestedPrivilegeLevel);
 	}
 
 	/**

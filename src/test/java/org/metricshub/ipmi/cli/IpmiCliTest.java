@@ -157,6 +157,60 @@ class IpmiCliTest {
 
 	@Test
 	@Timeout(30)
+	void rawTextJsonAndExitCodes() throws Exception {
+		try (FakeRmcpPlusBmc bmc = Fixtures.bmc()) {
+			// Get DCMI Capabilities Info (Group Extension 2Ch), and an OEM command with more than 16 bytes of data
+			bmc.handle(0x2c, 0x01, data -> Fixtures.bytes("00 dc 01 05 02 00 01 07"));
+			bmc.handle(0x30, 0x01, data -> {
+				byte[] reply = new byte[21];
+				for (int i = 1; i < reply.length; i++) {
+					reply[i] = (byte) (i - 1);
+				}
+				return reply;
+			});
+
+			Result dcmi = login(bmc, "-v", "raw", "0x2c", "1", "DC", "0x01");
+			assertEquals(0, dcmi.code, dcmi.err);
+			assertEquals("dc 01 05 02 00 01 07\n", dcmi.out);
+			assertTrue(dcmi.err.contains("with the Administrator privilege"), dcmi.err);
+			assertTrue(dcmi.err.contains("ipmicli: raw: "), dcmi.err);
+
+			assertEquals(golden("raw.txt"), login(bmc, "raw", "30", "01").out);
+			assertEquals(golden("raw-json.txt"), login(bmc, "raw", "0x30", "0x01", "--json").out);
+
+			// An error completion code: nothing on stdout, the code on stderr, exit code 70
+			Result unknown = login(bmc, "raw", "0x30", "0x42");
+			assertEquals(IpmiCli.EXIT_PROTOCOL, unknown.code);
+			assertEquals("", unknown.out);
+			assertTrue(unknown.err.contains("raw 30h 42h failed"), unknown.err);
+			assertTrue(unknown.err.contains("(completion code C1h)"), unknown.err);
+			Result unknownJson = login(bmc, "raw", "0x30", "0x42", "--json");
+			assertEquals(IpmiCli.EXIT_PROTOCOL, unknownJson.code);
+			assertEquals("{\"completionCode\":193}\n", unknownJson.out);
+
+			// Chassis Control at the User privilege: D4h, with the hint of the CLI
+			int control = bmc.getChassisControl();
+			Result refused = login(bmc, "-L", "user", "raw", "0x00", "0x02", "0x01");
+			assertEquals(IpmiCli.EXIT_AUTHENTICATION, refused.code);
+			assertTrue(refused.err.contains("use -L operator or -L administrator"), refused.err);
+			assertFalse(refused.err.contains("PrivilegeLevel.Operator"), refused.err);
+			assertEquals(control, bmc.getChassisControl());
+
+			// D4h at the default Administrator level: no level to raise to
+			bmc.handle(0x30, 0x02, data -> new byte[] { (byte) 0xd4 });
+			Result restricted = login(bmc, "raw", "0x30", "0x02");
+			assertEquals(IpmiCli.EXIT_AUTHENTICATION, restricted.code);
+			assertTrue(restricted.err.contains("even at the Administrator level"), restricted.err);
+			assertFalse(restricted.err.contains("-L"), restricted.err);
+			Result operator = login(bmc, "-L", "operator", "raw", "0x30", "0x02");
+			assertTrue(operator.err.contains("use -L administrator"), operator.err);
+			assertFalse(operator.err.contains("-L operator"), operator.err);
+			assertTrue(bmc.getErrors().isEmpty(), bmc.getErrors().toString());
+		}
+	}
+
+	@Test
+	@Timeout(30)
 	void chassisAndPowerStatus() throws Exception {
 		try (FakeRmcpPlusBmc bmc = Fixtures.bmc()) {
 			Result chassis = login(bmc, "chassis");

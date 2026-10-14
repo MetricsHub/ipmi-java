@@ -1,5 +1,5 @@
-keywords: cli, command line, ipmicli, standalone, jar, probe, info, device id, mc info, chassis, power, power on, power off, power cycle, reset, identify, sensors, fru, sel, system event log, sol, serial over lan, json, exit codes, ipmitool
-description: Manual of the ipmicli command-line client of the IPMI Java Client - subcommands, connection options, passwords and BMC key, text and JSON output, the System Event Log, the interactive Serial over LAN console, exit codes, and the ipmitool equivalents.
+keywords: cli, command line, ipmicli, standalone, jar, probe, info, device id, mc info, chassis, power, power on, power off, power cycle, reset, identify, sensors, fru, sel, system event log, sol, serial over lan, raw, dcmi, json, exit codes, ipmitool
+description: Manual of the ipmicli command-line client of the IPMI Java Client - subcommands, connection options, passwords and BMC key, text and JSON output, the System Event Log, the interactive Serial over LAN console, raw requests, exit codes, and the ipmitool equivalents.
 
 # Command-Line Client
 
@@ -38,6 +38,7 @@ ipmicli -h <host> -u <user> [options] sensors [--type <type>,...] [--name <glob>
 ipmicli -h <host> -u <user> [options] fru [<id>...] [--json]
 ipmicli -h <host> -u <user> [options] sel [--since <id>] [--json]
 ipmicli -h <host> -u <user> [options] sol [--escape <char> | --no-escape]
+ipmicli -h <host> -u <user> [options] raw <netfn> <command> [<data byte>...] [--json]
 ipmicli --help | --version
 ```
 
@@ -59,15 +60,13 @@ summary, `--version` the version of the build.
 | `fru` | `frus()` | The FRU inventory, one block per FRU with the fields of its chassis, board and product areas; `<id>...` reads only these FRU IDs. |
 | `sel` | `sel()` | The System Event Log, one line per entry with its time, the sensor that reported it, the event and its direction; `--since <id>` reads only the entries after the given record ID. |
 | `sol` | `sol().open()` | An interactive [Serial over LAN console](#interactive-sol-console) on the serial port of the server. |
+| `raw` | `raw(netFn, command).data(...).execute()` | Sends any request, like `ipmitool raw`: the network function, the command and the data bytes in hexadecimal, `0x` optional (`06`, `0x06` and `6` are the same byte). Prints the response data in hexadecimal, 16 bytes per line. Extension and OEM network functions are accepted (`raw 0x2c 0x01 0xdc 0x01`, Get DCMI Capabilities Info). |
 
 `sensors` lists the sensor types to pass to `--type` as they are named in
 [`SensorType`](apidocs/org/metricshub/ipmi/core/coding/commands/sdr/record/SensorType.html)
 (`Temperature`, `Voltage`, `Fan`, `PowerSupply`, `Processor`, `Memory`...), case-insensitively;
 `--name` takes globs where `*` matches any characters and `?` one, case-insensitively, and
 either option can be repeated or given a comma-separated list.
-
-The raw command subcommand follows with the corresponding operation of the library
-([#131](https://github.com/metricshub/ipmi-java/issues/131)).
 
 ## Connection options
 
@@ -96,8 +95,9 @@ MetricsHub command-line clients; `ipmitool` uses the reverse (see the
 
 ### Default privilege per subcommand
 
-A session asks for its maximum privilege level at login, and a BMC refuses the login when the
-account is not allowed that level. So the CLI asks for the **least** privilege that works (unlike
+A session asks for its maximum privilege level at login and is raised to it right after, and a
+BMC refuses the login, or the raise, when the account is not allowed that level. So the CLI asks
+for the **least** privilege that works (unlike
 `ipmitool`, which asks for Administrator and fails with read-only accounts unless given
 `-L USER`):
 
@@ -105,11 +105,13 @@ account is not allowed that level. So the CLI asks for the **least** privilege t
 | --- | --- |
 | `info`, `chassis`, `power status`, `sensors`, `fru`, `sel` | `user` |
 | `power on`, `off`, `cycle`, `reset`, `soft`, `diag`, `identify` | `operator` |
-| `sol` | `administrator` |
+| `sol`, `raw` | `administrator` |
 
 A BMC that refuses a command at the session's level answers `D4h`: the CLI exits with 77 and says
-to use `-L operator` or `-L administrator`. Serial over LAN is the usual case: most BMCs
-activate the SOL payload at the Administrator level only, some at the User level.
+which higher `-L` to use (at the Administrator level, that the BMC restricts the command). Serial over LAN is the usual case: most BMCs
+activate the SOL payload at the Administrator level only, some at the User level. A raw request
+can be anything, so `raw` asks for Administrator, like `ipmitool`: give `-L user` to send a read
+with a read-only account.
 
 ## Passwords and BMC key
 
@@ -132,7 +134,7 @@ and of the key when it ends.
 Diagnostics go **only to stderr**, so stdout can always be piped or parsed. The text output is
 meant for humans and is stable enough for `grep`; `--json` prints UTF-8
 [JSON Lines](https://jsonlines.org/): one object per sensor, FRU or SEL entry, one object for
-`probe`, `info` and `chassis`. Absent values (a reading the sensor does not have, a threshold the
+`probe`, `info`, `chassis` and `raw`. Absent values (a reading the sensor does not have, a threshold the
 record does not set, an empty FRU field) are omitted from the JSON objects, never printed as `0`.
 
 The output below was captured on a Lenovo RD350 (serial numbers masked), with
@@ -160,7 +162,7 @@ The last line is the suite a login with the same `-C` option would use: the firs
 preference that the BMC offers, or the single suite of a one-ID `-C`, which is used without
 discovery. When that suite is one the library does not implement, or one the BMC does not offer,
 the line says so and that the login would fail; `none` means a login would fail with
-*offers none of the cipher suites* ([Troubleshooting](troubleshooting.html#ipmiclientexception-the-bmc-offers-none-of-the-cipher-suites)).
+*offers none of the cipher suites* ([Troubleshooting](troubleshooting.html#ipmiclientexception-3a-the-bmc-offers-none-of-the-cipher-suites)).
 `--json` prints one object with the same fields and the suites as an array:
 
 ```json
@@ -364,7 +366,8 @@ the [System Event Log](system-event-log.html), in the order of the log: the reco
 (UTC, ISO-8601; `pre-init <seconds>` for an event logged before the BMC had the time, like the
 `Pre-Init` of `ipmitool`; empty for an OEM entry without timestamp), the sensor type of a system
 event or the record type of an OEM one, the sensor number, the event in the wording of
-`ipmiutil` or the OEM bytes, and `assertion` or `deassertion`. The times are UTC whatever the
+`ipmiutil` (of `ipmitool` for the few events `ipmiutil` does not name) or the OEM bytes, and
+`assertion` or `deassertion`. The times are UTC whatever the
 BMC keeps (it reports the offset of a local SEL time with Get SEL Time UTC Offset). `-v` adds to
 stderr what Get SEL Info says of the log: its number of entries, the time of the last addition
 and erase, and that offset.
@@ -388,6 +391,35 @@ $ ipmicli -h bmc.example.com -u monitor -pf pw.txt sel --since 5 --json
 The sensor names are not resolved: join `sensorNumber` with the `number` of `sensors --json`
 when you need them (`ipmitool sel elist` walks the SDR repository for that, which takes as long
 as `sensors` on a slow BMC).
+
+### `raw`
+
+```text
+$ ipmicli -h bmc.example.com -u admin -pf pw.txt raw 0x2c 0x01 0xdc 0x01
+dc 01 05 02 00 01 07
+$ ipmicli -h bmc.example.com -u admin -pf pw.txt raw 0x06 0x01
+20 01 05 38 02 bf 66 4a 00 f6 01 b2 01 00 00
+```
+
+The response data, after the completion code, in hexadecimal: 16 bytes per line, nothing for a
+reply without data. The first request is Get DCMI Capabilities Info (Group Extension network
+function `2Ch`, whose first data byte is the defining body, `DCh` for DCMI): the reply says DCMI
+1.5. The second is Get Device ID, the command behind `info`.
+
+Every byte is hexadecimal, `0x` or not: `10` is `10h`, where `ipmitool` reads `10` as decimal and
+`010` as octal. The network function must be one of a request: an even byte from `00` to `3e` (the odd ones are
+those of the responses, IPMI 2.0 section 5.1), the standard ones as well as Transport (`0c`),
+Group Extension (`2c`), OEM/Group (`2e`) and the controller-specific OEM ones (`30` to `3e`). An
+error completion code is printed on stderr with the exit code 70 (77 with the `-L` hint for
+`D4h`), after the data the BMC may have sent with it; it is not retried, a busy `c0` or a `c3`
+included. Like any message, the request is sent again when its reply is lost (`--retries 0` sends
+it once): a power command is better sent with `power`, which has the safeguards. `--json` prints
+one object, with the completion code as a number and the data in hexadecimal (omitted when
+empty), also for an error completion code:
+
+```json
+{"completionCode":0,"data":"dc010502000107"}
+```
 
 ## Interactive SOL console
 
@@ -445,7 +477,7 @@ The sysexits values of the MetricsHub command-line clients:
 | `64` | Invalid usage, including an unreadable password or key file, and a setting the client refuses (a cipher suite without integrity, a password longer than 20 bytes). |
 | `66` | `fru <id>`: no such FRU. |
 | `69` | BMC unreachable: unknown host, socket error, no reply to the session setup (wrong host, UDP port 623 filtered, IPMI over LAN disabled). |
-| `70` | IPMI failure: an error completion code, no common cipher suite, a malformed reply, the SOL console deactivated by the BMC. |
+| `70` | IPMI failure: an error completion code (also in the reply to `raw`), no common cipher suite, a BMC without IPMI 2.0 (RMCP+), a malformed reply, the SOL console deactivated by the BMC. |
 | `74` | Local I/O failure (stdout closed). |
 | `77` | Authentication or authorization failure: unknown user, wrong password or BMC key, privilege level refused at login, insufficient privilege (`D4h`, with the `-L` hint). |
 | `124` | Timeout: the deadline of the subcommand expired, or a message of the session got no reply after all the tries. |
@@ -521,6 +553,12 @@ A console on the serial port, closed with `~.`:
 ipmicli -h bmc.example.com -u admin -pf pw.txt sol
 ```
 
+The DCMI capabilities of a BMC, with a raw request:
+
+```bash
+ipmicli -h bmc.example.com -u admin -pf pw.txt raw 0x2c 0x01 0xdc 0x01
+```
+
 ## ipmitool equivalents
 
 | ipmitool | ipmicli |
@@ -536,6 +574,7 @@ ipmicli -h bmc.example.com -u admin -pf pw.txt sol
 | `ipmitool -I lanplus ... sel list` or `sel elist` | `ipmicli ... sel` (the sensor numbers, not the names) |
 | `ipmitool -I lanplus ... sel info` | `ipmicli ... -v sel` (on stderr) |
 | `ipmitool -I lanplus ... sol activate` | `ipmicli ... sol` |
+| `ipmitool -I lanplus ... raw 0x06 0x01` | `ipmicli ... raw 0x06 0x01` (every byte hexadecimal, `0x` or not, where `ipmitool` reads `10` as decimal and `010` as octal; no leading space before the bytes; an error completion code exits with 70, 77 for `D4h`, and the message on stderr; odd network functions are refused) |
 | `ipmitool -I lanplus ... lan print` (the cipher suites) | `ipmicli -h h probe` (no login needed) |
 | `-I lanplus` | Implied: the CLI speaks RMCP+ (IPMI 2.0) only. |
 | `-H host` | `-h host` |

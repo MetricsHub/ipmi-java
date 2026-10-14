@@ -23,6 +23,18 @@ class IpmiLanMessageTest {
 	}
 
 	@Test
+	void aNetworkFunctionCodeTheEnumerationDoesNotListIsEncoded() {
+		byte[] request = new IpmiLanRequest(0x2c, (byte) 0x01, new byte[] { (byte) 0xdc, 0x01 }, (byte) 5)
+				.getPayloadData();
+
+		assertEquals(0x2c << 2, request[1] & 0xff); // Group Extension (DCMI), LUN 0
+		assertEquals(0x01, request[5]);
+		assertEquals((byte) 0xdc, request[6]);
+		assertThrows(IllegalArgumentException.class, () -> new IpmiLanRequest(0x40, (byte) 1, null, (byte) 5));
+		assertThrows(IllegalArgumentException.class, () -> new IpmiLanRequest(-1, (byte) 1, null, (byte) 5));
+	}
+
+	@Test
 	void aResponseShorterThanItsFixedFieldsIsRejected() {
 		// rqAddr, netFn/rqLUN, checksum 1, rsAddr, rqSeq/rsLUN, cmd, completion code, checksum 2
 		for (int length = 0; length < 8; length++) {

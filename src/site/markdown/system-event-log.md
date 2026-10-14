@@ -80,7 +80,7 @@ Each [`SelEntry`](apidocs/org/metricshub/ipmi/client/SelEntry.html) is immutable
 | `eventType()` | The event/reading type code: `0x01` for a threshold event, `0x02`–`0x0C` generic discrete, `0x6F` sensor-specific, `0x70`–`0x7F` OEM |
 | `event()` | What happened, as the [`ReadingType`](apidocs/org/metricshub/ipmi/core/coding/commands/sdr/record/ReadingType.html) of the event offset: `UpperCriticalGoingHigh`, `PowerSupplyInputLost`, `LogAreaReset`, ... |
 | `direction()` | [`EventDirection`](apidocs/org/metricshub/ipmi/core/coding/commands/sel/EventDirection.html): `Assertion` (the threshold crossed, the failure detected) or `Deassertion` (back within the threshold, the failure gone) |
-| `description()` | The event in the wording of `ipmiutil`, as [`Sensor.states()`](sensors.html#states) (`Failure detected`, `Log area reset/cleared`, `Power Supply AC lost`), the name of the `ReadingType` spaced out when `ipmiutil` has none (`Upper Critical Going High`), or the event/reading type and offset when the specification does not name it (`Unknown event type 6Fh offset 7h`) |
+| `description()` | The event in the wording of `ipmiutil`, as [`Sensor.states()`](sensors.html#states) (`Failure detected`, `Log area reset/cleared`, `Power Supply AC lost`; that of `ipmitool` for the OS Boot installation events of IPMI 2.0 revision 1.1, which `ipmiutil` does not name: `Installation started`), the name of the `ReadingType` spaced out when neither names it (`Upper Critical Going High`), or the event/reading type and offset when the specification does not name it (`Unknown event type 08h offset 6h`) |
 | `eventData()` | The three event data bytes as the BMC sent them: the offset in the low nibble of the first; for a threshold event, the raw reading that triggered it and the threshold in the next two ([below](#threshold-events)) |
 | `manufacturerId()`, `oemData()` | The IANA enterprise number of a timestamped OEM entry, and the OEM bytes of an OEM entry (6 with a timestamp, 13 without) |
 | `record()` | The decoded [`SelRecord`](apidocs/org/metricshub/ipmi/core/coding/commands/sel/SelRecord.html), for everything else |
@@ -189,15 +189,15 @@ Clear SEL command, which the library does not implement.
 
 ```text
 $ ipmicli -h bmc.example.com -u monitor -pf pw.txt sel
-ID  Time                  Type                  Sensor  Event                             Direction
-1   2023-03-15T17:06:39Z  EventLoggingDisabled  114     Log area reset/cleared            assertion
-2   pre-init 39s          PowerSupply           101     Power Supply AC lost              assertion
-3   pre-init 44s          PowerSupply           101     Power Supply AC lost              deassertion
-4   2023-04-03T09:35:31Z  OsBoot                0       Unknown event type 6Fh offset 7h  assertion
-5   2024-03-28T15:20:37Z  PowerSupply           100     Power Supply AC lost              assertion
-6   2024-03-28T15:20:37Z  PowerSupply           116     Redundancy Lost                   assertion
-7   2024-03-28T15:20:42Z  PowerSupply           100     Power Supply AC lost              deassertion
+ID  Time                  Type                  Sensor  Event                      Direction
+1   2023-03-15T17:06:39Z  EventLoggingDisabled  114     Log area reset/cleared     assertion
+2   pre-init 39s          PowerSupply           101     Power Supply AC lost       assertion
+3   pre-init 44s          PowerSupply           101     Power Supply AC lost       deassertion
+4   2023-04-03T09:35:31Z  OsBoot                0       Installation started       assertion
+5   2024-03-28T15:20:37Z  PowerSupply           100     Power Supply AC lost       assertion
+6   2024-03-28T15:20:37Z  PowerSupply           116     Redundancy Lost            assertion
+7   2024-03-28T15:20:42Z  PowerSupply           100     Power Supply AC lost       deassertion
 ```
 
-(From a Dell iDRAC.) See [`sel`](cli.html#sel) in the manual of the command-line client:
+(The first entries of a Dell iDRAC.) See [`sel`](cli.html#sel) in the manual of the command-line client:
 `--since <id>` and `--json`.

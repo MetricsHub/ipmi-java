@@ -22,22 +22,17 @@ package org.metricshub.ipmi.core.sm.states;
  * ╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱
  */
 
-import org.metricshub.ipmi.core.coding.Encoder;
-import org.metricshub.ipmi.core.coding.commands.IpmiVersion;
-import org.metricshub.ipmi.core.coding.commands.session.GetChannelAuthenticationCapabilities;
-import org.metricshub.ipmi.core.coding.protocol.encoder.Protocolv15Encoder;
 import org.metricshub.ipmi.core.coding.rmcp.RmcpMessage;
 import org.metricshub.ipmi.core.coding.security.CipherSuite;
-import org.metricshub.ipmi.core.common.TypeConverter;
 import org.metricshub.ipmi.core.sm.StateMachine;
 import org.metricshub.ipmi.core.sm.actions.ErrorAction;
-import org.metricshub.ipmi.core.sm.events.Default;
+import org.metricshub.ipmi.core.sm.events.AuthenticationCapabilitiesReceived;
 import org.metricshub.ipmi.core.sm.events.StateMachineEvent;
 
 /**
- * State at which {@link CipherSuite} that will be used during the session is
- * already picked. Transition to {@link AuthcapWaiting} on {@link Default}. On
- * failure it is possible to retry by sending {@link Default} event again.
+ * The authentication capabilities and the {@link CipherSuite}s of the BMC were read. Transition to {@link Authcap} on
+ * {@link AuthenticationCapabilitiesReceived}, once the caller declared the cipher suite and the privilege of the
+ * session.
  */
 public class Ciphers extends State {
 
@@ -45,29 +40,8 @@ public class Ciphers extends State {
 	public void doTransition(
 			StateMachine stateMachine,
 			StateMachineEvent machineEvent) {
-		if (machineEvent instanceof Default) {
-			Default event = (Default) machineEvent;
-			GetChannelAuthenticationCapabilities authCap = new GetChannelAuthenticationCapabilities(
-					IpmiVersion.V15,
-					IpmiVersion.V20,
-					event.getCipherSuite(),
-					event.getPrivilegeLevel(),
-					TypeConverter.intToByte(0xe));
-			try {
-				stateMachine.setCurrent(new AuthcapWaiting(event.getSequenceNumber()));
-				stateMachine
-						.sendMessage(
-								Encoder
-										.encode(
-												new Protocolv15Encoder(),
-												authCap,
-												event.getSequenceNumber(),
-												0,
-												0));
-			} catch (Exception e) {
-				stateMachine.setCurrent(this);
-				stateMachine.doExternalAction(new ErrorAction(e));
-			}
+		if (machineEvent instanceof AuthenticationCapabilitiesReceived) {
+			stateMachine.setCurrent(new Authcap());
 		} else {
 			stateMachine
 					.doExternalAction(

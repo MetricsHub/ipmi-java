@@ -45,7 +45,7 @@ try (IpmiClient bmc = IpmiClient.builder("bmc.example.com")
 
 [`sol().open()`](apidocs/org/metricshub/ipmi/client/SolRequest.html) activates the SOL payload
 in the session of the client (or, when the BMC serves SOL on another UDP port, in a session it
-opens there with the same credentials) and returns a
+opens there with the same credentials and privilege) and returns a
 [`SolConsole`](apidocs/org/metricshub/ipmi/client/SolConsole.html):
 
 | Method | Behavior |
@@ -87,8 +87,11 @@ try (SerialOverLan sol = new SerialOverLan(connector, "bmc.example.com", "admin"
 }
 ```
 
-This constructor opens a dedicated session with the **Administrator** privilege, activates the
-SOL payload, and owns the session and the connector: **closing the `SerialOverLan`, or failing to
+This constructor opens a dedicated session with the **Administrator** privilege (raised to it
+right after the login: an account not allowed Administrator fails with `SessionException`, even
+on a BMC that would activate the payload at a lower level; open the session yourself at that level
+and use `SerialOverLan(connector, session)` then), activates the SOL payload, and owns the session
+and the connector: **closing the `SerialOverLan`, or failing to
 open it, closes the session and tears down the connector** passed to it. Use a new connector for
 each console opened this way.
 
@@ -108,12 +111,13 @@ always returns the suite it was built with, whether the BMC offers it or not.
 
 If the BMC serves SOL on another UDP port (Activate Payload returns it), the console activates the
 payload in a session on that port, as the IPMI specification requires: it uses the session
-already open there on the same connector, or opens one with the same user name, password and BMC
-key, which closing the console closes. The other sessions and the connector are left as they are.
+already open there on the same connector, or opens one with the same user name, password, BMC
+key and privilege level, which closing the console closes. The other sessions and the connector are left as they are.
 
-If the session's privilege is too low to activate the payload, the client raises it (Set Session
-Privilege Level) to the privilege the session was opened for, Administrator for the constructors
-that open their own session, and tries again. The constructors throw `SOLException` when the
+A session runs at the level it was opened for, which `openSession()` sets right after the login.
+Only a session opened with `MaximumAvailable` still runs at User: when the payload cannot be
+activated at that level, the console raises it to Administrator (Set Session Privilege Level) and
+tries again. The constructors throw `SOLException` when the
 payload cannot be activated (SOL disabled, no free payload instance, privilege refused, a payload
 size that leaves no room for characters), and `SessionException` when a session cannot be opened;
 they close what they opened before throwing.

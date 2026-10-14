@@ -27,8 +27,9 @@ package org.metricshub.ipmi.client;
  * ({@link IpmiAuthenticationException}), the session could not be established for a network reason
  * ({@link IpmiConnectionException}), the operation or a message of the session got no reply in time
  * ({@link IpmiTimeoutException}), or the BMC answered a command with an error completion code
- * ({@link IpmiCompletionCodeException}). The base class covers the rest: no cipher suite in common, handshake replies
- * that do not match the request, an interrupted operation (the interrupt status is restored).
+ * ({@link IpmiCompletionCodeException}). The base class covers the rest: no cipher suite in common, a BMC without IPMI
+ * 2.0 (RMCP+), handshake replies that do not match the request, an interrupted operation (the interrupt status is
+ * restored).
  * <p>
  * The checked exception of the protocol core that caused the failure, when there is one, is the
  * {@link #getCause()}.

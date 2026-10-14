@@ -4,14 +4,20 @@ import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.metricshub.ipmi.core.transport.FakeRmcpPlusBmc.GET_CHANNEL_AUTHENTICATION_CAPABILITIES;
+import static org.metricshub.ipmi.core.transport.FakeRmcpPlusBmc.GET_CHANNEL_CIPHER_SUITES;
 import static org.metricshub.ipmi.core.transport.FakeRmcpPlusBmc.GET_CHASSIS_STATUS;
+import static org.metricshub.ipmi.core.transport.FakeRmcpPlusBmc.IPMI_MESSAGE;
+import static org.metricshub.ipmi.core.transport.FakeRmcpPlusBmc.NETFN_APP;
 import static org.metricshub.ipmi.core.transport.FakeRmcpPlusBmc.NETFN_CHASSIS;
+import static org.metricshub.ipmi.core.transport.FakeRmcpPlusBmc.SET_SESSION_PRIVILEGE_LEVEL;
 
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
@@ -19,8 +25,14 @@ import org.metricshub.ipmi.client.IpmiClient;
 import org.metricshub.ipmi.core.api.async.ConnectionHandle;
 import org.metricshub.ipmi.core.coding.commands.PrivilegeLevel;
 import org.metricshub.ipmi.core.coding.commands.chassis.GetChassisStatus;
+import org.metricshub.ipmi.core.coding.commands.chassis.ChassisIdentify;
 import org.metricshub.ipmi.core.coding.commands.chassis.GetChassisStatusResponseData;
+import org.metricshub.ipmi.core.coding.commands.session.GetSessionInfo;
+import org.metricshub.ipmi.core.coding.payload.CompletionCode;
+import org.metricshub.ipmi.core.coding.payload.lan.IPMIException;
 import org.metricshub.ipmi.core.coding.security.CipherSuite;
+import org.metricshub.ipmi.core.connection.Ipmi20UnsupportedException;
+import org.metricshub.ipmi.core.connection.SessionException;
 import org.metricshub.ipmi.core.transport.FakeRmcpPlusBmc;
 import org.metricshub.ipmi.core.transport.FakeRmcpPlusBmc.Fault;
 
@@ -315,6 +327,144 @@ class RmcpPlusSessionTest {
 				connector.openSession(handle, USER, PASSWORD, null);
 				assertChassisStatus(getChassisStatus(connector, handle));
 				assertEquals(4, bmc.getCount(FakeRmcpPlusBmc.NETFN_CHASSIS, FakeRmcpPlusBmc.GET_CHASSIS_STATUS));
+				assertEquals(1, bmc.getCount(NETFN_APP, GET_CHANNEL_AUTHENTICATION_CAPABILITIES), "one per discovery");
+				assertEquals(Collections.emptyList(), bmc.getErrors());
+			} finally {
+				connector.tearDown();
+			}
+		}
+	}
+
+	@Test
+	@Timeout(30)
+	void openSessionRaisesOperatorAndAdministratorRightAfterTheHandshake() throws Exception {
+		PrivilegeLevel[] levels = { PrivilegeLevel.User, PrivilegeLevel.Operator, PrivilegeLevel.Administrator };
+		for (int i = 0; i < levels.length; i++) {
+			try (FakeRmcpPlusBmc bmc = new FakeRmcpPlusBmc(XCC_SUITES, USER, utf8(PASSWORD), null)) {
+				IpmiConnector connector = new IpmiConnector(0, 0);
+				try {
+					ConnectionHandle handle = openSession(connector, bmc, 17, PASSWORD, null, levels[i]);
+					int raises = levels[i] == PrivilegeLevel.User ? 0 : 1;
+					assertEquals(raises, bmc.getSessionRequests(), levels[i] + ": the first request of the session");
+					assertEquals(raises, bmc.getCount(NETFN_APP, SET_SESSION_PRIVILEGE_LEVEL), levels[i].toString());
+
+					// The present level of the session, as the BMC reports it (the fake starts every session at User)
+					int sessionId = connector
+							.getExistingSessionForCriteria(bmc.getAddress(), bmc.getPort(), USER)
+							.getManagedSystemSessionId();
+					assertEquals(i + 2, connector.sendMessage(handle, new GetSessionInfo(sessionId)).getPrivilegeLevel());
+
+					if (levels[i] == PrivilegeLevel.User) {
+						IPMIException refused = assertThrows(
+								IPMIException.class,
+								() -> connector.sendMessage(handle, new ChassisIdentify(0, false)));
+						assertEquals(CompletionCode.InsufficentPrivilege, refused.getCompletionCode());
+					} else {
+						connector.sendMessage(handle, new ChassisIdentify(0, false));
+						assertArrayEquals(new byte[] { 0 }, bmc.getChassisIdentify());
+					}
+					assertEquals(Collections.emptyList(), bmc.getErrors());
+				} finally {
+					connector.tearDown();
+				}
+			}
+		}
+	}
+
+	@Test
+	@Timeout(30)
+	void aRefusedPrivilegeFailsOpenSessionAndClosesTheSession() throws Exception {
+		try (FakeRmcpPlusBmc bmc = new FakeRmcpPlusBmc(XCC_SUITES, USER, utf8(PASSWORD), null)) {
+			// Refused once (80h: the level is not available for this user), then accepted
+			AtomicInteger calls = new AtomicInteger();
+			bmc
+					.handle(
+							NETFN_APP,
+							SET_SESSION_PRIVILEGE_LEVEL,
+							data -> calls.getAndIncrement() == 0 ? new byte[]
+							{ (byte) 0x80 } : new byte[] { 0x00, 0x04 });
+			IpmiConnector connector = new IpmiConnector(0, 0);
+			try {
+				ConnectionHandle handle = connector
+						.createConnection(bmc.getAddress(), bmc.getPort(), CipherSuite.forId(17), PrivilegeLevel.Administrator);
+				connector.setTimeout(handle, TIMEOUT_MS);
+				SessionException refused = assertThrows(
+						SessionException.class,
+						() -> connector.openSession(handle, USER, PASSWORD, null));
+				assertTrue(refused.getMessage().contains("Administrator privilege"), refused.getMessage());
+				assertTrue(refused.getMessage().contains("not available for this user"), refused.getMessage());
+				assertTrue(refused.getMessage().contains("(completion code 80h)"), refused.getMessage());
+				assertEquals(0x80, ((IPMIException) refused.getCause()).getRawCode());
+				assertEquals(1, bmc.getCount(NETFN_APP, SET_SESSION_PRIVILEGE_LEVEL), "a refusal is not sent again");
+				awaitClose(bmc);
+				assertEquals(null, connector.getExistingSessionForCriteria(bmc.getAddress(), bmc.getPort(), USER));
+
+				// The connection is ready for another login
+				connector.openSession(handle, USER, PASSWORD, null);
+				assertChassisStatus(getChassisStatus(connector, handle));
+				assertEquals(Collections.emptyList(), bmc.getErrors());
+			} finally {
+				connector.tearDown();
+			}
+		}
+	}
+
+	@Test
+	@Timeout(30)
+	void aLostReplyToSetSessionPrivilegeLevelIsSentAgain() throws Exception {
+		try (FakeRmcpPlusBmc bmc = new FakeRmcpPlusBmc(XCC_SUITES, USER, utf8(PASSWORD), null)) {
+			bmc.inject(1, Fault.DROP);
+			IpmiConnector connector = new IpmiConnector(0, 0);
+			try {
+				ConnectionHandle handle = openSession(connector, bmc, 17, PASSWORD, null, PrivilegeLevel.Operator);
+				assertEquals(2, bmc.getCount(NETFN_APP, SET_SESSION_PRIVILEGE_LEVEL));
+				connector.sendMessage(handle, new ChassisIdentify(0, false));
+				assertEquals(Collections.emptyList(), bmc.getErrors());
+			} finally {
+				connector.tearDown();
+			}
+		}
+	}
+
+	@Test
+	@Timeout(30)
+	void anIpmi15OnlyBmcIsRefusedWithoutAnyRmcpPlusPacket() throws Exception {
+		try (FakeRmcpPlusBmc bmc = new FakeRmcpPlusBmc(XCC_SUITES, USER, utf8(PASSWORD), null)) {
+			bmc.inject(Fault.IPMI_1_5_ONLY);
+			IpmiConnector connector = new IpmiConnector(0, 0);
+			try {
+				ConnectionHandle handle = connector.createConnection(bmc.getAddress(), bmc.getPort());
+				connector.setTimeout(handle, TIMEOUT_MS);
+				for (int call = 1; call <= 2; call++) {
+					Ipmi20UnsupportedException refused = assertThrows(
+							Ipmi20UnsupportedException.class,
+							() -> connector.getAvailableCipherSuites(handle));
+					assertTrue(refused.getMessage().contains("does not support IPMI 2.0"), refused.getMessage());
+					// The answer is not sent again, and the state was rolled back for another try
+					assertEquals(call, bmc.getCount(NETFN_APP, GET_CHANNEL_AUTHENTICATION_CAPABILITIES));
+				}
+				assertEquals(0, bmc.getCount(IPMI_MESSAGE), "no RMCP+ request");
+				assertEquals(Collections.emptyList(), bmc.getErrors());
+			} finally {
+				connector.tearDown();
+			}
+		}
+	}
+
+	@Test
+	@Timeout(30)
+	void aRefusedCipherSuiteListFailsAtOnceAndLeavesTheStepRetriable() throws Exception {
+		try (FakeRmcpPlusBmc bmc = new FakeRmcpPlusBmc(XCC_SUITES, USER, utf8(PASSWORD), null)) {
+			bmc.handle(NETFN_APP, GET_CHANNEL_CIPHER_SUITES, data -> new byte[] { (byte) 0xc1 });
+			IpmiConnector connector = new IpmiConnector(0, 0);
+			try {
+				ConnectionHandle handle = connector.createConnection(bmc.getAddress(), bmc.getPort());
+				connector.setTimeout(handle, TIMEOUT_MS);
+				for (int call = 1; call <= 2; call++) {
+					assertThrows(IPMIException.class, () -> connector.getAvailableCipherSuites(handle));
+					assertEquals(call, bmc.getCount(NETFN_APP, GET_CHANNEL_CIPHER_SUITES), "C1h is not sent again");
+					assertEquals(call, bmc.getCount(NETFN_APP, GET_CHANNEL_AUTHENTICATION_CAPABILITIES));
+				}
 				assertEquals(Collections.emptyList(), bmc.getErrors());
 			} finally {
 				connector.tearDown();
@@ -333,6 +483,20 @@ class RmcpPlusSessionTest {
 			String password,
 			byte[] kg)
 			throws Exception {
+		return openSession(connector, bmc, suiteId, password, kg, PrivilegeLevel.User);
+	}
+
+	/**
+	 * The same handshake, at the given privilege.
+	 */
+	private static ConnectionHandle openSession(
+			IpmiConnector connector,
+			FakeRmcpPlusBmc bmc,
+			int suiteId,
+			String password,
+			byte[] kg,
+			PrivilegeLevel level)
+			throws Exception {
 		ConnectionHandle handle = connector.createConnection(bmc.getAddress(), bmc.getPort());
 		connector.setTimeout(handle, TIMEOUT_MS);
 		CipherSuite suite = connector
@@ -341,7 +505,7 @@ class RmcpPlusSessionTest {
 				.filter(cipherSuite -> cipherSuite.getId() == suiteId)
 				.findFirst()
 				.orElseThrow(() -> new AssertionError("no suite " + suiteId));
-		connector.getChannelAuthenticationCapabilities(handle, suite, PrivilegeLevel.User);
+		connector.getChannelAuthenticationCapabilities(handle, suite, level);
 		connector.openSession(handle, USER, password, kg);
 		return handle;
 	}

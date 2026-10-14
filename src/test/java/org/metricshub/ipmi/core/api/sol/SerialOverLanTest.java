@@ -10,6 +10,7 @@ import static org.metricshub.ipmi.core.transport.FakeRmcpPlusBmc.ADMINISTRATOR;
 import static org.metricshub.ipmi.core.transport.FakeRmcpPlusBmc.DEACTIVATE_PAYLOAD;
 import static org.metricshub.ipmi.core.transport.FakeRmcpPlusBmc.LOSE_ACK;
 import static org.metricshub.ipmi.core.transport.FakeRmcpPlusBmc.NETFN_APP;
+import static org.metricshub.ipmi.core.transport.FakeRmcpPlusBmc.SET_SESSION_PRIVILEGE_LEVEL;
 
 import java.io.IOException;
 import java.net.InetAddress;
@@ -122,6 +123,21 @@ class SerialOverLanTest {
 
 	@Test
 	@Timeout(30)
+	void aConsoleWhoseAccountIsRefusedAdministratorDoesNotOpen() throws Exception {
+		try (FakeRmcpPlusBmc bmc = solBmc(null)) {
+			bmc.handle(NETFN_APP, SET_SESSION_PRIVILEGE_LEVEL, data -> new byte[] { (byte) 0x81 });
+			IpmiConnector connector = new IpmiConnector(0, 0);
+			assertThrows(
+					SessionException.class,
+					() -> new SerialOverLan(connector, host(bmc), bmc.getPort(), USER, PASSWORD, SUITE_17));
+			awaitClose(bmc);
+			assertTornDown(connector);
+			assertFalse(bmc.isSolActive());
+		}
+	}
+
+	@Test
+	@Timeout(30)
 	void aConsoleThatCannotActivateThePayloadClosesItsSession() throws Exception {
 		try (FakeRmcpPlusBmc bmc = solBmc(null)) {
 			bmc.handle(NETFN_APP, FakeRmcpPlusBmc.ACTIVATE_PAYLOAD, data -> new byte[] { (byte) 0x81 });
@@ -225,6 +241,35 @@ class SerialOverLanTest {
 				connector.closeSession(session.getConnectionHandle());
 				awaitClose(bmc);
 				assertEquals(Collections.emptyList(), bmc.getErrors());
+				assertEquals(Collections.emptyList(), solPort.getErrors());
+			} finally {
+				connector.tearDown();
+			}
+		}
+	}
+
+	@Test
+	@Timeout(30)
+	void theSessionOnThePayloadPortHasThePrivilegeOfTheSessionOfTheApplication() throws Exception {
+		try (
+				FakeRmcpPlusBmc bmc = new FakeRmcpPlusBmc(SUITES, USER, utf8(PASSWORD), null);
+				FakeRmcpPlusBmc solPort = new FakeRmcpPlusBmc(SUITES, USER, utf8(PASSWORD), null)) {
+			// SOL at the User level, for an account the BMC of the payload port does not raise above Operator
+			bmc.enableSol(solPort.getPort(), PAYLOAD_SIZE, FakeRmcpPlusBmc.USER);
+			solPort.enableSol(solPort.getPort(), PAYLOAD_SIZE, FakeRmcpPlusBmc.USER);
+			solPort
+					.handle(
+							NETFN_APP,
+							SET_SESSION_PRIVILEGE_LEVEL,
+							data -> (data[0] & 0x0f) > 3 ? new byte[]
+							{ (byte) 0x81 } : new byte[] { 0x00, data[0] });
+			IpmiConnector connector = new IpmiConnector(0, 0);
+			try {
+				SerialOverLan sol = new SerialOverLan(connector, openSession(connector, bmc, null, PrivilegeLevel.User));
+				assertTrue(solPort.isSolActive());
+				assertEquals(0, solPort.getCount(NETFN_APP, SET_SESSION_PRIVILEGE_LEVEL), "a User session is not raised");
+				sol.close();
+				awaitClose(solPort);
 				assertEquals(Collections.emptyList(), solPort.getErrors());
 			} finally {
 				connector.tearDown();
@@ -688,14 +733,25 @@ class SerialOverLanTest {
 
 	@Test
 	@Timeout(30)
-	void theSessionIsRaisedToThePrivilegeItWasOpenedFor() throws Exception {
+	void onlyASessionOpenedAtMaximumAvailableIsRaisedByTheConsole() throws Exception {
 		try (FakeRmcpPlusBmc bmc = new FakeRmcpPlusBmc(SUITES, USER, utf8(PASSWORD), null)) {
 			bmc.enableSol(bmc.getPort(), PAYLOAD_SIZE, FakeRmcpPlusBmc.OPERATOR);
 			IpmiConnector connector = new IpmiConnector(0, 0);
 			try {
-				// A session that cannot be raised above Operator: asking for Administrator fails
+				// openSession() raised the Operator session: the payload is activated at once
 				Session session = openSession(connector, bmc, null, PrivilegeLevel.Operator);
 				new SerialOverLan(connector, session).close();
+				assertEquals(1, bmc.getCount(NETFN_APP, SET_SESSION_PRIVILEGE_LEVEL));
+				assertEquals(1, bmc.getCount(NETFN_APP, FakeRmcpPlusBmc.ACTIVATE_PAYLOAD));
+				connector.closeSession(session.getConnectionHandle());
+				awaitClose(bmc);
+
+				// A session opened with MaximumAvailable still runs at User: the console raises it after the D4h
+				Session unraised = openSession(connector, bmc, null, PrivilegeLevel.MaximumAvailable);
+				assertEquals(1, bmc.getCount(NETFN_APP, SET_SESSION_PRIVILEGE_LEVEL));
+				new SerialOverLan(connector, unraised).close();
+				assertEquals(2, bmc.getCount(NETFN_APP, SET_SESSION_PRIVILEGE_LEVEL));
+				assertEquals(3, bmc.getCount(NETFN_APP, FakeRmcpPlusBmc.ACTIVATE_PAYLOAD));
 				assertEquals(Collections.emptyList(), bmc.getErrors());
 			} finally {
 				connector.tearDown();
@@ -707,16 +763,16 @@ class SerialOverLanTest {
 	@Timeout(30)
 	void aLostReplyToActivatePayloadIsRecovered() throws Exception {
 		try (FakeRmcpPlusBmc bmc = solBmc(null)) {
-			// Get Payload Activation Status, Activate Payload (refused: the session starts at User), Set Session
-			// Privilege Level, Activate Payload: its reply is lost, and the request sent again finds the payload active
-			bmc.inject(4, Fault.DROP);
+			// Set Session Privilege Level (by openSession()), Get Payload Activation Status, Activate Payload: its reply
+			// is lost, and the request sent again finds the payload active
+			bmc.inject(3, Fault.DROP);
 			IpmiConnector connector = new IpmiConnector(0, 0);
 			try {
 				SerialOverLan sol = new SerialOverLan(connector, openSession(connector, bmc, null));
 				assertTrue(bmc.isSolActive());
 				assertEquals(1, bmc.getCount(NETFN_APP, FakeRmcpPlusBmc.GET_PAYLOAD_INSTANCE_INFO));
 				assertEquals(1, bmc.getCount(NETFN_APP, DEACTIVATE_PAYLOAD));
-				assertEquals(4, bmc.getCount(NETFN_APP, FakeRmcpPlusBmc.ACTIVATE_PAYLOAD));
+				assertEquals(3, bmc.getCount(NETFN_APP, FakeRmcpPlusBmc.ACTIVATE_PAYLOAD));
 				assertTrue(sol.writeString("ls\r", StandardCharsets.US_ASCII));
 				sol.close();
 				assertEquals(Collections.emptyList(), bmc.getErrors());
@@ -1207,9 +1263,9 @@ class SerialOverLanTest {
 	@Timeout(30)
 	void anActivationWithoutReplyIsUndoneInTheSessionOfTheApplication() throws Exception {
 		try (FakeRmcpPlusBmc bmc = solBmc(null)) {
-			// Get Payload Activation Status, Activate Payload (refused at User), Set Session Privilege Level, then the 4
-			// tries of Activate Payload: the first one activates the payload, and no reply comes back
-			for (int request = 4; request <= 7; request++) {
+			// Set Session Privilege Level (by openSession()), Get Payload Activation Status, then the 4 tries of
+			// Activate Payload: the first one activates the payload, and no reply comes back
+			for (int request = 3; request <= 6; request++) {
 				bmc.inject(request, Fault.DROP);
 			}
 			IpmiConnector connector = new IpmiConnector(0, 0);

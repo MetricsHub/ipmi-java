@@ -100,7 +100,8 @@ public class IpmiCompletionCodeException extends IpmiClientException {
 	/**
 	 * Returns the network function of the command the BMC answered.
 	 *
-	 * @return the network function, or null when the command is not known
+	 * @return the network function, or null when the command is not known or its network function is one
+	 *         {@link NetworkFunction} does not list (an extension or OEM command)
 	 */
 	public NetworkFunction networkFunction() {
 		return networkFunction;

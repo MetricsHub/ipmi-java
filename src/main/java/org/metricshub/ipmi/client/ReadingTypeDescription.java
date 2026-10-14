@@ -151,6 +151,11 @@ public final class ReadingTypeDescription {
 		map.put(TransitionToOffDuty, "Transition to Off Duty");
 		map.put(TimerHardReset, "Hard reset");
 		map.put(BootCompleted, "boot completed - device not specified");
+		// The offsets of IPMI 2.0 revision 1.1, which ipmiutil does not name: in the wording of ipmitool
+		map.put(BaseOsInstallationStarted, "Installation started");
+		map.put(BaseOsInstallationCompleted, "Installation completed");
+		map.put(BaseOsInstallationAborted, "Installation aborted");
+		map.put(BaseOsInstallationFailed, "Installation failed");
 		map.put(PredictiveFailureDeasserted, "Predictive Failure Deasserted");
 		map.put(TransitionToDegraded, "Transition to Degraded");
 		map.put(TimerPowerDown, "Power down");

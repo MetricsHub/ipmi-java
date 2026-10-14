@@ -119,6 +119,8 @@ class CliArgumentsTest {
 		assertEquals(PrivilegeLevel.User, parse("fru").privilege());
 		assertEquals(PrivilegeLevel.User, parse("probe").privilege());
 		assertEquals(PrivilegeLevel.Administrator, parse("sol").privilege());
+		assertEquals(PrivilegeLevel.Administrator, parse("raw", "6", "1").privilege());
+		assertEquals(PrivilegeLevel.User, parse("-L", "user", "raw", "6", "1").privilege());
 		assertEquals(PrivilegeLevel.Administrator, parse("-L", "Administrator", "chassis").privilege());
 	}
 
@@ -150,6 +152,21 @@ class CliArgumentsTest {
 	}
 
 	@Test
+	void rawBytesInHexadecimal() throws Exception {
+		CliArguments dcmi = parse("raw", "0x2c", "01", "--json", "DC", "0X1");
+		assertEquals(CliArguments.Subcommand.RAW, dcmi.subcommand());
+		assertEquals(0x2c, dcmi.rawNetworkFunction());
+		assertEquals(1, dcmi.rawCommand());
+		assertArrayEquals(new int[] { 0xdc, 0x01 }, dcmi.rawData());
+		assertTrue(dcmi.json());
+
+		CliArguments deviceId = parse("raw", "6", "1");
+		assertEquals(6, deviceId.rawNetworkFunction());
+		assertEquals(0, deviceId.rawData().length);
+		assertEquals(0x3e, parse("raw", "3E", "FF", "ff", "0").rawNetworkFunction());
+	}
+
+	@Test
 	void doubleDashEndsTheOptions() throws Exception {
 		assertEquals(CliArguments.Subcommand.PROBE, parse("--", "probe").subcommand());
 		assertEquals("missing subcommand (" + CliArguments.SUBCOMMANDS + ")", usageError("-h", "bmc", "--"));
@@ -173,9 +190,29 @@ class CliArgumentsTest {
 		assertEquals("--escape requires a single printable ASCII character", usageError(login("sol", "--escape", "é")));
 		assertEquals("--escape requires a single printable ASCII character", usageError(login("sol", "--escape", " ")));
 		assertEquals(
-				"--json requires the probe or info or chassis or sensors or fru or sel subcommand",
+				"--json requires the probe or info or chassis or sensors or fru or sel or raw subcommand",
 				usageError(login("sol", "--json")));
 		assertEquals("--type requires the sensors subcommand", usageError(login("fru", "--type", "Fan")));
+		assertEquals("raw requires <netfn> <command> [<data byte>...]", usageError(login("raw")));
+		assertEquals("raw requires <netfn> <command> [<data byte>...]", usageError(login("raw", "6")));
+		for (String netFn : new String[] { "0x", "zz", "100", "+6", "" }) {
+			assertEquals(
+					"raw <netfn> must be a byte in hexadecimal (06, 0x06 or 6)",
+					usageError(login("raw", netFn, "1")),
+					netFn);
+		}
+		for (String netFn : new String[] { "07", "0x40", "ff" }) {
+			assertEquals(
+					"raw <netfn> must be a request network function: an even byte from 00 to 3e",
+					usageError(login("raw", netFn, "1")),
+					netFn);
+		}
+		assertEquals(
+				"raw <command> must be a byte in hexadecimal (06, 0x06 or 6)",
+				usageError(login("raw", "6", "0x100")));
+		assertEquals(
+				"raw <data byte> must be a byte in hexadecimal (06, 0x06 or 6)",
+				usageError(login("raw", "6", "1", "1ff")));
 		assertEquals("--long requires the sensors subcommand", usageError(login("chassis", "--long")));
 		assertEquals("--no-escape requires the sol subcommand", usageError(login("chassis", "--no-escape")));
 		assertEquals("unknown sensor type 'Fans'", usageError(login("sensors", "--type", "Fans")));

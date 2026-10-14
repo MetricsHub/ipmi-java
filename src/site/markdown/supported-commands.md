@@ -11,18 +11,20 @@ commands below. Each command is a class of
 sent with [`IpmiClient.send()`](low-level-api.html#sending-a-command-through-the-client) or the
 [low-level API](low-level-api.html#sending-commands); the last column shows which operations of
 `IpmiClient` use them. A command not listed here can be added by
-[extending `IpmiCommandCoder`](low-level-api.html#writing-your-own-command).
+[extending `IpmiCommandCoder`](low-level-api.html#writing-your-own-command) (any network
+function, the [extension and OEM ones](low-level-api.html#extension-and-oem-network-functions)
+included), or sent as bytes with [`raw()`](low-level-api.html#raw-requests).
 
 ## Commands
 
 | Command | Class | NetFn / Cmd | Used by `IpmiClient` |
 | --- | --- | --- | --- |
 | **Session** | | | |
-| Get Channel Authentication Capabilities | `GetChannelAuthenticationCapabilities` | App / `38h` | every session, `capabilities()` |
+| Get Channel Authentication Capabilities | `GetChannelAuthenticationCapabilities` | App / `38h` | every session (unless `cipherSuite(id)`), first and in the IPMI v1.5 format; `capabilities()` |
 | Get Channel Cipher Suites | `GetChannelCipherSuites` | App / `54h` | every session (unless `cipherSuite(id)`), `capabilities()` |
 | RMCP+ Open Session | `OpenSession` | (payload) | every session |
 | RAKP Message 1 / 3 | `Rakp1`, `Rakp3` | (payload) | every session |
-| Set Session Privilege Level | `SetSessionPrivilegeLevel` | App / `3Bh` | `privilege(Operator)`, `privilege(Administrator)` |
+| Set Session Privilege Level | `SetSessionPrivilegeLevel` | App / `3Bh` | every session opened at `privilege(Operator)` or `privilege(Administrator)`, right after RAKP 4 (sent by `IpmiConnector.openSession()`) |
 | Get Session Info | `GetSessionInfo` | App / `3Dh` | `sol()`: is the session that holds a SOL payload still there? |
 | Close Session | `CloseSession` | App / `3Ch` | `close()` |
 | **BMC** | | | |
@@ -53,8 +55,11 @@ sent with [`IpmiClient.send()`](low-level-api.html#sending-a-command-through-the
 
 The read operations of `IpmiClient` need nothing above the **User** privilege; Chassis Control
 and Chassis Identify need **Operator**, the payload commands and Serial over LAN **Administrator**
-([Privilege level](configuration.html#privilege-level)). Any command is sent in the session of the
-client with [`send()`](low-level-api.html#sending-a-command-through-the-client).
+([Privilege level](configuration.html#privilege-level)). The level is requested at login and set
+right after it with Set Session Privilege Level, by `IpmiClient` and `IpmiConnector.openSession()`
+alike (IPMI 2.0 section 22.18). Any command is sent in the session of the
+client with [`send()`](low-level-api.html#sending-a-command-through-the-client), or as bytes with
+[`raw()`](low-level-api.html#raw-requests).
 
 ## Cipher suites
 
@@ -89,6 +94,12 @@ decodes the records of the SDR repository (IPMI 2.0, section 43) into these clas
 Full, Compact and Event-Only records share
 [`AbstractSensorRecord`](apidocs/org/metricshub/ipmi/core/coding/commands/sdr/record/AbstractSensorRecord.html)
 (owner, entity, sensor type, event/reading type, units, name...).
+
+The name of a sensor or locator record is its ID string, decoded as its type/length byte says
+(IPMI 2.0 section 43.15): bits 7:6 give the encoding (8-bit ASCII + Latin 1, 6-bit packed ASCII,
+BCD plus, or Unicode, whose encoding the specification does not name and which the library reads
+as UTF-8), bits 4:0 the length in characters. The bytes after the string, which BMCs with
+fixed-length records fill with padding, are ignored, and the name ends at its first NUL character.
 
 ### OEM and unknown records
 

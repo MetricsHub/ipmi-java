@@ -25,10 +25,11 @@ package org.metricshub.ipmi.core.sm.events;
 import org.metricshub.ipmi.core.coding.commands.PrivilegeLevel;
 import org.metricshub.ipmi.core.sm.StateMachine;
 import org.metricshub.ipmi.core.sm.states.Authcap;
-import org.metricshub.ipmi.core.sm.states.AuthcapWaiting;
+import org.metricshub.ipmi.core.sm.states.Ciphers;
 
 /**
- * Performs transition from {@link AuthcapWaiting} to {@link Authcap}.
+ * Performs transition from {@link Ciphers} to {@link Authcap}: the caller declared the cipher suite and the privilege
+ * of the session.
  *
  * @see StateMachine
  */

@@ -64,7 +64,8 @@ public final class BmcCapabilities {
 	}
 
 	/**
-	 * Tells whether the BMC supports IPMI 2.0 (RMCP+) sessions.
+	 * Tells whether the BMC supports IPMI 2.0 (RMCP+) sessions: always true, as {@link IpmiClient#capabilities()}
+	 * fails with {@link IpmiClientException} for a BMC without them.
 	 *
 	 * @return true when IPMI 2.0 sessions are supported
 	 */

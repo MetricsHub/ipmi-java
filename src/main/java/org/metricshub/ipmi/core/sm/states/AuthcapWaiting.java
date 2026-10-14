@@ -33,19 +33,14 @@ import org.metricshub.ipmi.core.common.TypeConverter;
 import org.metricshub.ipmi.core.sm.StateMachine;
 import org.metricshub.ipmi.core.sm.actions.ErrorAction;
 import org.metricshub.ipmi.core.sm.actions.ResponseAction;
-import org.metricshub.ipmi.core.sm.events.AuthenticationCapabilitiesReceived;
+import org.metricshub.ipmi.core.sm.events.DefaultAck;
 import org.metricshub.ipmi.core.sm.events.StateMachineEvent;
 import org.metricshub.ipmi.core.sm.events.Timeout;
 
 /**
- * Waiting for the {@link GetChannelAuthenticationCapabilities} response. <br>
- * Transition to:
- * <ul>
- * <li>{@link Ciphers} on {@link Timeout}</li>
- * <li>{@link Authcap} on
- * {@link AuthenticationCapabilitiesReceived}</li>
- * </ul>
- * .
+ * Waiting for the {@link GetChannelAuthenticationCapabilities} response, the first one of the handshake. Back to
+ * {@link Uninitialized} on {@link Timeout}, on a reply that cannot be decoded or carries an error completion code, and
+ * on {@link DefaultAck} once the reply was read: Get Channel Cipher Suites comes next.
  */
 public class AuthcapWaiting extends State {
 
@@ -64,10 +59,8 @@ public class AuthcapWaiting extends State {
 	public void doTransition(
 			StateMachine stateMachine,
 			StateMachineEvent machineEvent) {
-		if (machineEvent instanceof Timeout) {
-			stateMachine.setCurrent(new Ciphers());
-		} else if (machineEvent instanceof AuthenticationCapabilitiesReceived) {
-			stateMachine.setCurrent(new Authcap());
+		if (machineEvent instanceof Timeout || machineEvent instanceof DefaultAck) {
+			stateMachine.setCurrent(new Uninitialized());
 		} else {
 			stateMachine
 					.doExternalAction(
@@ -98,7 +91,7 @@ public class AuthcapWaiting extends State {
 												.getResponseData(ipmiMessage)));
 			}
 		} catch (Exception e) {
-			stateMachine.setCurrent(new Ciphers());
+			stateMachine.setCurrent(new Uninitialized());
 			stateMachine.doExternalAction(new ErrorAction(e));
 		}
 	}

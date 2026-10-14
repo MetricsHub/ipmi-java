@@ -1,4 +1,4 @@
-keywords: troubleshooting, timeout, no reply, login, authentication, unauthorized name, insufficient privilege, 0xd4, serial over lan, ipmitool, ipmiutil, ipmicli, probe
+keywords: troubleshooting, timeout, no reply, login, authentication, unauthorized name, insufficient privilege, 0xd4, set session privilege level, ipmi 1.5, rmcp+, serial over lan, ipmitool, ipmiutil, ipmicli, probe
 description: Diagnose the usual failures of the IPMI Java Client — no reply, authentication errors, insufficient privilege, missing sensors or FRUs — and compare with ipmitool and ipmiutil.
 
 # Troubleshooting
@@ -33,7 +33,7 @@ The BMC did not answer the session setup after all the tries (4 tries of 5 s by 
 | Wrong address: the server's operating system instead of its BMC | The BMC has its own IP address (`ipmitool lan print 1` on the server). |
 | IPMI over LAN disabled on the BMC | [Enabling IPMI over LAN](preparing-the-bmc.html#enabling-ipmi-over-lan) |
 | UDP port 623 filtered | [Firewall](preparing-the-bmc.html#firewall) |
-| An IPMI 1.5-only BMC | Such BMCs never answer the RMCP+ requests of the client, starting with Get Channel Cipher Suites ([#154](https://github.com/metricshub/ipmi-java/issues/154)). |
+| An IPMI 1.5-only BMC, with `cipherSuite(id)` (`-C` with one ID) | Without the cipher suite discovery, the client does not ask the BMC which IPMI versions it supports, and an IPMI 1.5-only BMC never answers the RMCP+ Open Session. With the discovery, it fails at once ([below](#ipmiclientexception-3a-the-bmc-does-not-support-ipmi-2-0-2f-rmcp-2b)). |
 | Several sessions to the same BMC at the same time | BMCs drop replies under concurrent sessions: use one client per BMC, which [serializes its operations](configuration.html#thread-safety). |
 
 ## `IpmiTimeoutException`
@@ -52,14 +52,17 @@ when every try in a row gets no reply.
 
 ## `IpmiAuthenticationException`
 
-The RAKP handshake (the login) failed and the session could not be opened. The credentials are
-sent once; `statusCode()` says why:
+The RAKP handshake (the login) failed, or the BMC refused to raise the session to the requested
+privilege right after it (`80h`, `81h`: a BMC that is busy then is an `IpmiClientException`), and
+the session could not be opened. The credentials are sent once;
+`statusCode()` says why:
 
 | `statusCode()` | Meaning |
 | --- | --- |
 | `null` (`... wrong password or BMC key (Authentication check failed)`) | The BMC's proof does not match the password: **wrong password** (or wrong [BMC key](configuration.html#bmc-key)). |
 | `UnauthorizedName` | **Unknown user**, or a user not allowed to log in over the LAN channel. |
-| `UnauthorizedRole`, `InvalidRole`, `InsufficentPrivilege` | The account is not allowed the requested [privilege level](configuration.html#privilege-level) on the LAN channel, or the BMC refused to raise the session to it. |
+| `UnauthorizedRole`, `InvalidRole`, `InsufficentPrivilege` | The account is not allowed the requested [privilege level](configuration.html#privilege-level) on the LAN channel. |
+| `Unknown` (`... refused the Operator privilege to <user>: the level exceeds the privilege limit of the channel or of the user (completion code 81h)`, or `80h`, the level is not available for this user) | The login worked, but the account, the LAN channel or the cipher suite (`Cipher Suite Priv Max` in `ipmitool lan print 1`) is limited to a lower level, and the BMC refused to raise the session (Set Session Privilege Level). Request a lower [privilege](configuration.html#privilege-level) (`-L` with `ipmicli`), or allow the level to the account. |
 | `InvalidIntegrityCheckValue` | The BMC rejected the integrity check value of RAKP Message 3: wrong password or BMC key on a BMC that checks it first. |
 
 An `IllegalArgumentException` from `build()` (`Password is too long. ...`, `Username is too
@@ -74,8 +77,9 @@ Check the account with `ipmitool -I lanplus ... -L USER chassis status`: `ipmito
 
 ## `IpmiCompletionCodeException` with `InsufficentPrivilege` (`D4h`)
 
-The BMC refused a command at the session's privilege level. The default **User** level is enough
-for everything the client reads; `send()` of a control command (Chassis Control, chassis
+The BMC refused a command at the session's privilege level, which the client requests at login
+and sets right after it: the command needs a higher level than the requested one. The default
+**User** level is enough for everything the client reads; `send()` of a control command (Chassis Control, chassis
 identify) needs `privilege(PrivilegeLevel.Operator)` on the builder, and Serial over LAN
 `Administrator` on most BMCs. If a BMC refuses a read command at the User level, check:
 
@@ -89,6 +93,16 @@ what happens when another client deletes the sessions, for example a management 
 as an administrator; the revocation shows at a whole minute of the session's age (60 s, 120 s,
 ...). Close the client and open a new one, or wait for the next operation: a session whose
 messages get no reply is reopened, but one that answers `D4h` is not.
+
+## `IpmiClientException: The BMC ... does not support IPMI 2.0 / RMCP+ ...`
+
+Before any RMCP+ request, the client sends Get Channel Authentication Capabilities in the IPMI
+v1.5 format, which every BMC answers (IPMI 2.0, section 13.13), and its reply reports no IPMI v2.0
+connections (table 22-15): the BMC is IPMI 1.5-only (MD2, MD5 or straight password
+authentication), or IPMI 2.0 is disabled on its LAN channel. The client only opens RMCP+
+sessions ([What this client needs](preparing-the-bmc.html#what-this-client-needs)), like
+`ipmitool -I lanplus`, which refuses such a BMC too ("This BMC does not support IPMI v2 /
+RMCP+"). `ipmicli probe` exits with 70 the same way.
 
 ## `IpmiClientException: The BMC ... offers none of the cipher suites ...`
 

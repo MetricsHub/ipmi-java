@@ -19,6 +19,7 @@ import static org.metricshub.ipmi.client.Fixtures.USER;
 import static org.metricshub.ipmi.client.Fixtures.bmc;
 import static org.metricshub.ipmi.client.Fixtures.utf8;
 import static org.metricshub.ipmi.core.transport.FakeRmcpPlusBmc.ADMINISTRATOR;
+import static org.metricshub.ipmi.core.transport.FakeRmcpPlusBmc.GET_CHANNEL_AUTHENTICATION_CAPABILITIES;
 import static org.metricshub.ipmi.core.transport.FakeRmcpPlusBmc.GET_CHANNEL_CIPHER_SUITES;
 import static org.metricshub.ipmi.core.transport.FakeRmcpPlusBmc.GET_CHASSIS_STATUS;
 import static org.metricshub.ipmi.core.transport.FakeRmcpPlusBmc.CHASSIS_CONTROL;
@@ -948,6 +949,25 @@ class IpmiClientTest {
 
 	@Test
 	@Timeout(30)
+	void aPrivilegeRefusedOnTheSolPayloadPortIsAnAuthenticationFailure() throws Exception {
+		try (
+				FakeRmcpPlusBmc bmc = bmc();
+				FakeRmcpPlusBmc solPort = new FakeRmcpPlusBmc(SUITES, USER, utf8(PASSWORD), null)) {
+			solPort.enableSol(solPort.getPort(), 255, ADMINISTRATOR);
+			bmc.enableSol(solPort.getPort(), 255, ADMINISTRATOR);
+			solPort.handle(NETFN_APP, SET_SESSION_PRIVILEGE_LEVEL, data -> new byte[] { (byte) 0x81 });
+			try (IpmiClient client = client(bmc).privilege(PrivilegeLevel.Administrator).build()) {
+				IpmiAuthenticationException refused = assertThrows(
+						IpmiAuthenticationException.class,
+						() -> client.sol().open());
+				assertTrue(refused.getMessage().contains("(completion code 81h)"), refused.getMessage());
+				assertFalse(solPort.isSolActive());
+			}
+		}
+	}
+
+	@Test
+	@Timeout(30)
 	void aLostSessionIsReopenedAndAReadIsRetriedButNotASend() throws Exception {
 		try (FakeRmcpPlusBmc bmc = bmc(); IpmiClient client = client(bmc).build()) {
 			client.chassisStatus();
@@ -962,6 +982,51 @@ class IpmiClientTest {
 
 			assertTrue(client.chassisStatus().powerOn(), "the next operation opens a new session");
 			assertEquals(3, bmc.getCount(OPEN_SESSION_REQUEST));
+
+			bmc.expireSession();
+			assertThrows(IpmiTimeoutException.class, () -> client.raw(0x06, 0x01).execute());
+			assertEquals(3, bmc.getCount(OPEN_SESSION_REQUEST), "a raw request is never replayed");
+		}
+	}
+
+	@Test
+	@Timeout(30)
+	void rawRequestsOfAnyNetworkFunction() throws Exception {
+		try (FakeRmcpPlusBmc bmc = bmc(); IpmiClient client = client(bmc).build()) {
+			// Get DCMI Capabilities Info (Group Extension 2Ch), answered under 2Dh
+			List<byte[]> requests = new ArrayList<>();
+			bmc.handle(0x2c, 0x01, data -> {
+				requests.add(data);
+				return Fixtures.bytes("00 dc 01 05 02 00 01 07");
+			});
+			RawResponse dcmi = client.raw(0x2C, 0x01).data(0xDC, 0x01).execute();
+			assertEquals(CompletionCode.Ok, dcmi.completionCode());
+			assertEquals(0, dcmi.rawCompletionCode());
+			assertArrayEquals(Fixtures.bytes("dc 01 05 02 00 01 07"), dcmi.data());
+			assertEquals("completion code 00h, data DC 01 05 02 00 01 07", dcmi.toString());
+			assertEquals(1, requests.size());
+			assertArrayEquals(Fixtures.bytes("dc 01"), requests.get(0));
+
+			assertArrayEquals(FakeRmcpPlusBmc.DEVICE_ID, client.raw(0x06, 0x01).execute().data());
+
+			// An error completion code is returned, not thrown
+			RawResponse unknown = client.raw(0x30, 0x42).execute();
+			assertEquals(CompletionCode.InvalidCommand, unknown.completionCode());
+			assertEquals(0xc1, unknown.rawCompletionCode());
+			assertEquals(0, unknown.data().length);
+			assertEquals("completion code C1h", unknown.toString());
+			bmc.handle(0x2e, 0x01, data -> new byte[] { (byte) 0x80 });
+			RawResponse specific = client.raw(0x2e, 0x01).execute();
+			assertEquals(CompletionCode.Unknown, specific.completionCode());
+			assertEquals(0x80, specific.rawCompletionCode());
+
+			assertThrows(IllegalArgumentException.class, () -> client.raw(0x07, 1), "a response network function");
+			assertThrows(IllegalArgumentException.class, () -> client.raw(0x40, 1));
+			assertThrows(IllegalArgumentException.class, () -> client.raw(-2, 1));
+			assertThrows(IllegalArgumentException.class, () -> client.raw(6, 0x100));
+			assertThrows(IllegalArgumentException.class, () -> client.raw(6, 1).data(0x100));
+			assertThrows(IllegalArgumentException.class, () -> client.raw(6, 1).data(-1));
+			assertTrue(bmc.getErrors().isEmpty(), bmc.getErrors().toString());
 		}
 	}
 
@@ -1115,6 +1180,63 @@ class IpmiClientTest {
 			}
 			assertEquals(discoveries, bmc.getCount(NETFN_APP, GET_CHANNEL_CIPHER_SUITES), "no discovery with a fixed suite");
 			awaitClose(bmc);
+			assertEquals(Collections.emptyList(), bmc.getErrors());
+		}
+	}
+
+	@Test
+	@Timeout(30)
+	void aBusyBmcThatCannotRaiseTheSessionIsNotAnAuthenticationFailure() throws Exception {
+		try (FakeRmcpPlusBmc bmc = bmc()) {
+			bmc.handle(NETFN_APP, SET_SESSION_PRIVILEGE_LEVEL, data -> new byte[] { (byte) 0xc0 });
+			try (IpmiClient client = client(bmc).privilege(PrivilegeLevel.Operator).build()) {
+				IpmiClientException busy = assertThrows(IpmiClientException.class, client::chassisStatus);
+				assertEquals(IpmiClientException.class, busy.getClass());
+				assertTrue(busy.getMessage().contains("could not raise the session"), busy.getMessage());
+				assertTrue(busy.getMessage().contains("(completion code C0h)"), busy.getMessage());
+				assertEquals(2, bmc.getCount(NETFN_APP, SET_SESSION_PRIVILEGE_LEVEL), "busy is sent again");
+			}
+		}
+	}
+
+	@Test
+	@Timeout(30)
+	void anIpmi15OnlyBmcFailsWithAClientExceptionAtOnce() throws Exception {
+		try (FakeRmcpPlusBmc bmc = bmc()) {
+			bmc.inject(FakeRmcpPlusBmc.Fault.IPMI_1_5_ONLY);
+			try (IpmiClient client = client(bmc).build()) {
+				IpmiClientException refused = assertThrows(IpmiClientException.class, client::chassisStatus);
+				assertEquals(IpmiClientException.class, refused.getClass(), "the BMC answered: not a connection failure");
+				assertTrue(refused.getMessage().contains("does not support IPMI 2.0"), refused.getMessage());
+				assertEquals(
+						IpmiClientException.class,
+						assertThrows(IpmiClientException.class, client::capabilities).getClass());
+				assertEquals(2, bmc.getCount(NETFN_APP, GET_CHANNEL_AUTHENTICATION_CAPABILITIES), "once per operation");
+				assertEquals(0, bmc.getCount(FakeRmcpPlusBmc.IPMI_MESSAGE), "no RMCP+ request");
+			}
+			// Without discovery, the client does not ask: Open Session gets no reply
+			try (IpmiClient client = client(bmc).cipherSuite(17).build()) {
+				assertThrows(IpmiConnectionException.class, client::chassisStatus);
+				assertEquals(2, bmc.getCount(OPEN_SESSION_REQUEST));
+			}
+			assertEquals(Collections.emptyList(), bmc.getErrors());
+		}
+	}
+
+	@Test
+	@Timeout(30)
+	void aPrivilegeTheBmcRefusesFailsTheOperation() throws Exception {
+		try (FakeRmcpPlusBmc bmc = bmc()) {
+			bmc.handle(NETFN_APP, SET_SESSION_PRIVILEGE_LEVEL, data -> new byte[] { (byte) 0x81 });
+			try (IpmiClient client = client(bmc).privilege(PrivilegeLevel.Administrator).build()) {
+				IpmiAuthenticationException refused = assertThrows(IpmiAuthenticationException.class, client::chassisStatus);
+				assertEquals(CompletionCode.Unknown, refused.statusCode());
+				assertTrue(refused.getMessage().contains("refused the Administrator privilege to admin"), refused.getMessage());
+				assertTrue(refused.getMessage().contains("(completion code 81h)"), refused.getMessage());
+				assertEquals(1, bmc.getCount(OPEN_SESSION_REQUEST), "not replayed");
+				assertEquals(1, bmc.getCount(NETFN_APP, SET_SESSION_PRIVILEGE_LEVEL), "the refusal is not sent again");
+				awaitClose(bmc);
+			}
 			assertEquals(Collections.emptyList(), bmc.getErrors());
 		}
 	}

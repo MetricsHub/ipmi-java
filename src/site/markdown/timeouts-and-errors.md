@@ -51,6 +51,7 @@ BMC replies with a *transient* completion code are retried too: the request is s
 a random pause of up to 4 seconds when the BMC says it is busy (node busy, out of resources,
 initialization in progress), and at once after a timeout on the BMC side (`C3h`), where the BMC
 already waited for the device it could not reach. Any other error completion code fails at once.
+`raw()` retries none of them: it returns every completion code as the BMC sent it.
 
 With the defaults, a lost reply costs 5 seconds, then the request is sent again; a BMC that never
 answers fails the handshake after 4 tries, about 20 seconds into the first operation. A
@@ -72,8 +73,8 @@ The client keeps its session open between operations with its
 [keep-alive](configuration.html#keep-alive) messages. When the session is lost all the same (the
 BMC rebooted, expired it, or another client deleted it), the next operation opens a new one. A
 **read** operation (`chassisStatus()`, `sensors()`, `frus()`, `sel()`) that fails because the session was
-lost while it ran is retried **once** on a new session; `send()` and the control operations are
-never replayed, as a chassis control sent twice is not the same as sent once.
+lost while it ran is retried **once** on a new session; `send()`, `raw()` and the control
+operations are never replayed, as a chassis control sent twice is not the same as sent once.
 
 A session is considered lost when a message of the session got no reply after all its tries, when
 the connection was closed, or when the deadline of an operation expired.
@@ -86,8 +87,8 @@ the subclass, not on the message:
 
 | Exception | When |
 | --- | --- |
-| [`IpmiAuthenticationException`](apidocs/org/metricshub/ipmi/client/IpmiAuthenticationException.html) | The BMC refused the login: unknown user, wrong password or [BMC key](configuration.html#bmc-key), role or privilege refused. `statusCode()` carries the RAKP status code when the BMC sent one (`UnauthorizedName`, `UnauthorizedRole`, ...), and is `null` when the console side rejected the key exchange code of the BMC, the symptom of a wrong password or BMC key. The credentials are sent once. |
-| [`IpmiConnectionException`](apidocs/org/metricshub/ipmi/client/IpmiConnectionException.html) | The session could not be established for a network reason: unknown host, socket error, or no reply to the session setup after all the tries (wrong host, UDP port 623 filtered, IPMI over LAN disabled, an IPMI 1.5-only BMC). |
+| [`IpmiAuthenticationException`](apidocs/org/metricshub/ipmi/client/IpmiAuthenticationException.html) | The BMC refused the login: unknown user, wrong password or [BMC key](configuration.html#bmc-key), role or privilege refused, also when it refused to raise the session to the requested privilege right after the login. `statusCode()` carries the RAKP status code when the BMC sent one (`UnauthorizedName`, `UnauthorizedRole`, ...), or the completion code of Set Session Privilege Level (`Unknown` for its `80h` and `81h`), and is `null` when the console side rejected the key exchange code of the BMC, the symptom of a wrong password or BMC key. The credentials are sent once. |
+| [`IpmiConnectionException`](apidocs/org/metricshub/ipmi/client/IpmiConnectionException.html) | The session could not be established for a network reason: unknown host, socket error, or no reply to the session setup after all the tries (wrong host, UDP port 623 filtered, IPMI over LAN disabled, an IPMI 1.5-only BMC with `cipherSuite(id)`). |
 | [`IpmiTimeoutException`](apidocs/org/metricshub/ipmi/client/IpmiTimeoutException.html) | The [deadline](#deadline) of the operation expired, or a message of the session got no reply after all the tries. |
 | [`IpmiCompletionCodeException`](apidocs/org/metricshub/ipmi/client/IpmiCompletionCodeException.html) | The BMC answered a command with an error completion code: `completionCode()` (`CompletionCode`, `Unknown` for a code the library does not list), `rawCompletionCode()`, `networkFunction()` and `command()`. `InsufficentPrivilege` (sic, `D4h`) means the command needs a higher [privilege level](configuration.html#privilege-level) than the session has. |
 | `IpmiClientException` itself | The rest: no cipher suite in common ([how the suite is chosen](preparing-the-bmc.html#how-ipmiclient-chooses-the-suite)), a handshake reply that does not match the request (for another session, or confirming other algorithms than the requested ones), the SOL payload that cannot be activated, an interrupted operation (the interrupt status is restored). |

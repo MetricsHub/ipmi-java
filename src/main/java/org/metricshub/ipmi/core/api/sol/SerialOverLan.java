@@ -147,7 +147,8 @@ public class SerialOverLan implements Closeable {
 	 * @param cipherSuiteSelectionHandler
 	 *        {@link CipherSuiteSelectionHandler} that will allow to select {@link CipherSuite} among available ones.
 	 * @throws SOLException when the SOL payload cannot be activated
-	 * @throws SessionException when the session cannot be opened
+	 * @throws SessionException when the session cannot be opened, or the account is not allowed the Administrator
+	 *         privilege
 	 */
 	public SerialOverLan(IpmiConnector connector, String remoteHost, int remotePort, String user, String password,
 			CipherSuiteSelectionHandler cipherSuiteSelectionHandler) throws SOLException, SessionException {
@@ -174,7 +175,8 @@ public class SerialOverLan implements Closeable {
 	 * @param cipherSuiteSelectionHandler
 	 *        {@link CipherSuiteSelectionHandler} that will allow to select {@link CipherSuite} among available ones.
 	 * @throws SOLException when the SOL payload cannot be activated
-	 * @throws SessionException when the session cannot be opened
+	 * @throws SessionException when the session cannot be opened, or the account is not allowed the Administrator
+	 *         privilege
 	 */
 	public SerialOverLan(IpmiConnector connector, String remoteHost, int remotePort, String user, String password,
 			byte[] bmcKey, CipherSuiteSelectionHandler cipherSuiteSelectionHandler) throws SOLException, SessionException {
@@ -200,7 +202,8 @@ public class SerialOverLan implements Closeable {
 	 * @param cipherSuiteSelectionHandler
 	 *        {@link CipherSuiteSelectionHandler} that will allow to select {@link CipherSuite} among available ones.
 	 * @throws SOLException when the SOL payload cannot be activated
-	 * @throws SessionException when the session cannot be opened
+	 * @throws SessionException when the session cannot be opened, or the account is not allowed the Administrator
+	 *         privilege
 	 */
 	public SerialOverLan(IpmiConnector connector, String remoteHost, String user, String password,
 			CipherSuiteSelectionHandler cipherSuiteSelectionHandler) throws SOLException, SessionException {
@@ -317,16 +320,9 @@ public class SerialOverLan implements Closeable {
 						connectionHandle.getUser());
 
 		if (alternativeSession == null) {
-			alternativeSession = SessionManager
-					.establishSession(
-							ipmiConnector,
-							connectionHandle.getRemoteAddress().getHostAddress(),
-							solPayloadPort,
-							connectionHandle.getUser(),
-							connectionHandle.getPasswordBytes(),
-							connectionHandle.getBmcKey(),
-							// A suite of its own: opening the session keys the algorithms of its suite
-							new SpecificCipherSuiteSelector(connectionHandle.getCipherSuite().copy()));
+			// The credentials, suite and privilege level of the session given to the console, whose level may be enough
+			// for the payload
+			alternativeSession = SessionManager.establishSession(ipmiConnector, connectionHandle, solPayloadPort);
 			ownedConnections.add(alternativeSession.getConnectionHandle());
 		}
 
@@ -336,9 +332,9 @@ public class SerialOverLan implements Closeable {
 	}
 
 	/**
-	 * Tries to activate SOL payload in the given session.
-	 * If first activation try fails due to insufficient privileges, raises the session privileges
-	 * to the level the session was opened for and tries to activate payload once again.
+	 * Tries to activate SOL payload in the given session. If the first try fails due to insufficient privileges in a
+	 * session opened with {@link PrivilegeLevel#MaximumAvailable}, the only one {@code openSession()} does not raise,
+	 * raises it to Administrator and tries once again.
 	 *
 	 * @param ipmiConnector
 	 *        {@link IpmiConnector} that will be used for communication
@@ -382,8 +378,11 @@ public class SerialOverLan implements Closeable {
 	}
 
 	/**
-	 * Sends Activate Payload, and once more after raising the privilege of the session when it is too low, or after
-	 * deactivating the payload when a lost reply left it active in this session.
+	 * Sends Activate Payload, and once more after raising the privilege of a session opened with
+	 * {@link PrivilegeLevel#MaximumAvailable} when it is too low, or after deactivating the payload when a lost reply
+	 * left it active in this session. {@code openSession()} raised a session opened at Operator or Administrator, and a
+	 * User session cannot go higher; the session the console opens on the port of the payload has the level of the
+	 * given session, so a MaximumAvailable one is raised here too.
 	 */
 	private ActivateSolPayloadResponseData getActivatePayloadResponse(
 			IpmiConnector ipmiConnector,
@@ -391,7 +390,7 @@ public class SerialOverLan implements Closeable {
 			ActivateSolPayload activatePayload)
 			throws Exception {
 		ConnectionHandle connectionHandle = payloadSession.getConnectionHandle();
-		boolean raised = false;
+		boolean raised = connectionHandle.getPrivilegeLevel() != PrivilegeLevel.MaximumAvailable;
 		boolean deactivated = false;
 		while (true) {
 			try {
@@ -459,8 +458,8 @@ public class SerialOverLan implements Closeable {
 	}
 
 	/**
-	 * Sends proper command to managed system in order to raise user privileges in given session to the level the session
-	 * was opened for (Administrator when unknown): the BMC refuses a higher one.
+	 * Raises a session opened with {@link PrivilegeLevel#MaximumAvailable}, which still runs at User (IPMI 2.0 section
+	 * 22.18), to Administrator.
 	 *
 	 * @param ipmiConnector
 	 *        {@link IpmiConnector} that will be used for communication
@@ -470,13 +469,7 @@ public class SerialOverLan implements Closeable {
 	 *         If any exception occurred during communication.
 	 */
 	private void raiseSessionPrivileges(IpmiConnector ipmiConnector, ConnectionHandle connectionHandle) throws Exception {
-		PrivilegeLevel privilegeLevel = connectionHandle.getPrivilegeLevel();
-		if (privilegeLevel == null || privilegeLevel == PrivilegeLevel.MaximumAvailable) {
-			privilegeLevel = PrivilegeLevel.Administrator;
-		}
-		SetSessionPrivilegeLevel setSessionPrivilegeLevel = new SetSessionPrivilegeLevel(
-				privilegeLevel);
-		ipmiConnector.sendMessage(connectionHandle, setSessionPrivilegeLevel);
+		ipmiConnector.sendMessage(connectionHandle, new SetSessionPrivilegeLevel(PrivilegeLevel.Administrator));
 	}
 
 	/**

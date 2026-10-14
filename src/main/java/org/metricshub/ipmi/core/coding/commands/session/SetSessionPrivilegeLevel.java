@@ -40,7 +40,36 @@ import java.security.NoSuchAlgorithmException;
  */
 public class SetSessionPrivilegeLevel extends IpmiCommandCoder<SetSessionPrivilegeLevelResponseData> {
 
+	/** Completion code: the requested level is not available for this user (IPMI 2.0 table 22-24). */
+	public static final int LEVEL_NOT_AVAILABLE = 0x80;
+
+	/** Completion code: the requested level exceeds the privilege limit of the channel or of the user. */
+	public static final int LEVEL_ABOVE_LIMIT = 0x81;
+
 	private PrivilegeLevel privilegeLevel;
+
+	/**
+	 * Says why the BMC refused the level: the meaning of the command-specific completion codes of Set Session
+	 * Privilege Level (IPMI 2.0 table 22-24), or the message of the error reply for the other codes, then the code.
+	 *
+	 * @param refusal the error reply
+	 * @return the reason, ending with the completion code in hexadecimal
+	 */
+	public static String describeRefusal(IPMIException refusal) {
+		String reason;
+		switch (refusal.getRawCode()) {
+		case LEVEL_NOT_AVAILABLE:
+			reason = "the level is not available for this user";
+			break;
+		case LEVEL_ABOVE_LIMIT:
+			reason = "the level exceeds the privilege limit of the channel or of the user";
+			break;
+		default:
+			reason = refusal.getMessage();
+			break;
+		}
+		return reason + String.format(" (completion code %02Xh)", refusal.getRawCode());
+	}
 
 	/**
 	 * Initiates {@link SetSessionPrivilegeLevel} for encoding and decoding
