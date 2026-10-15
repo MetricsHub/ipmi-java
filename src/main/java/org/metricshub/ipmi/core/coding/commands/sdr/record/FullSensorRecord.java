@@ -408,7 +408,14 @@ public class FullSensorRecord extends AbstractSensorRecord {
 		}
 	}
 
+	/**
+	 * Returns the resolution of a linear sensor: the difference in units between two successive raw readings,
+	 * {@code |M x 10^R|} (IPMI 2.0 section 36.4.2). The resolution of a linearizable or non-linear sensor varies with
+	 * the reading: section 36.4a derives it from the neighboring readings, {@code calcFormula(x + 1) - calcFormula(x)}.
+	 *
+	 * @return the resolution, {@link Double#NaN} when the sensor is not linear
+	 */
 	public double getSensorResolution() {
-		return Math.abs(getM() / 2.0 * Math.pow(10, getrExp()));
+		return linearization == 0 ? Math.abs(getM() * Math.pow(10, getrExp())) : Double.NaN;
 	}
 }
