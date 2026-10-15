@@ -379,6 +379,36 @@ class IpmiCliTest {
 			Result undated = login(bmc, "fru", "--json");
 			assertFalse(undated.out.contains("mfgDate"), undated.out);
 			assertTrue(undated.out.contains("\"serialNumber\":\"409F3CA2\"}"), undated.out);
+
+			// The FRU device of a processor returns its processor information ROM
+			new FakeSdrRepository()
+					.add(fruDeviceLocatorRecord(1, Fixtures.CPU_FRU, EntityId.Processor.getCode(), 1, "PIROM 1"))
+					.fru(Fixtures.CPU_FRU, Fixtures.PIROM)
+					.install(bmc);
+			Result cpu = login(bmc, "fru");
+			assertEquals(0, cpu.code, cpu.err);
+			assertEquals(
+					"FRU 85: PIROM 1 (Processor 1)\n"
+							+ "  Processor S-spec           SR3GH\n"
+							+ "  Processor part number      37608DC00416530\n"
+							+ "  Processor PPIN             634AFBC3354D3C6D\n"
+							+ "  Processor CPUID            0654h\n"
+							+ "  Processor cores            8 with Hyper-Threading\n"
+							+ "  Processor frequency        2100-3000 MHz\n"
+							+ "  Processor L2 cache         1024 KB per core\n"
+							+ "  Processor L3 cache         11264 KB\n"
+							+ "  Processor max memory       768 GB\n"
+							+ "  Processor TDP              85 W\n"
+							+ "  Processor Tcase max        77 C\n",
+					cpu.out);
+			assertEquals(
+					"{\"id\":85,\"name\":\"PIROM 1\",\"entity\":\"Processor\",\"entityInstance\":1,\"manufacturer\":\"Intel\","
+							+ "\"model\":\"SR3GH\",\"serialNumber\":\"634AFBC3354D3C6D\",\"partNumber\":\"37608DC00416530\","
+							+ "\"pirom\":{\"sSpec\":\"SR3GH\",\"partNumber\":\"37608DC00416530\",\"ppin\":\"634AFBC3354D3C6D\","
+							+ "\"cpuid\":\"0654\",\"cores\":8,\"hyperThreading\":true,\"baseFrequencyMhz\":2100,"
+							+ "\"maxFrequencyMhz\":3000,\"l2KilobytesPerCore\":1024,\"l3Kilobytes\":11264,"
+							+ "\"maxMemoryGigabytes\":768,\"tdpWatts\":85,\"tcaseMax\":77,\"dtsMax\":90},\"complete\":true}\n",
+					login(bmc, "fru", "--json").out);
 		}
 		try (FakeRmcpPlusBmc bmc = Fixtures.bmc()) {
 			// FRU 1 is declared but absent: the BMC answers C3h to its Get FRU Inventory Area Info

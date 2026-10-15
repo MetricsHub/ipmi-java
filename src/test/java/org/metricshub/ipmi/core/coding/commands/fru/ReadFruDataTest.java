@@ -19,6 +19,7 @@ import org.metricshub.ipmi.core.coding.commands.fru.record.BaseCompatibilityInfo
 import org.metricshub.ipmi.core.coding.commands.fru.record.BoardInfo;
 import org.metricshub.ipmi.core.coding.commands.fru.record.FruRecord;
 import org.metricshub.ipmi.core.coding.commands.fru.record.InternalUseInfo;
+import org.metricshub.ipmi.core.coding.commands.fru.record.PiromInfo;
 import org.metricshub.ipmi.core.coding.commands.fru.record.PowerSupplyInfo;
 import org.metricshub.ipmi.core.coding.commands.fru.record.RawMultiRecordInfo;
 import org.metricshub.ipmi.core.coding.commands.fru.record.ProductInfo;
@@ -261,6 +262,10 @@ class ReadFruDataTest {
 		List<FruRecord> records = decode(Fixtures.DDR4_SPD);
 		assertEquals(1, records.size());
 		assertEquals("M393A2K43BB1-CTD", assertInstanceOf(SpdInfo.class, records.get(0)).getPartNumber());
+
+		List<FruRecord> pirom = decode(Fixtures.PIROM);
+		assertEquals(1, pirom.size());
+		assertEquals("SR3GH", assertInstanceOf(PiromInfo.class, pirom.get(0)).getSSpec());
 
 		byte[] ddr2 = { (byte) 0x80, 0x08, 0x08, 0x0e, 0x0a, 0x01, 0x40, 0x00 };
 		IllegalArgumentException refused = assertThrows(IllegalArgumentException.class, () -> decode(ddr2));

@@ -29,6 +29,7 @@ import org.metricshub.ipmi.core.coding.commands.fru.record.ChassisInfo;
 import org.metricshub.ipmi.core.coding.commands.fru.record.FruRecord;
 import org.metricshub.ipmi.core.coding.commands.fru.record.InternalUseInfo;
 import org.metricshub.ipmi.core.coding.commands.fru.record.MultiRecordInfo;
+import org.metricshub.ipmi.core.coding.commands.fru.record.PiromInfo;
 import org.metricshub.ipmi.core.coding.commands.fru.record.ProductInfo;
 import org.metricshub.ipmi.core.coding.commands.fru.record.SpdInfo;
 import org.metricshub.ipmi.core.coding.commands.sdr.GetSdr;
@@ -184,9 +185,11 @@ public class ReadFruData extends IpmiCommandCoder<ReadFruDataResponseData> {
 	 * @param problems receives a message for each area or multirecord that was skipped: beyond or truncated by the
 	 *        data read, or impossible to decode
 	 * @return the records of the chassis, board and product areas and of the multirecord area that could be decoded,
-	 *         or the single {@link SpdInfo} of a memory module whose FRU device returns its SPD data
+	 *         or the single {@link SpdInfo} of a memory module whose FRU device returns its SPD data, or the single
+	 *         {@link PiromInfo} of a processor whose FRU device returns its processor information ROM
 	 * @throws IllegalArgumentException when the common header is missing, of an unknown format or corrupt, or when
-	 *         the SPD data is of a DRAM type the library does not decode or is truncated
+	 *         the SPD data or the processor information ROM is of a revision the library does not decode or is
+	 *         truncated
 	 */
 	public static List<FruRecord> decodeFruData(List<ReadFruDataResponseData> fruData, List<String> problems) {
 		int size = 0;
@@ -210,6 +213,10 @@ public class ReadFruData extends IpmiCommandCoder<ReadFruDataResponseData> {
 		if (SpdInfo.isSpd(data, 0)) {
 			// The FRU device of a DIMM returns the JEDEC SPD data of the module, not an IPMI FRU inventory
 			return Collections.<FruRecord>singletonList(new SpdInfo(data, 0));
+		}
+		if (PiromInfo.isPirom(data, 0)) {
+			// The FRU device of a processor cartridge returns the Intel processor information ROM of the CPU
+			return Collections.<FruRecord>singletonList(new PiromInfo(data, 0));
 		}
 		if (data.length < COMMON_HEADER_SIZE) {
 			throw new IllegalArgumentException("FRU data shorter than its common header: " + data.length + " byte(s)");

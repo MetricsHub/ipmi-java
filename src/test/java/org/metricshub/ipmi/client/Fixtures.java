@@ -148,6 +148,19 @@ public final class Fixtures {
 	/** The FRU device ID of the memory module whose SPD data is {@link #DDR4_SPD}. */
 	public static final int DIMM_FRU = 2;
 
+	/** The FRU device ID of the processor whose ROM is {@link #PIROM}. */
+	public static final int CPU_FRU = 85;
+
+	/**
+	 * The processor information ROM of an Intel Xeon Silver 4110 (S-spec SR3GH, 8 cores with Hyper-Threading, 2.1 to
+	 * 3.0 GHz, 11 MB of L3, 85 W), as the FRU device of a processor of a Lenovo XCC returns it.
+	 */
+	public static final byte[] PIROM = bytes(
+			"07 80 00 0d 19 21 2b 31 34 56 65 6c 77 20 53 52 33 47 48 00 08 01 00 01 00 54 06 00 00 00 21 00"
+					+ " 30 02 60 09 00 80 00 24 00 00 01 00 04 00 2c 0c 00 00 00 00 50 12 00 06 00 12 00 06 50 13 00 10"
+					+ " 00 10 00 10 50 13 50 13 50 13 50 13 50 13 50 13 00 00 00 00 00 00 33 37 36 30 38 44 43 30 30 34"
+					+ " 31 36 35 33 30 77 85 00 90 00 59 00 bf eb fb ff 0e 3f 01 09 00 00 15 6d 3c 4d 35 c3 fb 4a 63 00");
+
 	/**
 	 * The SPD data of a Samsung 16 GB 2Rx8 DDR4-2666 ECC RDIMM (M393A2K43BB1-CTD): 8 Gb SDRAMs, 8 bits wide, on a
 	 * 64-bit bus with 8 bits of ECC, 2 ranks, made in week 23 of 2019.

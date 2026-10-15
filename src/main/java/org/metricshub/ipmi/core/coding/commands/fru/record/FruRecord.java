@@ -32,6 +32,24 @@ import org.metricshub.ipmi.core.common.TypeConverter;
 public abstract class FruRecord {
 
 	/**
+	 * Decodes a fixed-length ASCII field: its printable characters, without the trailing spaces and the padding.
+	 *
+	 * @param data the data
+	 * @param offset the offset of the field
+	 * @param length the length of the field
+	 * @return the text, empty when the field is not programmed
+	 */
+	protected static String ascii(byte[] data, int offset, int length) {
+		StringBuilder text = new StringBuilder();
+		for (int i = offset; i < offset + length; i++) {
+			if (data[i] >= 0x20 && data[i] < 0x7f) {
+				text.append((char) data[i]);
+			}
+		}
+		return text.toString().trim();
+	}
+
+	/**
 	 * Decodes string using the type/length field specification.
 	 *
 	 * @param typeFormat

@@ -8,7 +8,9 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.metricshub.ipmi.client.Fixtures.BOARD_SENSOR;
+import static org.metricshub.ipmi.client.Fixtures.CPU_FRU;
 import static org.metricshub.ipmi.client.Fixtures.DDR4_SPD;
+import static org.metricshub.ipmi.client.Fixtures.PIROM;
 import static org.metricshub.ipmi.client.Fixtures.DIMM_FRU;
 import static org.metricshub.ipmi.client.Fixtures.FAN_SENSOR;
 import static org.metricshub.ipmi.client.Fixtures.LENOVO;
@@ -884,24 +886,22 @@ class IpmiClientTest {
 
 	@Test
 	@Timeout(30)
-	void aProcessorPiromFruIsReportedWithoutBeingRead() throws Exception {
+	void aProcessorFruIsDecodedFromItsPirom() throws Exception {
 		try (FakeRmcpPlusBmc bmc = new FakeRmcpPlusBmc(SUITES, USER, utf8(PASSWORD), null)) {
-			byte[] locator = fruDeviceLocatorRecord(1, 85, EntityId.Processor.getCode(), 1, "PIROM 1");
+			byte[] locator = fruDeviceLocatorRecord(1, CPU_FRU, EntityId.Processor.getCode(), 1, "PIROM 1");
 			locator[11] = 0x03; // device type modifier: System Processor Cartridge FRU / PIROM
-			new FakeSdrRepository().add(locator).install(bmc);
+			new FakeSdrRepository().add(locator).fru(CPU_FRU, PIROM).install(bmc);
 			try (IpmiClient client = client(bmc).build()) {
 				FruList frus = client.frus().execute();
 				assertEquals(1, frus.size(), frus.toString());
-				Fru pirom = frus.get(0);
-				assertEquals("PIROM 1", pirom.name());
-				assertFalse(pirom.complete());
-				assertEquals(
-						Collections
-								.singletonList(
-										"FRU 85 is the processor information ROM (PIROM) of a processor, which is not decoded"),
-						pirom.problems());
-				assertTrue(pirom.records().isEmpty());
-				assertEquals(0, bmc.getCount(NETFN_STORAGE, FakeSdrRepository.READ_FRU_DATA), "not read");
+				Fru cpu = frus.get(0);
+				assertTrue(cpu.complete(), cpu.problems().toString());
+				assertEquals(8, cpu.pirom().get().getCores());
+				assertEquals("Intel", cpu.manufacturer());
+				assertEquals("SR3GH", cpu.model());
+				assertEquals("37608DC00416530", cpu.partNumber());
+				assertEquals("634AFBC3354D3C6D", cpu.serialNumber());
+				assertEquals("FRU 85 PIROM 1 (Processor 1): Intel SR3GH S/N 634AFBC3354D3C6D", cpu.toString());
 			}
 		}
 	}

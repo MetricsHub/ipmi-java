@@ -28,10 +28,14 @@ description: What changes when upgrading the IPMI Java Client — from 2.0.00, f
   and DRAM manufacturers, the part number, the serial number and the manufacturing date of a
   DDR3, DDR4 or DDR5 module; `manufacturer()`, `model()`, `serialNumber()` and `partNumber()`
   take their values from it, and `ipmicli fru` prints them
-  ([FRU Inventory](fru-inventory.html#memory-modules)). The FRU of a processor cartridge
-  (device type `10h`, modifier `03h`: the processor information ROM, PIROM) is no longer read:
-  it is returned with a problem naming the format, where 2.0.00 read it and reported
-  `Invalid format version`.
+  ([FRU Inventory](fru-inventory.html#memory-modules)).
+* The FRUs of processors are decoded: the FRU device of a processor cartridge returns the Intel
+  Processor Information ROM of the CPU, which 2.0.00 refused with
+  `Cannot decode FRU <id>: Invalid format version: 7`. The `Fru` now has `pirom()`, a
+  `PiromInfo` with the S-spec, part number, PPIN, CPUID, cores, frequencies, caches, memory
+  capacity and thermal design power of the processor; `manufacturer()` (`Intel`), `model()`
+  (the S-spec), `serialNumber()` (the PPIN) and `partNumber()` take their values from it, and
+  `ipmicli fru` prints them ([FRU Inventory](fru-inventory.html#processors)).
 
 ## Upgrading from 1.x to 2.0.00
 
