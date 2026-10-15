@@ -695,9 +695,10 @@ public final class IpmiCli {
 
 	/** The manufacturing year and week of a memory module as an ISO-8601 week date (2019-W23), null when unknown. */
 	private static String mfgDate(SpdInfo module) {
-		return module.getManufacturingYear() == 0 ?
+		int week = module.getManufacturingWeek();
+		return module.getManufacturingYear() == 0 || week < 1 || week > 53 ?
 				null :
-				String.format("%d-W%02d", module.getManufacturingYear(), module.getManufacturingWeek());
+				String.format("%d-W%02d", module.getManufacturingYear(), week);
 	}
 
 	private static Map<String, Object> fruFields(Fru fru) {

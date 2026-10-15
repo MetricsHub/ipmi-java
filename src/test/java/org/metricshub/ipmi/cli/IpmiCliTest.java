@@ -368,6 +368,17 @@ class IpmiCliTest {
 							+ "\"manufacturer\":\"Samsung\",\"dramManufacturer\":\"Samsung\",\"partNumber\":\"M393A2K43BB1-CTD\","
 							+ "\"serialNumber\":\"409F3CA2\",\"mfgDate\":\"2019-W23\"},\"complete\":true}\n",
 					login(bmc, "fru", "--json").out);
+
+			// A year without a week is no date
+			byte[] noWeek = Fixtures.DDR4_SPD.clone();
+			noWeek[324] = 0;
+			new FakeSdrRepository()
+					.add(fruDeviceLocatorRecord(1, Fixtures.DIMM_FRU, EntityId.MemoryDevice.getCode(), 1, "DIMM 1"))
+					.fru(Fixtures.DIMM_FRU, noWeek)
+					.install(bmc);
+			Result undated = login(bmc, "fru", "--json");
+			assertFalse(undated.out.contains("mfgDate"), undated.out);
+			assertTrue(undated.out.contains("\"serialNumber\":\"409F3CA2\"}"), undated.out);
 		}
 		try (FakeRmcpPlusBmc bmc = Fixtures.bmc()) {
 			// FRU 1 is declared but absent: the BMC answers C3h to its Get FRU Inventory Area Info
