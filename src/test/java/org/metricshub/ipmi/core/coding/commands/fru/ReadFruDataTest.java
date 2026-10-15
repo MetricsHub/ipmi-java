@@ -14,6 +14,7 @@ import java.util.Date;
 import java.util.List;
 
 import org.junit.jupiter.api.Test;
+import org.metricshub.ipmi.client.Fixtures;
 import org.metricshub.ipmi.core.coding.commands.fru.record.BaseCompatibilityInfo;
 import org.metricshub.ipmi.core.coding.commands.fru.record.BoardInfo;
 import org.metricshub.ipmi.core.coding.commands.fru.record.FruRecord;
@@ -21,6 +22,7 @@ import org.metricshub.ipmi.core.coding.commands.fru.record.InternalUseInfo;
 import org.metricshub.ipmi.core.coding.commands.fru.record.PowerSupplyInfo;
 import org.metricshub.ipmi.core.coding.commands.fru.record.RawMultiRecordInfo;
 import org.metricshub.ipmi.core.coding.commands.fru.record.ProductInfo;
+import org.metricshub.ipmi.core.coding.commands.fru.record.SpdInfo;
 
 class ReadFruDataTest {
 
@@ -252,6 +254,17 @@ class ReadFruDataTest {
 		List<FruRecord> records = decode(image);
 
 		assertEquals(3, records.size(), "board, product and the raw record; the area is not read past the corrupt header");
+	}
+
+	@Test
+	void spdDataOfAMemoryModuleGivesItsSpdRecord() {
+		List<FruRecord> records = decode(Fixtures.DDR4_SPD);
+		assertEquals(1, records.size());
+		assertEquals("M393A2K43BB1-CTD", assertInstanceOf(SpdInfo.class, records.get(0)).getPartNumber());
+
+		byte[] ddr2 = { (byte) 0x80, 0x08, 0x08, 0x0e, 0x0a, 0x01, 0x40, 0x00 };
+		IllegalArgumentException refused = assertThrows(IllegalArgumentException.class, () -> decode(ddr2));
+		assertEquals("The SPD data of a DDR2 module is not decoded", refused.getMessage());
 	}
 
 	@Test

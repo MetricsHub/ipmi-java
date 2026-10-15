@@ -145,6 +145,71 @@ public final class Fixtures {
 		return result;
 	}
 
+	/** The FRU device ID of the memory module whose SPD data is {@link #DDR4_SPD}. */
+	public static final int DIMM_FRU = 2;
+
+	/**
+	 * The SPD data of a Samsung 16 GB 2Rx8 DDR4-2666 ECC RDIMM (M393A2K43BB1-CTD): 8 Gb SDRAMs, 8 bits wide, on a
+	 * 64-bit bus with 8 bits of ECC, 2 ranks, made in week 23 of 2019.
+	 */
+	public static final byte[] DDR4_SPD = ddr4Spd();
+
+	private static byte[] ddr4Spd() {
+		byte[] spd = new byte[512];
+		spd[0] = 0x23; // 384 bytes used of 512
+		spd[1] = 0x11; // SPD revision 1.1
+		spd[2] = 0x0C; // DDR4
+		spd[3] = 0x01; // RDIMM
+		spd[4] = (byte) 0x85; // 8 Gb, 4 banks, 2 bank groups
+		spd[12] = 0x09; // 2 ranks, x8
+		spd[13] = 0x0B; // 64 bits + 8 bits of ECC
+		identify(spd, 320, 329, 1, 0xCE, 19, 23, "409F3CA2", "M393A2K43BB1-CTD", 20, 1);
+		return spd;
+	}
+
+	/**
+	 * Writes the manufacturing information of a memory module into its SPD data: the JEDEC ID of the module
+	 * manufacturer, the manufacturing date, the serial number, the part number and, after the revision code, the JEDEC
+	 * ID of the DRAM manufacturer, taken to be the same.
+	 *
+	 * @param spd the SPD data
+	 * @param offset the offset of the module manufacturer ID (117 for DDR3, 320 for DDR4, 512 for DDR5)
+	 * @param partNumberOffset the offset of the part number (128 for DDR3, after the CRC; 329 for DDR4; 521 for DDR5)
+	 * @param bank the JEDEC JEP106 bank of the manufacturer, 1 for the first one
+	 * @param code the JEDEC JEP106 code of the manufacturer, with its parity bit
+	 * @param year the year of manufacture, 2000-based
+	 * @param week the week of manufacture
+	 * @param serial the serial number, 8 hexadecimal digits
+	 * @param partNumber the part number
+	 * @param partNumberLength the length of the part number field (18 for DDR3, 20 for DDR4, 30 for DDR5)
+	 * @param revisionLength the length of the revision code field (2 for DDR3, 1 for DDR4 and DDR5)
+	 */
+	public static void identify(
+			byte[] spd,
+			int offset,
+			int partNumberOffset,
+			int bank,
+			int code,
+			int year,
+			int week,
+			String serial,
+			String partNumber,
+			int partNumberLength,
+			int revisionLength) {
+		spd[offset] = (byte) (0x80 | (bank - 1)); // the parity bit, set for bank 1 (no continuation code)
+		spd[offset + 1] = (byte) code;
+		spd[offset + 2] = 0x01; // location
+		spd[offset + 3] = (byte) Integer.parseInt(String.valueOf(year), 16); // BCD
+		spd[offset + 4] = (byte) Integer.parseInt(String.valueOf(week), 16);
+		for (int i = 0; i < 4; i++) {
+			spd[offset + 5 + i] = (byte) Integer.parseInt(serial.substring(2 * i, 2 * i + 2), 16);
+		}
+		byte[] part = String.format("%-" + partNumberLength + "s", partNumber).getBytes(StandardCharsets.US_ASCII);
+		System.arraycopy(part, 0, spd, partNumberOffset, partNumberLength);
+		spd[partNumberOffset + partNumberLength + revisionLength] = (byte) (0x80 | (bank - 1));
+		spd[partNumberOffset + partNumberLength + revisionLength + 1] = (byte) code;
+	}
+
 	public static final byte[] BASE_BOARD_PRODUCT_INFO = {
 			1,
 			0,

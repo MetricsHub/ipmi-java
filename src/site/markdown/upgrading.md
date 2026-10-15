@@ -22,6 +22,13 @@ description: What changes when upgrading the IPMI Java Client — from 2.0.00, f
   `isNonLinear()` tells them apart, and `calcFormula(int, SensorReadingFactors)` converts a
   reading byte with the factors of the reply; `calcFormula(int)` still returns `NaN` for them.
   Their thresholds stay empty.
+* The FRUs of memory modules are decoded: the FRU device of a DIMM returns the JEDEC SPD data of
+  the module, which 2.0.00 refused with `Cannot decode FRU <id>: Invalid format version`. The
+  `Fru` now has `spd()`, an `SpdInfo` with the memory and module type, the capacity, the module
+  and DRAM manufacturers, the part number, the serial number and the manufacturing date of a
+  DDR3, DDR4 or DDR5 module; `manufacturer()`, `model()`, `serialNumber()` and `partNumber()`
+  take their values from it, and `ipmicli fru` prints them
+  ([FRU Inventory](fru-inventory.html#memory-modules)).
 
 ## Upgrading from 1.x to 2.0.00
 

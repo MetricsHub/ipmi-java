@@ -79,6 +79,7 @@ import org.metricshub.ipmi.core.coding.commands.sdr.record.SensorUnit;
 import org.metricshub.ipmi.core.coding.commands.fru.record.BoardInfo;
 import org.metricshub.ipmi.core.coding.commands.fru.record.ChassisInfo;
 import org.metricshub.ipmi.core.coding.commands.fru.record.ProductInfo;
+import org.metricshub.ipmi.core.coding.commands.fru.record.SpdInfo;
 import org.metricshub.ipmi.core.coding.payload.CompletionCode;
 import org.metricshub.ipmi.core.coding.payload.lan.IPMIException;
 import org.metricshub.ipmi.core.coding.security.CipherSuite;
@@ -676,6 +677,28 @@ public final class IpmiCli {
 			field(out, "Product asset tag", area.getAssetTag());
 			fields(out, "Product custom", area.getCustomProductInfo());
 		}
+		Optional<SpdInfo> spd = fru.spd();
+		if (spd.isPresent()) {
+			SpdInfo module = spd.get();
+			field(
+					out,
+					"Memory type",
+					module.getMemoryType() + " " + module.getModuleType() + (module.isEcc() ? " ECC" : ""));
+			field(out, "Memory capacity", module.getCapacityMegabytes() + " MB");
+			field(out, "Module manufacturer", module.getManufacturer());
+			field(out, "DRAM manufacturer", module.getDramManufacturer());
+			field(out, "Module part number", module.getPartNumber());
+			field(out, "Module serial number", module.getSerialNumber());
+			field(out, "Module mfg date", mfgDate(module));
+		}
+	}
+
+	/** The manufacturing year and week of a memory module as an ISO-8601 week date (2019-W23), null when unknown. */
+	private static String mfgDate(SpdInfo module) {
+		int week = module.getManufacturingWeek();
+		return module.getManufacturingYear() == 0 || week < 1 || week > 53 ?
+				null :
+				String.format(Locale.ROOT, "%d-W%02d", module.getManufacturingYear(), week);
 	}
 
 	private static Map<String, Object> fruFields(Fru fru) {
@@ -716,6 +739,19 @@ public final class IpmiCli {
 			put(product, "assetTag", area.getAssetTag());
 			put(product, "custom", area.getCustomProductInfo());
 			fields.put("product", product);
+		});
+		fru.spd().ifPresent(module -> {
+			Map<String, Object> spd = new LinkedHashMap<String, Object>();
+			spd.put("memoryType", module.getMemoryType());
+			spd.put("moduleType", module.getModuleType());
+			spd.put("capacityMegabytes", module.getCapacityMegabytes());
+			spd.put("ecc", module.isEcc());
+			put(spd, "manufacturer", module.getManufacturer());
+			put(spd, "dramManufacturer", module.getDramManufacturer());
+			put(spd, "partNumber", module.getPartNumber());
+			put(spd, "serialNumber", module.getSerialNumber());
+			put(spd, "mfgDate", mfgDate(module));
+			fields.put("spd", spd);
 		});
 		fields.put("complete", fru.complete());
 		if (!fru.complete()) {

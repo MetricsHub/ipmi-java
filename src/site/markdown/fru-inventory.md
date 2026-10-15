@@ -1,5 +1,5 @@
-keywords: fru, field replaceable unit, inventory, serial number, part number, manufacturer, product, board, chassis, read fru data
-description: Read the FRU inventory of a server through its BMC — which FRUs are read, and the Fru object with the Board, Chassis, Product and MultiRecord areas.
+keywords: fru, field replaceable unit, inventory, serial number, part number, manufacturer, product, board, chassis, read fru data, dimm, memory module, spd, serial presence detect, ddr4, ddr5, jedec
+description: Read the FRU inventory of a server through its BMC — which FRUs are read, and the Fru object with the Board, Chassis, Product and MultiRecord areas, and the SPD data of memory modules.
 
 # FRU Inventory
 
@@ -58,6 +58,7 @@ Each [`Fru`](apidocs/org/metricshub/ipmi/client/Fru.html) is immutable and holds
 | `manufacturer()`, `model()`, `serialNumber()`, `partNumber()` | The summary, from the Product area, or from the Board area for a field the Product area does not give; empty when neither gives it |
 | `board()`, `product()`, `chassis()` | The decoded [`BoardInfo`](apidocs/org/metricshub/ipmi/core/coding/commands/fru/record/BoardInfo.html), [`ProductInfo`](apidocs/org/metricshub/ipmi/core/coding/commands/fru/record/ProductInfo.html) and [`ChassisInfo`](apidocs/org/metricshub/ipmi/core/coding/commands/fru/record/ChassisInfo.html) areas, each `Optional` |
 | `multiRecords()` | The decoded records of the MultiRecord area ([`MultiRecordInfo`](apidocs/org/metricshub/ipmi/core/coding/commands/fru/record/MultiRecordInfo.html): power supply, DC output, management access...) |
+| `spd()` | The decoded [`SpdInfo`](apidocs/org/metricshub/ipmi/core/coding/commands/fru/record/SpdInfo.html) of a memory module (see [Memory modules](#memory-modules)), `Optional` |
 | `records()`, `locator()` | Every decoded area, and the [`FruDeviceLocatorRecord`](apidocs/org/metricshub/ipmi/core/coding/commands/sdr/record/FruDeviceLocatorRecord.html) that located the FRU |
 | `complete()`, `problems()` | Whether the inventory was read and decoded entirely, and what went wrong otherwise |
 
@@ -80,4 +81,40 @@ for (Fru fru : bmc.frus().execute()) {
 [`FruList`](apidocs/org/metricshub/ipmi/client/FruList.html), the result of `execute()`, is an
 unmodifiable `List<Fru>` that also gives the SDR records the walk skipped
 (`skippedRecords()`).
+
+## Memory modules
+
+Some BMCs (a Lenovo XCC, for one) locate a FRU device per DIMM slot. Such a device returns the
+**Serial Presence Detect (SPD)** data of the module, the JEDEC EEPROM contents that describe it,
+rather than a FRU inventory with a common header and areas. The library recognizes SPD data by
+its JEDEC DRAM device type and decodes the DDR3, DDR4 and DDR5 layouts into an
+[`SpdInfo`](apidocs/org/metricshub/ipmi/core/coding/commands/fru/record/SpdInfo.html), the only
+record of the FRU:
+
+| Method | Content |
+| --- | --- |
+| `getMemoryType()`, `getModuleType()` | `DDR4`; `RDIMM`, `UDIMM`, `SO-DIMM`, `LRDIMM`... |
+| `getCapacityMegabytes()`, `isEcc()` | The capacity of the module, computed from the SDRAM density, the device and bus widths and the ranks; whether the bus carries ECC bits |
+| `getManufacturer()`, `getDramManufacturer()` | The makers of the module and of its DRAM chips, from their JEDEC JEP106 codes (`Samsung`, `Micron Technology`, `SK Hynix`, `Kingston`...); `JEDEC bank <n> code <xx>h` for a code the library does not name |
+| `getPartNumber()`, `getSerialNumber()` | The part number (`M393A2K40BB2-CTD`) and the serial number, 8 hexadecimal digits |
+| `getManufacturingYear()`, `getManufacturingWeek()` | When the module was made (`2017`, `45`), 0 when not programmed |
+
+The summary of the `Fru` takes its values from the SPD data: `manufacturer()` is the module
+manufacturer, `model()` and `partNumber()` the part number, `serialNumber()` the serial number.
+
+```java
+for (Fru fru : bmc.frus().execute()) {
+	fru.spd().ifPresent(spd -> System.out.println(fru.name() + ": " + spd.getCapacityMegabytes() + " MB "
+			+ spd.getMemoryType() + " " + spd.getModuleType() + " " + spd.getManufacturer() + " " + spd.getPartNumber()));
+}
+```
+
+```
+DIMM_2: 16384 MB DDR4 RDIMM Samsung M393A2K40BB2-CTD
+DIMM_3: 16384 MB DDR4 RDIMM Samsung M393A2K40BB2-CTD
+```
+
+The SPD data of a DDR2 or LPDDR module is recognized but not decoded: the FRU is returned
+without records and `problems()` says so. An empty DIMM slot is a FRU the BMC refuses to read
+(completion code `CBh`), like any absent FRU.
 

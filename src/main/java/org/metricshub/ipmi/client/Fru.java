@@ -33,6 +33,7 @@ import org.metricshub.ipmi.core.coding.commands.fru.record.ChassisInfo;
 import org.metricshub.ipmi.core.coding.commands.fru.record.FruRecord;
 import org.metricshub.ipmi.core.coding.commands.fru.record.MultiRecordInfo;
 import org.metricshub.ipmi.core.coding.commands.fru.record.ProductInfo;
+import org.metricshub.ipmi.core.coding.commands.fru.record.SpdInfo;
 import org.metricshub.ipmi.core.coding.commands.sdr.record.EntityId;
 import org.metricshub.ipmi.core.coding.commands.sdr.record.FruDeviceLocatorRecord;
 
@@ -40,8 +41,8 @@ import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 
 /**
  * A Field Replaceable Unit of the system: the board, chassis, product and multirecord areas of its FRU inventory
- * (IPMI Platform Management FRU Information Storage Definition), located by an SDR record. A FRU that could not be
- * read entirely is not {@link #complete()} and lists its {@link #problems()}.
+ * (IPMI Platform Management FRU Information Storage Definition), or the SPD data of a memory module, located by an
+ * SDR record. A FRU that could not be read entirely is not {@link #complete()} and lists its {@link #problems()}.
  */
 // EI_EXPOSE_REP also matches EI_EXPOSE_REP2
 @SuppressFBWarnings(value = "EI_EXPOSE_REP", justification = "The decoded areas and locator record of the protocol "
@@ -102,47 +103,55 @@ public final class Fru {
 	}
 
 	/**
-	 * Returns the manufacturer, from the product area, or from the board area when the product area does not name it.
+	 * Returns the manufacturer, from the product area, or from the board area when the product area does not name it,
+	 * or the module manufacturer of a memory module.
 	 *
-	 * @return the manufacturer, empty when neither area names it
+	 * @return the manufacturer, empty when no area names it
 	 */
 	public String manufacturer() {
-		return first(ProductInfo::getManufacturerName, BoardInfo::getBoardManufacturer);
+		return first(ProductInfo::getManufacturerName, BoardInfo::getBoardManufacturer, SpdInfo::getManufacturer);
 	}
 
 	/**
 	 * Returns the model, from the product name of the product area, or from the board product name when the product
-	 * area does not give it.
+	 * area does not give it, or the part number of a memory module.
 	 *
-	 * @return the model, empty when neither area gives it
+	 * @return the model, empty when no area gives it
 	 */
 	public String model() {
-		return first(ProductInfo::getProductName, BoardInfo::getBoardProductName);
+		return first(ProductInfo::getProductName, BoardInfo::getBoardProductName, SpdInfo::getPartNumber);
 	}
 
 	/**
-	 * Returns the serial number, from the product area, or from the board area when the product area does not give it.
+	 * Returns the serial number, from the product area, or from the board area when the product area does not give it,
+	 * or the one of a memory module.
 	 *
-	 * @return the serial number, empty when neither area gives it
+	 * @return the serial number, empty when no area gives it
 	 */
 	public String serialNumber() {
-		return first(ProductInfo::getProductSerialNumber, BoardInfo::getBoardSerialNumber);
+		return first(ProductInfo::getProductSerialNumber, BoardInfo::getBoardSerialNumber, SpdInfo::getSerialNumber);
 	}
 
 	/**
 	 * Returns the part number: the product model number of the product area, or the board part number when the
-	 * product area does not give it.
+	 * product area does not give it, or the part number of a memory module.
 	 *
-	 * @return the part number, empty when neither area gives it
+	 * @return the part number, empty when no area gives it
 	 */
 	public String partNumber() {
-		return first(ProductInfo::getProductModelNumber, BoardInfo::getBoardPartNumber);
+		return first(ProductInfo::getProductModelNumber, BoardInfo::getBoardPartNumber, SpdInfo::getPartNumber);
 	}
 
-	private String first(Function<ProductInfo, String> fromProduct, Function<BoardInfo, String> fromBoard) {
+	private String first(
+			Function<ProductInfo, String> fromProduct,
+			Function<BoardInfo, String> fromBoard,
+			Function<SpdInfo, String> fromSpd) {
 		String value = product().map(fromProduct).orElse(null);
 		if (value == null || value.trim().isEmpty()) {
 			value = board().map(fromBoard).orElse(null);
+		}
+		if (value == null || value.trim().isEmpty()) {
+			value = spd().map(fromSpd).orElse(null);
 		}
 		return value == null ? "" : value.trim();
 	}
@@ -172,6 +181,16 @@ public final class Fru {
 	 */
 	public Optional<ChassisInfo> chassis() {
 		return area(ChassisInfo.class);
+	}
+
+	/**
+	 * Returns the SPD data of a memory module, as the protocol core decodes it: the FRU device of a DIMM returns the
+	 * JEDEC SPD data of the module (type, capacity, manufacturer, part and serial numbers) instead of a FRU inventory.
+	 *
+	 * @return the SPD data, empty when the FRU is not a memory module or its SPD data could not be decoded
+	 */
+	public Optional<SpdInfo> spd() {
+		return area(SpdInfo.class);
 	}
 
 	private <T extends FruRecord> Optional<T> area(Class<T> type) {

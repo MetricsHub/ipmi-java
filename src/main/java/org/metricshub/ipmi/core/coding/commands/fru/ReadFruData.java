@@ -30,6 +30,7 @@ import org.metricshub.ipmi.core.coding.commands.fru.record.FruRecord;
 import org.metricshub.ipmi.core.coding.commands.fru.record.InternalUseInfo;
 import org.metricshub.ipmi.core.coding.commands.fru.record.MultiRecordInfo;
 import org.metricshub.ipmi.core.coding.commands.fru.record.ProductInfo;
+import org.metricshub.ipmi.core.coding.commands.fru.record.SpdInfo;
 import org.metricshub.ipmi.core.coding.commands.sdr.GetSdr;
 import org.metricshub.ipmi.core.coding.commands.sdr.record.FruDeviceLocatorRecord;
 import org.metricshub.ipmi.core.coding.payload.IpmiPayload;
@@ -45,6 +46,7 @@ import java.util.function.BiFunction;
 import java.security.InvalidKeyException;
 import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 /**
@@ -181,8 +183,10 @@ public class ReadFruData extends IpmiCommandCoder<ReadFruDataResponseData> {
 	 * @param fruData the chunks of the FRU data, in order
 	 * @param problems receives a message for each area or multirecord that was skipped: beyond or truncated by the
 	 *        data read, or impossible to decode
-	 * @return the records of the chassis, board and product areas and of the multirecord area that could be decoded
-	 * @throws IllegalArgumentException when the common header is missing, of an unknown format or corrupt
+	 * @return the records of the chassis, board and product areas and of the multirecord area that could be decoded,
+	 *         or the single {@link SpdInfo} of a memory module whose FRU device returns its SPD data
+	 * @throws IllegalArgumentException when the common header is missing, of an unknown format or corrupt, or when
+	 *         the SPD data is of a DRAM type the library does not decode or is truncated
 	 */
 	public static List<FruRecord> decodeFruData(List<ReadFruDataResponseData> fruData, List<String> problems) {
 		int size = 0;
@@ -203,11 +207,14 @@ public class ReadFruData extends IpmiCommandCoder<ReadFruDataResponseData> {
 			offset += length;
 		}
 
+		if (SpdInfo.isSpd(data, 0)) {
+			// The FRU device of a DIMM returns the JEDEC SPD data of the module, not an IPMI FRU inventory
+			return Collections.<FruRecord>singletonList(new SpdInfo(data, 0));
+		}
 		if (data.length < COMMON_HEADER_SIZE) {
 			throw new IllegalArgumentException("FRU data shorter than its common header: " + data.length + " byte(s)");
 		}
 		if (data[0] != 0x1) {
-			// TODO: recognize SPD records returned by DIMM FRUs (#107)
 			throw new IllegalArgumentException("Invalid format version: " + data[0]);
 		}
 		if (!isChecksumValid(data, 0, COMMON_HEADER_SIZE)) {

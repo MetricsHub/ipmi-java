@@ -1,0 +1,1149 @@
+# JEDEC JEP106 manufacturer identification codes, one per line: bank (1-based), code (hex, with its parity bit), name.
+# Taken from the tables of ipmitool (lib/dimm_spd.c), which stop at bank 9, under the following license:
+#
+# Copyright (c) 2003 Sun Microsystems, Inc.  All Rights Reserved.
+#
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions
+# are met:
+#
+# Redistribution of source code must retain the above copyright
+# notice, this list of conditions and the following disclaimer.
+#
+# Redistribution in binary form must reproduce the above copyright
+# notice, this list of conditions and the following disclaimer in the
+# documentation and/or other materials provided with the distribution.
+#
+# Neither the name of Sun Microsystems, Inc. or the names of
+# contributors may be used to endorse or promote products derived
+# from this software without specific prior written permission.
+#
+# This software is provided "AS IS," without a warranty of any kind.
+# ALL EXPRESS OR IMPLIED CONDITIONS, REPRESENTATIONS AND WARRANTIES,
+# INCLUDING ANY IMPLIED WARRANTY OF MERCHANTABILITY, FITNESS FOR A
+# PARTICULAR PURPOSE OR NON-INFRINGEMENT, ARE HEREBY EXCLUDED.
+# SUN MICROSYSTEMS, INC. ("SUN") AND ITS LICENSORS SHALL NOT BE LIABLE
+# FOR ANY DAMAGES SUFFERED BY LICENSEE AS A RESULT OF USING, MODIFYING
+# OR DISTRIBUTING THIS SOFTWARE OR ITS DERIVATIVES.  IN NO EVENT WILL
+# SUN OR ITS LICENSORS BE LIABLE FOR ANY LOST REVENUE, PROFIT OR DATA,
+# OR FOR DIRECT, INDIRECT, SPECIAL, CONSEQUENTIAL, INCIDENTAL OR
+# PUNITIVE DAMAGES, HOWEVER CAUSED AND REGARDLESS OF THE THEORY OF
+# LIABILITY, ARISING OUT OF THE USE OF OR INABILITY TO USE THIS SOFTWARE,
+# EVEN IF SUN HAS BEEN ADVISED OF THE POSSIBILITY OF SUCH DAMAGES.
+1 01 AMD
+1 02 AMI
+1 83 Fairchild
+1 04 Fujitsu
+1 85 GTE
+1 86 Harris
+1 07 Hitachi
+1 08 Inmos
+1 89 Intel
+1 8A I.T.T.
+1 0B Intersil
+1 8C Monolithic Memories
+1 0D Mostek
+1 0E Freescale (Motorola)
+1 8F National
+1 10 NEC
+1 91 RCA
+1 92 Raytheon
+1 13 Conexant (Rockwell)
+1 94 Seeq
+1 15 NXP (Philips)
+1 16 Synertek
+1 97 Texas Instruments
+1 98 Toshiba
+1 19 Xicor
+1 1A Zilog
+1 9B Eurotechnique
+1 1C Mitsubishi
+1 9D Lucent (AT&T)
+1 9E Exel
+1 1F Atmel
+1 20 STMicroelectronics
+1 A1 Lattice Semi.
+1 A2 NCR
+1 23 Wafer Scale Integration
+1 A4 IBM
+1 25 Tristar
+1 26 Visic
+1 A7 Intl. CMOS Technology
+1 A8 SSSI
+1 29 MicrochipTechnology
+1 2A Ricoh Ltd.
+1 AB VLSI
+1 2C Micron Technology
+1 AD SK Hynix
+1 AE OKI Semiconductor
+1 2F ACTEL
+1 B0 Sharp
+1 31 Catalyst
+1 32 Panasonic
+1 B3 IDT
+1 34 Cypress
+1 B5 DEC
+1 B6 LSI Logic
+1 37 Zarlink (Plessey)
+1 38 UTMC
+1 B9 Thinking Machine
+1 BA Thomson CSF
+1 3B Integrated CMOS (Vertex)
+1 BC Honeywell
+1 3D Tektronix
+1 3E Oracle Corporation
+1 BF Silicon Storage Technology
+1 40 ProMos/Mosel Vitelic
+1 C1 Infineon (Siemens)
+1 C2 Macronix
+1 43 Xerox
+1 C4 Plus Logic
+1 45 SanDisk Corporation
+1 46 Elan Circuit Tech.
+1 C7 European Silicon Str.
+1 C8 Apple Computer
+1 49 Xilinx
+1 4A Compaq
+1 CB Protocol Engines
+1 4C SCI
+1 CD Seiko Instruments
+1 CE Samsung
+1 4F I3 Design System
+1 D0 Klic
+1 51 Crosspoint Solutions
+1 52 Alliance Semiconductor
+1 D3 Tandem
+1 54 Hewlett-Packard
+1 D5 Integrated Silicon Solutions
+1 D6 Brooktree
+1 57 New Media
+1 58 MHS Electronic
+1 D9 Performance Semi.
+1 DA Winbond Electronic
+1 5B Kawasaki Steel
+1 DC Bright Micro
+1 5D TECMAR
+1 5E Exar
+1 DF PCMCIA
+1 E0 LG Semi (Goldstar)
+1 61 Northern Telecom
+1 62 Sanyo
+1 E3 Array Microsystems
+1 64 Crystal Semiconductor
+1 E5 Analog Devices
+1 E6 PMC-Sierra
+1 67 Asparix
+1 68 Convex Computer
+1 E9 Quality Semiconductor
+1 EA Nimbus Technology
+1 6B Transwitch
+1 EC Micronas (ITT Intermetall)
+1 6D Cannon
+1 6E Altera
+1 EF NEXCOM
+1 70 Qualcomm
+1 F1 Sony
+1 F2 Cray Research
+1 73 AMS(Austria Micro)
+1 F4 Vitesse
+1 75 Aster Electronics
+1 76 Bay Networks (Synoptic)
+1 F7 Zentrum/ZMD
+1 F8 TRW
+1 79 Thesys
+1 7A Solbourne Computer
+1 FB Allied-Signal
+1 7C Dialog Semiconductor
+1 FD Media Vision
+1 FE Numonyx Corporation
+2 01 Cirrus Logic
+2 02 National Instruments
+2 83 ILC Data Device
+2 04 Alcatel Mietec
+2 85 Micro Linear
+2 86 Univ. of NC
+2 07 JTAG Technologies
+2 08 BAE Systems (Loral)
+2 89 Nchip
+2 8A Galileo Tech
+2 0B Bestlink Systems
+2 8C Graychip
+2 0D GENNUM
+2 0E VideoLogic
+2 8F Robert Bosch
+2 10 Chip Express
+2 91 DATARAM
+2 92 United Microelectronics Corp.
+2 13 TCSI
+2 94 Smart Modular
+2 15 Hughes Aircraft
+2 16 Lanstar Semiconductor
+2 97 Qlogic
+2 98 Kingston
+2 19 Music Semi
+2 1A Ericsson Components
+2 9B SpaSE
+2 1C Eon Silicon Devices
+2 9D Integrated Silicon Solution (ISSI)
+2 9E DoD
+2 1F Integ. Memories Tech.
+2 20 Corollary Inc.
+2 A1 Dallas Semiconductor
+2 A2 Omnivision
+2 23 EIV(Switzerland)
+2 A4 Novatel Wireless
+2 25 Zarlink (Mitel)
+2 26 Clearpoint
+2 A7 Cabletron
+2 A8 STEC (Silicon Tech)
+2 29 Vanguard
+2 2A Hagiwara Sys-Com
+2 AB Vantis
+2 2C Celestica
+2 AD Century
+2 AE Hal Computers
+2 2F Rohm Company Ltd.
+2 B0 Juniper Networks
+2 31 Libit Signal Processing
+2 32 Mushkin Enhanced Memory
+2 B3 Tundra Semiconductor
+2 34 Adaptec Inc.
+2 B5 LightSpeed Semi.
+2 B6 ZSP Corp.
+2 37 AMIC Technology
+2 38 Adobe Systems
+2 B9 Dynachip
+2 BA PNY Technologies, Inc.
+2 3B Newport Digital
+2 BC MMC Networks
+2 3D T Square
+2 3E Seiko Epson
+2 BF Broadcom
+2 40 Viking Components
+2 C1 V3 Semiconductor
+2 C2 Flextronics (Orbit Semiconductor)
+2 43 Suwa Electronics
+2 C4 Transmeta
+2 45 Micron CMS
+2 46 American Computer & Digital Components Inc.
+2 C7 Enhance 3000 Inc.
+2 C8 Tower Semiconductor
+2 49 CPU Design
+2 4A Price Point
+2 CB Maxim Integrated Product
+2 4C Tellabs
+2 CD Centaur Technology
+2 CE Unigen Corporation
+2 4F Transcend Information
+2 D0 Memory Card Technology
+2 51 CKD Corporation Ltd.
+2 52 Capital Instruments, Inc.
+2 D3 Aica Kogyo, Ltd.
+2 54 Linvex Technology
+2 D5 MSC Vertriebs GmbH
+2 D6 AKM Company, Ltd.
+2 57 Dynamem, Inc.
+2 58 NERA ASA
+2 D9 GSI Technology
+2 DA Dane-Elec (C Memory)
+2 5B Acorn Computers
+2 DC Lara Technology
+2 5D Oak Technology, Inc.
+2 5E Itec Memory
+2 DF Tanisys Technology
+2 E0 Truevision
+2 61 Wintec Industries
+2 62 Super PC Memory
+2 E3 MGV Memory
+2 64 Galvantech
+2 E5 Gadzoox Networks
+2 E6 Multi Dimensional Cons.
+2 67 GateField
+2 68 Integrated Memory System
+2 E9 Triscend
+2 EA XaQti
+2 6B Goldenram
+2 EC Clear Logic
+2 6D Cimaron Communications
+2 6E Nippon Steel Semi. Corp.
+2 EF Advantage Memory
+2 70 AMCC
+2 F1 LeCroy
+2 F2 Yamaha Corporation
+2 73 Digital Microwave
+2 F4 NetLogic Microsystems
+2 75 MIMOS Semiconductor
+2 76 Advanced Fibre
+2 F7 BF Goodrich Data.
+2 F8 Epigram
+2 79 Acbel Polytech Inc.
+2 7A Apacer Technology
+2 FB Admor Memory
+2 7C FOXCONN
+2 FD Quadratics Superconductor
+2 FE 3COM
+3 01 Camintonn Corporation
+3 02 ISOA Incorporated
+3 83 Agate Semiconductor
+3 04 ADMtek Incorporated
+3 85 HYPERTEC
+3 86 Adhoc Technologies
+3 07 MOSAID Technologies
+3 08 Ardent Technologies
+3 89 Switchcore
+3 8A Cisco Systems, Inc.
+3 0B Allayer Technologies
+3 8C WorkX AG (Wichman)
+3 0D Oasis Semiconductor
+3 0E Novanet Semiconductor
+3 8F E-M Solutions
+3 10 Power General
+3 91 Advanced Hardware Arch.
+3 92 Inova Semiconductors GmbH
+3 13 Telocity
+3 94 Delkin Devices
+3 15 Symagery Microsystems
+3 16 C-Port Corporation
+3 97 SiberCore Technologies
+3 98 Southland Microsystems
+3 19 Malleable Technologies
+3 1A Kendin Communications
+3 9B Great Technology Microcomputer
+3 1C Sanmina Corporation
+3 9D HADCO Corporation
+3 9E Corsair
+3 1F Actrans System Inc.
+3 20 ALPHA Technologies
+3 A1 Silicon Laboratories, Inc. (Cygnal)
+3 A2 Artesyn Technologies
+3 23 Align Manufacturing
+3 A4 Peregrine Semiconductor
+3 25 Chameleon Systems
+3 26 Aplus Flash Technology
+3 A7 MIPS Technologies
+3 A8 Chrysalis ITS
+3 29 ADTEC Corporation
+3 2A Kentron Technologies
+3 AB Win Technologies
+3 2C Tezzaron Semiconductor
+3 AD Extreme Packet Devices
+3 AE RF Micro Devices
+3 2F Siemens AG
+3 B0 Sarnoff Corporation
+3 31 Itautec SA
+3 32 Radiata Inc.
+3 B3 Benchmark Elect. (AVEX)
+3 34 Legend
+3 B5 SpecTek Incorporated
+3 B6 Hi/fn
+3 37 Enikia Incorporated
+3 38 SwitchOn Networks
+3 B9 AANetcom Incorporated
+3 BA Micro Memory Bank
+3 3B ESS Technology
+3 BC Virata Corporation
+3 3D Excess Bandwidth
+3 3E West Bay Semiconductor
+3 BF DSP Group
+3 40 Newport Communications
+3 C1 Chip2Chip Incorporated
+3 C2 Phobos Corporation
+3 43 Intellitech Corporation
+3 C4 Nordic VLSI ASA
+3 45 Ishoni Networks
+3 46 Silicon Spice
+3 C7 Alchemy Semiconductor
+3 C8 Agilent Technologies
+3 49 Centillium Communications
+3 4A W.L. Gore
+3 CB HanBit Electronics
+3 4C GlobeSpan
+3 CD Element 14
+3 CE Pycon
+3 4F Saifun Semiconductors
+3 D0 Sibyte, Incorporated
+3 51 MetaLink Technologies
+3 52 Feiya Technology
+3 D3 I & C Technology
+3 54 Shikatronics
+3 D5 Elektrobit
+3 D6 Megic
+3 57 Com-Tier
+3 58 Malaysia Micro Solutions
+3 D9 Hyperchip
+3 DA Gemstone Communications
+3 5B Anadigm (Anadyne)
+3 DC 3ParData
+3 5D Mellanox Technologies
+3 5E Tenx Technologies
+3 DF Helix AG
+3 E0 Domosys
+3 61 Skyup Technology
+3 62 HiNT Corporation
+3 E3 Chiaro
+3 64 MDT Technologies GmbH
+3 E5 Exbit Technology A/S
+3 E6 Integrated Technology Express
+3 67 AVED Memory
+3 68 Legerity
+3 E9 Jasmine Networks
+3 EA Caspian Networks
+3 6B nCUBE
+3 EC Silicon Access Networks
+3 6D FDK Corporation
+3 6E High Bandwidth Access
+3 EF MultiLink Technology
+3 70 BRECIS
+3 F1 World Wide Packets
+3 F2 APW
+3 73 Chicory Systems
+3 F4 Xstream Logic
+3 75 Fast-Chip
+3 76 Zucotto Wireless
+3 F7 Realchip
+3 F8 Galaxy Power
+3 79 eSilicon
+3 7A Morphics Technology
+3 FB Accelerant Networks
+3 7C Silicon Wave
+3 FD SandCraft
+3 FE Elpida
+4 01 Solectron
+4 02 Optosys Technologies
+4 83 Buffalo (Formerly Melco)
+4 04 TriMedia Technologies
+4 85 Cyan Technologies
+4 86 Global Locate
+4 07 Optillion
+4 08 Terago Communications
+4 89 Ikanos Communications
+4 8A Princeton Technology
+4 0B Nanya Technology
+4 8C Elite Flash Storage
+4 0D Mysticom
+4 0E LightSand Communications
+4 8F ATI Technologies
+4 10 Agere Systems
+4 91 NeoMagic
+4 92 AuroraNetics
+4 13 Golden Empire
+4 94 Mushkin
+4 15 Tioga Technologies
+4 16 Netlist
+4 97 TeraLogic
+4 98 Cicada Semiconductor
+4 19 Centon Electronics
+4 1A Tyco Electronics
+4 9B Magis Works
+4 1C Zettacom
+4 9D Cogency Semiconductor
+4 9E Chipcon AS
+4 1F Aspex Technology
+4 20 F5 Networks
+4 A1 Programmable Silicon Solutions
+4 A2 ChipWrights
+4 23 Acorn Networks
+4 A4 Quicklogic
+4 25 Kingmax Semiconductor
+4 26 BOPS
+4 A7 Flasys
+4 A8 BitBlitz Communications
+4 29 eMemory Technology
+4 2A Procket Networks
+4 AB Purple Ray
+4 2C Trebia Networks
+4 AD Delta Electronics
+4 AE Onex Communications
+4 2F Ample Communications
+4 B0 Memory Experts Intl
+4 31 Astute Networks
+4 32 Azanda Network Devices
+4 B3 Dibcom
+4 34 Tekmos
+4 B5 API NetWorks
+4 B6 Bay Microsystems
+4 37 Firecron Ltd
+4 38 Resonext Communications
+4 B9 Tachys Technologies
+4 BA Equator Technology
+4 3B Concept Computer
+4 BC SILCOM
+4 3D 3Dlabs
+4 3E c't Magazine
+4 BF Sanera Systems
+4 40 Silicon Packets
+4 C1 Viasystems Group
+4 C2 Simtek
+4 43 Semicon Devices Singapore
+4 C4 Satron Handelsges
+4 45 Improv Systems
+4 46 INDUSYS GmbH
+4 C7 Corrent
+4 C8 Infrant Technologies
+4 49 Ritek Corp
+4 4A empowerTel Networks
+4 CB Hypertec
+4 4C Cavium Networks
+4 CD PLX Technology
+4 CE Massana Design
+4 4F Intrinsity
+4 D0 Valence Semiconductor
+4 51 Terawave Communications
+4 52 IceFyre Semiconductor
+4 D3 Primarion
+4 54 Picochip Designs Ltd
+4 D5 Silverback Systems
+4 D6 Jade Star Technologies
+4 57 Pijnenburg Securealink
+4 58 takeMS - Ultron AG
+4 D9 Cambridge Silicon Radio
+4 DA Swissbit
+4 5B Nazomi Communications
+4 DC eWave System
+4 5D Rockwell Collins
+4 5E Picocel Co. Ltd. (Paion)
+4 DF Alphamosaic Ltd
+4 E0 Sandburst
+4 61 SiCon Video
+4 62 NanoAmp Solutions
+4 E3 Ericsson Technology
+4 64 PrairieComm
+4 E5 Mitac International
+4 E6 Layer N Networks
+4 67 MtekVision (Atsana)
+4 68 Allegro Networks
+4 E9 Marvell Semiconductors
+4 EA Netergy Microelectronic
+4 6B NVIDIA
+4 EC Internet Machines
+4 6D Memorysolution GmbH
+4 6E Litchfield Communication
+4 EF Accton Technology
+4 70 Teradiant Networks
+4 F1 Scaleo Chip
+4 F2 Cortina Systems
+4 73 RAM Components
+4 F4 Raqia Networks
+4 75 ClearSpeed
+4 76 Matsushita Battery
+4 F7 Xelerated
+4 F8 SimpleTech
+4 79 Utron Technology
+4 7A Astec International
+4 FB AVM gmbH
+4 7C Redux Communications
+4 FD Dot Hill Systems
+4 FE TeraChip
+5 01 T-RAM Incorporated
+5 02 Innovics Wireless
+5 83 Teknovus
+5 04 KeyEye Communications
+5 85 Runcom Technologies
+5 86 RedSwitch
+5 07 Dotcast
+5 08 Silicon Mountain Memory
+5 89 Signia Technologies
+5 8A Pixim
+5 0B Galazar Networks
+5 8C White Electronic Designs
+5 0D Patriot Scientific
+5 0E Neoaxiom Corporation
+5 8F 3Y Power Technology
+5 10 Scaleo Chip
+5 91 Potentia Power Systems
+5 92 C-guys Incorporated
+5 13 Digital Communications Technology Incorporated
+5 94 Silicon-Based Technology
+5 15 Fulcrum Microsystems
+5 16 Positivo Informatica Ltd
+5 97 XIOtech Corporation
+5 98 PortalPlayer
+5 19 Zhiying Software
+5 1A ParkerVision, Inc.
+5 9B Phonex Broadband
+5 1C Skyworks Solutions
+5 9D Entropic Communications
+5 9E I'M Intelligent Memory Ltd.
+5 1F Zensys A/S
+5 20 Legend Silicon Corp.
+5 A1 Sci-worx GmbH
+5 A2 SMSC (Standard Microsystems)
+5 23 Renesas Electronics
+5 A4 Raza Microelectronics
+5 25 Phyworks
+5 26 MediaTek
+5 A7 Non-cents Productions
+5 A8 US Modular
+5 29 Wintegra Ltd.
+5 2A Mathstar
+5 AB StarCore
+5 2C Oplus Technologies
+5 AD Mindspeed
+5 AE Just Young Computer
+5 2F Radia Communications
+5 B0 OCZ
+5 31 Emuzed
+5 32 LOGIC Devices
+5 B3 Inphi Corporation
+5 34 Quake Technologies
+5 B5 Vixel
+5 B6 SolusTek
+5 37 Kongsberg Maritime
+5 38 Faraday Technology
+5 B9 Altium Ltd.
+5 BA Insyte
+5 3B ARM Ltd.
+5 BC DigiVision
+5 3D Vativ Technologies
+5 3E Endicott Interconnect Technologies
+5 BF Pericom
+5 40 Bandspeed
+5 C1 LeWiz Communications
+5 C2 CPU Technology
+5 43 Ramaxel Technology
+5 C4 DSP Group
+5 45 Axis Communications
+5 46 Legacy Electronics
+5 C7 Chrontel
+5 C8 Powerchip Semiconductor
+5 49 MobilEye Technologies
+5 4A Excel Semiconductor
+5 CB A-DATA Technology
+5 4C VirtualDigm
+5 CD G Skill Intl
+5 CE Quanta Computer
+5 4F Yield Microelectronics
+5 D0 Afa Technologies
+5 51 KINGBOX Technology Co. Ltd.
+5 52 Ceva
+5 D3 iStor Networks
+5 54 Advance Modules
+5 D5 Microsoft
+5 D6 Open-Silicon
+5 57 Goal Semiconductor
+5 58 ARC International
+5 D9 Simmtec
+5 DA Metanoia
+5 5B Key Stream
+5 DC Lowrance Electronics
+5 5D Adimos
+5 5E SiGe Semiconductor
+5 DF Fodus Communications
+5 E0 Credence Systems Corp.
+5 61 Genesis Microchip Inc.
+5 62 Vihana, Inc.
+5 E3 WIS Technologies
+5 64 GateChange Technologies
+5 E5 High Density Devices AS
+5 E6 Synopsys
+5 67 Gigaram
+5 68 Enigma Semiconductor Inc.
+5 E9 Century Micro Inc.
+5 EA Icera Semiconductor
+5 6B Mediaworks Integrated Systems
+5 EC O'Neil Product Development
+5 6D Supreme Top Technology Ltd.
+5 6E MicroDisplay Corporation
+5 EF Team Group Inc.
+5 70 Sinett Corporation
+5 F1 Toshiba Corporation
+5 F2 Tensilica
+5 73 SiRF Technology
+5 F4 Bacoc Inc.
+5 75 SMaL Camera Technologies
+5 76 Thomson SC
+5 F7 Airgo Networks
+5 F8 Wisair Ltd.
+5 79 SigmaTel
+5 7A Arkados
+5 FB Compete IT gmbH Co. KG
+5 7C Eudar Technology Inc.
+5 FD Focus Enhancements
+5 FE Xyratex
+6 01 Specular Networks
+6 02 Patriot Memory (PDP Systems)
+6 83 U-Chip Technology Corp.
+6 04 Silicon Optix
+6 85 Greenfield Networks
+6 86 CompuRAM GmbH
+6 07 Stargen, Inc.
+6 08 NetCell Corporation
+6 89 Excalibrus Technologies Ltd
+6 8A SCM Microsystems
+6 0B Xsigo Systems, Inc.
+6 8C CHIPS & Systems Inc
+6 0D Tier 1 Multichip Solutions
+6 0E CWRL Labs
+6 8F Teradici
+6 10 Gigaram, Inc.
+6 91 g2 Microsystems
+6 92 PowerFlash Semiconductor
+6 13 P.A. Semi, Inc.
+6 94 NovaTech Solutions, S.A.
+6 15 c2 Microsystems, Inc.
+6 16 Level5 Networks
+6 97 COS Memory AG
+6 98 Innovasic Semiconductor
+6 19 02IC Co. Ltd
+6 1A Tabula, Inc.
+6 9B Crucial Technology
+6 1C Chelsio Communications
+6 9D Solarflare Communications
+6 9E Xambala Inc.
+6 1F EADS Astrium
+6 20 Terra Semiconductor, Inc.
+6 A1 Imaging Works, Inc.
+6 A2 Astute Networks, Inc.
+6 23 Tzero
+6 A4 Emulex
+6 25 Power-One
+6 26 Pulse~LINK Inc.
+6 A7 Hon Hai Precision Industry
+6 A8 White Rock Networks Inc.
+6 29 Telegent Systems USA, Inc.
+6 2A Atrua Technologies, Inc.
+6 AB Acbel Polytech Inc.
+6 2C eRide Inc.
+6 AD ULi Electronics Inc.
+6 AE Magnum Semiconductor Inc.
+6 2F neoOne Technology, Inc.
+6 B0 Connex Technology, Inc.
+6 31 Stream Processors, Inc.
+6 32 Focus Enhancements
+6 B3 Telecis Wireless, Inc.
+6 34 uNav Microelectronics
+6 B5 Tarari, Inc.
+6 B6 Ambric, Inc.
+6 37 Newport Media, Inc.
+6 38 VMTS
+6 B9 Enuclia Semiconductor, Inc.
+6 BA Virtium Technology Inc.
+6 3B Solid State System Co., Ltd.
+6 BC Kian Tech LLC
+6 3D Artimi
+6 3E Power Quotient International
+6 BF Avago Technologies
+6 40 ADTechnology
+6 C1 Sigma Designs
+6 C2 SiCortex, Inc.
+6 43 Ventura Technology Group
+6 C4 eASIC
+6 45 M.H.S. SAS
+6 46 Micro Star International
+6 C7 Rapport Inc.
+6 C8 Makway International
+6 49 Broad Reach Engineering Co.
+6 4A Semiconductor Mfg Intl Corp
+6 CB SiConnect
+6 4C FCI USA Inc.
+6 CD Validity Sensors
+6 CE Coney Technology Co. Ltd.
+6 4F Spans Logic
+6 D0 Neterion Inc.
+6 51 Qimonda
+6 52 New Japan Radio Co. Ltd.
+6 D3 Velogix
+6 54 Montalvo Systems
+6 D5 iVivity Inc.
+6 D6 Walton Chaintech
+6 57 AENEON
+6 58 Lorom Industrial Co. Ltd.
+6 D9 Radiospire Networks
+6 DA Sensio Technologies, Inc.
+6 5B Nethra Imaging
+6 DC Hexon Technology Pte Ltd
+6 5D CompuStocx (CSX)
+6 5E Methode Electronics, Inc.
+6 DF Connect One Ltd.
+6 E0 Opulan Technologies
+6 61 Septentrio NV
+6 62 Goldenmars Technology Inc.
+6 E3 Kreton Corporation
+6 64 Cochlear Ltd.
+6 E5 Altair Semiconductor
+6 E6 NetEffect, Inc.
+6 67 Spansion, Inc.
+6 68 Taiwan Semiconductor Mfg
+6 E9 Emphany Systems Inc.
+6 EA ApaceWave Technologies
+6 6B Mobilygen Corporation
+6 EC Tego
+6 6D Cswitch Corporation
+6 6E Haier (Beijing) IC Design Co.
+6 EF MetaRAM
+6 70 Axel Electronics Co. Ltd.
+6 F1 Tilera Corporation
+6 F2 Aquantia
+6 73 Vivace Semiconductor
+6 F4 Redpine Signals
+6 75 Octalica
+6 76 InterDigital Communications
+6 F7 Avant Technology
+6 F8 Asrock, Inc.
+6 79 Availink
+6 7A Quartics, Inc.
+6 FB Element CXI
+6 7C Innovaciones Microelectronicas
+6 FD VeriSilicon Microelectronics
+6 FE W5 Networks
+7 01 MOVEKING
+7 02 Mavrix Technology, Inc.
+7 83 CellGuide Ltd.
+7 04 Faraday Technology
+7 85 Diablo Technologies, Inc.
+7 86 Jennic
+7 07 Octasic
+7 08 Molex Incorporated
+7 89 3Leaf Networks
+7 8A Bright Micron Technology
+7 0B Netxen
+7 8C NextWave Broadband Inc.
+7 0D DisplayLink
+7 0E ZMOS Technology
+7 8F Tec-Hill
+7 10 Multigig, Inc.
+7 91 Amimon
+7 92 Euphonic Technologies, Inc.
+7 13 BRN Phoenix
+7 94 InSilica
+7 15 Ember Corporation
+7 16 Avexir Technologies Corporation
+7 97 Echelon Corporation
+7 98 Edgewater Computer Systems
+7 19 XMOS Semiconductor Ltd.
+7 1A GENUSION, Inc.
+7 9B Memory Corp NV
+7 1C SiliconBlue Technologies
+7 9D Rambus Inc.
+7 9E Andes Technology Corporation
+7 1F Coronis Systems
+7 20 Achronix Semiconductor
+7 A1 Siano Mobile Silicon Ltd.
+7 A2 Semtech Corporation
+7 23 Pixelworks Inc.
+7 A4 Gaisler Research AB
+7 25 Teranetics
+7 26 Toppan Printing Co. Ltd.
+7 A7 Kingxcon
+7 A8 Silicon Integrated Systems
+7 29 I-O Data Device, Inc.
+7 2A NDS Americas Inc.
+7 AB Solomon Systech Limited
+7 2C On Demand Microelectronics
+7 AD Amicus Wireless Inc.
+7 AE SMARDTV SNC
+7 2F Comsys Communication Ltd.
+7 B0 Movidia Ltd.
+7 31 Javad GNSS, Inc.
+7 32 Montage Technology Group
+7 B3 Trident Microsystems
+7 34 Super Talent
+7 B5 Optichron, Inc.
+7 B6 Future Waves UK Ltd.
+7 37 SiBEAM, Inc.
+7 38 Inicore,Inc.
+7 B9 Virident Systems
+7 BA M2000, Inc.
+7 3B ZeroG Wireless, Inc.
+7 BC Gingle Technology Co. Ltd.
+7 3D Space Micro Inc.
+7 3E Wilocity
+7 BF Novafora, Inc.
+7 40 iKoa Corporation
+7 C1 ASint Technology
+7 C2 Ramtron
+7 43 Plato Networks Inc.
+7 C4 IPtronics AS
+7 45 Infinite-Memories
+7 46 Parade Technologies Inc.
+7 C7 Dune Networks
+7 C8 GigaDevice Semiconductor
+7 49 Modu Ltd.
+7 4A CEITEC
+7 CB Northrop Grumman
+7 4C XRONET Corporation
+7 CD Sicon Semiconductor AB
+7 CE Atla Electronics Co. Ltd.
+7 4F TOPRAM Technology
+7 D0 Silego Technology Inc.
+7 51 Kinglife
+7 52 Ability Industries Ltd.
+7 D3 Silicon Power Computer & Communications
+7 54 Augusta Technology, Inc.
+7 D5 Nantronics Semiconductors
+7 D6 Hilscher Gesellschaft
+7 57 Quixant Ltd.
+7 58 Percello Ltd.
+7 D9 NextIO Inc.
+7 DA Scanimetrics Inc.
+7 5B FS-Semi Company Ltd.
+7 DC Infinera Corporation
+7 5D SandForce Inc.
+7 5E Lexar Media
+7 DF Teradyne Inc.
+7 E0 Memory Exchange Corp.
+7 61 Suzhou Smartek Electronics
+7 62 Avantium Corporation
+7 E3 ATP Electronics Inc.
+7 64 Valens Semiconductor Ltd
+7 E5 Agate Logic, Inc.
+7 E6 Netronome
+7 67 Zenverge, Inc.
+7 68 N-trig Ltd
+7 E9 SanMax Technologies Inc.
+7 EA Contour Semiconductor Inc.
+7 6B TwinMOS
+7 EC Silicon Systems, Inc.
+7 6D V-Color Technology Inc.
+7 6E Certicom Corporation
+7 EF JSC ICC Milandr
+7 70 PhotoFast Global Inc.
+7 F1 InnoDisk Corporation
+7 F2 Muscle Power
+7 73 Energy Micro
+7 F4 Innofidei
+7 75 CopperGate Communications
+7 76 Holtek Semiconductor Inc.
+7 F7 Myson Century, Inc.
+7 F8 FIDELIX
+7 79 Red Digital Cinema
+7 7A Densbits Technology
+7 FB Zempro
+7 7C MoSys
+7 FD Provigent
+7 FE Triad Semiconductor, Inc.
+8 01 Siklu Communication Ltd.
+8 02 A Force Manufacturing Ltd.
+8 83 Strontium
+8 04 Abilis Systems
+8 85 Siglead, Inc.
+8 86 Ubicom, Inc.
+8 07 Unifosa Corporation
+8 08 Stretch, Inc.
+8 89 Lantiq Deutschland GmbH
+8 8A Visipro.
+8 0B EKMemory
+8 8C Microelectronics Institute ZTE
+8 0D Cognovo Ltd.
+8 0E Carry Technology Co. Ltd.
+8 8F Nokia
+8 10 King Tiger Technology
+8 91 Sierra Wireless
+8 92 HT Micron
+8 13 Albatron Technology Co. Ltd.
+8 94 Leica Geosystems AG
+8 15 BroadLight
+8 16 AEXEA
+8 97 ClariPhy Communications, Inc.
+8 98 Green Plug
+8 19 Design Art Networks
+8 1A Mach Xtreme Technology Ltd.
+8 9B ATO Solutions Co. Ltd.
+8 1C Ramsta
+8 9D Greenliant Systems, Ltd.
+8 9E Teikon
+8 1F Antec Hadron
+8 20 NavCom Technology, Inc.
+8 A1 Shanghai Fudan Microelectronics
+8 A2 Calxeda, Inc.
+8 23 JSC EDC Electronics
+8 A4 Kandit Technology Co. Ltd.
+8 25 Ramos Technology
+8 26 Goldenmars Technology
+8 A7 XeL Technology Inc.
+8 A8 Newzone Corporation
+8 29 ShenZhen MercyPower Tech
+8 2A Nanjing Yihuo Technology
+8 AB Nethra Imaging Inc.
+8 2C SiTel Semiconductor BV
+8 AD SolidGear Corporation
+8 AE Topower Computer Ind Co Ltd.
+8 2F Wilocity
+8 B0 Profichip GmbH
+8 31 Gerad Technologies
+8 32 Ritek Corporation
+8 B3 Gomos Technology Limited
+8 34 Memoright Corporation
+8 B5 D-Broad, Inc.
+8 B6 HiSilicon Technologies
+8 37 Syndiant Inc..
+8 38 Enverv Inc.
+8 B9 Cognex
+8 BA Xinnova Technology Inc.
+8 3B Ultron AG
+8 BC Concord Idea Corporation
+8 3D AIM Corporation
+8 3E Lifetime Memory Products
+8 BF Ramsway
+8 40 Recore Systems B.V.
+8 C1 Haotian Jinshibo Science Tech
+8 C2 Being Advanced Memory
+8 43 Adesto Technologies
+8 C4 Giantec Semiconductor, Inc.
+8 45 HMD Electronics AG
+8 46 Gloway International (HK)
+8 C7 Kingcore
+8 C8 Anucell Technology Holding
+8 49 Accord Software & Systems Pvt. Ltd.
+8 4A Active-Semi Inc.
+8 CB Denso Corporation
+8 4C TLSI Inc.
+8 CD Qidan
+8 CE Mustang
+8 4F Orca Systems
+8 D0 Passif Semiconductor
+8 51 GigaDevice Semiconductor (Beijing) Inc.
+8 52 Memphis Electronic
+8 D3 Beckhoff Automation GmbH
+8 54 Harmony Semiconductor Corp
+8 D5 Air Computers SRL
+8 D6 TMT Memory
+8 57 Eorex Corporation
+8 58 Xingtera
+8 D9 Netsol
+8 DA Bestdon Technology Co. Ltd.
+8 5B Baysand Inc.
+8 DC Uroad Technology Co. Ltd.
+8 5D Wilk Elektronik S.A.
+8 5E AAI
+8 DF Harman
+8 E0 Berg Microelectronics Inc.
+8 61 ASSIA, Inc.
+8 62 Visiontek Products LLC
+8 E3 OCMEMORY
+8 64 Welink Solution Inc.
+8 E5 Shark Gaming
+8 E6 Avalanche Technology
+8 67 R&D Center ELVEES OJSC
+8 68 KingboMars Technology Co. Ltd.
+8 E9 High Bridge Solutions Industria Eletronica
+8 EA Transcend Technology Co. Ltd.
+8 6B Everspin Technologies
+8 EC Hon-Hai Precision
+8 6D Smart Storage Systems
+8 6E Toumaz Group
+8 EF Zentel Electronics Corporation
+8 70 Panram International Corporation
+8 F1 Silicon Space Technology
+8 F2 LITE-ON IT Corporation
+8 73 Inuitive
+8 F4 HMicro
+8 75 BittWare, Inc.
+8 76 GLOBALFOUNDRIES
+8 F7 ACPI Digital Co. Ltd.
+8 F8 Annapurna Labs
+8 79 AcSiP Technology Corporation
+8 7A Idea! Electronic Systems
+8 FB Gowe Technology Co. Ltd.
+8 7C Hermes Testing Solutions, Inc.
+8 FD Positivo BGH
+8 FE Intelligence Silicon Technology
+9 01 3D PLUS
+9 02 Diehl Aerospace
+9 83 Fairchild
+9 04 Mercury Systems
+9 85 Sonics, Inc.
+9 86 GE Intelligent Platforms GmbH & Co.
+9 07 Shenzhen Jinge Information Co. Ltd.
+9 08 SCWW
+9 89 Silicon Motion Inc.
+9 8A Anurag
+9 0B King Kong
+9 8C FROM30 Co. Ltd.
+9 0D Gowin Semiconductor Corp
+9 0E Fremont Micro Devices Ltd.
+9 8F Ericsson Modems
+9 10 Exelis
+9 91 Satixfy Ltd.
+9 92 Galaxy Microsystems Ltd.
+9 13 Gloway International Co. Ltd.
+9 94 Lab
+9 15 Smart Energy Instruments
+9 16 Approved Memory Corporation
+9 97 Axell Corporation
+9 98 Essencore Limited
+9 19 Phytium
+9 1A Xi'an SinoChip Semiconductor
+9 9B Ambiq Micro
+9 1C eveRAM Technology, Inc.
+9 9D Infomax
+9 9E Butterfly Network, Inc.
+9 1F Shenzhen City Gcai Electronics
+9 20 Stack Devices Corporation
+9 A1 ADK Media Group
+9 A2 TSP Global Co., Ltd.
+9 23 HighX
+9 A4 Shenzhen Elicks Technology
+9 25 ISSI/Chingis
+9 26 Google, Inc.
+9 A7 Dasima International Development
+9 A8 Leahkinn Technology Limited
+9 29 HIMA Paul Hildebrandt GmbH Co KG
+9 2A Keysight Technologies
+9 AB Techcomp International (Fastable)
+9 2C Ancore Technology Corporation
+9 AD Nuvoton
+9 AE Korea Uhbele International Group Ltd.
+9 2F Ikegami Tsushinki Co Ltd.
+9 B0 RelChip, Inc.
+9 31 Baikal Electronics
+9 32 Nemostech Inc.
+9 B3 Memorysolution GmbH
+9 34 Silicon Integrated Systems Corporation
+9 B5 Xiede
+9 B6 Multilaser Components
+9 37 Flash Chi
+9 38 Jone
+9 B9 GCT Semiconductor Inc.
+9 BA Hong Kong Zetta Device Technology
+9 3B Unimemory Technology(s) Pte Ltd.
+9 BC Cuso
+9 3D Kuso
+9 3E Uniquify Inc.
+9 BF Skymedi Corporation
+9 40 Core Chance Co. Ltd.
+9 C1 Tekism Co. Ltd.
+9 C2 Seagate Technology PLC
+9 43 Hong Kong Gaia Group Co. Limited
+9 C4 Gigacom Semiconductor LLC
+9 45 V2 Technologies
+9 46 TLi
+9 C7 Neotion
+9 C8 Lenovo
+9 49 Shenzhen Zhongteng Electronic Corp. Ltd.
+9 4A Compound Photonics
+9 CB in2H2 inc
+9 4C Shenzhen Pango Microsystems Co. Ltd
+9 CD Vasekey
+9 CE Cal-Comp Industria de Semicondutores
+9 4F Eyenix Co., Ltd.
+9 D0 Heoriady
+9 51 Accelerated Memory Production Inc.
+9 52 INVECAS, Inc.
+9 D3 AP Memory
+9 54 Douqi Technology
+9 D5 Etron Technology, Inc.
+9 D6 Indie Semiconductor
+9 57 Socionext Inc.
+9 58 HGST
+9 D9 EVGA
+9 DA Audience Inc.
+9 5B EpicGear
+9 DC Vitesse Enterprise Co.
+9 5D Foxtronn International Corporation
+9 5E Bretelon Inc.
+9 DF Zbit Semiconductor, Inc.
+9 E0 Eoplex Inc
+9 61 MaxLinear, Inc.
+9 62 ETA Devices
+9 E3 LOKI
+9 64 IMS Semiconductor Co., Ltd
+9 E5 Dosilicon Co., Ltd.
+9 E6 Dolphin Integration
+9 67 Shenzhen Mic Electronics Technology
+9 68 Boya Microelectronics Inc.
+9 E9 Geniachip (Roche)
+9 EA Axign
+9 6B Kingred Electronic Technology Ltd.
+9 EC Chao Yue Zhuo Computer Business Dept.
+9 6D Guangzhou Si Nuo Electronic Technology.
