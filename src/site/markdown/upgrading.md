@@ -32,7 +32,7 @@ description: What changes when upgrading the IPMI Java Client — from 2.0.00, f
 * The FRUs of processors are decoded: the FRU device of a processor cartridge returns the Intel
   Processor Information ROM of the CPU, which 2.0.00 refused with
   `Cannot decode FRU <id>: Invalid format version: 7`. The `Fru` now has `pirom()`, a
-  `PiromInfo` with the S-spec, part number, PPIN, CPUID, cores, frequencies, caches, memory
+  `PiromInfo` with the S-spec, part number, PPIN, CPUID, cores, frequencies, caches, NVM DIMM
   capacity and thermal design power of the processor; `manufacturer()` (`Intel`), `model()`
   (the S-spec), `serialNumber()` (the PPIN) and `partNumber()` take their values from it, and
   `ipmicli fru` prints them ([FRU Inventory](fru-inventory.html#processors)).

@@ -42,6 +42,9 @@ public class PiromInfo extends FruRecord {
 	/** The data format revision this class decodes. */
 	private static final int REVISION = 0x07;
 
+	/** The size of the header: the revision, the size and the section pointers (03h to 0Ch). */
+	private static final int HEADER_SIZE = 0x0D;
+
 	private final String sSpec;
 	private final int cores;
 	private final boolean hyperThreading;
@@ -51,7 +54,7 @@ public class PiromInfo extends FruRecord {
 	private final int maxFrequencyMhz;
 	private final int l2KilobytesPerCore;
 	private final int l3Kilobytes;
-	private final int maxMemoryGigabytes;
+	private final int nvmDimmMaxCapacityGigabytes;
 	private final String partNumber;
 	private final int tcaseMax;
 	private final int tdpWatts;
@@ -105,7 +108,7 @@ public class PiromInfo extends FruRecord {
 		// Cache data: MLC per core (KB), LLC (KB), NVM DIMM maximum capacity (multiples of 64 GB)
 		l2KilobytesPerCore = cache < 0 ? 0 : binary16(rom, cache);
 		l3Kilobytes = cache < 0 ? 0 : binary16(rom, cache + 2);
-		maxMemoryGigabytes = cache < 0 ? 0 : binary16(rom, cache + 4) * 64;
+		nvmDimmMaxCapacityGigabytes = cache < 0 ? 0 : binary16(rom, cache + 4) * 64;
 		// Part numbers: family number (7 ASCII) then SKU number (8 ASCII) make the part number marked on the processor
 		partNumber = partNumbers < 0 ? "" : ascii(rom, partNumbers, 15);
 		// Thermal reference: Tcase maximum (BCD, degrees Celsius), TDP (BCD, W), DTS maximum (BCD, degrees Celsius)
@@ -129,17 +132,35 @@ public class PiromInfo extends FruRecord {
 	 * @return true for a PIROM, decodable or not
 	 */
 	public static boolean isPirom(byte[] fruData, int offset) {
-		return fruData.length >= offset + 3
-				&& fruData[offset] >= 0x02
-				&& fruData[offset] <= 0x0F
-				&& fruData[offset + 1] == (byte) SIZE
-				&& fruData[offset + 2] == 0x00;
+		if (fruData.length < offset + 3 || fruData[offset] < 0x02 || fruData[offset] > 0x0F) {
+			return false;
+		}
+		// The size is least significant byte first up to revision 7, most significant byte first from revision 8
+		byte first = fruData[offset + 1];
+		byte second = fruData[offset + 2];
+		return first == (byte) SIZE && second == 0x00 || first == 0x00 && second == (byte) SIZE;
 	}
 
-	/** The offset of a section of the given length from its header pointer, -1 when absent or beyond the ROM. */
+	/**
+	 * The offset of a section of the given length from its header pointer, -1 when the section is absent (00h).
+	 *
+	 * @throws IllegalArgumentException when the pointer leads into the header or beyond the ROM
+	 */
 	private static int section(byte[] rom, int pointer, int length) {
 		int offset = TypeConverter.byteToInt(rom[pointer]);
-		return offset == 0 || offset + length > SIZE ? -1 : offset;
+		if (offset == 0) {
+			return -1;
+		}
+		if (offset < HEADER_SIZE || offset + length > SIZE) {
+			throw new IllegalArgumentException(
+					String
+							.format(
+									Locale.ROOT,
+									"The processor information ROM section pointer at %02Xh (%02Xh) is outside the ROM",
+									pointer,
+									offset));
+		}
+		return offset;
 	}
 
 	private static int bcd(byte value) {
@@ -239,12 +260,13 @@ public class PiromInfo extends FruRecord {
 	}
 
 	/**
-	 * Returns the maximum memory capacity the processor supports.
+	 * Returns the maximum capacity of non-volatile memory DIMMs (persistent memory) the processor supports, as the
+	 * datasheet names the field; on the processors seen it equals the maximum memory of the model.
 	 *
 	 * @return the capacity in gigabytes, a multiple of 64, 0 when not programmed
 	 */
-	public int getMaxMemoryGigabytes() {
-		return maxMemoryGigabytes;
+	public int getNvmDimmMaxCapacityGigabytes() {
+		return nvmDimmMaxCapacityGigabytes;
 	}
 
 	/**

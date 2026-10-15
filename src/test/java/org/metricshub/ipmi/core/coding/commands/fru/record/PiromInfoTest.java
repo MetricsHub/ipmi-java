@@ -24,7 +24,7 @@ class PiromInfoTest {
 		assertEquals(3000, cpu.getMaxFrequencyMhz());
 		assertEquals(1024, cpu.getL2KilobytesPerCore());
 		assertEquals(11264, cpu.getL3Kilobytes());
-		assertEquals(768, cpu.getMaxMemoryGigabytes());
+		assertEquals(768, cpu.getNvmDimmMaxCapacityGigabytes());
 		assertEquals("37608DC00416530", cpu.getPartNumber());
 		assertEquals(77, cpu.getTcaseMax());
 		assertEquals(85, cpu.getTdpWatts());
@@ -50,8 +50,19 @@ class PiromInfoTest {
 	}
 
 	@Test
+	void aCorruptSectionPointerIsRefused() {
+		byte[] rom = Fixtures.PIROM.clone();
+		rom[0x09] = 0x78; // part numbers beyond the ROM
+		IllegalArgumentException beyond = assertThrows(IllegalArgumentException.class, () -> new PiromInfo(rom, 0));
+		assertEquals("The processor information ROM section pointer at 09h (78h) is outside the ROM", beyond.getMessage());
+		rom[0x09] = 0x05; // into the header
+		assertThrows(IllegalArgumentException.class, () -> new PiromInfo(rom, 0));
+	}
+
+	@Test
 	void piromDataIsToldFromFruInventories() {
 		assertTrue(PiromInfo.isPirom(Fixtures.PIROM, 0));
+		assertTrue(PiromInfo.isPirom(new byte[] { 0x08, 0x00, (byte) 0x80 }, 0), "revision 8, size MSB first");
 		assertFalse(PiromInfo.isPirom(Fixtures.BASE_BOARD_PRODUCT_INFO, 0), "a FRU common header");
 		assertFalse(PiromInfo.isPirom(Fixtures.DDR4_SPD, 0), "SPD data");
 		assertFalse(PiromInfo.isPirom(new byte[] { 0x07, (byte) 0x80 }, 0), "too short");

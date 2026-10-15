@@ -136,7 +136,7 @@ only record of the FRU; another revision is reported in `problems()`:
 | `getCpuid()` | The low 16 bits of the CPUID signature: type, family, model and stepping (`0654h`) |
 | `getCores()`, `isHyperThreading()` | The cores, and whether they run two threads |
 | `getBaseFrequencyMhz()`, `getMaxFrequencyMhz()`, `getSystemClockMhz()` | The P1 (base) and P0 (turbo) core frequencies, and the system clock |
-| `getL2KilobytesPerCore()`, `getL3Kilobytes()`, `getMaxMemoryGigabytes()` | The caches, and the memory capacity the processor supports |
+| `getL2KilobytesPerCore()`, `getL3Kilobytes()`, `getNvmDimmMaxCapacityGigabytes()` | The caches, and the maximum capacity of non-volatile memory DIMMs the processor supports |
 | `getTdpWatts()`, `getTcaseMax()`, `getDtsMax()` | The thermal design power, and the maximum case and sensor temperatures |
 
 The summary of the `Fru` takes its values from the ROM: `manufacturer()` is `Intel`, `model()`

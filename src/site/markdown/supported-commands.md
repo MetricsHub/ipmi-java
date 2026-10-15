@@ -154,7 +154,7 @@ decodes the FRU information (Platform Management FRU Information Storage Definit
 | MultiRecord: OEM | `OemInfo` |
 | MultiRecord: any other type (Extended DC Output, Extended DC Load, reserved) | `RawMultiRecordInfo`, with the type and the bytes of the record |
 | JEDEC SPD data of a memory module (DDR3, DDR4, DDR5), in place of the FRU inventory | `SpdInfo`: memory and module type, capacity, ECC, module and DRAM manufacturers (JEDEC JEP106), part number, serial number, manufacturing date |
-| Intel Processor Information ROM of a processor (data format revision 7), in place of the FRU inventory | `PiromInfo`: S-spec, part number, PPIN, CPUID, cores, frequencies, caches, memory capacity, TDP and temperatures |
+| Intel Processor Information ROM of a processor (data format revision 7), in place of the FRU inventory | `PiromInfo`: S-spec, part number, PPIN, CPUID, cores, frequencies, caches, NVM DIMM capacity, TDP and temperatures |
 
 `frus()` returns every decoded area, the MultiRecord ones included
 ([`Fru.multiRecords()`](apidocs/org/metricshub/ipmi/client/Fru.html)). The FRU device of a DIMM

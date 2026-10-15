@@ -709,7 +709,10 @@ public final class IpmiCli {
 					"Processor L2 cache",
 					cpu.getL2KilobytesPerCore() == 0 ? null : cpu.getL2KilobytesPerCore() + " KB per core");
 			field(out, "Processor L3 cache", cpu.getL3Kilobytes() == 0 ? null : cpu.getL3Kilobytes() + " KB");
-			field(out, "Processor max memory", cpu.getMaxMemoryGigabytes() == 0 ? null : cpu.getMaxMemoryGigabytes() + " GB");
+			field(
+					out,
+					"Processor NVM DIMM max",
+					cpu.getNvmDimmMaxCapacityGigabytes() == 0 ? null : cpu.getNvmDimmMaxCapacityGigabytes() + " GB");
 			field(out, "Processor TDP", cpu.getTdpWatts() == 0 ? null : cpu.getTdpWatts() + " W");
 			field(out, "Processor Tcase max", cpu.getTcaseMax() == 0 ? null : cpu.getTcaseMax() + " C");
 		}
@@ -791,16 +794,19 @@ public final class IpmiCli {
 			put(pirom, "partNumber", cpu.getPartNumber());
 			put(pirom, "ppin", cpu.getPpin());
 			put(pirom, "cpuid", cpu.getCpuid() == 0 ? null : String.format(Locale.ROOT, "%04X", cpu.getCpuid()));
-			pirom.put("cores", cpu.getCores());
-			pirom.put("hyperThreading", cpu.isHyperThreading());
-			pirom.put("baseFrequencyMhz", cpu.getBaseFrequencyMhz());
-			pirom.put("maxFrequencyMhz", cpu.getMaxFrequencyMhz());
-			pirom.put("l2KilobytesPerCore", cpu.getL2KilobytesPerCore());
-			pirom.put("l3Kilobytes", cpu.getL3Kilobytes());
-			pirom.put("maxMemoryGigabytes", cpu.getMaxMemoryGigabytes());
-			pirom.put("tdpWatts", cpu.getTdpWatts());
-			pirom.put("tcaseMax", cpu.getTcaseMax());
-			pirom.put("dtsMax", cpu.getDtsMax());
+			// A value of 0 is a field the ROM does not give (an absent section): omitted, like an empty FRU field
+			if (cpu.getCores() != 0) {
+				pirom.put("cores", cpu.getCores());
+				pirom.put("hyperThreading", cpu.isHyperThreading());
+			}
+			put(pirom, "baseFrequencyMhz", cpu.getBaseFrequencyMhz());
+			put(pirom, "maxFrequencyMhz", cpu.getMaxFrequencyMhz());
+			put(pirom, "l2KilobytesPerCore", cpu.getL2KilobytesPerCore());
+			put(pirom, "l3Kilobytes", cpu.getL3Kilobytes());
+			put(pirom, "nvmDimmMaxCapacityGigabytes", cpu.getNvmDimmMaxCapacityGigabytes());
+			put(pirom, "tdpWatts", cpu.getTdpWatts());
+			put(pirom, "tcaseMax", cpu.getTcaseMax());
+			put(pirom, "dtsMax", cpu.getDtsMax());
 			fields.put("pirom", pirom);
 		});
 		fields.put("complete", fru.complete());
@@ -1180,6 +1186,13 @@ public final class IpmiCli {
 	private static void put(Map<String, Object> fields, String key, String value) {
 		if (value != null && !value.trim().isEmpty()) {
 			fields.put(key, value.trim());
+		}
+	}
+
+	/** Puts a number the source gives, 0 standing for a value it does not give. */
+	private static void put(Map<String, Object> fields, String key, int value) {
+		if (value != 0) {
+			fields.put(key, value);
 		}
 	}
 

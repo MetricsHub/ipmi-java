@@ -105,8 +105,8 @@ public final class Fru {
 	}
 
 	/**
-	 * Returns the manufacturer, from the product area, or from the board area when the product area does not name it,
-	 * or the module manufacturer of a memory module.
+	 * Returns the manufacturer, from the product area, or from the board area when the product area does not name it;
+	 * the module manufacturer of a memory module; Intel for a processor.
 	 *
 	 * @return the manufacturer, empty when no area names it
 	 */
@@ -120,7 +120,7 @@ public final class Fru {
 
 	/**
 	 * Returns the model, from the product name of the product area, or from the board product name when the product
-	 * area does not give it, or the part number of a memory module.
+	 * area does not give it; the part number of a memory module; the S-spec of a processor.
 	 *
 	 * @return the model, empty when no area gives it
 	 */
@@ -133,8 +133,8 @@ public final class Fru {
 	}
 
 	/**
-	 * Returns the serial number, from the product area, or from the board area when the product area does not give it,
-	 * or the one of a memory module.
+	 * Returns the serial number, from the product area, or from the board area when the product area does not give it;
+	 * the one of a memory module; the PPIN of a processor.
 	 *
 	 * @return the serial number, empty when no area gives it
 	 */
@@ -148,7 +148,7 @@ public final class Fru {
 
 	/**
 	 * Returns the part number: the product model number of the product area, or the board part number when the
-	 * product area does not give it, or the part number of a memory module.
+	 * product area does not give it; the part number of a memory module or of a processor.
 	 *
 	 * @return the part number, empty when no area gives it
 	 */

@@ -355,7 +355,7 @@ FRU 85: PIROM 1 (Processor 1)
   Processor frequency        2100-3000 MHz
   Processor L2 cache         1024 KB per core
   Processor L3 cache         11264 KB
-  Processor max memory       768 GB
+  Processor NVM DIMM max     768 GB
   Processor TDP              85 W
   Processor Tcase max        77 C
 ipmicli: FRU 3: Cannot read FRU 3: ReadFruData failed: Requested Sensor, data, or record not present. (completion code CBh)

@@ -397,7 +397,7 @@ class IpmiCliTest {
 							+ "  Processor frequency        2100-3000 MHz\n"
 							+ "  Processor L2 cache         1024 KB per core\n"
 							+ "  Processor L3 cache         11264 KB\n"
-							+ "  Processor max memory       768 GB\n"
+							+ "  Processor NVM DIMM max     768 GB\n"
 							+ "  Processor TDP              85 W\n"
 							+ "  Processor Tcase max        77 C\n",
 					cpu.out);
@@ -407,7 +407,7 @@ class IpmiCliTest {
 							+ "\"pirom\":{\"sSpec\":\"SR3GH\",\"partNumber\":\"37608DC00416530\",\"ppin\":\"634AFBC3354D3C6D\","
 							+ "\"cpuid\":\"0654\",\"cores\":8,\"hyperThreading\":true,\"baseFrequencyMhz\":2100,"
 							+ "\"maxFrequencyMhz\":3000,\"l2KilobytesPerCore\":1024,\"l3Kilobytes\":11264,"
-							+ "\"maxMemoryGigabytes\":768,\"tdpWatts\":85,\"tcaseMax\":77,\"dtsMax\":90},\"complete\":true}\n",
+							+ "\"nvmDimmMaxCapacityGigabytes\":768,\"tdpWatts\":85,\"tcaseMax\":77,\"dtsMax\":90},\"complete\":true}\n",
 					login(bmc, "fru", "--json").out);
 		}
 		try (FakeRmcpPlusBmc bmc = Fixtures.bmc()) {
