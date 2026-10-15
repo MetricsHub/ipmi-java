@@ -28,10 +28,14 @@ import static org.metricshub.ipmi.core.transport.FakeRmcpPlusBmc.GET_CHANNEL_CIP
 import static org.metricshub.ipmi.core.transport.FakeRmcpPlusBmc.GET_CHASSIS_STATUS;
 import static org.metricshub.ipmi.core.transport.FakeRmcpPlusBmc.CHASSIS_CONTROL;
 import static org.metricshub.ipmi.core.transport.FakeRmcpPlusBmc.CHASSIS_IDENTIFY;
+import static org.metricshub.ipmi.core.transport.FakeRmcpPlusBmc.DEVICE_ID;
+import static org.metricshub.ipmi.core.transport.FakeRmcpPlusBmc.GET_DEVICE_ID;
 import static org.metricshub.ipmi.core.transport.FakeRmcpPlusBmc.NETFN_APP;
 import static org.metricshub.ipmi.core.transport.FakeRmcpPlusBmc.NETFN_CHASSIS;
 import static org.metricshub.ipmi.core.transport.FakeRmcpPlusBmc.OPEN_SESSION_REQUEST;
+import static org.metricshub.ipmi.core.transport.FakeRmcpPlusBmc.SEND_MESSAGE;
 import static org.metricshub.ipmi.core.transport.FakeRmcpPlusBmc.SET_SESSION_PRIVILEGE_LEVEL;
+import static org.metricshub.ipmi.core.transport.FakeSdrRepository.GET_DEVICE_SDR;
 import static org.metricshub.ipmi.core.transport.FakeSdrRepository.GET_SDR;
 import static org.metricshub.ipmi.core.transport.FakeSdrRepository.GET_SDR_REPOSITORY_INFO;
 import static org.metricshub.ipmi.core.transport.FakeSdrRepository.GET_SENSOR_READING;
@@ -40,6 +44,7 @@ import static org.metricshub.ipmi.core.transport.FakeSdrRepository.NETFN_STORAGE
 import static org.metricshub.ipmi.core.transport.FakeSdrRepository.compactSensorRecord;
 import static org.metricshub.ipmi.core.transport.FakeSdrRepository.fruDeviceLocatorRecord;
 import static org.metricshub.ipmi.core.transport.FakeSdrRepository.record;
+import static org.metricshub.ipmi.core.transport.FakeSdrRepository.withOwner;
 import static org.metricshub.ipmi.core.transport.FakeSel.GET_SEL_ENTRY;
 import static org.metricshub.ipmi.core.transport.FakeSel.GET_SEL_INFO;
 import static org.metricshub.ipmi.core.transport.FakeSel.RESERVE_SEL;
@@ -985,6 +990,124 @@ class IpmiClientTest {
 					assertTrue(sensor.problem().get().contains("GetSensorReading"), sensor.problem().get());
 				}
 				assertEquals(1, bmc.getCount(OPEN_SESSION_REQUEST), "a malformed reply does not lose the session");
+			}
+		}
+	}
+
+	@Test
+	@Timeout(30)
+	void eachSensorIsReadFromItsOwner() throws Exception {
+		for (FakeRmcpPlusBmc.BridgeReply reply : new FakeRmcpPlusBmc.BridgeReply[] {
+				FakeRmcpPlusBmc.BridgeReply.SEPARATE,
+				FakeRmcpPlusBmc.BridgeReply.EMBEDDED }) {
+			try (FakeRmcpPlusBmc bmc = new FakeRmcpPlusBmc(SUITES, USER, utf8(PASSWORD), null)) {
+				// Four sensors numbered 7: at LUN 0 and LUN 1 of the BMC, on a controller behind it, of the BIOS
+				byte[] sensor = compactSensorRecord(
+						1,
+						7,
+						EntityId.Processor.getCode(),
+						1,
+						SensorType.Processor.getCode(),
+						0x6f,
+						"S");
+				new FakeSdrRepository()
+						.add(withOwner(sensor, 0x20, 0, 0))
+						.add(withOwner(FakeSdrRepository.withId(sensor, 2), 0x20, 0, 1))
+						.add(withOwner(FakeSdrRepository.withId(sensor, 3), 0x2c, 6, 0))
+						.add(withOwner(FakeSdrRepository.withId(sensor, 4), 0xb1, 0, 0))
+						.readingAtLun(0, 7, 0x10, 0x40, 0x00)
+						.readingAtLun(1, 7, 0x20, 0x40, 0x00)
+						.install(bmc);
+				bmc.satellite(6, 0x2c, NETFN_SENSOR, GET_SENSOR_READING, data -> new byte[] { 0x00, 0x30, 0x40, 0x00 });
+				bmc.bridgeReply(reply);
+				try (IpmiClient client = client(bmc).build()) {
+					SensorList sensors = client.sensors().execute();
+					assertEquals(0x10, sensors.get(0).rawReading().getAsInt(), reply.toString());
+					assertEquals(0x20, sensors.get(1).rawReading().getAsInt(), "read at the LUN of its record");
+					assertEquals(0x30, sensors.get(2).rawReading().getAsInt(), "read from its controller");
+					assertFalse(sensors.get(2).problem().isPresent(), sensors.get(2).problem().toString());
+
+					Sensor bios = sensors.get(3);
+					assertFalse(bios.rawReading().isPresent(), "the BMC would answer for its own sensor 7");
+					assertEquals(SensorStatus.UNAVAILABLE, bios.status());
+					assertTrue(bios.problem().get().contains("system software (owner ID B1h)"), bios.problem().get());
+
+					assertEquals(2, bmc.getCount(NETFN_SENSOR, GET_SENSOR_READING), "the BMC reads its own sensors only");
+					assertEquals(1, bmc.getBridgedRequests().size());
+					byte[] bridged = bmc.getBridgedRequests().get(0);
+					assertEquals(0x2c, bridged[0] & 0xff, "addressed to the controller");
+					assertEquals(NETFN_SENSOR << 2, bridged[1] & 0xff, "Sensor/Event at LUN 0");
+					assertEquals(0x81, bridged[3] & 0xff, "from the remote console");
+					assertEquals(GET_SENSOR_READING, bridged[5] & 0xff);
+					assertEquals(7, bridged[6]);
+					assertEquals(1, bmc.getCount(OPEN_SESSION_REQUEST));
+					assertEquals(Collections.emptyList(), bmc.getErrors());
+				}
+			}
+		}
+	}
+
+	@Test
+	@Timeout(30)
+	void aControllerThatDoesNotAnswerCostsItsSensorsOnly() throws Exception {
+		try (FakeRmcpPlusBmc bmc = new FakeRmcpPlusBmc(SUITES, USER, utf8(PASSWORD), null)) {
+			byte[] sensor = compactSensorRecord(
+					1,
+					1,
+					EntityId.Processor.getCode(),
+					1,
+					SensorType.Processor.getCode(),
+					0x6f,
+					"S");
+			new FakeSdrRepository()
+					.add(withOwner(sensor, 0x2c, 6, 0))
+					.add(withOwner(FakeSdrRepository.withId(sensor, 2), 0x2c, 6, 0))
+					.add(withOwner(FakeSdrRepository.withId(sensor, 3), 0x42, 0, 0))
+					.add(FakeSdrRepository.withId(sensor, 4))
+					.reading(1, 0x10, 0x40, 0x00)
+					.install(bmc);
+			// The BMC forwards the requests to 2Ch, which never answers; nothing answers at 42h
+			bmc.satellite(6, 0x2c, NETFN_SENSOR, GET_SENSOR_READING, data -> new byte[] { 0x00, 0x30, 0x40, 0x00 });
+			bmc.bridgeReply(FakeRmcpPlusBmc.BridgeReply.NONE);
+			try (IpmiClient client = client(bmc).build()) {
+				SensorList sensors = client.sensors().execute();
+				for (int i = 0; i < 2; i++) {
+					assertEquals(SensorStatus.UNAVAILABLE, sensors.get(i).status());
+					assertEquals(
+							"No reply from the controller at 2Ch on channel 6 through the BMC",
+							sensors.get(i).problem().get());
+				}
+				assertTrue(sensors.get(2).problem().get().contains("NAK on write"), sensors.get(2).problem().get());
+				assertTrue(sensors.get(2).problem().get().contains("83h"), sensors.get(2).problem().get());
+				assertEquals(0x10, sensors.get(3).rawReading().getAsInt(), "the sensors of the BMC are read");
+				assertEquals(3, bmc.getCount(NETFN_APP, SEND_MESSAGE), "2 tries for the first sensor of 2Ch, 1 for 42h");
+				assertEquals(1, bmc.getCount(OPEN_SESSION_REQUEST), "the session is kept");
+			}
+		}
+	}
+
+	@Test
+	@Timeout(30)
+	void aBmcWithoutRepositoryIsWalkedThroughItsDeviceSdrs() throws Exception {
+		try (FakeRmcpPlusBmc bmc = new FakeRmcpPlusBmc(SUITES, USER, utf8(PASSWORD), null)) {
+			new FakeSdrRepository()
+					.add(compactSensorRecord(1, 1, EntityId.Processor.getCode(), 1, SensorType.Processor.getCode(), 0x6f, "S"))
+					.reading(1, 0x10, 0x40, 0x00)
+					.deviceSdrs()
+					.install(bmc);
+			// Provides Device SDRs (bit 7 of the device revision), a Sensor Device without SDR Repository
+			byte[] deviceId = DEVICE_ID.clone();
+			deviceId[1] = (byte) 0x81;
+			deviceId[5] = 0x01;
+			byte[] reply = new byte[1 + deviceId.length];
+			System.arraycopy(deviceId, 0, reply, 1, deviceId.length);
+			bmc.handle(NETFN_APP, GET_DEVICE_ID, data -> reply);
+			try (IpmiClient client = client(bmc).build()) {
+				SensorList sensors = client.sensors().execute();
+				assertEquals(1, sensors.size(), sensors.toString());
+				assertEquals(0x10, sensors.get(0).rawReading().getAsInt());
+				assertEquals(1, bmc.getCount(NETFN_SENSOR, GET_DEVICE_SDR));
+				assertEquals(0, bmc.getCount(NETFN_STORAGE, GET_SDR));
 			}
 		}
 	}
