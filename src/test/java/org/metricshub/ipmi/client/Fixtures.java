@@ -163,7 +163,7 @@ public final class Fixtures {
 		spd[4] = (byte) 0x85; // 8 Gb, 4 banks, 2 bank groups
 		spd[12] = 0x09; // 2 ranks, x8
 		spd[13] = 0x0B; // 64 bits + 8 bits of ECC
-		identify(spd, 320, 1, 0xCE, 19, 23, "409F3CA2", "M393A2K43BB1-CTD", 20, 1);
+		identify(spd, 320, 329, 1, 0xCE, 19, 23, "409F3CA2", "M393A2K43BB1-CTD", 20, 1);
 		return spd;
 	}
 
@@ -174,6 +174,7 @@ public final class Fixtures {
 	 *
 	 * @param spd the SPD data
 	 * @param offset the offset of the module manufacturer ID (117 for DDR3, 320 for DDR4, 512 for DDR5)
+	 * @param partNumberOffset the offset of the part number (128 for DDR3, after the CRC; 329 for DDR4; 521 for DDR5)
 	 * @param bank the JEDEC JEP106 bank of the manufacturer, 1 for the first one
 	 * @param code the JEDEC JEP106 code of the manufacturer, with its parity bit
 	 * @param year the year of manufacture, 2000-based
@@ -186,6 +187,7 @@ public final class Fixtures {
 	public static void identify(
 			byte[] spd,
 			int offset,
+			int partNumberOffset,
 			int bank,
 			int code,
 			int year,
@@ -203,9 +205,9 @@ public final class Fixtures {
 			spd[offset + 5 + i] = (byte) Integer.parseInt(serial.substring(2 * i, 2 * i + 2), 16);
 		}
 		byte[] part = String.format("%-" + partNumberLength + "s", partNumber).getBytes(StandardCharsets.US_ASCII);
-		System.arraycopy(part, 0, spd, offset + 9, partNumberLength);
-		spd[offset + 9 + partNumberLength + revisionLength] = (byte) (0x80 | (bank - 1));
-		spd[offset + 10 + partNumberLength + revisionLength] = (byte) code;
+		System.arraycopy(part, 0, spd, partNumberOffset, partNumberLength);
+		spd[partNumberOffset + partNumberLength + revisionLength] = (byte) (0x80 | (bank - 1));
+		spd[partNumberOffset + partNumberLength + revisionLength + 1] = (byte) code;
 	}
 
 	public static final byte[] BASE_BOARD_PRODUCT_INFO = {

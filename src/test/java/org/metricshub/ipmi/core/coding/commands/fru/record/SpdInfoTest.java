@@ -22,7 +22,9 @@ class SpdInfoTest {
 		spd[4] = 0x03; // 2 Gb, 8 banks
 		spd[7] = 0x08; // 2 ranks, x4
 		spd[8] = 0x0B; // 64 bits + 8 bits of ECC
-		identify(spd, 117, 1, 0x2C, 14, 8, "0E1F2A3B", "36JSF1G72PZ-1G6M1", 18, 2);
+		identify(spd, 117, 128, 1, 0x2C, 14, 8, "0E1F2A3B", "36JSF1G72PZ-1G6M1", 18, 2);
+		spd[126] = 0x41; // the SPD CRC, between the serial number and the part number: printable here on purpose
+		spd[127] = 0x42;
 		return spd;
 	}
 
@@ -37,7 +39,7 @@ class SpdInfoTest {
 		spd[6] = 0x20; // x8
 		spd[234] = 0x08; // 2 ranks, symmetrical
 		spd[235] = 0x2A; // 2 channels, 32 bits + 8 bits of ECC each
-		identify(spd, 512, 1, 0xAD, 23, 45, "72A0C813", "HMCG88AEBRA107N", 30, 1);
+		identify(spd, 512, 521, 1, 0xAD, 23, 45, "72A0C813", "HMCG88AEBRA107N", 30, 1);
 		return spd;
 	}
 
@@ -62,6 +64,32 @@ class SpdInfoTest {
 		byte[] image = Fixtures.DDR4_SPD.clone();
 		image[6] = 0x32; // 3DS package, 4 dies
 		assertEquals(4 * 16384, new SpdInfo(image, 0).getCapacityMegabytes());
+	}
+
+	@Test
+	void ddr4AsymmetricalModuleHalvesItsOddRanks() {
+		byte[] image = Fixtures.DDR4_SPD.clone();
+		image[12] = 0x49; // 2 ranks, x8, asymmetrical
+		image[10] = 0x04; // secondary SDRAMs of half the density
+		// 8192 / 8 x 64 / 8 + 4096 / 8 x 64 / 8
+		assertEquals(8192 + 4096, new SpdInfo(image, 0).getCapacityMegabytes());
+	}
+
+	@Test
+	void aZeroFilledDateIsNotProgrammed() {
+		byte[] image = Fixtures.DDR4_SPD.clone();
+		image[323] = 0;
+		image[324] = 0;
+		SpdInfo spd = new SpdInfo(image, 0);
+		assertEquals(0, spd.getManufacturingYear());
+		assertEquals(0, spd.getManufacturingWeek());
+	}
+
+	@Test
+	void ddr5ChannelCountIsAPowerOfTwo() {
+		byte[] image = ddr5();
+		image[235] = 0x4A; // 4 channels of 32 bits + 4 bits of ECC
+		assertEquals(2 * 32768, new SpdInfo(image, 0).getCapacityMegabytes());
 	}
 
 	@Test

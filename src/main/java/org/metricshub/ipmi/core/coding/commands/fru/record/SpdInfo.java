@@ -133,30 +133,39 @@ public class SpdInfo extends FruRecord {
 		}
 		int type = TypeConverter.byteToInt(fruData[offset + 2]);
 		int identification; // the offset of the manufacturing information (module manufacturer ID to serial number)
+		int partNumberOffset;
 		int partNumberLength;
+		int revisionLength;
 		switch (type) {
 		case DDR3:
+			// Manufacturer ID (2), location (1), date (2), serial number (4), then the SPD CRC (2) before the part number
 			identification = 117;
+			partNumberOffset = 128;
 			partNumberLength = 18;
+			revisionLength = 2;
 			break;
 		case DDR4:
 			identification = 320;
+			partNumberOffset = 329;
 			partNumberLength = 20;
+			revisionLength = 1;
 			break;
 		case DDR5:
 			identification = 512;
+			partNumberOffset = 521;
 			partNumberLength = 30;
+			revisionLength = 1;
 			break;
 		default:
 			throw new IllegalArgumentException("The SPD data of a " + memoryType + " module is not decoded");
 		}
-		// Manufacturer ID (2), location (1), date (2), serial number (4), part number, revision (1 or 2), DRAM
-		// manufacturer ID (2): the DRAM manufacturer is at the end and some devices return fewer bytes than that
-		int dramManufacturerOffset = identification + 9 + partNumberLength + (type == DDR3 ? 2 : 1);
-		if (fruData.length < offset + identification + 9 + partNumberLength) {
+		// The DRAM manufacturer ID (2) follows the part number and the revision code; it is at the end and some
+		// devices return fewer bytes than that
+		int dramManufacturerOffset = partNumberOffset + partNumberLength + revisionLength;
+		if (fruData.length < offset + partNumberOffset + partNumberLength) {
 			throw new IllegalArgumentException(
 					"The " + memoryType + " SPD data is truncated: " + (fruData.length - offset) + " of "
-							+ (identification + 9 + partNumberLength) + " bytes read");
+							+ (partNumberOffset + partNumberLength) + " bytes read");
 		}
 		byte[] spd = new byte[fruData.length - offset];
 		System.arraycopy(fruData, offset, spd, 0, spd.length);
@@ -169,11 +178,12 @@ public class SpdInfo extends FruRecord {
 		// Bus width extension (DDR3 byte 8, DDR4 byte 13, DDR5 byte 235 bits 4:3): the extra bits carry the ECC
 		ecc = ((spd[type == DDR3 ? 8 : type == DDR4 ? 13 : 235] >> 3) & 0x03) != 0;
 		manufacturer = manufacturer(spd, identification);
+		// A date left zero-filled or FFh-filled is not programmed
 		int year = bcd(spd[identification + 3]);
-		manufacturingYear = year < 0 ? 0 : 2000 + year;
+		manufacturingYear = year <= 0 ? 0 : 2000 + year;
 		manufacturingWeek = Math.max(0, bcd(spd[identification + 4]));
 		serialNumber = serialNumber(spd, identification + 5);
-		partNumber = ascii(spd, identification + 9, partNumberLength);
+		partNumber = ascii(spd, partNumberOffset, partNumberLength);
 		dramManufacturer = spd.length >= dramManufacturerOffset + 2 ? manufacturer(spd, dramManufacturerOffset) : "";
 	}
 
@@ -198,16 +208,33 @@ public class SpdInfo extends FruRecord {
 
 	/**
 	 * Module capacity of a DDR3 or DDR4 module (JEDEC 21-C annexes K and L): the SDRAM capacity divided by the
-	 * device width, times the primary bus width and the number of ranks, each rank counting the dies of a 3DS stack.
+	 * device width, times the primary bus width and the number of ranks. A DDR4 rank counts the dies of a 3DS stack,
+	 * and the odd ranks of an asymmetrical DDR4 module (byte 12 bit 6) hold the secondary SDRAMs of byte 10, whose
+	 * density is the primary one divided by the ratio of its bits 3:2.
 	 */
 	private static int ddr3Ddr4Capacity(byte[] spd, int type) {
 		int organization = spd[type == DDR3 ? 7 : 12];
-		int busWidth = spd[type == DDR3 ? 8 : 13];
 		int ranks = ((organization >> 3) & 0x07) + 1;
-		if (type == DDR4 && (spd[6] & 0x03) == 0x02) {
-			ranks *= ((spd[6] >> 4) & 0x07) + 1; // a 3DS stack: one logical rank per die
+		int busWidth = 8 << (spd[type == DDR3 ? 8 : 13] & 0x07);
+		int deviceWidth = 4 << (organization & 0x07);
+		int density = densityMegabits(spd[4] & 0x0f);
+		if (type == DDR3) {
+			return density / 8 * busWidth / deviceWidth * ranks;
 		}
-		return densityMegabits(spd[4] & 0x0f) / 8 * (8 << (busWidth & 0x07)) / (4 << (organization & 0x07)) * ranks;
+		boolean asymmetrical = (organization & 0x40) != 0;
+		int evenRanks = asymmetrical ? (ranks + 1) / 2 : ranks;
+		int capacity = ddr4RankCapacity(density, spd[6], busWidth, deviceWidth) * evenRanks;
+		if (asymmetrical) {
+			int secondaryDensity = density >> ((spd[10] >> 2) & 0x03);
+			capacity += ddr4RankCapacity(secondaryDensity, spd[10], busWidth, deviceWidth) * (ranks - evenRanks);
+		}
+		return capacity;
+	}
+
+	/** The capacity of one DDR4 package rank, whose SDRAM package type byte gives the dies of a 3DS stack. */
+	private static int ddr4RankCapacity(int density, int packageType, int busWidth, int deviceWidth) {
+		int dies = (packageType & 0x03) == 0x02 ? ((packageType >> 4) & 0x07) + 1 : 1; // 3DS: a logical rank per die
+		return density / 8 * busWidth / deviceWidth * dies;
 	}
 
 	/**
@@ -217,7 +244,7 @@ public class SpdInfo extends FruRecord {
 	 */
 	private static int ddr5Capacity(byte[] spd) {
 		int ranks = ((spd[234] >> 3) & 0x07) + 1;
-		int channels = ((spd[235] >> 5) & 0x03) + 1;
+		int channels = 1 << ((spd[235] >> 5) & 0x03);
 		int busWidth = 8 << (spd[235] & 0x07);
 		boolean asymmetrical = (spd[234] & 0x40) != 0;
 		int evenRanks = asymmetrical ? (ranks + 1) / 2 : ranks;
