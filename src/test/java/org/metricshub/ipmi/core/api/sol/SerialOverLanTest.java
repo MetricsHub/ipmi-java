@@ -929,6 +929,8 @@ class SerialOverLanTest {
 				int next = packets % 15 + 1;
 				bmc.sendSol(next, FakeRmcpPlusBmc.SOL_BREAK, text(10));
 				await(() -> !events.isEmpty(), "the listener is told before the characters fit");
+				// The listener may be told before the Suspend NACK reaches the BMC
+				await(() -> acks(bmc) == packets + 1, "the console answers the packet");
 				assertEquals(next + "/0 NACK", ack(bmc.getSolPackets().get(packets)), "a Suspend NACK");
 
 				// The packet sent again once resumed: its status is not reported again
