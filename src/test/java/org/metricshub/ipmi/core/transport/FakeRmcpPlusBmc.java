@@ -387,7 +387,8 @@ public class FakeRmcpPlusBmc implements AutoCloseable {
 	 * @param address the 8-bit slave address of the controller
 	 * @param netFn the network function of the request the controller handles
 	 * @param command the command code
-	 * @param handler computes the completion code and the response data from the request data
+	 * @param handler computes the completion code and the response data from the request data, or null when the
+	 *        controller does not answer
 	 */
 	public void satellite(int channel, int address, int netFn, int command, Function<byte[], byte[]> handler) {
 		handle(NETFN_APP, SEND_MESSAGE, this::sendMessage);
@@ -1249,6 +1250,9 @@ public class FakeRmcpPlusBmc implements AutoCloseable {
 		byte[] result = handler == null ?
 				new byte[]
 				{ (byte) 0xc1 } : handler.apply(Arrays.copyOfRange(request, 6, request.length - 1));
+		if (result == null) {
+			return new byte[] { 0x00 }; // forwarded, and the controller does not answer
+		}
 		byte[] response = response(request, result);
 		if (bridgeReply == BridgeReply.EMBEDDED) {
 			return concat(new byte[1], response);

@@ -545,9 +545,18 @@ public final class IpmiClient implements AutoCloseable {
 				throw e;
 			}
 			// The controller behind the BMC did not answer (absent, or the BMC does not forward its response): the
-			// session is fine, and the sensors of the other owners are read
-			silentOwners.add(owner);
-			return Sensor.of(record, reading, null, "No reply from " + describeOwner(record) + " through the BMC");
+			// session is fine, and the sensors of the other owners are read. A controller that answered the reading and
+			// not the factors only costs this sensor its conversion
+			if (reading == null) {
+				silentOwners.add(owner);
+			}
+			return Sensor
+					.of(
+							record,
+							reading,
+							null,
+							"No reply from " + describeOwner(record) + " through the BMC"
+									+ (reading == null ? "" : " to Get Sensor Reading Factors"));
 		} catch (IpmiConnectionException e) {
 			throw e;
 		} catch (IpmiClientException e) {

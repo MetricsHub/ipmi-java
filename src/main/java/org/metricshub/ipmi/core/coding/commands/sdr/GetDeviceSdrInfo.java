@@ -47,13 +47,27 @@ public class GetDeviceSdrInfo extends IpmiCommandCoder<GetDeviceSdrInfoResponseD
 
 	private final boolean sdrCount;
 
+	private final byte lun;
+
 	/**
-	 * Creates the command.
+	 * Creates the command, addressed to LUN 0.
 	 *
 	 * @param sdrCount true for the number of SDRs of the device, false for the number of sensors at LUN 0
 	 */
 	public GetDeviceSdrInfo(boolean sdrCount) {
+		this(sdrCount, 0);
+	}
+
+	/**
+	 * Creates the command, addressed to a LUN of the device: the sensor count is the one of that LUN.
+	 *
+	 * @param sdrCount true for the number of SDRs of the device, false for the number of sensors at the LUN
+	 * @param lun the LUN, 0 to 3 (the response flags list the LUNs that have sensors)
+	 * @throws IllegalArgumentException when the LUN is not 0 to 3
+	 */
+	public GetDeviceSdrInfo(boolean sdrCount, int lun) {
 		this.sdrCount = sdrCount;
+		this.lun = checkLun(lun);
 	}
 
 	@Override
@@ -73,7 +87,8 @@ public class GetDeviceSdrInfo extends IpmiCommandCoder<GetDeviceSdrInfoResponseD
 				getCommandCode(),
 				new byte[]
 				{ (byte) (sdrCount ? 1 : 0) },
-				TypeConverter.intToByte(sequenceNumber));
+				TypeConverter.intToByte(sequenceNumber),
+				lun);
 	}
 
 	@Override

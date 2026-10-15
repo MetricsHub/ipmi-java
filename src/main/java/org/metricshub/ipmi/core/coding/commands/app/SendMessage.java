@@ -106,7 +106,7 @@ public class SendMessage<R extends ResponseData> extends IpmiCommandCoder<R> {
 	}
 
 	/**
-	 * Tells whether the BMC answered Send Message itself with success to one of the tries of this request: it then
+	 * Tells whether the BMC answered Send Message itself with success to the latest try of this request: it then
 	 * forwarded the request, and a missing response is the one of the controller, not of the BMC.
 	 *
 	 * @return whether the BMC acknowledged the request
@@ -127,6 +127,8 @@ public class SendMessage<R extends ResponseData> extends IpmiCommandCoder<R> {
 
 	@Override
 	protected IpmiPayload preparePayload(int sequenceNumber) throws NoSuchAlgorithmException, InvalidKeyException {
+		// Each try is encoded again: a BMC that acknowledged an earlier try may not answer this one
+		acknowledged = false;
 		// The IPMB message of table 22-10, addressed to the controller. The requester stays the remote console (81h)
 		// with the same sequence number: the BMC saves both to route the response back (section 6.13.4)
 		IpmiLanRequest request = encodeRequest(command, sequenceNumber);
