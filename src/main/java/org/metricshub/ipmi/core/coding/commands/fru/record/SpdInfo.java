@@ -26,6 +26,7 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -89,12 +90,17 @@ public class SpdInfo extends FruRecord {
 			"DDIMM",
 			"Solder down" };
 
+	/** The standard SDRAM densities of DDR4 in megabits, in increasing order: the steps of the density ratio. */
+	private static final int[] DDR4_DENSITIES = { 256, 512, 1024, 2048, 4096, 8192, 12288, 16384, 24576, 32768 };
+
 	/** JEDEC JEP106 manufacturer names by bank (1-based) and code, loaded on first use. */
 	private static Map<Integer, String> manufacturers;
 
 	static {
 		MEMORY_TYPES.put(0x07, "DDR");
 		MEMORY_TYPES.put(0x08, "DDR2");
+		MEMORY_TYPES.put(0x09, "DDR2 FB-DIMM");
+		MEMORY_TYPES.put(0x0A, "DDR2 FB-DIMM probe");
 		MEMORY_TYPES.put(DDR3, "DDR3");
 		MEMORY_TYPES.put(DDR4, "DDR4");
 		MEMORY_TYPES.put(0x0E, "DDR4E");
@@ -103,6 +109,7 @@ public class SpdInfo extends FruRecord {
 		MEMORY_TYPES.put(0x11, "LPDDR4X");
 		MEMORY_TYPES.put(DDR5, "DDR5");
 		MEMORY_TYPES.put(0x13, "LPDDR5");
+		MEMORY_TYPES.put(0x14, "DDR5 NVDIMM-P");
 		MEMORY_TYPES.put(0x15, "LPDDR5X");
 	}
 
@@ -225,7 +232,9 @@ public class SpdInfo extends FruRecord {
 		int evenRanks = asymmetrical ? (ranks + 1) / 2 : ranks;
 		int capacity = ddr4RankCapacity(density, spd[6], busWidth, deviceWidth) * evenRanks;
 		if (asymmetrical) {
-			int secondaryDensity = density >> ((spd[10] >> 2) & 0x03);
+			// The secondary SDRAMs are one or two standard density steps below the primary ones (byte 10 bits 3:2)
+			int step = Arrays.binarySearch(DDR4_DENSITIES, density) - ((spd[10] >> 2) & 0x03);
+			int secondaryDensity = step >= 0 ? DDR4_DENSITIES[step] : 0;
 			capacity += ddr4RankCapacity(secondaryDensity, spd[10], busWidth, deviceWidth) * (ranks - evenRanks);
 		}
 		return capacity;
@@ -258,7 +267,9 @@ public class SpdInfo extends FruRecord {
 	private static int ddr5RankCapacity(byte[] spd, int densityByte, int busWidth) {
 		int[] densities = { 0, 4096, 8192, 12288, 16384, 24576, 32768, 49152, 65536 }; // Mb per die
 		int density = spd[densityByte] & 0x1f;
-		int dies = 1 << ((spd[densityByte] >> 5) & 0x07);
+		int[] diesPerPackage = { 1, 2, 2, 4, 8, 16 }; // monolithic, DDP, 2H 3DS, 4H 3DS, 8H 3DS, 16H 3DS
+		int diesCode = (spd[densityByte] >> 5) & 0x07;
+		int dies = diesCode < diesPerPackage.length ? diesPerPackage[diesCode] : 0;
 		int ioWidth = 4 << ((spd[densityByte + 2] >> 5) & 0x07);
 		return (density < densities.length ? densities[density] : 0) / 8 * dies * busWidth / ioWidth;
 	}

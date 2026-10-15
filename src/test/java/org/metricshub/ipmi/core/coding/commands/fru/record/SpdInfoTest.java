@@ -73,6 +73,20 @@ class SpdInfoTest {
 		image[10] = 0x04; // secondary SDRAMs of half the density
 		// 8192 / 8 x 64 / 8 + 4096 / 8 x 64 / 8
 		assertEquals(8192 + 4096, new SpdInfo(image, 0).getCapacityMegabytes());
+		// The density steps are the standard densities: one below 16 Gb is 12 Gb, two below is 8 Gb
+		image[4] = (byte) 0x86;
+		assertEquals(16384 + 12288, new SpdInfo(image, 0).getCapacityMegabytes());
+		image[10] = 0x08;
+		assertEquals(16384 + 8192, new SpdInfo(image, 0).getCapacityMegabytes());
+	}
+
+	@Test
+	void ddr5DieCountIsALookup() {
+		byte[] image = ddr5();
+		image[4] = 0x44; // 16 Gb per die, code 010: 2 dies (2H 3DS)
+		assertEquals(2 * 32768, new SpdInfo(image, 0).getCapacityMegabytes());
+		image[4] = (byte) 0xA4; // code 101: 16 dies
+		assertEquals(16 * 32768, new SpdInfo(image, 0).getCapacityMegabytes());
 	}
 
 	@Test
@@ -159,6 +173,8 @@ class SpdInfoTest {
 	void spdDataIsToldFromFruInventories() {
 		assertTrue(SpdInfo.isSpd(Fixtures.DDR4_SPD, 0));
 		assertTrue(SpdInfo.isSpd(new byte[] { (byte) 0x80, 0x08, 0x08 }, 0), "DDR2, not decoded but recognized");
+		assertTrue(SpdInfo.isSpd(new byte[] { (byte) 0x80, 0x08, 0x09 }, 0), "DDR2 FB-DIMM");
+		assertTrue(SpdInfo.isSpd(new byte[] { 0x30, 0x10, 0x14 }, 0), "DDR5 NVDIMM-P");
 		assertFalse(SpdInfo.isSpd(Fixtures.BASE_BOARD_PRODUCT_INFO, 0), "a FRU common header");
 		assertFalse(SpdInfo.isSpd(new byte[] { 0x55, 0x00, 0x55 }, 0), "not a DRAM type");
 		assertFalse(SpdInfo.isSpd(new byte[] { 0x23, 0x11 }, 0), "too short");
