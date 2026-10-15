@@ -69,7 +69,7 @@ summary, `--version` the version of the build.
 | `power on`, `off`, `cycle`, `reset`, `soft`, `diag` | `chassisControl()` | Powers the system on; off at once; off then on; resets it; asks the operating system to shut down (ACPI); pulses a diagnostic interrupt (NMI). Prints nothing: the exit code says whether the BMC accepted the command, which it carries out afterwards. |
 | `identify`, `identify <seconds>`, `identify force`, `identify off` | `chassisIdentify()` | Blinks the identify LED of the chassis for 15 seconds, or for `<seconds>` (1 to 255), or until `identify off` with `force` (not every BMC supports it). Prints nothing. |
 | `sensors` | `sensors()` | One line per sensor with its reading, unit and status. `--type` and `--name` select the sensors **before** they are read (fewer round trips on a slow BMC); `--long` adds the sensor number, the entity, the six thresholds and the problem of a sensor without reading. |
-| `fru` | `frus()` | The FRU inventory, one block per FRU with the fields of its chassis, board and product areas, or the SPD data of a memory module; `<id>...` reads only these FRU IDs. |
+| `fru` | `frus()` | The FRU inventory, one block per FRU with the fields of its chassis, board and product areas, or the SPD data of a memory module, or the processor information ROM of a processor; `<id>...` reads only these FRU IDs. |
 | `sel` | `sel()` | The System Event Log, one line per entry with its time, the sensor that reported it, the event and its direction; `--since <id>` reads only the entries after the given record ID. |
 | `sol` | `sol().open()` | An interactive [Serial over LAN console](#interactive-sol-console) on the serial port of the server. |
 | `raw` | `raw(netFn, command).data(...).execute()` | Sends any request, like `ipmitool raw`: the network function, the command and the data bytes in hexadecimal, `0x` optional (`06`, `0x06` and `6` are the same byte). Prints the response data in hexadecimal, 16 bytes per line. Extension and OEM network functions are accepted (`raw 0x2c 0x01 0xdc 0x01`, Get DCMI Capabilities Info). |
@@ -345,6 +345,19 @@ FRU 97: DIMM_2 (MemoryDevice 2)
   Module part number         M393A2K40BB2-CTD
   Module serial number       3768424A
   Module mfg date            2017-W45
+
+FRU 85: PIROM 1 (Processor 1)
+  Processor S-spec           SR3GH
+  Processor part number      37608DC00416530
+  Processor PPIN             634AFBC3354D3C6D
+  Processor CPUID            0654h
+  Processor cores            8 with Hyper-Threading
+  Processor frequency        2100-3000 MHz
+  Processor L2 cache         1024 KB per core
+  Processor L3 cache         11264 KB
+  Processor NVM DIMM max     768 GB
+  Processor TDP              85 W
+  Processor Tcase max        77 C
 ipmicli: FRU 3: Cannot read FRU 3: ReadFruData failed: Requested Sensor, data, or record not present. (completion code CBh)
 ```
 
@@ -353,7 +366,10 @@ record, then the fields of its chassis, board and product areas that are not emp
 fields of an area numbered as the area lists them, a binary one in hexadecimal). The board
 manufacturing date is UTC, ISO-8601. A memory module (FRU 97 above, whose FRU device returns the
 SPD data of the DIMM) is printed with its type, capacity, manufacturers, part and serial numbers
-and manufacturing week ([Memory modules](fru-inventory.html#memory-modules)). A FRU the BMC cannot read completely is reported on stderr
+and manufacturing week ([Memory modules](fru-inventory.html#memory-modules)), and a processor
+(FRU 85, whose FRU device returns the processor information ROM of the CPU) with its S-spec,
+part number, PPIN, cores, frequencies, caches and thermal design power
+([Processors](fru-inventory.html#processors)). A FRU the BMC cannot read completely is reported on stderr
 with the fields read so far, and `fru` exits with 1 once every FRU is printed; a FRU that is
 declared but absent (an empty power supply bay, FRU 3 above) is the usual case
 ([Troubleshooting](troubleshooting.html#sensors-or-frus-are-missing)).

@@ -1,5 +1,5 @@
-keywords: fru, field replaceable unit, inventory, serial number, part number, manufacturer, product, board, chassis, read fru data, dimm, memory module, spd, serial presence detect, ddr4, ddr5, jedec
-description: Read the FRU inventory of a server through its BMC — which FRUs are read, and the Fru object with the Board, Chassis, Product and MultiRecord areas, and the SPD data of memory modules.
+keywords: fru, field replaceable unit, inventory, serial number, part number, manufacturer, product, board, chassis, read fru data, dimm, memory module, spd, serial presence detect, ddr4, ddr5, jedec, processor, pirom, s-spec, ppin
+description: Read the FRU inventory of a server through its BMC — which FRUs are read, and the Fru object with the Board, Chassis, Product and MultiRecord areas, the SPD data of memory modules and the processor information ROM of processors.
 
 # FRU Inventory
 
@@ -117,4 +117,41 @@ DIMM_3: 16384 MB DDR4 RDIMM Samsung M393A2K40BB2-CTD
 The SPD data of a DDR2 or LPDDR module is recognized but not decoded: the FRU is returned
 without records and `problems()` says so. An empty DIMM slot is a FRU the BMC refuses to read
 (completion code `CBh`), like any absent FRU.
+
+## Processors
+
+The same BMCs may locate a FRU device per processor, declared as a *System Processor Cartridge
+FRU / PIROM* (device type `10h`, modifier `03h`): it returns the **Processor Information ROM**
+of the CPU, the 128-byte EEPROM on the package of an Intel Xeon processor (Intel Xeon Scalable
+Processors Datasheet, Volume One, chapter 5). The library recognizes it by its header (a data
+format revision and the size `0080h`) and decodes data format revision 7 into a
+[`PiromInfo`](apidocs/org/metricshub/ipmi/core/coding/commands/fru/record/PiromInfo.html), the
+only record of the FRU, after checking its static checksum; another revision, a corrupt checksum or section pointer
+is reported in `problems()`:
+
+| Method | Content |
+| --- | --- |
+| `getSSpec()` | The S-spec of the processor, which identifies its exact model and stepping (`SR3GH`, an Intel Xeon Silver 4110) |
+| `getPartNumber()` | The part number marked on the processor: the Intel family number and SKU number |
+| `getPpin()` | The Protected Processor Inventory Number, the unique 64-bit identifier of the processor, as 16 hexadecimal digits |
+| `getCpuid()` | The low 16 bits of the CPUID signature: type, family, model and stepping (`0654h`) |
+| `getCores()`, `isHyperThreading()` | The cores, and whether they run two threads |
+| `getBaseFrequencyMhz()`, `getMaxFrequencyMhz()`, `getSystemClockMhz()` | The P1 (base) and P0 (turbo) core frequencies, and the system clock |
+| `getL2KilobytesPerCore()`, `getL3Kilobytes()`, `getNvmDimmMaxCapacityGigabytes()` | The caches, and the maximum capacity of non-volatile memory DIMMs the processor supports |
+| `getTdpWatts()`, `getTcaseMax()`, `getDtsMax()` | The thermal design power, and the maximum case and sensor temperatures |
+
+The summary of the `Fru` takes its values from the ROM: `manufacturer()` is `Intel`, `model()`
+the S-spec, `partNumber()` the part number and `serialNumber()` the PPIN.
+
+```java
+for (Fru fru : bmc.frus().execute()) {
+	fru.pirom().ifPresent(cpu -> System.out.println(fru.name() + ": " + cpu.getSSpec() + ", " + cpu.getCores()
+			+ " cores at " + cpu.getBaseFrequencyMhz() + " MHz, " + cpu.getTdpWatts() + " W, PPIN " + cpu.getPpin()));
+}
+```
+
+```
+PIROM 1: SR3GH, 8 cores at 2100 MHz, 85 W, PPIN 634AFBC3354D3C6D
+PIROM 2: SR3GH, 8 cores at 2100 MHz, 85 W, PPIN 666DB709E2AB8496
+```
 

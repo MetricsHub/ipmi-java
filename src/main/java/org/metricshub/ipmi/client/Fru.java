@@ -32,6 +32,7 @@ import org.metricshub.ipmi.core.coding.commands.fru.record.BoardInfo;
 import org.metricshub.ipmi.core.coding.commands.fru.record.ChassisInfo;
 import org.metricshub.ipmi.core.coding.commands.fru.record.FruRecord;
 import org.metricshub.ipmi.core.coding.commands.fru.record.MultiRecordInfo;
+import org.metricshub.ipmi.core.coding.commands.fru.record.PiromInfo;
 import org.metricshub.ipmi.core.coding.commands.fru.record.ProductInfo;
 import org.metricshub.ipmi.core.coding.commands.fru.record.SpdInfo;
 import org.metricshub.ipmi.core.coding.commands.sdr.record.EntityId;
@@ -41,8 +42,9 @@ import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 
 /**
  * A Field Replaceable Unit of the system: the board, chassis, product and multirecord areas of its FRU inventory
- * (IPMI Platform Management FRU Information Storage Definition), or the SPD data of a memory module, located by an
- * SDR record. A FRU that could not be read entirely is not {@link #complete()} and lists its {@link #problems()}.
+ * (IPMI Platform Management FRU Information Storage Definition), or the SPD data of a memory module, or the
+ * processor information ROM of a processor, located by an SDR record. A FRU that could not be read entirely is not
+ * {@link #complete()} and lists its {@link #problems()}.
  */
 // EI_EXPOSE_REP also matches EI_EXPOSE_REP2
 @SuppressFBWarnings(value = "EI_EXPOSE_REP", justification = "The decoded areas and locator record of the protocol "
@@ -103,55 +105,75 @@ public final class Fru {
 	}
 
 	/**
-	 * Returns the manufacturer, from the product area, or from the board area when the product area does not name it,
-	 * or the module manufacturer of a memory module.
+	 * Returns the manufacturer, from the product area, or from the board area when the product area does not name it;
+	 * the module manufacturer of a memory module; Intel for a processor.
 	 *
 	 * @return the manufacturer, empty when no area names it
 	 */
 	public String manufacturer() {
-		return first(ProductInfo::getManufacturerName, BoardInfo::getBoardManufacturer, SpdInfo::getManufacturer);
+		return first(
+				ProductInfo::getManufacturerName,
+				BoardInfo::getBoardManufacturer,
+				SpdInfo::getManufacturer,
+				pirom -> "Intel");
 	}
 
 	/**
 	 * Returns the model, from the product name of the product area, or from the board product name when the product
-	 * area does not give it, or the part number of a memory module.
+	 * area does not give it; the part number of a memory module; the S-spec of a processor.
 	 *
 	 * @return the model, empty when no area gives it
 	 */
 	public String model() {
-		return first(ProductInfo::getProductName, BoardInfo::getBoardProductName, SpdInfo::getPartNumber);
+		return first(
+				ProductInfo::getProductName,
+				BoardInfo::getBoardProductName,
+				SpdInfo::getPartNumber,
+				PiromInfo::getSSpec);
 	}
 
 	/**
-	 * Returns the serial number, from the product area, or from the board area when the product area does not give it,
-	 * or the one of a memory module.
+	 * Returns the serial number, from the product area, or from the board area when the product area does not give it;
+	 * the one of a memory module; the PPIN of a processor.
 	 *
 	 * @return the serial number, empty when no area gives it
 	 */
 	public String serialNumber() {
-		return first(ProductInfo::getProductSerialNumber, BoardInfo::getBoardSerialNumber, SpdInfo::getSerialNumber);
+		return first(
+				ProductInfo::getProductSerialNumber,
+				BoardInfo::getBoardSerialNumber,
+				SpdInfo::getSerialNumber,
+				PiromInfo::getPpin);
 	}
 
 	/**
 	 * Returns the part number: the product model number of the product area, or the board part number when the
-	 * product area does not give it, or the part number of a memory module.
+	 * product area does not give it; the part number of a memory module or of a processor.
 	 *
 	 * @return the part number, empty when no area gives it
 	 */
 	public String partNumber() {
-		return first(ProductInfo::getProductModelNumber, BoardInfo::getBoardPartNumber, SpdInfo::getPartNumber);
+		return first(
+				ProductInfo::getProductModelNumber,
+				BoardInfo::getBoardPartNumber,
+				SpdInfo::getPartNumber,
+				PiromInfo::getPartNumber);
 	}
 
 	private String first(
 			Function<ProductInfo, String> fromProduct,
 			Function<BoardInfo, String> fromBoard,
-			Function<SpdInfo, String> fromSpd) {
+			Function<SpdInfo, String> fromSpd,
+			Function<PiromInfo, String> fromPirom) {
 		String value = product().map(fromProduct).orElse(null);
 		if (value == null || value.trim().isEmpty()) {
 			value = board().map(fromBoard).orElse(null);
 		}
 		if (value == null || value.trim().isEmpty()) {
 			value = spd().map(fromSpd).orElse(null);
+		}
+		if (value == null || value.trim().isEmpty()) {
+			value = pirom().map(fromPirom).orElse(null);
 		}
 		return value == null ? "" : value.trim();
 	}
@@ -191,6 +213,17 @@ public final class Fru {
 	 */
 	public Optional<SpdInfo> spd() {
 		return area(SpdInfo.class);
+	}
+
+	/**
+	 * Returns the processor information ROM of a processor, as the protocol core decodes it: the FRU device of a
+	 * processor cartridge returns the Intel PIROM of the CPU (S-spec, cores, frequencies, caches, part number, TDP,
+	 * PPIN) instead of a FRU inventory.
+	 *
+	 * @return the PIROM, empty when the FRU is not a processor or its ROM could not be decoded
+	 */
+	public Optional<PiromInfo> pirom() {
+		return area(PiromInfo.class);
 	}
 
 	private <T extends FruRecord> Optional<T> area(Class<T> type) {

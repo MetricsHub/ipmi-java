@@ -78,6 +78,7 @@ import org.metricshub.ipmi.core.coding.commands.sdr.record.SensorType;
 import org.metricshub.ipmi.core.coding.commands.sdr.record.SensorUnit;
 import org.metricshub.ipmi.core.coding.commands.fru.record.BoardInfo;
 import org.metricshub.ipmi.core.coding.commands.fru.record.ChassisInfo;
+import org.metricshub.ipmi.core.coding.commands.fru.record.PiromInfo;
 import org.metricshub.ipmi.core.coding.commands.fru.record.ProductInfo;
 import org.metricshub.ipmi.core.coding.commands.fru.record.SpdInfo;
 import org.metricshub.ipmi.core.coding.payload.CompletionCode;
@@ -691,6 +692,40 @@ public final class IpmiCli {
 			field(out, "Module serial number", module.getSerialNumber());
 			field(out, "Module mfg date", mfgDate(module));
 		}
+		Optional<PiromInfo> pirom = fru.pirom();
+		if (pirom.isPresent()) {
+			PiromInfo cpu = pirom.get();
+			field(out, "Processor S-spec", cpu.getSSpec());
+			field(out, "Processor part number", cpu.getPartNumber());
+			field(out, "Processor PPIN", cpu.getPpin());
+			field(out, "Processor CPUID", cpu.getCpuid() == 0 ? null : String.format(Locale.ROOT, "%04Xh", cpu.getCpuid()));
+			field(
+					out,
+					"Processor cores",
+					cpu.getCores() == 0 ? null : cpu.getCores() + (cpu.isHyperThreading() ? " with Hyper-Threading" : ""));
+			field(out, "Processor frequency", frequency(cpu));
+			field(
+					out,
+					"Processor L2 cache",
+					cpu.getL2KilobytesPerCore() == 0 ? null : cpu.getL2KilobytesPerCore() + " KB per core");
+			field(out, "Processor L3 cache", cpu.getL3Kilobytes() == 0 ? null : cpu.getL3Kilobytes() + " KB");
+			field(
+					out,
+					"Processor NVM DIMM max",
+					cpu.getNvmDimmMaxCapacityGigabytes() == 0 ? null : cpu.getNvmDimmMaxCapacityGigabytes() + " GB");
+			field(out, "Processor TDP", cpu.getTdpWatts() == 0 ? null : cpu.getTdpWatts() + " W");
+			field(out, "Processor Tcase max", cpu.getTcaseMax() == 0 ? null : cpu.getTcaseMax() + " C");
+		}
+	}
+
+	/** The base and turbo frequencies of a processor, "2100-3000 MHz", null when unknown. */
+	private static String frequency(PiromInfo cpu) {
+		if (cpu.getBaseFrequencyMhz() == 0) {
+			return null;
+		}
+		return cpu.getMaxFrequencyMhz() > cpu.getBaseFrequencyMhz() ?
+				cpu.getBaseFrequencyMhz() + "-" + cpu.getMaxFrequencyMhz() + " MHz" :
+				cpu.getBaseFrequencyMhz() + " MHz";
 	}
 
 	/** The manufacturing year and week of a memory module as an ISO-8601 week date (2019-W23), null when unknown. */
@@ -752,6 +787,27 @@ public final class IpmiCli {
 			put(spd, "serialNumber", module.getSerialNumber());
 			put(spd, "mfgDate", mfgDate(module));
 			fields.put("spd", spd);
+		});
+		fru.pirom().ifPresent(cpu -> {
+			Map<String, Object> pirom = new LinkedHashMap<String, Object>();
+			put(pirom, "sSpec", cpu.getSSpec());
+			put(pirom, "partNumber", cpu.getPartNumber());
+			put(pirom, "ppin", cpu.getPpin());
+			put(pirom, "cpuid", cpu.getCpuid() == 0 ? null : String.format(Locale.ROOT, "%04X", cpu.getCpuid()));
+			// A value of 0 is a field the ROM does not give (an absent section): omitted, like an empty FRU field
+			if (cpu.getCores() != 0) {
+				pirom.put("cores", cpu.getCores());
+				pirom.put("hyperThreading", cpu.isHyperThreading());
+			}
+			put(pirom, "baseFrequencyMhz", cpu.getBaseFrequencyMhz());
+			put(pirom, "maxFrequencyMhz", cpu.getMaxFrequencyMhz());
+			put(pirom, "l2KilobytesPerCore", cpu.getL2KilobytesPerCore());
+			put(pirom, "l3Kilobytes", cpu.getL3Kilobytes());
+			put(pirom, "nvmDimmMaxCapacityGigabytes", cpu.getNvmDimmMaxCapacityGigabytes());
+			put(pirom, "tdpWatts", cpu.getTdpWatts());
+			put(pirom, "tcaseMax", cpu.getTcaseMax());
+			put(pirom, "dtsMax", cpu.getDtsMax());
+			fields.put("pirom", pirom);
 		});
 		fields.put("complete", fru.complete());
 		if (!fru.complete()) {
@@ -1130,6 +1186,13 @@ public final class IpmiCli {
 	private static void put(Map<String, Object> fields, String key, String value) {
 		if (value != null && !value.trim().isEmpty()) {
 			fields.put(key, value.trim());
+		}
+	}
+
+	/** Puts a number the source gives, 0 standing for a value it does not give. */
+	private static void put(Map<String, Object> fields, String key, int value) {
+		if (value != 0) {
+			fields.put(key, value);
 		}
 	}
 

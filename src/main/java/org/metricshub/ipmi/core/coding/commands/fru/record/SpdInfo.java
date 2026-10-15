@@ -339,17 +339,6 @@ public class SpdInfo extends FruRecord {
 		return zeros || ones ? "" : text.toString();
 	}
 
-	/** The printable ASCII characters of a field, without the trailing spaces and the padding. */
-	private static String ascii(byte[] spd, int offset, int length) {
-		StringBuilder text = new StringBuilder();
-		for (int i = offset; i < offset + length; i++) {
-			if (spd[i] >= 0x20 && spd[i] < 0x7f) {
-				text.append((char) spd[i]);
-			}
-		}
-		return text.toString().trim();
-	}
-
 	/** A two-digit BCD byte as a number, -1 when it is not one (not programmed: 00h or FFh counts as 0 or none). */
 	private static int bcd(byte value) {
 		int high = (value >> 4) & 0x0f;

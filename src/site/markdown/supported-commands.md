@@ -154,14 +154,17 @@ decodes the FRU information (Platform Management FRU Information Storage Definit
 | MultiRecord: OEM | `OemInfo` |
 | MultiRecord: any other type (Extended DC Output, Extended DC Load, reserved) | `RawMultiRecordInfo`, with the type and the bytes of the record |
 | JEDEC SPD data of a memory module (DDR3, DDR4, DDR5), in place of the FRU inventory | `SpdInfo`: memory and module type, capacity, ECC, module and DRAM manufacturers (JEDEC JEP106), part number, serial number, manufacturing date |
+| Intel Processor Information ROM of a processor (data format revision 7), in place of the FRU inventory | `PiromInfo`: S-spec, part number, PPIN, CPUID, cores, frequencies, caches, NVM DIMM capacity, TDP and temperatures |
 
 `frus()` returns every decoded area, the MultiRecord ones included
 ([`Fru.multiRecords()`](apidocs/org/metricshub/ipmi/client/Fru.html)). The FRU device of a DIMM
 returns the SPD data of the module rather than a FRU inventory: the data is recognized by its
 JEDEC DRAM device type and decoded into a single `SpdInfo`
-([`Fru.spd()`](apidocs/org/metricshub/ipmi/client/Fru.html)). The SPD data of a DDR2 or LPDDR
-module is recognized but not decoded, and a FRU in any other format is returned without areas,
-with the reason in `Fru.problems()`.
+([`Fru.spd()`](apidocs/org/metricshub/ipmi/client/Fru.html)); the FRU device of a processor
+returns its Processor Information ROM, decoded into a single `PiromInfo`
+([`Fru.pirom()`](apidocs/org/metricshub/ipmi/client/Fru.html)). The SPD data of a DDR2 or LPDDR
+module and a processor information ROM of another revision are recognized but not decoded, and
+a FRU in any other format is returned without areas, with the reason in `Fru.problems()`.
 
 The decoder checks the common header checksum and rejects a FRU whose header is corrupt. An area
 that the data read does not hold in full is skipped, the others are returned, and
