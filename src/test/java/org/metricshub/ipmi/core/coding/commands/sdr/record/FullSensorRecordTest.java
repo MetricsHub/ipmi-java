@@ -216,8 +216,8 @@ class FullSensorRecordTest {
 	}
 
 	@Test
-	void reservedAndOemLinearizationsHaveNoComputableReading() {
-		int[] codes = { 0x0c, 0x6f, 0x7f };
+	void reservedLinearizationsHaveNoComputableReading() {
+		int[] codes = { 0x0c, 0x6f };
 		for (int code : codes) {
 			FullSensorRecord record = (FullSensorRecord) SensorRecord
 					.populateSensorRecord(conversionRecord(0x00, code));
@@ -280,15 +280,35 @@ class FullSensorRecordTest {
 	}
 
 	@Test
-	void nonLinearSensorHasNoComputableReading() {
-		byte[] nonLinear = EXPONENTIAL_TEMPERATURE.clone();
-		nonLinear[23] = 0x70; // linearization: non-linear, the factors hold at the nominal reading only
+	void nonLinearSensorIsConvertedWithTheFactorsOfItsReadingOnly() {
+		// M=-2, B=3, R exponent -1, B exponent 1, as in bytes 3-8 of Get Sensor Reading Factors
+		SensorReadingFactors factors = new SensorReadingFactors(
+				new byte[]
+				{ (byte) 0xfe, (byte) 0xc0, 0x03, 0, 0, (byte) 0xf1 },
+				0);
+		for (int code : new int[] { 0x70, 0x7f }) { // non-linear, and non-linear OEM defined
+			byte[] nonLinear = EXPONENTIAL_TEMPERATURE.clone();
+			nonLinear[23] = (byte) code;
 
-		FullSensorRecord record = (FullSensorRecord) SensorRecord.populateSensorRecord(nonLinear);
+			FullSensorRecord record = (FullSensorRecord) SensorRecord.populateSensorRecord(nonLinear);
 
-		assertFalse(record.hasAnalogReading());
-		assertTrue(Double.isNaN(record.calcFormula(7)));
-		assertTrue(Double.isNaN(record.getUpperCriticalThreshold()));
+			assertTrue(record.isNonLinear());
+			assertTrue(record.hasAnalogReading());
+			// The factors of the record hold at the nominal reading only
+			assertTrue(Double.isNaN(record.calcFormula(7)));
+			assertTrue(Double.isNaN(record.getUpperCriticalThreshold()));
+			// IPMI 2.0 section 36.2: no linearization function on top of the returned factors
+			assertEquals((-2 * 4 + 3 * 10) / 10.0, record.calcFormula(4, factors), DELTA);
+		}
+	}
+
+	@Test
+	void factorsOfALinearizableSensorAreLinearized() {
+		SensorReadingFactors factors = new SensorReadingFactors(new byte[] { 0x02, 0, 0, 0, 0, 0 }, 0); // M=2
+		FullSensorRecord record = (FullSensorRecord) SensorRecord.populateSensorRecord(EXPONENTIAL_TEMPERATURE);
+
+		assertFalse(record.isNonLinear());
+		assertEquals(Math.exp(6), record.calcFormula(3, factors), DELTA);
 	}
 
 	@Test

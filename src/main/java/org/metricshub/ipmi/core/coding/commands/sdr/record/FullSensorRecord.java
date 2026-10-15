@@ -29,15 +29,11 @@ import org.metricshub.ipmi.core.common.TypeConverter;
  */
 public class FullSensorRecord extends AbstractSensorRecord {
 
-	private double m;
+	private SensorReadingFactors factors;
 
 	private double tolerance;
 
-	private double b;
-
 	private double accuracy;
-
-	private int rExp;
 
 	private double nominalReading;
 
@@ -71,6 +67,11 @@ public class FullSensorRecord extends AbstractSensorRecord {
 	/** Last linearization code (cube root, Table 43-1 byte 24) the library can apply. */
 	private static final int LAST_LINEARIZABLE = 0x0b;
 
+	/** Linearization codes of the non-linear sensors (Table 43-1 byte 24): 70h, and 71h-7Fh OEM defined. */
+	private static final int FIRST_NON_LINEAR = 0x70;
+
+	private static final int LAST_NON_LINEAR = 0x7f;
+
 	@Override
 	protected void populateTypeSpecficValues(
 			byte[] recordData,
@@ -78,29 +79,13 @@ public class FullSensorRecord extends AbstractSensorRecord {
 		populateSensorHeader(recordData, 12);
 		populateCapabilitiesAndUnits(recordData);
 
-		int calcM = TypeConverter.byteToInt(recordData[24]);
-
-		calcM |= (TypeConverter.byteToInt(recordData[25]) & 0xc0) << 2;
-
-		setM(TypeConverter.decode2sComplement(calcM, 9));
+		factors = new SensorReadingFactors(recordData, 24);
+		setTolerance(factors.getTolerance());
+		setAccuracy(factors.getAccuracy());
 
 		sensorUnits1 = recordData[20];
 		// Needed by calcFormula(): set before the first conversion
 		linearization = TypeConverter.byteToInt(recordData[23]) & 0x7f;
-
-		int calcB = TypeConverter.byteToInt(recordData[26]);
-
-		calcB |= (TypeConverter.byteToInt(recordData[27]) & 0xc0) << 2;
-
-		setB(TypeConverter.decode2sComplement(calcB, 9));
-
-		int calcAcc = TypeConverter.byteToInt(recordData[27]) & 0x3f;
-
-		calcAcc |= (TypeConverter.byteToInt(recordData[28]) & 0xf0) << 2;
-
-		int exp = (TypeConverter.byteToInt(recordData[28]) & 0x0c) >> 2;
-
-		setAccuracy((double) calcAcc / 10000 * Math.pow(10, exp));
 
 		setSensorDirection(
 				SensorDirection
@@ -108,19 +93,6 @@ public class FullSensorRecord extends AbstractSensorRecord {
 								TypeConverter
 										.byteToInt(recordData[28])
 										& 0x3));
-
-		setrExp(
-				TypeConverter
-						.decode2sComplement(
-								(TypeConverter.byteToInt(recordData[29]) & 0xf0) >> 4,
-								3));
-
-		int bExp = TypeConverter
-				.decode2sComplement(
-						TypeConverter.byteToInt(recordData[29]) & 0xf,
-						3);
-
-		setB(getB() * Math.pow(10, bExp));
 
 		setNominalReading(calcFormula(TypeConverter.byteToInt(recordData[31])));
 		setNormalMaximum(calcFormula(TypeConverter.byteToInt(recordData[32])));
@@ -177,17 +149,6 @@ public class FullSensorRecord extends AbstractSensorRecord {
 		}
 
 		populateName(recordData, 47);
-
-		// Tolerance in half raw counts (byte 26 bits [5:0]): +/- tolerance / 2 x |M| x 10^R (Table 43-1)
-		setTolerance((TypeConverter.byteToInt(recordData[25]) & 0x3f) / 2.0 * Math.abs(getM()) * Math.pow(10, getrExp()));
-	}
-
-	private double getM() {
-		return m;
-	}
-
-	private void setM(double m) {
-		this.m = m;
 	}
 
 	public double getTolerance() {
@@ -198,28 +159,12 @@ public class FullSensorRecord extends AbstractSensorRecord {
 		this.tolerance = mTolerance;
 	}
 
-	private double getB() {
-		return b;
-	}
-
-	private void setB(double b) {
-		this.b = b;
-	}
-
 	public double getAccuracy() {
 		return accuracy;
 	}
 
 	public void setAccuracy(double bAccuracy) {
 		this.accuracy = bAccuracy;
-	}
-
-	private void setrExp(int rExp) {
-		this.rExp = rExp;
-	}
-
-	private int getrExp() {
-		return rExp;
 	}
 
 	public double getNominalReading() {
@@ -314,14 +259,25 @@ public class FullSensorRecord extends AbstractSensorRecord {
 
 	/**
 	 * Tells whether the reading byte of this sensor converts to a value: false when the data format of Sensor Units 1
-	 * is 11b (no analog reading, Table 43-1), or when the linearization is non-linear (70h-7Fh) or reserved, as the
-	 * conversion then needs the Get Sensor Reading Factors command, which the library does not implement.
+	 * is 11b (no analog reading, Table 43-1), or when the linearization is reserved. The reading of a non-linear sensor
+	 * ({@link #isNonLinear()}) converts with the factors of {@link #calcFormula(int, SensorReadingFactors)} only.
 	 *
-	 * @return whether {@link #calcFormula(int)} gives a meaningful value
+	 * @return whether the reading byte gives a meaningful value
 	 */
 	public boolean hasAnalogReading() {
 		return ((TypeConverter.byteToInt(sensorUnits1) & 0xc0) >> 6) != NO_ANALOG_READING
-				&& linearization <= LAST_LINEARIZABLE;
+				&& (linearization <= LAST_LINEARIZABLE || isNonLinear());
+	}
+
+	/**
+	 * Tells whether the sensor is non-linear (linearization 70h-7Fh, Table 43-1): the factors of the record hold at the
+	 * nominal reading only, and the factors of any other reading come from the Get Sensor Reading Factors command
+	 * (IPMI 2.0 section 36.2).
+	 *
+	 * @return whether the sensor is non-linear
+	 */
+	public boolean isNonLinear() {
+		return linearization >= FIRST_NON_LINEAR && linearization <= LAST_NON_LINEAR;
 	}
 
 	/**
@@ -331,10 +287,24 @@ public class FullSensorRecord extends AbstractSensorRecord {
 	 * @param value
 	 *        - Value to be converted. Length of 8 is assumed.
 	 * @return converted value, {@link Double#NaN} when the sensor has no analog reading
-	 *         ({@link #hasAnalogReading()})
+	 *         ({@link #hasAnalogReading()}) or is non-linear ({@link #isNonLinear()})
 	 */
 	public double calcFormula(int value) {
 		return calcFormula(value, 8, sensorUnits1);
+	}
+
+	/**
+	 * Converts a reading with the factors the BMC returned for it in reply to Get Sensor Reading Factors, as a
+	 * non-linear sensor needs ({@link #isNonLinear()}). The linearization function of the record applies on top of the
+	 * factors, except for a non-linear sensor, whose factors already hold for the reading (IPMI 2.0 section 36.2).
+	 *
+	 * @param value the reading byte, 0 to 255
+	 * @param readingFactors the factors the BMC returned for that reading byte
+	 * @return converted value, {@link Double#NaN} when the sensor has no analog reading
+	 */
+	public double calcFormula(int value, SensorReadingFactors readingFactors) {
+		double result = convert(value, 8, sensorUnits1, readingFactors);
+		return isNonLinear() ? result : linearize(result);
 	}
 
 	/**
@@ -348,34 +318,27 @@ public class FullSensorRecord extends AbstractSensorRecord {
 	 * @param units1
 	 *        - byte containing numeric data format
 	 * @return converted value
-	 * @throws IllegalArgumentException
-	 *         when record's numeric values are linearized in a way that is
-	 *         not supported
 	 */
 	protected double calcFormula(int value, int length, byte units1) {
-		int dataFormat = (TypeConverter.byteToInt(units1) & 0xc0) >> 6;
+		return linearize(convert(value, length, units1, factors));
+	}
 
-		int base = 0;
+	private static double convert(int value, int length, byte units1, SensorReadingFactors readingFactors) {
+		int dataFormat = (TypeConverter.byteToInt(units1) & 0xc0) >> 6;
 
 		switch (dataFormat) {
 		case 0: // unsigned
-			base = value;
-			break;
+			return readingFactors.convert(value);
 		case 1: // 1's complement
-			base = TypeConverter.decode1sComplement(value, length - 1);
-			break;
+			return readingFactors.convert(TypeConverter.decode1sComplement(value, length - 1));
 		case 2: // 2's complement
-			base = TypeConverter.decode2sComplement(value, length - 1);
-			break;
-		case 3: // no analog reading: the byte is not a value to convert
+			return readingFactors.convert(TypeConverter.decode2sComplement(value, length - 1));
+		default: // no analog reading: the byte is not a value to convert
 			return Double.NaN;
-		default:
-			throw new IllegalArgumentException(
-					"Invalid data format in sensorUnits1");
 		}
+	}
 
-		double result = (getM() * base + getB()) * Math.pow(10, getrExp());
-
+	private double linearize(double result) {
 		switch (linearization) {
 		case 0:
 			return result;
@@ -402,8 +365,8 @@ public class FullSensorRecord extends AbstractSensorRecord {
 		case 11:
 			return Math.cbrt(result);
 		default:
-			// 70h-7Fh are non-linear: the SDR factors hold at the nominal reading only and the conversion needs
-			// Get Sensor Reading Factors, which the library does not implement; the rest is reserved
+			// 70h-7Fh are non-linear: the factors of the record hold at the nominal reading only and the conversion
+			// needs those of Get Sensor Reading Factors (calcFormula(int, SensorReadingFactors)); the rest is reserved
 			return Double.NaN;
 		}
 	}
@@ -411,11 +374,12 @@ public class FullSensorRecord extends AbstractSensorRecord {
 	/**
 	 * Returns the resolution of a linear sensor: the difference in units between two successive raw readings,
 	 * {@code |M x 10^R|} (IPMI 2.0 section 36.4.2). The resolution of a linearizable or non-linear sensor varies with
-	 * the reading: section 36.4a derives it from the neighboring readings, {@code calcFormula(x + 1) - calcFormula(x)}.
+	 * the reading: section 36.4a derives it from the neighboring readings, {@code calcFormula(x + 1) - calcFormula(x)}
+	 * (with the factors of each reading for a non-linear sensor, {@link #calcFormula(int, SensorReadingFactors)}).
 	 *
 	 * @return the resolution, {@link Double#NaN} when the sensor is not linear
 	 */
 	public double getSensorResolution() {
-		return linearization == 0 ? Math.abs(getM() * Math.pow(10, getrExp())) : Double.NaN;
+		return linearization == 0 ? Math.abs(factors.getM() * Math.pow(10, factors.getRExp())) : Double.NaN;
 	}
 }

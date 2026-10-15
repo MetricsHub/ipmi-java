@@ -64,6 +64,8 @@ import org.metricshub.ipmi.core.coding.commands.payload.GetPayloadInstanceInfo;
 import org.metricshub.ipmi.core.coding.commands.sdr.GetSdrRepositoryInfo;
 import org.metricshub.ipmi.core.coding.commands.sdr.GetSdrRepositoryInfoResponseData;
 import org.metricshub.ipmi.core.coding.commands.sdr.GetSensorReading;
+import org.metricshub.ipmi.core.coding.commands.sdr.GetSensorReadingFactors;
+import org.metricshub.ipmi.core.coding.commands.sdr.GetSensorReadingResponseData;
 import org.metricshub.ipmi.core.coding.commands.sdr.record.AbstractSensorRecord;
 import org.metricshub.ipmi.core.coding.commands.sdr.record.CompactSensorRecord;
 import org.metricshub.ipmi.core.coding.commands.sdr.record.FullSensorRecord;
@@ -483,22 +485,35 @@ public final class IpmiClient implements AutoCloseable {
 
 	private Sensor readSensor(AbstractSensorRecord record) {
 		int number = TypeConverter.byteToInt(record.getSensorNumber());
+		GetSensorReadingResponseData reading = null;
 		try {
-			return Sensor.of(record, link.send(new GetSensorReading(number)), null);
+			reading = link.send(new GetSensorReading(number));
+			if (record instanceof FullSensorRecord
+					&& ((FullSensorRecord) record).isNonLinear()
+					&& ((FullSensorRecord) record).hasAnalogReading()
+					&& Sensor.isValid(reading)) {
+				// IPMI 2.0 section 36.2: the factors of the record hold at the nominal reading only
+				int raw = (int) reading.getPlainSensorReading();
+				return Sensor.of(record, reading, link.send(new GetSensorReadingFactors(number, raw)).getFactors(), null);
+			}
+			return Sensor.of(record, reading, null, null);
 		} catch (IpmiCompletionCodeException e) {
-			// A reading the BMC refuses (not present, insufficient privilege...) costs that sensor, not the whole walk
+			// A reading the BMC refuses (not present, insufficient privilege...) costs that sensor, not the whole walk;
+			// refused factors cost its reading only
 			return Sensor
 					.of(
 							record,
+							reading,
 							null,
-							"Get Sensor Reading failed: " + e.completionCode().getMessage()
+							(reading == null ? "Get Sensor Reading" : "Get Sensor Reading Factors") + " failed: "
+									+ e.completionCode().getMessage()
 									+ String.format(" (completion code %02Xh)", e.rawCompletionCode()));
 		} catch (IpmiTimeoutException | IpmiConnectionException e) {
 			// The BMC stopped answering: the walk cannot go on
 			throw e;
 		} catch (IpmiClientException e) {
 			// A reply the BMC malformed costs that sensor too
-			return Sensor.of(record, null, e.getMessage());
+			return Sensor.of(record, reading, null, e.getMessage());
 		}
 	}
 

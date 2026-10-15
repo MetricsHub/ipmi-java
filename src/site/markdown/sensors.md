@@ -1,4 +1,4 @@
-keywords: sensors, sdr, sensor data record, sensor reading, thresholds, temperature, voltage, fan, power, states
+keywords: sensors, sdr, sensor data record, sensor reading, thresholds, temperature, voltage, fan, power, states, non-linear, get sensor reading factors
 description: Read the sensors of a server through its BMC — how the SDR repository is walked, selecting sensors, and the Sensor object with its reading, thresholds, status and states.
 
 # Sensors
@@ -71,7 +71,7 @@ Each [`Sensor`](apidocs/org/metricshub/ipmi/client/Sensor.html) is immutable and
 | `status()` | [`SensorStatus`](apidocs/org/metricshub/ipmi/client/SensorStatus.html): `OK`, `NON_CRITICAL`, `CRITICAL` or `NON_RECOVERABLE` for a threshold sensor, against its thresholds; `OK` for a discrete sensor that answers; `UNAVAILABLE` when the reading is unavailable |
 | `states()` | The asserted states of a discrete sensor, in the wording of `ipmiutil` (of `ipmitool` for the few states `ipmiutil` does not name), each once |
 | `rawStates()` | The same, as [`ReadingType`](apidocs/org/metricshub/ipmi/core/coding/commands/sdr/record/ReadingType.html)s |
-| `problem()` | Why the sensor has no reading and no states: the BMC refused the reading (with its completion code), the reading is not valid yet, or scanning is disabled; empty otherwise |
+| `problem()` | Why the sensor has no reading and no states: the BMC refused the reading (with its completion code), the reading is not valid yet, or scanning is disabled; why a non-linear sensor has no reading (but has its states and status) when the BMC refused its reading factors; empty otherwise |
 | `record()`, `readingData()` | The decoded record ([`FullSensorRecord`](apidocs/org/metricshub/ipmi/core/coding/commands/sdr/record/FullSensorRecord.html) or [`CompactSensorRecord`](apidocs/org/metricshub/ipmi/core/coding/commands/sdr/record/CompactSensorRecord.html)) and the [`GetSensorReadingResponseData`](apidocs/org/metricshub/ipmi/core/coding/commands/sdr/GetSensorReadingResponseData.html), for everything else |
 
 [`SensorList`](apidocs/org/metricshub/ipmi/client/SensorList.html), the result of `execute()`,
@@ -97,9 +97,15 @@ Fan 1 = 6600.0 Rpm (upper critical: OptionalDouble.empty, OK)
 System 3.3V = 3.38 Volts (upper critical: OptionalDouble[3.56], OK)
 ```
 
+A non-linear sensor (linearization `70h`-`7Fh`) has factors that vary with the reading: the
+client asks the BMC for the factors of each reading with Get Sensor Reading Factors (IPMI 2.0,
+section 35.5) and applies them without linearization function (section 36.2). Its thresholds
+are empty, as each threshold byte would need factors of its own; `status()` still tells which
+threshold the BMC finds the reading at or beyond.
+
 `reading()` is empty when the BMC flags the reading it does not vouch for (unavailable, scanning
-disabled), when the record has no analog reading, or when it refused the reading:
-`problem()` says which.
+disabled), when the record has no analog reading, or when it refused the reading or the factors
+of a non-linear sensor: `problem()` says which.
 
 > [!NOTE]
 > A Compact record that describes several shared sensors is reported as a single sensor

@@ -38,6 +38,7 @@ included), or sent as bytes with [`raw()`](low-level-api.html#raw-requests).
 | Reserve SDR Repository | `ReserveSdrRepository` | Storage / `22h` | `sensors()`, `frus()` |
 | Get SDR | `GetSdr` | Storage / `23h` | `sensors()`, `frus()` |
 | Get Sensor Reading | `GetSensorReading` | Sensor/Event / `2Dh` | `sensors()` |
+| Get Sensor Reading Factors | `GetSensorReadingFactors` | Sensor/Event / `23h` | `sensors()`: the reading of a non-linear sensor (linearization `70h`-`7Fh`) |
 | **FRU** | | | |
 | Get FRU Inventory Area Info | `GetFruInventoryAreaInfo` | Storage / `10h` | `frus()` |
 | Read FRU Data | `ReadFruData` | Storage / `11h` | `frus()` |

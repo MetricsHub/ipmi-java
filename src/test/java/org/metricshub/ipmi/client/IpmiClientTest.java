@@ -892,6 +892,37 @@ class IpmiClientTest {
 
 	@Test
 	@Timeout(30)
+	void aNonLinearSensorIsConvertedWithTheFactorsOfItsReading() throws Exception {
+		byte[] nonLinear = Fixtures.FRONT_PANEL_FULL_RECORD.clone();
+		nonLinear[23] = 0x70; // linearization: non-linear
+		try (FakeRmcpPlusBmc bmc = new FakeRmcpPlusBmc(SUITES, USER, utf8(PASSWORD), null)) {
+			FakeSdrRepository sdr = new FakeSdrRepository()
+					.add(nonLinear)
+					.reading(TEMPERATURE_SENSOR, 0x9a, 0x40, 0x00)
+					// next reading A0h, M=2, B=0, R exponent -1
+					.factors(TEMPERATURE_SENSOR, 0x9a, 0xa0, 0x02, 0x00, 0x00, 0x00, 0x00, 0xf0);
+			sdr.install(bmc);
+			try (IpmiClient client = client(bmc).build()) {
+				Sensor temperature = client.sensors().execute().get(0);
+				assertEquals(30.8, temperature.reading().getAsDouble(), 1e-9); // 154 x 2 / 10, no linearization
+				assertEquals(SensorStatus.OK, temperature.status());
+				assertFalse(temperature.problem().isPresent());
+				assertFalse(temperature.upperCritical().isPresent(), "a threshold byte needs its own factors");
+
+				// A BMC that refuses the factors costs the reading only
+				sdr.factors(TEMPERATURE_SENSOR, 0x9a, 0xc1);
+				temperature = client.sensors().execute().get(0);
+				assertFalse(temperature.reading().isPresent());
+				assertEquals(0x9a, temperature.rawReading().getAsInt());
+				assertEquals(SensorStatus.OK, temperature.status());
+				assertTrue(temperature.problem().get().contains("Get Sensor Reading Factors"), temperature.problem().get());
+				assertTrue(temperature.problem().get().contains("C1h"), temperature.problem().get());
+			}
+		}
+	}
+
+	@Test
+	@Timeout(30)
 	void aMalformedReadingReplyCostsThatSensorAndKeepsTheSession() throws Exception {
 		try (FakeRmcpPlusBmc bmc = bmc()) {
 			// One data byte: Get Sensor Reading needs two
