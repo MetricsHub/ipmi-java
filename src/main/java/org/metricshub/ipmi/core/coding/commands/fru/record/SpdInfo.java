@@ -28,6 +28,7 @@ import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.Locale;
 import java.util.Map;
 
 import org.metricshub.ipmi.core.common.TypeConverter;
@@ -188,7 +189,8 @@ public class SpdInfo extends FruRecord {
 		// A date left zero-filled or FFh-filled is not programmed
 		int year = bcd(spd[identification + 3]);
 		manufacturingYear = year <= 0 ? 0 : 2000 + year;
-		manufacturingWeek = Math.max(0, bcd(spd[identification + 4]));
+		int week = bcd(spd[identification + 4]);
+		manufacturingWeek = week < 1 || week > 53 ? 0 : week;
 		serialNumber = serialNumber(spd, identification + 5);
 		partNumber = ascii(spd, partNumberOffset, partNumberLength);
 		dramManufacturer = spd.length >= dramManufacturerOffset + 2 ? manufacturer(spd, dramManufacturerOffset) : "";
@@ -217,7 +219,9 @@ public class SpdInfo extends FruRecord {
 	 * Module capacity of a DDR3 or DDR4 module (JEDEC 21-C annexes K and L): the SDRAM capacity divided by the
 	 * device width, times the primary bus width and the number of ranks. A DDR4 rank counts the dies of a 3DS stack,
 	 * and the odd ranks of an asymmetrical DDR4 module (byte 12 bit 6) hold the secondary SDRAMs of byte 10, whose
-	 * density is the primary one divided by the ratio of its bits 3:2.
+	 * density is one or two standard steps below the primary one (bits 3:2). The ranks are split as for DDR5, even
+	 * ranks primary and odd ranks secondary, which is exact for the 2-rank modules met in practice; a 3-rank module
+	 * made of a single-die primary package and a dual-die secondary package would count one secondary rank too few.
 	 */
 	private static int ddr3Ddr4Capacity(byte[] spd, int type) {
 		int organization = spd[type == DDR3 ? 7 : 12];
@@ -294,7 +298,7 @@ public class SpdInfo extends FruRecord {
 			return ""; // not programmed
 		}
 		String name = manufacturers().get(bank << 8 | code);
-		return name == null ? String.format("JEDEC bank %d code %02Xh", bank, code) : name;
+		return name == null ? String.format(Locale.ROOT, "JEDEC bank %d code %02Xh", bank, code) : name;
 	}
 
 	private static synchronized Map<Integer, String> manufacturers() {

@@ -698,7 +698,7 @@ public final class IpmiCli {
 		int week = module.getManufacturingWeek();
 		return module.getManufacturingYear() == 0 || week < 1 || week > 53 ?
 				null :
-				String.format("%d-W%02d", module.getManufacturingYear(), week);
+				String.format(Locale.ROOT, "%d-W%02d", module.getManufacturingYear(), week);
 	}
 
 	private static Map<String, Object> fruFields(Fru fru) {

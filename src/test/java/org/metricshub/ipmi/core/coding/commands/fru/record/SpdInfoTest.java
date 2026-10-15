@@ -81,6 +81,15 @@ class SpdInfoTest {
 	}
 
 	@Test
+	void aWeekOutOfRangeIsNotProgrammed() {
+		byte[] image = Fixtures.DDR4_SPD.clone();
+		image[324] = 0x60;
+		assertEquals(0, new SpdInfo(image, 0).getManufacturingWeek());
+		image[324] = 0x53;
+		assertEquals(53, new SpdInfo(image, 0).getManufacturingWeek());
+	}
+
+	@Test
 	void ddr5DieCountIsALookup() {
 		byte[] image = ddr5();
 		image[4] = 0x44; // 16 Gb per die, code 010: 2 dies (2H 3DS)
