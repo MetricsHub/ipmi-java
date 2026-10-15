@@ -163,7 +163,6 @@ public class MessageQueue extends TimerTask {
 	 */
 	public int add(PayloadCoder request, boolean oneWay) {
 		run();
-		boolean first = true;
 		synchronized (queue) {
 			synchronized (lastSequenceNumberLock) {
 				if (queue.size() < QUEUE_SIZE) {
@@ -172,20 +171,10 @@ public class MessageQueue extends TimerTask {
 					while (isReserved(sequenceNumber)) {
 						sequenceNumber = incrementSequenceNumber(sequenceNumber);
 
-						if (!first) {
-							try {
-								lastSequenceNumberLock.wait(1);
-							} catch (InterruptedException e) {
-								Thread.currentThread().interrupt();
-							}
-						}
-
 						if (sequenceNumber == lastSequenceNumber) {
 							// we checked all available sequence numbers, so return -1 (no available sequence numbers)
 							return -1;
 						}
-
-						first = false;
 					}
 
 					reserveTag(sequenceNumber);
