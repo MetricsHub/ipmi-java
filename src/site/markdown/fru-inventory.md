@@ -118,3 +118,8 @@ The SPD data of a DDR2 or LPDDR module is recognized but not decoded: the FRU is
 without records and `problems()` says so. An empty DIMM slot is a FRU the BMC refuses to read
 (completion code `CBh`), like any absent FRU.
 
+The same BMCs may locate a FRU device per processor, declared as a *System Processor Cartridge
+FRU / PIROM* (device type `10h`, modifier `03h`): it returns the Processor Information ROM of the
+CPU, an Intel format the library does not decode. Such a FRU is returned without being read,
+with `problems()` saying so.
+

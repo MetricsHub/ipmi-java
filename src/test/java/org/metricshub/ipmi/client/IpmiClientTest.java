@@ -884,6 +884,30 @@ class IpmiClientTest {
 
 	@Test
 	@Timeout(30)
+	void aProcessorPiromFruIsReportedWithoutBeingRead() throws Exception {
+		try (FakeRmcpPlusBmc bmc = new FakeRmcpPlusBmc(SUITES, USER, utf8(PASSWORD), null)) {
+			byte[] locator = fruDeviceLocatorRecord(1, 85, EntityId.Processor.getCode(), 1, "PIROM 1");
+			locator[11] = 0x03; // device type modifier: System Processor Cartridge FRU / PIROM
+			new FakeSdrRepository().add(locator).install(bmc);
+			try (IpmiClient client = client(bmc).build()) {
+				FruList frus = client.frus().execute();
+				assertEquals(1, frus.size(), frus.toString());
+				Fru pirom = frus.get(0);
+				assertEquals("PIROM 1", pirom.name());
+				assertFalse(pirom.complete());
+				assertEquals(
+						Collections
+								.singletonList(
+										"FRU 85 is the processor information ROM (PIROM) of a processor, which is not decoded"),
+						pirom.problems());
+				assertTrue(pirom.records().isEmpty());
+				assertEquals(0, bmc.getCount(NETFN_STORAGE, FakeSdrRepository.READ_FRU_DATA), "not read");
+			}
+		}
+	}
+
+	@Test
+	@Timeout(30)
 	void anEmptyRepositoryGivesEmptyResults() throws Exception {
 		try (FakeRmcpPlusBmc bmc = new FakeRmcpPlusBmc(SUITES, USER, utf8(PASSWORD), null)) {
 			new FakeSdrRepository().install(bmc);

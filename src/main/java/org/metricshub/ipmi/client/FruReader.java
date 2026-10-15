@@ -39,6 +39,7 @@ import org.metricshub.ipmi.core.coding.commands.fru.record.ChassisInfo;
 import org.metricshub.ipmi.core.coding.commands.fru.record.FruRecord;
 import org.metricshub.ipmi.core.coding.commands.fru.record.ProductInfo;
 import org.metricshub.ipmi.core.coding.commands.sdr.record.CompactSensorRecord;
+import org.metricshub.ipmi.core.coding.commands.sdr.record.DeviceType;
 import org.metricshub.ipmi.core.coding.commands.sdr.record.EntityId;
 import org.metricshub.ipmi.core.coding.commands.sdr.record.FruDeviceLocatorRecord;
 import org.metricshub.ipmi.core.coding.commands.sdr.record.SensorRecord;
@@ -59,6 +60,9 @@ final class FruReader {
 
 	/** Name of the system board FRU when none of its areas names it. */
 	private static final String SYSTEM_BOARD_NAME = "System Board";
+
+	/** Device type modifier of a FRU inventory device that is a System Processor Cartridge FRU / PIROM. */
+	private static final int PIROM_MODIFIER = 0x03;
 
 	private final Exchange exchange;
 	private final Set<Integer> selectedIds;
@@ -100,7 +104,7 @@ final class FruReader {
 						frus.add(new Fru(locator, systemBoard, systemBoardProblems));
 					} else {
 						List<String> problems = new ArrayList<String>();
-						frus.add(new Fru(locator, inventory(id, problems), problems));
+						frus.add(new Fru(locator, inventory(locator, problems), problems));
 					}
 				}
 			} else
@@ -155,6 +159,23 @@ final class FruReader {
 			}
 		}
 		return null;
+	}
+
+	/**
+	 * Reads and decodes the inventory of a located FRU, except the processor information ROM (PIROM) of a processor
+	 * cartridge (device type 10h with modifier 03h, IPMI 2.0 table 43-12): an Intel format the library does not
+	 * decode, so the FRU is reported without reading it.
+	 */
+	private List<FruRecord> inventory(FruDeviceLocatorRecord locator, List<String> problems) {
+		if (locator.getDeviceType() == DeviceType.FRUInventoryDevice
+				&& locator.getDeviceTypeModifier() == PIROM_MODIFIER) {
+			problems
+					.add(
+							"FRU " + locator.getDeviceId()
+									+ " is the processor information ROM (PIROM) of a processor, which is not decoded");
+			return Collections.emptyList();
+		}
+		return inventory(locator.getDeviceId(), problems);
 	}
 
 	/**
