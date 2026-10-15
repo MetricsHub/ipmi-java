@@ -46,17 +46,6 @@ public class IpmiMessageHandler extends MessageHandler {
 	}
 
 	/**
-	 * Tells whether the reply answers the request: the same command code, under the response network function of
-	 * the request (the request one plus one, IPMI 2.0 section 5.1). The codes are compared as numbers, so that the
-	 * reply to a request of a network function {@code NetworkFunction} does not list (Transport 0Ch, Group Extension
-	 * 2Ch, OEM 30h-3Eh) is matched like any other.
-	 */
-	private static boolean answers(IpmiCommandCoder<?> request, IpmiLanMessage reply) {
-		return request.getCommandCode() == reply.getCommand()
-				&& request.getNetworkFunctionCode() + 1 == reply.getNetworkFunctionCode();
-	}
-
-	/**
 	 * If message is of type {@link IpmiLanMessage}, finds corresponding request message and extracts response data from
 	 * it,
 	 * using data carried in this message.
@@ -79,7 +68,7 @@ public class IpmiMessageHandler extends MessageHandler {
 
 			// A late reply to a request that timed out may carry the tag of a newer queued request: the reply of a
 			// request answers the command of that request, and the request stays queued
-			if (coder instanceof IpmiCommandCoder && !answers((IpmiCommandCoder) coder, lanMessagePayload)) {
+			if (coder instanceof IpmiCommandCoder && !((IpmiCommandCoder<?>) coder).answers(lanMessagePayload)) {
 				return;
 			}
 

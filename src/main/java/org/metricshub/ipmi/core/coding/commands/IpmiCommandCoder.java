@@ -24,8 +24,11 @@ package org.metricshub.ipmi.core.coding.commands;
 
 import org.metricshub.ipmi.core.coding.PayloadCoder;
 import org.metricshub.ipmi.core.coding.payload.CompletionCode;
+import org.metricshub.ipmi.core.coding.payload.IpmiPayload;
 import org.metricshub.ipmi.core.coding.payload.PlainMessage;
 import org.metricshub.ipmi.core.coding.payload.lan.IPMIException;
+import org.metricshub.ipmi.core.coding.payload.lan.IpmiLanMessage;
+import org.metricshub.ipmi.core.coding.payload.lan.IpmiLanRequest;
 import org.metricshub.ipmi.core.coding.payload.lan.IpmiLanResponse;
 import org.metricshub.ipmi.core.coding.payload.lan.NetworkFunction;
 import org.metricshub.ipmi.core.coding.protocol.AuthenticationType;
@@ -75,6 +78,54 @@ public abstract class IpmiCommandCoder<R extends ResponseData> extends PayloadCo
 			return ((IpmiLanResponse) message.getPayload()).getCommand() == getCommandCode();
 		}
 		return message.getPayload() instanceof PlainMessage;
+	}
+
+	/**
+	 * Tells whether a reply received under the tag of this request answers it: the same command code, under the
+	 * response network function of the request (the request one plus one, IPMI 2.0 section 5.1). The codes are
+	 * compared as numbers, so that the reply to a request of a network function {@link NetworkFunction} does not list
+	 * (Transport 0Ch, Group Extension 2Ch, OEM 30h-3Eh) is matched like any other. A reply that does not answer the
+	 * request (the late reply of an older request that had the same tag) is ignored, and the request keeps waiting.
+	 *
+	 * @param reply the IPMI message received under the tag of this request
+	 * @return whether the reply answers this request
+	 */
+	public boolean answers(IpmiLanMessage reply) {
+		return getCommandCode() == reply.getCommand() && getNetworkFunctionCode() + 1 == reply.getNetworkFunctionCode();
+	}
+
+	/**
+	 * Checks the LUN a request is addressed to: 2 bits (IPMI 2.0 section 5.1).
+	 *
+	 * @param lun the LUN, 0 to 3
+	 * @return the LUN as a byte
+	 * @throws IllegalArgumentException when the LUN is not 0 to 3
+	 */
+	protected static byte checkLun(int lun) {
+		if (lun < 0 || lun > 3) {
+			throw new IllegalArgumentException("Invalid LUN: " + lun);
+		}
+		return TypeConverter.intToByte(lun);
+	}
+
+	/**
+	 * Encodes the request of a command for a command that carries it in its own data (Send Message).
+	 *
+	 * @param command the command to encode
+	 * @param sequenceNumber the sequence number of the request
+	 * @return the request, addressed to the BMC
+	 * @throws IllegalArgumentException when the command is not an IPMI request (an RMCP+ session setup message)
+	 * @throws NoSuchAlgorithmException when the command cannot be encoded
+	 * @throws InvalidKeyException when the command cannot be encoded
+	 */
+	protected static IpmiLanRequest encodeRequest(IpmiCommandCoder<?> command, int sequenceNumber)
+			throws NoSuchAlgorithmException,
+			InvalidKeyException {
+		IpmiPayload payload = command.preparePayload(sequenceNumber);
+		if (!(payload instanceof IpmiLanRequest)) {
+			throw new IllegalArgumentException(command.getClass().getSimpleName() + " is not an IPMI request");
+		}
+		return (IpmiLanRequest) payload;
 	}
 
 	/**
