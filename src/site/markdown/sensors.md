@@ -1,4 +1,4 @@
-keywords: sensors, sdr, sensor data record, sensor reading, thresholds, temperature, voltage, fan, power, states, non-linear, get sensor reading factors
+keywords: sensors, sdr, sensor data record, sensor reading, thresholds, temperature, voltage, fan, power, states, non-linear, get sensor reading factors, sensor owner, lun, satellite controller, send message, bridging, get device sdr
 description: Read the sensors of a server through its BMC — how the SDR repository is walked, selecting sensors, and the Sensor object with its reading, thresholds, status and states.
 
 # Sensors
@@ -26,17 +26,44 @@ try (IpmiClient bmc = IpmiClient.builder(host).credentials(user, password).build
    records in chunks when the BMC cannot return them at once, and reserving the repository
    (**Reserve SDR Repository**) when the BMC requires it or cancels the reservation; the walk is
    done once per client and shared with `frus()` ([SDR cache](configuration.html#sdr-cache));
-2. sends **Get Sensor Reading** for every selected **Full Sensor** and **Compact Sensor** record.
+2. sends **Get Sensor Reading** for every selected **Full Sensor** and **Compact Sensor** record,
+   to the owner the record names ([Sensor owners](#sensor-owners)).
 
 Event-Only records (sensors without a reading), the locator and association records, and the
 OEM records are part of the walk but are not returned. A record the library cannot decode is
 skipped and listed in `skippedRecords()`; the walk goes on
 ([Supported Commands](supported-commands.html#sdr-records)).
 
-The walk reads only the sensors of the **BMC's** SDR repository, through the BMC itself: sensors
-owned by satellite controllers that the BMC does not bridge, and the Device SDRs of other
-controllers, are not read ([#84](https://github.com/metricshub/ipmi-java/issues/84),
-[#105](https://github.com/metricshub/ipmi-java/issues/105)).
+A BMC without SDR repository that holds the SDRs of its own sensors (Get Device ID: a Sensor
+Device that provides Device SDRs, without SDR Repository Device) is walked with
+**Get Device SDR** instead, as `ipmitool` does, when it refuses Get SDR Repository Info. These
+SDRs are read again by each operation: they have no timestamp that tells whether a copy is
+current.
+
+### Sensor owners
+
+Each sensor record names the owner of the sensor (IPMI 2.0, section 5.4): a controller, by its
+slave address, channel and LUN, or system software, by its software ID. The client asks the
+owner for the reading:
+
+| Owner in the record | How the reading is requested |
+| --- | --- |
+| The BMC (`20h` on channel 0) | Get Sensor Reading to the BMC, at the LUN of the record |
+| Another controller: a satellite controller of the power supplies and fans, of a RAID adapter, of a network adapter, the Intel Management Engine | Get Sensor Reading forwarded by the BMC with **Send Message** (IPMI 2.0, section 6.13.3) |
+| System software, the BIOS for instance (bit 0 of the owner ID set: `B1h` on Dell iDRACs) | None: no controller holds the reading, and the BMC would answer for its own sensor of the same number. The sensor is returned without reading or states, `UNAVAILABLE`, with its `problem()` |
+
+The BMC returns the response of the other controller as a message of its own, after its response
+to Send Message, or within that response: the client accepts both. A controller that does not
+answer costs its own sensors only, whose `problem()` says
+`No reply from the controller at 44h on channel 0 through the BMC`: the session is kept, and the
+other sensors of that controller are not requested again during the same operation.
+
+Send Message to another controller needs the **Operator** privilege (IPMI 2.0, table G-1). Some
+BMCs allow it at the User level (HPE iLO 5), others only at the Administrator level (an AMI-based
+GIGABYTE BMC). A client below the level the BMC requires gets the sensors of the BMC as usual,
+and those of the other controllers without reading, their `problem()` saying
+`Get Sensor Reading through the BMC to the controller at 2Ch on channel 6 failed: ... (completion code D4h)`
+([Privilege level](configuration.html#privilege-level)).
 
 ### Selecting sensors
 
@@ -71,7 +98,7 @@ Each [`Sensor`](apidocs/org/metricshub/ipmi/client/Sensor.html) is immutable and
 | `status()` | [`SensorStatus`](apidocs/org/metricshub/ipmi/client/SensorStatus.html): `OK`, `NON_CRITICAL`, `CRITICAL` or `NON_RECOVERABLE` for a threshold sensor, against its thresholds; `OK` for a discrete sensor that answers; `UNAVAILABLE` when the reading is unavailable |
 | `states()` | The asserted states of a discrete sensor, in the wording of `ipmiutil` (of `ipmitool` for the few states `ipmiutil` does not name), each once |
 | `rawStates()` | The same, as [`ReadingType`](apidocs/org/metricshub/ipmi/core/coding/commands/sdr/record/ReadingType.html)s |
-| `problem()` | Why the sensor has no reading and no states: the BMC refused the reading (with its completion code), the reading is not valid yet, or scanning is disabled; why a non-linear sensor has no reading (but has its states and status) when the BMC refused its reading factors; empty otherwise |
+| `problem()` | Why the sensor has no reading and no states: the BMC refused the reading (with its completion code), the reading is not valid yet, scanning is disabled, the sensor belongs to system software, or the controller that owns it did not answer through the BMC ([Sensor owners](#sensor-owners)); why a non-linear sensor has no reading (but has its states and status) when the BMC refused its reading factors; empty otherwise |
 | `record()`, `readingData()` | The decoded record ([`FullSensorRecord`](apidocs/org/metricshub/ipmi/core/coding/commands/sdr/record/FullSensorRecord.html) or [`CompactSensorRecord`](apidocs/org/metricshub/ipmi/core/coding/commands/sdr/record/CompactSensorRecord.html)) and the [`GetSensorReadingResponseData`](apidocs/org/metricshub/ipmi/core/coding/commands/sdr/GetSensorReadingResponseData.html), for everything else |
 
 [`SensorList`](apidocs/org/metricshub/ipmi/client/SensorList.html), the result of `execute()`,

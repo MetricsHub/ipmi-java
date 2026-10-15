@@ -28,7 +28,8 @@ included), or sent as bytes with [`raw()`](low-level-api.html#raw-requests).
 | Get Session Info | `GetSessionInfo` | App / `3Dh` | `sol()`: is the session that holds a SOL payload still there? |
 | Close Session | `CloseSession` | App / `3Ch` | `close()` |
 | **BMC** | | | |
-| Get Device ID | `GetDeviceId` | App / `01h` | `deviceId()`, and the [keep-alive](configuration.html#keep-alive) of every session |
+| Get Device ID | `GetDeviceId` | App / `01h` | `deviceId()`, and the [keep-alive](configuration.html#keep-alive) of every session; `sensors()`, `frus()`: does a BMC that refuses Get SDR Repository Info hold Device SDRs? |
+| Send Message | `SendMessage` | App / `34h` | `sensors()`: the sensors of the other controllers than the BMC ([Sensor owners](sensors.html#sensor-owners)) |
 | **Chassis** | | | |
 | Get Chassis Status | `GetChassisStatus` | Chassis / `01h` | `chassisStatus()` |
 | Chassis Control | `ChassisControl` | Chassis / `02h` | `chassisControl()` |
@@ -37,6 +38,9 @@ included), or sent as bytes with [`raw()`](low-level-api.html#raw-requests).
 | Get SDR Repository Info | `GetSdrRepositoryInfo` | Storage / `20h` | `sensors()`, `frus()` ([SDR cache](configuration.html#sdr-cache)) |
 | Reserve SDR Repository | `ReserveSdrRepository` | Storage / `22h` | `sensors()`, `frus()` |
 | Get SDR | `GetSdr` | Storage / `23h` | `sensors()`, `frus()` |
+| Get Device SDR Info | `GetDeviceSdrInfo` | Sensor/Event / `20h` | `sensors()`, `frus()`: a BMC without SDR repository that holds Device SDRs |
+| Get Device SDR | `GetDeviceSdr` | Sensor/Event / `21h` | `sensors()`, `frus()`: a BMC without SDR repository that holds Device SDRs |
+| Reserve Device SDR Repository | `ReserveDeviceSdrRepository` | Sensor/Event / `22h` | `sensors()`, `frus()`: a BMC without SDR repository, when it asks for a reservation |
 | Get Sensor Reading | `GetSensorReading` | Sensor/Event / `2Dh` | `sensors()` |
 | Get Sensor Reading Factors | `GetSensorReadingFactors` | Sensor/Event / `23h` | `sensors()`: the reading of a non-linear sensor (linearization `70h`-`7Fh`) |
 | **FRU** | | | |
@@ -54,8 +58,10 @@ included), or sent as bytes with [`raw()`](low-level-api.html#raw-requests).
 | Get Payload Instance Info | `GetPayloadInstanceInfo` | App / `4Bh` | `sol()` |
 | Get Channel Payload Support | `GetChannelPayloadSupport` | App / `4Eh` | |
 
-The read operations of `IpmiClient` need nothing above the **User** privilege; Chassis Control
-and Chassis Identify need **Operator**, the payload commands and Serial over LAN **Administrator**
+The read operations of `IpmiClient` need nothing above the **User** privilege, but for the sensors
+of other controllers than the BMC, which Send Message reaches at the **Operator** level (some BMCs
+allow it at User, others require Administrator); Chassis Control and Chassis Identify need
+**Operator**, the payload commands and Serial over LAN **Administrator**
 ([Privilege level](configuration.html#privilege-level)). The level is requested at login and set
 right after it with Set Session Privilege Level, by `IpmiClient` and `IpmiConnector.openSession()`
 alike (IPMI 2.0 section 22.18). Any command is sent in the session of the

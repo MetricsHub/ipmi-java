@@ -119,6 +119,11 @@ for the **least** privilege that works (unlike
 | `power on`, `off`, `cycle`, `reset`, `soft`, `diag`, `identify` | `operator` |
 | `sol`, `raw` | `administrator` |
 
+`sensors` at the `user` level prints the sensors of other controllers than the BMC (power supplies,
+fans, RAID adapter behind an HPE iLO, for instance) without reading on the BMCs that serve them at
+a higher level, with the `D4h` problem in `--long` and `--json`: give `-L operator`, or
+`-L administrator` on some BMCs ([Sensor owners](sensors.html#sensor-owners)).
+
 A BMC that refuses a command at the session's level answers `D4h`: the CLI exits with 77 and says
 which higher `-L` to use (at the Administrator level, that the BMC restricts the command). Serial over LAN is the usual case: most BMCs
 activate the SOL payload at the Administrator level only, some at the User level. A raw request
