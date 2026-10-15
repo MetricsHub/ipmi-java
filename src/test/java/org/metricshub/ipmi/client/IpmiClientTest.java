@@ -8,6 +8,8 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.metricshub.ipmi.client.Fixtures.BOARD_SENSOR;
+import static org.metricshub.ipmi.client.Fixtures.DDR4_SPD;
+import static org.metricshub.ipmi.client.Fixtures.DIMM_FRU;
 import static org.metricshub.ipmi.client.Fixtures.FAN_SENSOR;
 import static org.metricshub.ipmi.client.Fixtures.LENOVO;
 import static org.metricshub.ipmi.client.Fixtures.PASSWORD;
@@ -852,6 +854,30 @@ class IpmiClientTest {
 				assertTrue(frus.get(0).problems().get(0).contains("C3h"), frus.get(0).problems().toString());
 				assertTrue(frus.get(0).records().isEmpty());
 				assertEquals("", frus.get(0).manufacturer(), "no area to take a manufacturer from");
+			}
+		}
+	}
+
+	@Test
+	@Timeout(30)
+	void aMemoryModuleFruIsDecodedFromItsSpdData() throws Exception {
+		try (FakeRmcpPlusBmc bmc = new FakeRmcpPlusBmc(SUITES, USER, utf8(PASSWORD), null)) {
+			new FakeSdrRepository()
+					.add(fruDeviceLocatorRecord(1, DIMM_FRU, EntityId.MemoryDevice.getCode(), 1, "DIMM 1"))
+					.fru(DIMM_FRU, DDR4_SPD)
+					.install(bmc);
+			try (IpmiClient client = client(bmc).build()) {
+				FruList frus = client.frus().execute();
+				assertEquals(1, frus.size(), frus.toString());
+				Fru dimm = frus.get(0);
+				assertTrue(dimm.complete(), dimm.problems().toString());
+				assertFalse(dimm.board().isPresent());
+				assertEquals(16384, dimm.spd().get().getCapacityMegabytes());
+				assertEquals("Samsung", dimm.manufacturer());
+				assertEquals("M393A2K43BB1-CTD", dimm.model());
+				assertEquals("M393A2K43BB1-CTD", dimm.partNumber());
+				assertEquals("409F3CA2", dimm.serialNumber());
+				assertEquals("FRU 2 DIMM 1 (MemoryDevice 1): Samsung M393A2K43BB1-CTD S/N 409F3CA2", dimm.toString());
 			}
 		}
 	}

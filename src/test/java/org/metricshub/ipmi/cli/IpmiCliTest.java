@@ -338,6 +338,37 @@ class IpmiCliTest {
 			assertTrue(missing.out.startsWith("FRU 1: PSU 1"), "the FRUs found are printed");
 			assertTrue(missing.err.endsWith("ipmicli: no such FRU 7\n"), missing.err);
 		}
+		try (
+				FakeRmcpPlusBmc bmc = new FakeRmcpPlusBmc(
+						Fixtures.SUITES,
+						Fixtures.USER,
+						Fixtures.utf8(Fixtures.PASSWORD),
+						null)) {
+			// The FRU device of a memory module returns its SPD data
+			new FakeSdrRepository()
+					.add(fruDeviceLocatorRecord(1, Fixtures.DIMM_FRU, EntityId.MemoryDevice.getCode(), 1, "DIMM 1"))
+					.fru(Fixtures.DIMM_FRU, Fixtures.DDR4_SPD)
+					.install(bmc);
+			Result dimm = login(bmc, "fru");
+			assertEquals(0, dimm.code, dimm.err);
+			assertEquals(
+					"FRU 2: DIMM 1 (MemoryDevice 1)\n"
+							+ "  Memory type                DDR4 RDIMM ECC\n"
+							+ "  Memory capacity            16384 MB\n"
+							+ "  Module manufacturer        Samsung\n"
+							+ "  DRAM manufacturer          Samsung\n"
+							+ "  Module part number         M393A2K43BB1-CTD\n"
+							+ "  Module serial number       409F3CA2\n"
+							+ "  Module mfg date            2019-W23\n",
+					dimm.out);
+			assertEquals(
+					"{\"id\":2,\"name\":\"DIMM 1\",\"entity\":\"MemoryDevice\",\"entityInstance\":1,\"manufacturer\":\"Samsung\","
+							+ "\"model\":\"M393A2K43BB1-CTD\",\"serialNumber\":\"409F3CA2\",\"partNumber\":\"M393A2K43BB1-CTD\","
+							+ "\"spd\":{\"memoryType\":\"DDR4\",\"moduleType\":\"RDIMM\",\"capacityMegabytes\":16384,\"ecc\":true,"
+							+ "\"manufacturer\":\"Samsung\",\"dramManufacturer\":\"Samsung\",\"partNumber\":\"M393A2K43BB1-CTD\","
+							+ "\"serialNumber\":\"409F3CA2\",\"mfgDate\":\"2019-W23\"},\"complete\":true}\n",
+					login(bmc, "fru", "--json").out);
+		}
 		try (FakeRmcpPlusBmc bmc = Fixtures.bmc()) {
 			// FRU 1 is declared but absent: the BMC answers C3h to its Get FRU Inventory Area Info
 			new FakeSdrRepository()
