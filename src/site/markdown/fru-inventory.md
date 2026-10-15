@@ -126,7 +126,8 @@ of the CPU, the 128-byte EEPROM on the package of an Intel Xeon processor (Intel
 Processors Datasheet, Volume One, chapter 5). The library recognizes it by its header (a data
 format revision and the size `0080h`) and decodes data format revision 7 into a
 [`PiromInfo`](apidocs/org/metricshub/ipmi/core/coding/commands/fru/record/PiromInfo.html), the
-only record of the FRU; another revision is reported in `problems()`:
+only record of the FRU, after checking its static checksum; another revision, a corrupt checksum or section pointer
+is reported in `problems()`:
 
 | Method | Content |
 | --- | --- |

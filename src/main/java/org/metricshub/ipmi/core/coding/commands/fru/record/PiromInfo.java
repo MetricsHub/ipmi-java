@@ -45,6 +45,9 @@ public class PiromInfo extends FruRecord {
 	/** The size of the header: the revision, the size and the section pointers (03h to 0Ch). */
 	private static final int HEADER_SIZE = 0x0D;
 
+	/** The offset of the static checksum, which covers every byte before it. */
+	private static final int STATIC_CHECKSUM = 0x76;
+
 	private final String sSpec;
 	private final int cores;
 	private final boolean hyperThreading;
@@ -66,8 +69,8 @@ public class PiromInfo extends FruRecord {
 	 *
 	 * @param fruData the PIROM bytes, from the start of the FRU data
 	 * @param offset the offset of PIROM byte 0 in the data
-	 * @throws IllegalArgumentException when the data is not a PIROM, is of another data format revision, or ends
-	 *         before its 128 bytes
+	 * @throws IllegalArgumentException when the data is not a PIROM, is of another data format revision, ends before
+	 *         its 128 bytes, fails its static checksum or has a section pointer outside the ROM
 	 */
 	public PiromInfo(byte[] fruData, int offset) {
 		super();
@@ -86,6 +89,15 @@ public class PiromInfo extends FruRecord {
 		}
 		byte[] rom = new byte[SIZE];
 		System.arraycopy(fruData, offset, rom, 0, SIZE);
+		// The static checksum (76h) is the two's complement of the sum of bytes 00h to 75h (datasheet section 5.4.13):
+		// Intel programs it, so a mismatch is corrupt data, not a careless firmware
+		int sum = 0;
+		for (int i = 0; i <= STATIC_CHECKSUM; i++) {
+			sum += rom[i];
+		}
+		if ((sum & 0xff) != 0) {
+			throw new IllegalArgumentException("The processor information ROM has an invalid static checksum");
+		}
 
 		// Header: a byte pointer to each section (03h to 0Ch), 00h when the section is absent
 		int processor = section(rom, 0x03, 11);

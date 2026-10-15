@@ -12,6 +12,16 @@ import org.metricshub.ipmi.client.Fixtures;
 
 class PiromInfoTest {
 
+	/** Recomputes the static checksum (76h) of a ROM whose static bytes were changed. */
+	private static byte[] checksummed(byte[] rom) {
+		int sum = 0;
+		for (int i = 0; i < 0x76; i++) {
+			sum += rom[i];
+		}
+		rom[0x76] = (byte) -sum;
+		return rom;
+	}
+
 	@Test
 	void xeonSilver4110() {
 		PiromInfo cpu = new PiromInfo(Fixtures.PIROM, 0);
@@ -38,7 +48,7 @@ class PiromInfoTest {
 		byte[] rom = Fixtures.PIROM.clone();
 		rom[0x0A] = 0; // no thermal reference data
 		rom[0x0C] = 0; // no PPIN
-		PiromInfo cpu = new PiromInfo(rom, 0);
+		PiromInfo cpu = new PiromInfo(checksummed(rom), 0);
 		assertEquals(0, cpu.getTdpWatts());
 		assertEquals(0, cpu.getTcaseMax());
 		assertEquals("", cpu.getPpin());
@@ -46,17 +56,29 @@ class PiromInfoTest {
 
 		Arrays.fill(rom, 0x77, 0x7F, (byte) 0);
 		rom[0x0C] = 0x77;
-		assertEquals("", new PiromInfo(rom, 0).getPpin(), "a zero PPIN is not programmed");
+		assertEquals("", new PiromInfo(checksummed(rom), 0).getPpin(), "a zero PPIN is not programmed");
+	}
+
+	@Test
+	void anInvalidStaticChecksumIsRefused() {
+		byte[] rom = Fixtures.PIROM.clone();
+		rom[0x14] = 0x16; // 16 cores instead of 8
+		IllegalArgumentException corrupt = assertThrows(IllegalArgumentException.class, () -> new PiromInfo(rom, 0));
+		assertEquals("The processor information ROM has an invalid static checksum", corrupt.getMessage());
+		rom[0x76] = (byte) (rom[0x76] - 0x0E); // the checksum of the changed data
+		assertEquals(16, new PiromInfo(rom, 0).getCores());
 	}
 
 	@Test
 	void aCorruptSectionPointerIsRefused() {
 		byte[] rom = Fixtures.PIROM.clone();
 		rom[0x09] = 0x78; // part numbers beyond the ROM
-		IllegalArgumentException beyond = assertThrows(IllegalArgumentException.class, () -> new PiromInfo(rom, 0));
+		IllegalArgumentException beyond = assertThrows(
+				IllegalArgumentException.class,
+				() -> new PiromInfo(checksummed(rom), 0));
 		assertEquals("The processor information ROM section pointer at 09h (78h) is outside the ROM", beyond.getMessage());
 		rom[0x09] = 0x05; // into the header
-		assertThrows(IllegalArgumentException.class, () -> new PiromInfo(rom, 0));
+		assertThrows(IllegalArgumentException.class, () -> new PiromInfo(checksummed(rom), 0));
 	}
 
 	@Test
