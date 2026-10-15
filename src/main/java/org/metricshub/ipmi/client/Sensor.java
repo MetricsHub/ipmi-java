@@ -36,6 +36,7 @@ import org.metricshub.ipmi.core.coding.commands.sdr.record.AbstractSensorRecord;
 import org.metricshub.ipmi.core.coding.commands.sdr.record.EntityId;
 import org.metricshub.ipmi.core.coding.commands.sdr.record.FullSensorRecord;
 import org.metricshub.ipmi.core.coding.commands.sdr.record.ReadingType;
+import org.metricshub.ipmi.core.coding.commands.sdr.record.SensorReadingFactors;
 import org.metricshub.ipmi.core.coding.commands.sdr.record.SensorRecord;
 import org.metricshub.ipmi.core.coding.commands.sdr.record.SensorType;
 import org.metricshub.ipmi.core.coding.commands.sdr.record.SensorUnit;
@@ -59,13 +60,19 @@ public final class Sensor {
 
 	private final AbstractSensorRecord record;
 	private final GetSensorReadingResponseData reading;
+	private final SensorReadingFactors factors;
 	private final String problem;
 	private final List<ReadingType> rawStates;
 	private final List<String> states;
 
-	private Sensor(AbstractSensorRecord record, GetSensorReadingResponseData reading, String problem) {
+	private Sensor(
+			AbstractSensorRecord record,
+			GetSensorReadingResponseData reading,
+			SensorReadingFactors factors,
+			String problem) {
 		this.record = record;
 		this.reading = reading;
+		this.factors = factors;
 		this.problem = problem;
 		this.rawStates = reading == null || !isValid(reading) ?
 				Collections.<ReadingType>emptyList() :
@@ -75,14 +82,20 @@ public final class Sensor {
 	}
 
 	/**
-	 * Creates the sensor from its record and the reply of the BMC to Get Sensor Reading.
+	 * Creates the sensor from its record and the replies of the BMC to Get Sensor Reading and, for a non-linear
+	 * sensor, Get Sensor Reading Factors.
 	 *
 	 * @param record the Full or Compact sensor record of the sensor
 	 * @param reading the reply to Get Sensor Reading, or null when the BMC gave none
+	 * @param factors the factors of the reading of a non-linear sensor, or null
 	 * @param problem why the BMC gave no reading, or null when it gave one
 	 * @return the sensor
 	 */
-	static Sensor of(AbstractSensorRecord record, GetSensorReadingResponseData reading, String problem) {
+	static Sensor of(
+			AbstractSensorRecord record,
+			GetSensorReadingResponseData reading,
+			SensorReadingFactors factors,
+			String problem) {
 		String why = problem;
 		if (why == null && reading != null) {
 			if (!reading.isSensorStateValid()) {
@@ -91,10 +104,10 @@ public final class Sensor {
 				why = "Sensor scanning is disabled";
 			}
 		}
-		return new Sensor(record, reading, why);
+		return new Sensor(record, reading, factors, why);
 	}
 
-	private static boolean isValid(GetSensorReadingResponseData reading) {
+	static boolean isValid(GetSensorReadingResponseData reading) {
 		// IPMI 2.0 table 35-15: neither the reading nor the states are valid when the sensor is unavailable or not scanned
 		return reading.isSensorStateValid() && reading.isScanningEnabled();
 	}
@@ -178,7 +191,7 @@ public final class Sensor {
 
 	/**
 	 * Returns the reading of a threshold sensor, in its {@link #unit()}, converted with the formula and the
-	 * linearization of its record.
+	 * linearization of its record, or for a non-linear sensor with the factors the BMC returned for the reading.
 	 *
 	 * @return the reading, or empty when the sensor has none: a discrete sensor, an unavailable reading
 	 *         ({@link #problem()}), or a record without analog reading
@@ -191,7 +204,8 @@ public final class Sensor {
 		if (!full.hasAnalogReading()) {
 			return OptionalDouble.empty();
 		}
-		double value = reading.getSensorReading(full);
+		double value = factors == null ?
+				reading.getSensorReading(full) : full.calcFormula(rawReading().getAsInt(), factors);
 		return Double.isNaN(value) ? OptionalDouble.empty() : OptionalDouble.of(value);
 	}
 
@@ -324,10 +338,10 @@ public final class Sensor {
 	}
 
 	/**
-	 * Returns why the sensor has no reading and no states.
+	 * Returns why the sensor has no reading and, unless only the factors of a non-linear sensor are missing, no states.
 	 *
-	 * @return the problem: the BMC refused the reading (with its completion code), the reading is not valid yet, or
-	 *         scanning is disabled; empty when the sensor has a reading
+	 * @return the problem: the BMC refused the reading or the factors of a non-linear sensor (with its completion
+	 *         code), the reading is not valid yet, or scanning is disabled; empty when the sensor has a reading
 	 */
 	public Optional<String> problem() {
 		return Optional.ofNullable(problem);

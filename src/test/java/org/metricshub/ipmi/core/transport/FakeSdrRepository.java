@@ -26,6 +26,8 @@ public final class FakeSdrRepository {
 	public static final int RESERVE_SDR_REPOSITORY = 0x22;
 	/** Command code of Get SDR. */
 	public static final int GET_SDR = 0x23;
+	/** Command code of Get Sensor Reading Factors. */
+	public static final int GET_SENSOR_READING_FACTORS = 0x23;
 	/** Command code of Get Sensor Reading. */
 	public static final int GET_SENSOR_READING = 0x2d;
 	/** Command code of Get FRU Inventory Area Info. */
@@ -45,6 +47,7 @@ public final class FakeSdrRepository {
 
 	private final List<byte[]> records = new ArrayList<>();
 	private final Map<Integer, byte[]> readings = new ConcurrentHashMap<>();
+	private final Map<Integer, byte[]> factors = new ConcurrentHashMap<>();
 	private final Map<Integer, byte[]> frus = new ConcurrentHashMap<>();
 	private final java.util.Set<Integer> chunkedOnly = ConcurrentHashMap.newKeySet();
 	private final Map<Integer, Integer> cancelOnce = new ConcurrentHashMap<>();
@@ -62,6 +65,7 @@ public final class FakeSdrRepository {
 		bmc.handle(NETFN_STORAGE, RESERVE_SDR_REPOSITORY, data -> new byte[] { 0x00, 0x01, 0x00 });
 		bmc.handle(NETFN_STORAGE, GET_SDR, this::getSdr);
 		bmc.handle(NETFN_SENSOR, GET_SENSOR_READING, this::getSensorReading);
+		bmc.handle(NETFN_SENSOR, GET_SENSOR_READING_FACTORS, this::getSensorReadingFactors);
 		bmc.handle(NETFN_STORAGE, GET_FRU_INVENTORY_AREA_INFO, this::fruInventoryAreaInfo);
 		bmc.handle(NETFN_STORAGE, READ_FRU_DATA, this::readFruData);
 	}
@@ -93,6 +97,20 @@ public final class FakeSdrRepository {
 	 */
 	public FakeSdrRepository reading(int sensorNumber, int... reply) {
 		readings.put(sensorNumber, bytes(reply));
+		return this;
+	}
+
+	/**
+	 * Sets the reply of Get Sensor Reading Factors for a sensor number and a reading byte: next reading, factors (or a
+	 * completion code alone). The BMC answers Invalid Command to any other request, as a BMC without the command does.
+	 *
+	 * @param sensorNumber the sensor number
+	 * @param reading the reading byte
+	 * @param reply the reply bytes after the completion code
+	 * @return this repository
+	 */
+	public FakeSdrRepository factors(int sensorNumber, int reading, int... reply) {
+		factors.put(sensorNumber << 8 | reading, bytes(reply));
 		return this;
 	}
 
@@ -214,6 +232,14 @@ public final class FakeSdrRepository {
 			return reply; // a completion code alone
 		}
 		return concat(new byte[1], reply);
+	}
+
+	private byte[] getSensorReadingFactors(byte[] data) {
+		byte[] reply = factors.get((data[0] & 0xff) << 8 | data[1] & 0xff);
+		if (reply == null) {
+			return new byte[] { (byte) 0xc1 }; // invalid command
+		}
+		return reply.length == 1 ? reply : concat(new byte[1], reply);
 	}
 
 	private byte[] fruInventoryAreaInfo(byte[] data) {

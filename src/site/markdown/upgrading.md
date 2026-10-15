@@ -15,6 +15,13 @@ description: What changes when upgrading the IPMI Java Client — from 2.0.00, f
   raw readings of a linear sensor (IPMI 2.0 section 36.4.2), and `NaN` for a linearizable or
   non-linear sensor, whose resolution varies with the reading; 2.0.00 returned half of `|M x 10^R|`
   whatever the linearization.
+* A non-linear sensor (linearization `70h`-`7Fh`) has a `reading()`: the client converts each
+  reading with the factors the BMC returns for it in reply to the new `GetSensorReadingFactors`
+  command (one more request per non-linear sensor and per read), where 2.0.00 returned the
+  sensor without reading. `FullSensorRecord.hasAnalogReading()` is now `true` for these sensors,
+  `isNonLinear()` tells them apart, and `calcFormula(int, SensorReadingFactors)` converts a
+  reading byte with the factors of the reply; `calcFormula(int)` still returns `NaN` for them.
+  Their thresholds stay empty.
 
 ## Upgrading from 1.x to 2.0.00
 
