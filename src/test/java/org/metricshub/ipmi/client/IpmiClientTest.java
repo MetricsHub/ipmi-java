@@ -36,6 +36,7 @@ import static org.metricshub.ipmi.core.transport.FakeRmcpPlusBmc.OPEN_SESSION_RE
 import static org.metricshub.ipmi.core.transport.FakeRmcpPlusBmc.SEND_MESSAGE;
 import static org.metricshub.ipmi.core.transport.FakeRmcpPlusBmc.SET_SESSION_PRIVILEGE_LEVEL;
 import static org.metricshub.ipmi.core.transport.FakeSdrRepository.GET_DEVICE_SDR;
+import static org.metricshub.ipmi.core.transport.FakeSdrRepository.GET_DEVICE_SDR_INFO;
 import static org.metricshub.ipmi.core.transport.FakeSdrRepository.GET_SDR;
 import static org.metricshub.ipmi.core.transport.FakeSdrRepository.GET_SDR_REPOSITORY_INFO;
 import static org.metricshub.ipmi.core.transport.FakeSdrRepository.GET_SENSOR_READING;
@@ -74,6 +75,7 @@ import org.junit.jupiter.api.Timeout;
 import org.metricshub.ipmi.core.coding.commands.PrivilegeLevel;
 import org.metricshub.ipmi.core.coding.commands.chassis.GetChassisStatus;
 import org.metricshub.ipmi.core.coding.commands.chassis.PowerCommand;
+import org.metricshub.ipmi.core.coding.commands.sdr.GetDeviceSdrInfo;
 import org.metricshub.ipmi.core.coding.commands.sdr.record.EntityId;
 import org.metricshub.ipmi.core.coding.commands.sdr.record.OemRecord;
 import org.metricshub.ipmi.core.coding.commands.sdr.record.ReadingType;
@@ -1095,13 +1097,7 @@ class IpmiClientTest {
 					.reading(1, 0x10, 0x40, 0x00)
 					.deviceSdrs()
 					.install(bmc);
-			// Provides Device SDRs (bit 7 of the device revision), a Sensor Device without SDR Repository
-			byte[] deviceId = DEVICE_ID.clone();
-			deviceId[1] = (byte) 0x81;
-			deviceId[5] = 0x01;
-			byte[] reply = new byte[1 + deviceId.length];
-			System.arraycopy(deviceId, 0, reply, 1, deviceId.length);
-			bmc.handle(NETFN_APP, GET_DEVICE_ID, data -> reply);
+			holdsDeviceSdrsOnly(bmc);
 			try (IpmiClient client = client(bmc).build()) {
 				SensorList sensors = client.sensors().execute();
 				assertEquals(1, sensors.size(), sensors.toString());
@@ -1110,6 +1106,64 @@ class IpmiClientTest {
 				assertEquals(0, bmc.getCount(NETFN_STORAGE, GET_SDR));
 			}
 		}
+	}
+
+	@Test
+	@Timeout(30)
+	void aDeviceWithoutSdrCountIsWalkedAndMayHaveNone() throws Exception {
+		try (FakeRmcpPlusBmc bmc = new FakeRmcpPlusBmc(SUITES, USER, utf8(PASSWORD), null)) {
+			FakeSdrRepository sdr = new FakeSdrRepository().deviceSdrs();
+			sdr.install(bmc);
+			holdsDeviceSdrsOnly(bmc);
+			// Get Device SDR Info is optional: without the count, the first "record not present" means no record
+			bmc.handle(NETFN_SENSOR, GET_DEVICE_SDR_INFO, data -> new byte[] { (byte) 0xc1 });
+			try (IpmiClient client = client(bmc).build()) {
+				assertTrue(client.sensors().execute().isEmpty());
+				assertEquals(1, bmc.getCount(NETFN_SENSOR, GET_DEVICE_SDR));
+
+				// A dynamic population without its change indicator is malformed: the walk goes on without the count
+				bmc.handle(NETFN_SENSOR, GET_DEVICE_SDR_INFO, data -> new byte[] { 0x00, 0x01, (byte) 0x81 });
+				assertThrows(IpmiClientException.class, () -> client.send(new GetDeviceSdrInfo(true)));
+				sdr
+						.add(compactSensorRecord(1, 1, EntityId.Processor.getCode(), 1, SensorType.Processor.getCode(), 0x6f, "S"))
+						.reading(1, 0x10, 0x40, 0x00);
+				assertEquals(1, client.sensors().execute().size());
+			}
+		}
+	}
+
+	@Test
+	@Timeout(30)
+	void aSendMessageTheBmcDoesNotAcknowledgeLosesTheSession() throws Exception {
+		try (FakeRmcpPlusBmc bmc = new FakeRmcpPlusBmc(SUITES, USER, utf8(PASSWORD), null)) {
+			byte[] sensor = compactSensorRecord(
+					1,
+					1,
+					EntityId.Processor.getCode(),
+					1,
+					SensorType.Processor.getCode(),
+					0x6f,
+					"S");
+			new FakeSdrRepository().add(withOwner(sensor, 0x2c, 6, 0)).install(bmc);
+			// The BMC itself does not answer Send Message: unlike a silent controller, that is the session failing
+			bmc.handle(NETFN_APP, SEND_MESSAGE, data -> null);
+			try (IpmiClient client = client(bmc).build()) {
+				assertThrows(IpmiTimeoutException.class, () -> client.sensors().execute());
+				assertEquals(2, bmc.getCount(OPEN_SESSION_REQUEST), "the read is replayed once on a new session");
+			}
+		}
+	}
+
+	/**
+	 * Makes the BMC answer Get Device ID as a Sensor Device that provides Device SDRs (bit 7 of the device revision),
+	 * without SDR Repository.
+	 */
+	private static void holdsDeviceSdrsOnly(FakeRmcpPlusBmc bmc) {
+		byte[] reply = new byte[1 + DEVICE_ID.length];
+		System.arraycopy(DEVICE_ID, 0, reply, 1, DEVICE_ID.length);
+		reply[2] = (byte) 0x81;
+		reply[6] = 0x01;
+		bmc.handle(NETFN_APP, GET_DEVICE_ID, data -> reply);
 	}
 
 	@Test

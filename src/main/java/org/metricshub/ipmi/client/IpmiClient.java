@@ -1081,11 +1081,12 @@ public final class IpmiClient implements AutoCloseable {
 			} catch (IPMIException e) {
 				throw new IpmiCompletionCodeException(command, e);
 			} catch (ConnectionException e) {
-				if (command instanceof SendMessage) {
-					// The controller the BMC forwards the request to may be absent: the session is not in question
+				if (command instanceof SendMessage && ((SendMessage<?>) command).isAcknowledged()) {
+					// The BMC forwarded the request, and the controller did not answer: it may be absent, and the session
+					// is not in question. A BMC that did not even acknowledge the request is lost like for any command
 					throw new IpmiTimeoutException(
-							"No reply from " + host + " to " + name + " after " + tries + " tries: the controller the BMC "
-									+ "forwards the request to may be absent",
+							"No reply from the controller behind " + host + " to " + name + " after " + tries
+									+ " tries: the BMC forwarded the request, the controller may be absent",
 							e);
 				}
 				if (once) {

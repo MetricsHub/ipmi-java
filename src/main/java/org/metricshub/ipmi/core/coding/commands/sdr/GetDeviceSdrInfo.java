@@ -87,8 +87,12 @@ public class GetDeviceSdrInfo extends IpmiCommandCoder<GetDeviceSdrInfoResponseD
 		}
 		int flags = TypeConverter.byteToInt(raw[1]);
 		boolean dynamic = (flags & 0x80) != 0;
+		if (dynamic && raw.length < DYNAMIC_LENGTH) {
+			throw new IllegalArgumentException(
+					"Invalid response payload length: a dynamic population has a change indicator");
+		}
 		Long changeIndicator = null;
-		if (dynamic && raw.length >= DYNAMIC_LENGTH) {
+		if (dynamic) {
 			changeIndicator = TypeConverter.littleEndianByteArrayToInt(new byte[] { raw[2], raw[3], raw[4], raw[5] })
 					& 0xffffffffL;
 		}

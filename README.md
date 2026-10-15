@@ -29,7 +29,7 @@ try (IpmiClient bmc = IpmiClient.builder("bmc.example.com").credentials("monitor
 }
 ```
 
-A client owns one RMCP+ session, opened by the first operation and closed by `close()`: always use it in a try-with-resources block. The BMC must have IPMI over LAN enabled and an account with the User privilege: see [Preparing the BMC](https://metricshub.org/ipmi-java/preparing-the-bmc.html).
+A client owns one RMCP+ session, opened by the first operation and closed by `close()`: always use it in a try-with-resources block. The BMC must have IPMI over LAN enabled and an account with the User privilege, Operator on most BMCs for the sensors of other controllers than the BMC (power supplies, fans, RAID adapter...), which the BMC reaches with Send Message: see [Preparing the BMC](https://metricshub.org/ipmi-java/preparing-the-bmc.html).
 
 ## Command-line client
 

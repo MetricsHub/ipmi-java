@@ -46,8 +46,9 @@ import org.metricshub.ipmi.core.common.TypeConverter;
  * <p>
  * The BMC answers the Send Message request at once, then forwards the response of the controller under the sequence
  * number of the carried request, which is the one of the Send Message request. Some BMCs put the response of the
- * controller in their response to Send Message instead: both are accepted. A Send Message request that gets no reply
- * says nothing about the session: the controller may be absent or busy.
+ * controller in their response to Send Message instead: both are accepted. A request the BMC acknowledged
+ * ({@link #isAcknowledged()}) that gets no response of the controller says nothing about the session: the controller
+ * may be absent or busy.
  * </p>
  *
  * @param <R> the type of the response of the carried command
@@ -69,6 +70,9 @@ public class SendMessage<R extends ResponseData> extends IpmiCommandCoder<R> {
 	private final int address;
 
 	private final IpmiCommandCoder<R> command;
+
+	/** Set by the thread that receives the replies, read by the one that sent the request. */
+	private volatile boolean acknowledged;
 
 	/**
 	 * Creates the command.
@@ -99,6 +103,16 @@ public class SendMessage<R extends ResponseData> extends IpmiCommandCoder<R> {
 	 */
 	public IpmiCommandCoder<R> getCommand() {
 		return command;
+	}
+
+	/**
+	 * Tells whether the BMC answered Send Message itself with success to one of the tries of this request: it then
+	 * forwarded the request, and a missing response is the one of the controller, not of the BMC.
+	 *
+	 * @return whether the BMC acknowledged the request
+	 */
+	public boolean isAcknowledged() {
+		return acknowledged;
 	}
 
 	@Override
@@ -135,9 +149,11 @@ public class SendMessage<R extends ResponseData> extends IpmiCommandCoder<R> {
 	@Override
 	public boolean answers(IpmiLanMessage reply) {
 		if (super.answers(reply)) {
-			return !(reply instanceof IpmiLanResponse)
-					|| ((IpmiLanResponse) reply).getCompletionCode() != CompletionCode.Ok
-					|| reply.getData() != null;
+			if (!(reply instanceof IpmiLanResponse) || ((IpmiLanResponse) reply).getCompletionCode() != CompletionCode.Ok) {
+				return true;
+			}
+			acknowledged = true;
+			return reply.getData() != null;
 		}
 		return command.answers(reply);
 	}
