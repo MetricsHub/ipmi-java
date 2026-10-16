@@ -38,16 +38,32 @@ import org.metricshub.ipmi.core.common.TypeConverter;
  */
 public class GetSensorReading extends IpmiCommandCoder<GetSensorReadingResponseData> {
 
-	private byte sensorId;
+	private final byte sensorId;
+
+	private final byte lun;
+
+	/**
+	 * Initiates class for both encoding and decoding, for a sensor at LUN 0 of its owner.
+	 *
+	 * @param sensorId
+	 *        - ID of the sensor which reading is to be retrieved
+	 */
+	public GetSensorReading(int sensorId) {
+		this(sensorId, 0);
+	}
 
 	/**
 	 * Initiates class for both encoding and decoding.
 	 *
 	 * @param sensorId
 	 *        - ID of the sensor which reading is to be retrieved
+	 * @param lun
+	 *        - the LUN of the sensor owner, from the SDR record of the sensor, 0 to 3
+	 * @throws IllegalArgumentException when the LUN is not 0 to 3
 	 */
-	public GetSensorReading(int sensorId) {
+	public GetSensorReading(int sensorId, int lun) {
 		this.sensorId = TypeConverter.intToByte(sensorId);
+		this.lun = checkLun(lun);
 	}
 
 	@Override
@@ -69,7 +85,8 @@ public class GetSensorReading extends IpmiCommandCoder<GetSensorReadingResponseD
 				getNetworkFunction(),
 				getCommandCode(),
 				payloadData,
-				TypeConverter.intToByte(sequenceNumber));
+				TypeConverter.intToByte(sequenceNumber),
+				lun);
 	}
 
 	@Override

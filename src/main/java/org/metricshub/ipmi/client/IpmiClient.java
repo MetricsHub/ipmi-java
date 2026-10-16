@@ -31,6 +31,7 @@ import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
@@ -53,6 +54,7 @@ import org.metricshub.ipmi.core.coding.commands.IpmiCommandCoder;
 import org.metricshub.ipmi.core.coding.commands.PrivilegeLevel;
 import org.metricshub.ipmi.core.coding.commands.ResponseData;
 import org.metricshub.ipmi.core.coding.commands.app.GetDeviceId;
+import org.metricshub.ipmi.core.coding.commands.app.SendMessage;
 import org.metricshub.ipmi.core.coding.commands.chassis.ChassisControl;
 import org.metricshub.ipmi.core.coding.commands.chassis.ChassisIdentify;
 import org.metricshub.ipmi.core.coding.commands.chassis.GetChassisStatus;
@@ -67,6 +69,7 @@ import org.metricshub.ipmi.core.coding.commands.sdr.GetSensorReading;
 import org.metricshub.ipmi.core.coding.commands.sdr.GetSensorReadingFactors;
 import org.metricshub.ipmi.core.coding.commands.sdr.GetSensorReadingResponseData;
 import org.metricshub.ipmi.core.coding.commands.sdr.record.AbstractSensorRecord;
+import org.metricshub.ipmi.core.coding.commands.sdr.record.AddressType;
 import org.metricshub.ipmi.core.coding.commands.sdr.record.CompactSensorRecord;
 import org.metricshub.ipmi.core.coding.commands.sdr.record.FullSensorRecord;
 import org.metricshub.ipmi.core.coding.commands.sdr.record.SensorRecord;
@@ -78,6 +81,7 @@ import org.metricshub.ipmi.core.coding.commands.session.Rakp1;
 import org.metricshub.ipmi.core.coding.commands.session.SetSessionPrivilegeLevel;
 import org.metricshub.ipmi.core.coding.payload.CompletionCode;
 import org.metricshub.ipmi.core.coding.payload.lan.IPMIException;
+import org.metricshub.ipmi.core.coding.payload.lan.IpmiLanConstants;
 import org.metricshub.ipmi.core.coding.protocol.PayloadType;
 import org.metricshub.ipmi.core.coding.security.CipherSuite;
 import org.metricshub.ipmi.core.common.Constants;
@@ -159,7 +163,7 @@ public final class IpmiClient implements AutoCloseable {
 	 * The suites without integrity (0, 1, 6, 15), which the builder refuses: the list of suites comes unauthenticated,
 	 * so falling back to them would let an attacker downgrade the session to one whose replies can be forged.
 	 */
-	private static final Set<Integer> SUITES_WITHOUT_INTEGRITY = new java.util.HashSet<Integer>(
+	private static final Set<Integer> SUITES_WITHOUT_INTEGRITY = new HashSet<Integer>(
 			Arrays.asList(0, 1, 6, 15));
 
 	private static final int LAST_STANDARD_SUITE = 19;
@@ -472,49 +476,126 @@ public final class IpmiClient implements AutoCloseable {
 		return run("sensors", deadline, true, true, () -> {
 			SdrRepository sdr = repository();
 			List<Sensor> sensors = new ArrayList<Sensor>();
+			// The controllers behind the BMC, and their LUNs, that did not answer: the walk does not wait for them again
+			Set<Integer> silentOwners = new HashSet<Integer>();
 			for (SensorRecord record : sdr.records()) {
 				// Only the Full and Compact sensor records have a reading (IPMI 2.0 section 43)
 				if ((record instanceof FullSensorRecord || record instanceof CompactSensorRecord)
 						&& selection.test((AbstractSensorRecord) record)) {
-					sensors.add(readSensor((AbstractSensorRecord) record));
+					sensors.add(readSensor((AbstractSensorRecord) record, silentOwners));
 				}
 			}
 			return new SensorList(sensors, sdr.skippedRecords());
 		});
 	}
 
-	private Sensor readSensor(AbstractSensorRecord record) {
+	/**
+	 * Reads a sensor from its owner, as its record gives it (IPMI 2.0 section 5.4): the BMC, at the LUN of the record;
+	 * another controller, through the BMC (Send Message); none for a sensor of system software, whose number the BMC
+	 * would answer for one of its own sensors.
+	 */
+	private Sensor readSensor(AbstractSensorRecord record, Set<Integer> silentOwners) {
+		if (record.getAddressType() == AddressType.SystemSoftwareId) {
+			return Sensor
+					.of(
+							record,
+							null,
+							null,
+							String
+									.format(
+											"The sensor belongs to system software (owner ID %02Xh), not to a controller: it has no reading",
+											ownerAddress(record) | 1));
+		}
+		boolean bridged = isBridged(record);
+		int owner = TypeConverter.byteToInt(record.getChannelNumber()) << 10
+				| ownerAddress(record) << 2
+				| TypeConverter.byteToInt(record.getSensorOwnerLun());
+		if (bridged && silentOwners.contains(owner)) {
+			return Sensor.of(record, null, null, "No reply from " + describeOwner(record) + " through the BMC");
+		}
 		int number = TypeConverter.byteToInt(record.getSensorNumber());
+		int lun = TypeConverter.byteToInt(record.getSensorOwnerLun());
 		GetSensorReadingResponseData reading = null;
 		try {
-			reading = link.send(new GetSensorReading(number));
+			reading = sendToOwner(record, new GetSensorReading(number, lun));
 			if (record instanceof FullSensorRecord
 					&& ((FullSensorRecord) record).isNonLinear()
 					&& ((FullSensorRecord) record).hasAnalogReading()
 					&& Sensor.isValid(reading)) {
 				// IPMI 2.0 section 36.2: the factors of the record hold at the nominal reading only
 				int raw = (int) reading.getPlainSensorReading();
-				return Sensor.of(record, reading, link.send(new GetSensorReadingFactors(number, raw)).getFactors(), null);
+				return Sensor
+						.of(record, reading, sendToOwner(record, new GetSensorReadingFactors(number, raw, lun)).getFactors(), null);
 			}
 			return Sensor.of(record, reading, null, null);
 		} catch (IpmiCompletionCodeException e) {
 			// A reading the BMC refuses (not present, insufficient privilege...) costs that sensor, not the whole walk;
 			// refused factors cost its reading only
+			String meaning = bridged ? SendMessage.describeCompletionCode(e.rawCompletionCode()) : null;
 			return Sensor
 					.of(
 							record,
 							reading,
 							null,
-							(reading == null ? "Get Sensor Reading" : "Get Sensor Reading Factors") + " failed: "
-									+ e.completionCode().getMessage()
+							(reading == null ? "Get Sensor Reading" : "Get Sensor Reading Factors")
+									+ (bridged ? " through the BMC to " + describeOwner(record) : "") + " failed: "
+									+ (meaning == null ? e.completionCode().getMessage() : meaning)
 									+ String.format(" (completion code %02Xh)", e.rawCompletionCode()));
-		} catch (IpmiTimeoutException | IpmiConnectionException e) {
-			// The BMC stopped answering: the walk cannot go on
+		} catch (IpmiTimeoutException e) {
+			if (!bridged || link.lost) {
+				// The BMC stopped answering: the walk cannot go on
+				throw e;
+			}
+			// The controller behind the BMC did not answer (absent, or the BMC does not forward its response): the
+			// session is fine, and the sensors of the other owners are read. A controller that answered the reading and
+			// not the factors only costs this sensor its conversion
+			if (reading == null) {
+				silentOwners.add(owner);
+			}
+			return Sensor
+					.of(
+							record,
+							reading,
+							null,
+							"No reply from " + describeOwner(record) + " through the BMC"
+									+ (reading == null ? "" : " to Get Sensor Reading Factors"));
+		} catch (IpmiConnectionException e) {
 			throw e;
 		} catch (IpmiClientException e) {
 			// A reply the BMC malformed costs that sensor too
 			return Sensor.of(record, reading, null, e.getMessage());
 		}
+	}
+
+	/**
+	 * Sends a command to the controller that owns a sensor: the BMC itself, or another controller through the BMC
+	 * (Send Message with response tracking, IPMI 2.0 section 6.13.3).
+	 */
+	private <R extends ResponseData> R sendToOwner(AbstractSensorRecord record, IpmiCommandCoder<R> command) {
+		return isBridged(record) ?
+				link
+						.send(
+								new SendMessage<R>(TypeConverter.byteToInt(record.getChannelNumber()), ownerAddress(record), command)) :
+				link.send(command);
+	}
+
+	/**
+	 * Tells whether a sensor belongs to another controller than the BMC: another IPMB address, or another channel.
+	 */
+	private static boolean isBridged(AbstractSensorRecord record) {
+		return ownerAddress(record) != IpmiLanConstants.BMC_ADDRESS || record.getChannelNumber() != 0;
+	}
+
+	/**
+	 * Returns the sensor owner ID of the record in its 8-bit form (IPMI 2.0 table 5-3), without the software ID bit.
+	 */
+	private static int ownerAddress(AbstractSensorRecord record) {
+		return (TypeConverter.byteToInt(record.getSensorOwnerId()) & 0x7f) << 1;
+	}
+
+	private static String describeOwner(AbstractSensorRecord record) {
+		return String.format("the controller at %02Xh on channel %d", ownerAddress(record), record.getChannelNumber())
+				+ (record.getSensorOwnerLun() == 0 ? "" : ", LUN " + record.getSensorOwnerLun());
 	}
 
 	FruList readFrus(Set<Integer> ids, Duration deadline) {
@@ -577,7 +658,7 @@ public final class IpmiClient implements AutoCloseable {
 	 */
 	private boolean reclaimStaleSol(SOLException failure) throws SOLException {
 		GetPayloadActivationStatusResponseData status = link.send(new GetPayloadActivationStatus(PayloadType.Sol));
-		Set<Integer> free = new java.util.HashSet<Integer>();
+		Set<Integer> free = new HashSet<Integer>();
 		for (Byte instance : status.getAvailableInstances()) {
 			free.add(TypeConverter.byteToInt(instance));
 		}
@@ -634,9 +715,27 @@ public final class IpmiClient implements AutoCloseable {
 		if (sdrCache && repository != null && repository.isCurrent(info)) {
 			return repository;
 		}
-		SdrRepository walked = SdrWalker.walk(link, info);
+		SdrRepository walked = info == null && holdsDeviceSdrsOnly() ?
+				SdrWalker.walkDevice(link) : SdrWalker.walk(link, info);
 		repository = sdrCache ? walked : null;
 		return walked;
+	}
+
+	/**
+	 * Tells whether the BMC, which refused Get SDR Repository Info, has no SDR repository but holds the SDRs of its
+	 * sensors itself, to be read with Get Device SDR: the rule of ipmitool, from Get Device ID (IPMI 2.0 table 20-2).
+	 */
+	private boolean holdsDeviceSdrsOnly() {
+		DeviceId id;
+		try {
+			id = new DeviceId(link.send(new GetDeviceId()));
+		} catch (IpmiCompletionCodeException e) {
+			return false;
+		}
+		Set<DeviceFunction> functions = id.functions();
+		return id.providesDeviceSdrs()
+				&& functions.contains(DeviceFunction.SENSOR_DEVICE)
+				&& !functions.contains(DeviceFunction.SDR_REPOSITORY_DEVICE);
 	}
 
 	private BmcCapabilities readCapabilities() throws Exception {
@@ -994,6 +1093,14 @@ public final class IpmiClient implements AutoCloseable {
 			} catch (IPMIException e) {
 				throw new IpmiCompletionCodeException(command, e);
 			} catch (ConnectionException e) {
+				if (command instanceof SendMessage && ((SendMessage<?>) command).isAcknowledged()) {
+					// The BMC forwarded the request, and the controller did not answer: it may be absent, and the session
+					// is not in question. A BMC that did not even acknowledge the request is lost like for any command
+					throw new IpmiTimeoutException(
+							"No reply from the controller behind " + host + " to " + name + " after " + tries
+									+ " tries: the BMC forwarded the request, the controller may be absent",
+							e);
+				}
 				if (once) {
 					throw new IpmiTimeoutException(
 							"No reply from " + host + " to " + name + ", which is sent once and not again: whether the BMC"

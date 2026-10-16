@@ -12,7 +12,7 @@ import java.util.concurrent.ConcurrentHashMap;
 /**
  * An SDR repository, sensor readings and FRU inventories served by a {@link FakeRmcpPlusBmc}: Get SDR Repository
  * Info, Reserve SDR Repository, Get SDR (whole or in chunks), Get Sensor Reading, Get FRU Inventory Area Info and
- * Read FRU Data.
+ * Read FRU Data; or, with {@link #deviceSdrs()}, the same records as the device SDRs of a BMC without repository.
  */
 public final class FakeSdrRepository {
 
@@ -20,6 +20,12 @@ public final class FakeSdrRepository {
 	public static final int NETFN_STORAGE = 0x0a;
 	/** Network function of the sensor/event commands. */
 	public static final int NETFN_SENSOR = 0x04;
+	/** Command code of Get Device SDR Info (sensor/event). */
+	public static final int GET_DEVICE_SDR_INFO = 0x20;
+	/** Command code of Get Device SDR (sensor/event). */
+	public static final int GET_DEVICE_SDR = 0x21;
+	/** Command code of Reserve Device SDR Repository (sensor/event). */
+	public static final int RESERVE_DEVICE_SDR_REPOSITORY = 0x22;
 	/** Command code of Get SDR Repository Info. */
 	public static final int GET_SDR_REPOSITORY_INFO = 0x20;
 	/** Command code of Reserve SDR Repository. */
@@ -54,6 +60,8 @@ public final class FakeSdrRepository {
 	private volatile int addTimestamp = 1;
 	private volatile int deleteTimestamp = 1;
 	private volatile boolean infoSupported = true;
+	private volatile boolean device;
+	private FakeRmcpPlusBmc bmc;
 
 	/**
 	 * Registers the handlers on the BMC.
@@ -61,9 +69,13 @@ public final class FakeSdrRepository {
 	 * @param bmc the BMC
 	 */
 	public void install(FakeRmcpPlusBmc bmc) {
+		this.bmc = bmc;
 		bmc.handle(NETFN_STORAGE, GET_SDR_REPOSITORY_INFO, this::repositoryInfo);
-		bmc.handle(NETFN_STORAGE, RESERVE_SDR_REPOSITORY, data -> new byte[] { 0x00, 0x01, 0x00 });
-		bmc.handle(NETFN_STORAGE, GET_SDR, this::getSdr);
+		bmc.handle(NETFN_STORAGE, RESERVE_SDR_REPOSITORY, data -> repository(new byte[] { 0x00, 0x01, 0x00 }));
+		bmc.handle(NETFN_STORAGE, GET_SDR, data -> repository(getSdr(data)));
+		bmc.handle(NETFN_SENSOR, GET_DEVICE_SDR_INFO, data -> deviceSdr(deviceSdrInfo(data)));
+		bmc.handle(NETFN_SENSOR, RESERVE_DEVICE_SDR_REPOSITORY, data -> deviceSdr(new byte[] { 0x00, 0x01, 0x00 }));
+		bmc.handle(NETFN_SENSOR, GET_DEVICE_SDR, data -> deviceSdr(getSdr(data)));
 		bmc.handle(NETFN_SENSOR, GET_SENSOR_READING, this::getSensorReading);
 		bmc.handle(NETFN_SENSOR, GET_SENSOR_READING_FACTORS, this::getSensorReadingFactors);
 		bmc.handle(NETFN_STORAGE, GET_FRU_INVENTORY_AREA_INFO, this::fruInventoryAreaInfo);
@@ -96,7 +108,30 @@ public final class FakeSdrRepository {
 	 * @return this repository
 	 */
 	public FakeSdrRepository reading(int sensorNumber, int... reply) {
-		readings.put(sensorNumber, bytes(reply));
+		return readingAtLun(0, sensorNumber, reply);
+	}
+
+	/**
+	 * Sets the reply of Get Sensor Reading for a sensor number at a LUN of the BMC.
+	 *
+	 * @param lun the LUN the request is addressed to
+	 * @param sensorNumber the sensor number
+	 * @param reply the reply bytes after the completion code
+	 * @return this repository
+	 */
+	public FakeSdrRepository readingAtLun(int lun, int sensorNumber, int... reply) {
+		readings.put(lun << 8 | sensorNumber, bytes(reply));
+		return this;
+	}
+
+	/**
+	 * Serves the records as the device SDRs of a BMC without SDR repository (Get Device SDR Info, Reserve Device SDR
+	 * Repository, Get Device SDR): the SDR repository commands then answer Invalid Command.
+	 *
+	 * @return this repository
+	 */
+	public FakeSdrRepository deviceSdrs() {
+		device = true;
 		return this;
 	}
 
@@ -165,8 +200,27 @@ public final class FakeSdrRepository {
 		infoSupported = false;
 	}
 
+	private byte[] repository(byte[] reply) {
+		return device ? new byte[] { (byte) 0xc1 } : reply;
+	}
+
+	private byte[] deviceSdr(byte[] reply) {
+		return device ? reply : new byte[] { (byte) 0xc1 };
+	}
+
+	/**
+	 * Get Device SDR Info (IPMI 2.0 table 35-2): the SDR count, or the sensor count, and a static population with
+	 * sensors at LUN 0.
+	 */
+	private byte[] deviceSdrInfo(byte[] data) {
+		if (data.length != 1 || data[0] != 0x01) {
+			return new byte[] { (byte) 0xcc }; // the walk asks for the SDR count
+		}
+		return new byte[] { 0x00, (byte) records.size(), 0x01 };
+	}
+
 	private byte[] repositoryInfo(byte[] data) {
-		if (!infoSupported) {
+		if (device || !infoSupported) {
 			return new byte[] { (byte) 0xc1 };
 		}
 		return ByteBuffer
@@ -224,7 +278,7 @@ public final class FakeSdrRepository {
 	}
 
 	private byte[] getSensorReading(byte[] data) {
-		byte[] reply = readings.get(data[0] & 0xff);
+		byte[] reply = readings.get(bmc.getRequestLun() << 8 | data[0] & 0xff);
 		if (reply == null) {
 			return new byte[] { (byte) 0xcb }; // requested sensor not present
 		}
@@ -303,6 +357,22 @@ public final class FakeSdrRepository {
 		body[26] = (byte) (0xc0 | name.length()); // 8-bit ASCII ID string
 		System.arraycopy(name.getBytes(StandardCharsets.US_ASCII), 0, body, 27, name.length());
 		return record(recordId, COMPACT_SENSOR_RECORD, body);
+	}
+
+	/**
+	 * Returns a copy of a sensor record with another owner (IPMI 2.0 table 43-2, bytes 6 and 7).
+	 *
+	 * @param record the Full or Compact sensor record
+	 * @param ownerId the sensor owner ID byte: the 8-bit slave address, or a software ID with bit 0 set
+	 * @param channel the channel of the owner
+	 * @param lun the LUN of the owner
+	 * @return the copy
+	 */
+	public static byte[] withOwner(byte[] record, int ownerId, int channel, int lun) {
+		byte[] copy = record.clone();
+		copy[5] = (byte) ownerId;
+		copy[6] = (byte) (channel << 4 | lun);
+		return copy;
 	}
 
 	/**

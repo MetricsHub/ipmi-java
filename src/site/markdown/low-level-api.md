@@ -1,4 +1,4 @@
-keywords: low-level api, ipmiconnector, ipmiasyncconnector, session, cipher suite, privilege level, sendmessage, send, raw, ipmi command, sel, system event log, chassis control, custom command, dcmi, extension network function, oem network function
+keywords: low-level api, ipmiconnector, ipmiasyncconnector, session, cipher suite, privilege level, sendmessage, send, raw, ipmi command, sel, system event log, chassis control, custom command, dcmi, extension network function, oem network function, send message, bridging, satellite controller
 description: Send any IPMI command in the session of IpmiClient with send() or as bytes with raw(), or open RMCP+ sessions yourself with IpmiConnector — choosing the cipher suite and privilege level, timeouts, reading the System Event Log, controlling the power, the asynchronous connector, and writing your own commands, DCMI and OEM ones included.
 
 # Low-Level API
@@ -36,6 +36,31 @@ try (IpmiClient bmc = IpmiClient.builder(host).credentials(user, password).build
 BMC answers with an error completion code, and `IpmiTimeoutException` when it does not answer. A
 command is **never replayed** on a new session when the session is lost while it is sent: the
 next operation opens a new session.
+
+### Commands for another controller
+
+[`SendMessage`](apidocs/org/metricshub/ipmi/core/coding/commands/app/SendMessage.html) carries any
+command to a controller behind the BMC (Send Message with response tracking, IPMI 2.0 section
+6.13.3), given its channel and its slave address in the 8-bit form of the SDR records, and returns
+the typed response of that controller. The Intel Management Engine of a server, at `2Ch` on
+channel 6:
+
+```java
+GetDeviceIdResponseData me = bmc.send(new SendMessage<>(6, 0x2C, new GetDeviceId()));
+System.out.println("ME firmware " + me.getFirmwareRevision() + ", manufacturer " + me.getManufacturerId());
+```
+
+```text
+ME firmware 4.44, manufacturer 343
+```
+
+The LUN is the one the command is built with: `new GetSensorReading(number, lun)`. Send Message
+to another controller needs the Operator privilege, and some BMCs require Administrator: they
+answer `D4h` below it. A reply lost after the BMC acknowledged Send Message
+([`isAcknowledged()`](apidocs/org/metricshub/ipmi/core/coding/commands/app/SendMessage.html#isAcknowledged()))
+fails with `IpmiTimeoutException` but keeps the session, as the controller may be absent; a request
+the BMC does not acknowledge loses the session, like any other command. `sensors()` sends Send Message itself
+([Sensor owners](sensors.html#sensor-owners)).
 
 ### Reading the System Event Log
 

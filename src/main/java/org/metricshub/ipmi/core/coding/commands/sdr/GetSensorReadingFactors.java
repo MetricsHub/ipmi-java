@@ -46,15 +46,30 @@ public class GetSensorReadingFactors extends IpmiCommandCoder<GetSensorReadingFa
 
 	private final byte reading;
 
+	private final byte lun;
+
 	/**
-	 * Creates the command.
+	 * Creates the command for a sensor at LUN 0 of its owner.
 	 *
 	 * @param sensorNumber the number of the sensor
 	 * @param reading the reading byte to get the factors of, as Get Sensor Reading returned it
 	 */
 	public GetSensorReadingFactors(int sensorNumber, int reading) {
+		this(sensorNumber, reading, 0);
+	}
+
+	/**
+	 * Creates the command.
+	 *
+	 * @param sensorNumber the number of the sensor
+	 * @param reading the reading byte to get the factors of, as Get Sensor Reading returned it
+	 * @param lun the LUN of the sensor owner, from the SDR record of the sensor, 0 to 3
+	 * @throws IllegalArgumentException when the LUN is not 0 to 3
+	 */
+	public GetSensorReadingFactors(int sensorNumber, int reading, int lun) {
 		this.sensorNumber = TypeConverter.intToByte(sensorNumber);
 		this.reading = TypeConverter.intToByte(reading);
+		this.lun = checkLun(lun);
 	}
 
 	@Override
@@ -74,7 +89,8 @@ public class GetSensorReadingFactors extends IpmiCommandCoder<GetSensorReadingFa
 				getCommandCode(),
 				new byte[]
 				{ sensorNumber, reading },
-				TypeConverter.intToByte(sequenceNumber));
+				TypeConverter.intToByte(sequenceNumber),
+				lun);
 	}
 
 	@Override

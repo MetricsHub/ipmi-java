@@ -1,4 +1,4 @@
-keywords: upgrade, migration, release notes, breaking changes, 2.0, fluent client, builder, device id, raw, dcmi, network function, ipmiclientexception, slf4j, ipmicli, standalone jar, sel, system event log, chassis control, chassis identify, protected fields, accessors, abstractsensorrecord, validateresponse, utf-8, bmc key, cipher suite, integrity, org.sentrysoftware
+keywords: upgrade, migration, sensor owner, send message, get device sdr, release notes, breaking changes, 2.0, fluent client, builder, device id, raw, dcmi, network function, ipmiclientexception, slf4j, ipmicli, standalone jar, sel, system event log, chassis control, chassis identify, protected fields, accessors, abstractsensorrecord, validateresponse, utf-8, bmc key, cipher suite, integrity, org.sentrysoftware
 description: What changes when upgrading the IPMI Java Client — from 2.0.00, from 1.x to 2.0.00 (the fluent client, the System Event Log), from 1.2.02, from 1.2.01, and from the org.sentrysoftware:ipmi artifact of 1.2.00 and earlier.
 
 # Upgrading
@@ -36,6 +36,27 @@ description: What changes when upgrading the IPMI Java Client — from 2.0.00, f
   capacity and thermal design power of the processor; `manufacturer()` (`Intel`), `model()`
   (the S-spec), `serialNumber()` (the PPIN) and `partNumber()` take their values from it, and
   `ipmicli fru` prints them ([FRU Inventory](fru-inventory.html#processors)).
+
+* Each sensor is read from the owner its SDR record names
+  ([Sensor owners](sensors.html#sensor-owners)): at the LUN of its record when the BMC owns it,
+  where 2.0.00 always addressed LUN 0; through the BMC with Send Message when another controller
+  owns it, where 2.0.00 asked the BMC for its own sensor of the same number, which answered with
+  the reading of an unrelated sensor or `CBh` (the power supply, fan, network and drive sensors of
+  an HPE iLO 5 now have their readings); and not at all when system software owns it, where
+  2.0.00 returned the states of an unrelated BMC sensor (the BIOS sensors of Dell iDRACs, owner
+  `B1h`, are now `UNAVAILABLE`, without states, with their `problem()`). The sensors of other
+  controllers need the Operator privilege on most BMCs: below it they are returned without
+  reading, with the `D4h` in their `problem()`.
+* A BMC without SDR repository that holds the SDRs of its own sensors (Get Device ID: Sensor
+  Device, provides Device SDRs, no SDR Repository Device) is walked with Get Device SDR when it
+  refuses Get SDR Repository Info, where 2.0.00 failed the walk.
+* New in the protocol core: `SendMessage`, which carries any command to a controller behind the
+  BMC ([Commands for another controller](low-level-api.html#commands-for-another-controller));
+  `GetDeviceSdrInfo`, `GetDeviceSdr` and `ReserveDeviceSdrRepository`; the LUN argument of
+  `GetSensorReading` and `GetSensorReadingFactors`; `IpmiCommandCoder.answers(IpmiLanMessage)`,
+  which tells whether a reply received under the tag of a request answers it, and which a command
+  with more than one reply overrides (the response to Send Message itself does not end the
+  exchange).
 
 ## Upgrading from 1.x to 2.0.00
 

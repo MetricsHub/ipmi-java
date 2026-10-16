@@ -78,6 +78,8 @@ public class FakeRmcpPlusBmc implements AutoCloseable {
 	public static final int GET_CHANNEL_CIPHER_SUITES = 0x54;
 	/** Get Session Info. */
 	public static final int GET_SESSION_INFO = 0x3d;
+	/** Command code of Send Message (App). */
+	public static final int SEND_MESSAGE = 0x34;
 
 	/** Privilege level User. */
 	public static final int USER = 2;
@@ -130,6 +132,18 @@ public class FakeRmcpPlusBmc implements AutoCloseable {
 			0x02,
 			0x03,
 			0x04 };
+
+	/**
+	 * How the BMC returns the response of a controller behind it to a Send Message request (IPMI 2.0 section 6.13).
+	 */
+	public enum BridgeReply {
+		/** A response to Send Message, then the response of the controller as a message of its own, as the spec says. */
+		SEPARATE,
+		/** The response of the controller in the data of the response to Send Message, as some BMCs do. */
+		EMBEDDED,
+		/** A response to Send Message, and nothing more: the controller does not answer. */
+		NONE
+	}
 
 	/**
 	 * Faults the BMC injects: the handshake ones in every handshake ({@link #inject(Fault)}), the others in the reply to
@@ -188,6 +202,17 @@ public class FakeRmcpPlusBmc implements AutoCloseable {
 	private final Map<Integer, Fault> replyFaults = new ConcurrentHashMap<>();
 	private final AtomicInteger sessionRequests = new AtomicInteger();
 	private final List<String> errors = new CopyOnWriteArrayList<>();
+	/** The handlers of the controllers behind the BMC, by channel, address, network function and command. */
+	private final Map<Long, Function<byte[], byte[]>> satellites = new ConcurrentHashMap<>();
+	/** The controllers behind the BMC, by channel and address. */
+	private final Set<Integer> satelliteAddresses = ConcurrentHashMap.newKeySet();
+	/** The IPMB requests the BMC received in Send Message requests. */
+	private final List<byte[]> bridgedRequests = new CopyOnWriteArrayList<>();
+	private volatile BridgeReply bridgeReply = BridgeReply.SEPARATE;
+	/** The response of a controller to send after the reply to Send Message, sealed, or null. */
+	private volatile byte[] followUp;
+	/** The LUN of the IPMI request being executed. */
+	private volatile int requestLun;
 	private volatile Session session;
 	private volatile SocketAddress console;
 
@@ -343,6 +368,49 @@ public class FakeRmcpPlusBmc implements AutoCloseable {
 	 */
 	public void handle(int netFn, int command, Function<byte[], byte[]> handler) {
 		handlers.put(key(netFn, command), handler);
+	}
+
+	/**
+	 * Returns the LUN the IPMI request being executed is addressed to, for the handlers, those of the controllers
+	 * behind the BMC included.
+	 *
+	 * @return the responder LUN of the request, 0 to 3
+	 */
+	public int getRequestLun() {
+		return requestLun;
+	}
+
+	/**
+	 * Puts a controller behind the BMC, which forwards it the requests of Send Message with response tracking
+	 * (IPMI 2.0 section 6.13.3); a Send Message to another address fails with 83h (NAK on write).
+	 *
+	 * @param channel the channel of the controller
+	 * @param address the 8-bit slave address of the controller
+	 * @param netFn the network function of the request the controller handles
+	 * @param command the command code
+	 * @param handler computes the completion code and the response data from the request data, or null when the
+	 *        controller does not answer
+	 */
+	public void satellite(int channel, int address, int netFn, int command, Function<byte[], byte[]> handler) {
+		handle(NETFN_APP, SEND_MESSAGE, this::sendMessage);
+		satelliteAddresses.add(channel << 8 | address);
+		satellites.put((long) channel << 24 | address << 16 | netFn << 8 | command, handler);
+	}
+
+	/**
+	 * Sets how the BMC returns the response of a controller behind it; {@link BridgeReply#SEPARATE} by default.
+	 *
+	 * @param reply how the response is returned
+	 */
+	public void bridgeReply(BridgeReply reply) {
+		bridgeReply = reply;
+	}
+
+	/**
+	 * @return the IPMB requests the BMC received in Send Message requests, in order
+	 */
+	public List<byte[]> getBridgedRequests() {
+		return bridgedRequests;
 	}
 
 	/**
@@ -613,6 +681,11 @@ public class FakeRmcpPlusBmc implements AutoCloseable {
 				if (reply != null) {
 					socket.send(new DatagramPacket(reply, reply.length, packet.getSocketAddress()));
 				}
+				byte[] next = followUp;
+				if (next != null) {
+					followUp = null;
+					socket.send(new DatagramPacket(next, next.length, packet.getSocketAddress()));
+				}
 			} catch (IOException | GeneralSecurityException | RuntimeException e) {
 				errors.add(e.toString());
 			}
@@ -864,6 +937,10 @@ public class FakeRmcpPlusBmc implements AutoCloseable {
 			// The IV starts the payload, at 16: its bytes 7 and 8 are XORed into the response data bytes 1 and 2
 			reply[16 + 7] ^= (byte) 0x80;
 			reply[16 + 8] ^= (byte) 0x80;
+		}
+		if (followUp != null) {
+			// The response of a controller behind the BMC, after the reply to Send Message
+			followUp = seal(current, 0x00, followUp, nextSequenceNumber(current), true);
 		}
 		return reply;
 	}
@@ -1124,10 +1201,19 @@ public class FakeRmcpPlusBmc implements AutoCloseable {
 		count(key(netFn, command));
 		Function<byte[], byte[]> handler = handlers.get(key(netFn, command));
 		byte[] data = Arrays.copyOfRange(request, 6, request.length - 1);
+		requestLun = request[1] & 0x03;
 		byte[] result = handler == null ? new byte[] { (byte) 0xc1 } : handler.apply(data); // C1h: invalid command
+		return result == null ? null : response(request, result);
+	}
+
+	/**
+	 * Builds the response message to a request message (IPMI 2.0 table 22-10): rqAddr, netFn/rqLUN, checksum, rsAddr,
+	 * rqSeq/rsLUN, cmd, completion code and data, checksum.
+	 */
+	private static byte[] response(byte[] request, byte[] result) {
 		byte[] response = new byte[7 + result.length];
 		response[0] = request[3];
-		response[1] = (byte) ((netFn + 1) << 2 | request[4] & 0x03);
+		response[1] = (byte) (((request[1] & 0xff) >> 2) + 1 << 2 | request[4] & 0x03);
 		response[2] = checksum(response, 0, 2);
 		response[3] = request[0];
 		response[4] = (byte) (request[4] & 0xfc | request[1] & 0x03);
@@ -1135,6 +1221,46 @@ public class FakeRmcpPlusBmc implements AutoCloseable {
 		System.arraycopy(result, 0, response, 6, result.length);
 		response[response.length - 1] = checksum(response, 3, response.length - 1);
 		return response;
+	}
+
+	/**
+	 * Send Message with response tracking (IPMI 2.0 table 22-9): forwards the IPMB request to the controller and
+	 * returns its response as {@link #bridgeReply(BridgeReply)} says.
+	 */
+	private byte[] sendMessage(byte[] data) {
+		byte[] request = data.length > 0 ? Arrays.copyOfRange(data, 1, data.length) : data;
+		if ((data.length == 0 || (data[0] & 0xc0) != 0x40)
+				|| request.length < 7
+				|| checksum(request, 0, 3) != 0
+				|| checksum(request, 3, request.length) != 0) {
+			errors.add("Bad Send Message request: " + hex(data));
+			return new byte[] { (byte) 0xcc }; // invalid data field
+		}
+		bridgedRequests.add(request);
+		int channel = data[0] & 0x0f;
+		int address = request[0] & 0xff;
+		if (!satelliteAddresses.contains(channel << 8 | address)) {
+			return new byte[] { (byte) 0x83 }; // NAK on write
+		}
+		if (bridgeReply == BridgeReply.NONE) {
+			return new byte[] { 0x00 };
+		}
+		int netFn = (request[1] & 0xff) >> 2;
+		requestLun = request[1] & 0x03;
+		Function<byte[], byte[]> handler = satellites
+				.get((long) channel << 24 | address << 16 | netFn << 8 | request[5] & 0xff);
+		byte[] result = handler == null ?
+				new byte[]
+				{ (byte) 0xc1 } : handler.apply(Arrays.copyOfRange(request, 6, request.length - 1));
+		if (result == null) {
+			return new byte[] { 0x00 }; // forwarded, and the controller does not answer
+		}
+		byte[] response = response(request, result);
+		if (bridgeReply == BridgeReply.EMBEDDED) {
+			return concat(new byte[1], response);
+		}
+		followUp = response;
+		return new byte[] { 0x00 };
 	}
 
 	/**

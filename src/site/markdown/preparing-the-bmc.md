@@ -24,7 +24,7 @@ only, and works whether the server is powered on or off, as long as the BMC has 
 | IPMI 2.0 (RMCP+) | The client only opens RMCP+ sessions. IPMI 1.5-only BMCs (RMCP with MD2/MD5 or straight password authentication) are not supported: the client refuses them at once with `IpmiClientException: The BMC ... does not support IPMI 2.0 / RMCP+`. |
 | UDP port 623 | Open from the machine running the client to the BMC. The port can be changed with [`setPort()`](configuration.html#host-and-port). |
 | An account | Enabled, with a password, allowed to log in over IPMI on the LAN channel. |
-| Privilege level | **User** for everything `IpmiClient` reads; **Operator** for the control commands; **Administrator** for [Serial over LAN](serial-over-lan.html). |
+| Privilege level | **User** for everything `IpmiClient` reads, but for the [sensors of other controllers](sensors.html#sensor-owners) than the BMC, which most BMCs serve at the Operator level; **Operator** for the control commands; **Administrator** for [Serial over LAN](serial-over-lan.html). |
 | A supported cipher suite | Suite **3** or **17** in practice; see [Cipher suites](#cipher-suites). |
 
 ## Enabling IPMI over LAN

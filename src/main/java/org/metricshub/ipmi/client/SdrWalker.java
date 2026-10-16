@@ -25,18 +25,22 @@ package org.metricshub.ipmi.client;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.metricshub.ipmi.core.coding.commands.sdr.GetDeviceSdr;
+import org.metricshub.ipmi.core.coding.commands.sdr.GetDeviceSdrInfo;
+import org.metricshub.ipmi.core.coding.commands.sdr.GetDeviceSdrInfoResponseData;
 import org.metricshub.ipmi.core.coding.commands.sdr.GetSdr;
 import org.metricshub.ipmi.core.coding.commands.sdr.GetSdrRepositoryInfoResponseData;
 import org.metricshub.ipmi.core.coding.commands.sdr.GetSdrResponseData;
+import org.metricshub.ipmi.core.coding.commands.sdr.ReserveDeviceSdrRepository;
 import org.metricshub.ipmi.core.coding.commands.sdr.ReserveSdrRepository;
 import org.metricshub.ipmi.core.coding.commands.sdr.record.SensorRecord;
 import org.metricshub.ipmi.core.coding.payload.CompletionCode;
 import org.metricshub.ipmi.core.common.TypeConverter;
 
 /**
- * Walks the SDR repository (IPMI 2.0 section 33.12): reads every record, whole when the BMC allows it and in chunks
- * otherwise, and decodes it. A record the BMC returns truncated or that the library cannot decode is skipped and
- * reported, never fatal.
+ * Walks the SDR repository (IPMI 2.0 section 33.12), or the SDRs a BMC without repository holds itself (section 35):
+ * reads every record, whole when the BMC allows it and in chunks otherwise, and decodes it. A record the BMC returns
+ * truncated or that the library cannot decode is skipped and reported, never fatal.
  */
 final class SdrWalker {
 
@@ -54,18 +58,30 @@ final class SdrWalker {
 	 */
 	private static final int CHUNK_SIZE = 16;
 
+	/** Bytes to read for the whole record (Get SDR, IPMI 2.0 table 33-6). */
+	private static final int WHOLE_RECORD = 0xFF;
+
 	/** Size of the SDR record header; its last byte is the length of the rest of the record. */
 	private static final int HEADER_SIZE = 5;
 
 	private final Exchange exchange;
+	/** Whether the walk reads the device SDRs (Get Device SDR) rather than the repository (Get SDR). */
+	private final boolean device;
+	/**
+	 * Whether the walk may find no record although it was not told so: the BMC did not give the count, or the device
+	 * has a dynamic population that may have lost its records since it gave it.
+	 */
+	private final boolean mayBeEmpty;
 	private final List<SensorRecord> records = new ArrayList<SensorRecord>();
 	private final List<SkippedRecord> skipped = new ArrayList<SkippedRecord>();
 	private int nextRecordId;
 	private int reservationId;
 	private int lastReservationId = -1;
 
-	private SdrWalker(Exchange exchange) {
+	private SdrWalker(Exchange exchange, boolean device, boolean mayBeEmpty) {
 		this.exchange = exchange;
+		this.device = device;
+		this.mayBeEmpty = mayBeEmpty;
 	}
 
 	/**
@@ -77,12 +93,38 @@ final class SdrWalker {
 	 * @throws IpmiClientException when a record cannot be read at all: the BMC does not answer or refuses the read
 	 */
 	static SdrRepository walk(Exchange exchange, GetSdrRepositoryInfoResponseData info) {
-		SdrWalker walker = new SdrWalker(exchange);
+		SdrWalker walker = new SdrWalker(exchange, false, info == null);
 		// An empty repository answers "record not present" to the first Get SDR
 		if (info == null || info.getRecordCount() > 0) {
 			walker.walk();
 		}
 		return new SdrRepository(walker.records, walker.skipped, info);
+	}
+
+	/**
+	 * Reads the SDRs that a BMC without SDR repository holds itself, as a Sensor Device (Get Device SDR, IPMI 2.0
+	 * section 35.3). They are read again by each walk: the repository timestamps that tell whether a cached copy is
+	 * current do not exist for them.
+	 *
+	 * @param exchange the session to read them from
+	 * @return the records
+	 * @throws IpmiClientException when a record cannot be read at all: the BMC does not answer or refuses the read
+	 */
+	static SdrRepository walkDevice(Exchange exchange) {
+		GetDeviceSdrInfoResponseData info;
+		try {
+			info = exchange.send(new GetDeviceSdrInfo(true));
+		} catch (IpmiTimeoutException | IpmiConnectionException e) {
+			throw e;
+		} catch (IpmiClientException e) {
+			// A refused or malformed reply: the walk finds the records without their count
+			info = null;
+		}
+		SdrWalker walker = new SdrWalker(exchange, true, info == null || info.isDynamicPopulation());
+		if (info == null || info.getCount() > 0) {
+			walker.walk();
+		}
+		return new SdrRepository(walker.records, walker.skipped, null);
 	}
 
 	private void walk() {
@@ -95,13 +137,19 @@ final class SdrWalker {
 					records.add(record);
 				}
 			} catch (IpmiCompletionCodeException e) {
+				// In a walk that may find none, "record not present" to the first record means there is none
+				if (mayBeEmpty && nextRecordId == 0 && e.completionCode() == CompletionCode.DataNotPresent) {
+					return;
+				}
 				// The BMC canceled the reservation (it does so when another session appears): take a new one and read
 				// the record again, once
 				if (lastReservationId == reservationId || e.completionCode() != CompletionCode.ReservationCanceled) {
 					throw e;
 				}
 				lastReservationId = reservationId;
-				reservationId = exchange.send(new ReserveSdrRepository()).getReservationId();
+				reservationId = exchange
+						.send(device ? new ReserveDeviceSdrRepository() : new ReserveSdrRepository())
+						.getReservationId();
 			}
 		}
 	}
@@ -114,7 +162,7 @@ final class SdrWalker {
 		int recordId = nextRecordId;
 		GetSdrResponseData reply;
 		try {
-			reply = exchange.send(new GetSdr(reservationId, recordId));
+			reply = exchange.send(getSdr(recordId, 0, WHOLE_RECORD));
 		} catch (IpmiCompletionCodeException e) {
 			// The record is too large for one reply
 			if (e.completionCode() != CompletionCode.CannotRespond && e.completionCode() != CompletionCode.UnspecifiedError) {
@@ -135,7 +183,7 @@ final class SdrWalker {
 	 * canceled by the BMC in the middle of the record makes the walk read the whole record again, rather than skip it.
 	 */
 	private SensorRecord readInChunks(int recordId) {
-		GetSdrResponseData first = exchange.send(new GetSdr(reservationId, recordId, 0, INITIAL_CHUNK_SIZE));
+		GetSdrResponseData first = exchange.send(getSdr(recordId, 0, INITIAL_CHUNK_SIZE));
 		byte[] header = first.getSensorRecordData();
 		if (header == null || header.length < HEADER_SIZE) {
 			nextRecordId = first.getNextRecordId();
@@ -154,7 +202,7 @@ final class SdrWalker {
 		System.arraycopy(header, 0, bytes, 0, read);
 		while (read < size) {
 			int toRead = Math.min(CHUNK_SIZE, size - read);
-			byte[] chunk = exchange.send(new GetSdr(reservationId, recordId, read, toRead)).getSensorRecordData();
+			byte[] chunk = exchange.send(getSdr(recordId, read, toRead)).getSensorRecordData();
 			int got = chunk == null ? 0 : Math.min(toRead, chunk.length);
 			if (got == 0) {
 				nextRecordId = first.getNextRecordId();
@@ -171,6 +219,11 @@ final class SdrWalker {
 		}
 		nextRecordId = first.getNextRecordId();
 		return decode(recordId, bytes);
+	}
+
+	private GetSdr getSdr(int recordId, int offset, int size) {
+		return device ?
+				new GetDeviceSdr(reservationId, recordId, offset, size) : new GetSdr(reservationId, recordId, offset, size);
 	}
 
 	private SensorRecord decode(int recordId, byte[] data) {
