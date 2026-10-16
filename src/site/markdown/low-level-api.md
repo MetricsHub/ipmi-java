@@ -56,8 +56,10 @@ ME firmware 4.44, manufacturer 343
 
 The LUN is the one the command is built with: `new GetSensorReading(number, lun)`. Send Message
 to another controller needs the Operator privilege, and some BMCs require Administrator: they
-answer `D4h` below it. A lost reply fails with `IpmiTimeoutException` but keeps the session, as the
-controller may be absent; `sensors()` sends Send Message itself
+answer `D4h` below it. A reply lost after the BMC acknowledged Send Message
+([`isAcknowledged()`](apidocs/org/metricshub/ipmi/core/coding/commands/app/SendMessage.html#isAcknowledged()))
+fails with `IpmiTimeoutException` but keeps the session, as the controller may be absent; a request
+the BMC does not acknowledge loses the session, like any other command. `sensors()` sends Send Message itself
 ([Sensor owners](sensors.html#sensor-owners)).
 
 ### Reading the System Event Log

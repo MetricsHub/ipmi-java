@@ -371,7 +371,8 @@ public class FakeRmcpPlusBmc implements AutoCloseable {
 	}
 
 	/**
-	 * Returns the LUN the IPMI request being executed is addressed to, for the handlers.
+	 * Returns the LUN the IPMI request being executed is addressed to, for the handlers, those of the controllers
+	 * behind the BMC included.
 	 *
 	 * @return the responder LUN of the request, 0 to 3
 	 */
@@ -1245,6 +1246,7 @@ public class FakeRmcpPlusBmc implements AutoCloseable {
 			return new byte[] { 0x00 };
 		}
 		int netFn = (request[1] & 0xff) >> 2;
+		requestLun = request[1] & 0x03;
 		Function<byte[], byte[]> handler = satellites
 				.get((long) channel << 24 | address << 16 | netFn << 8 | request[5] & 0xff);
 		byte[] result = handler == null ?

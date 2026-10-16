@@ -1090,6 +1090,46 @@ class IpmiClientTest {
 
 	@Test
 	@Timeout(30)
+	void aSilentLunDoesNotHideTheOtherLunsOfItsController() throws Exception {
+		try (FakeRmcpPlusBmc bmc = new FakeRmcpPlusBmc(SUITES, USER, utf8(PASSWORD), null)) {
+			byte[] sensor = compactSensorRecord(
+					1,
+					1,
+					EntityId.Processor.getCode(),
+					1,
+					SensorType.Processor.getCode(),
+					0x6f,
+					"S");
+			new FakeSdrRepository()
+					.add(withOwner(sensor, 0x2c, 0, 0))
+					.add(withOwner(FakeSdrRepository.withId(sensor, 2), 0x2c, 0, 1))
+					.add(withOwner(FakeSdrRepository.withId(sensor, 3), 0x2c, 0, 0))
+					.install(bmc);
+			// The controller answers at LUN 1, not at LUN 0
+			bmc
+					.satellite(
+							0,
+							0x2c,
+							NETFN_SENSOR,
+							GET_SENSOR_READING,
+							data -> bmc.getRequestLun() == 0 ? null : new byte[]
+							{ 0x00, 0x20, 0x40, 0x00 });
+			try (IpmiClient client = client(bmc).build()) {
+				SensorList sensors = client.sensors().execute();
+				assertEquals(
+						"No reply from the controller at 2Ch on channel 0 through the BMC",
+						sensors.get(0).problem().get());
+				assertEquals(0x20, sensors.get(1).rawReading().getAsInt(), "LUN 1 is asked after LUN 0 kept silent");
+				assertEquals(
+						"No reply from the controller at 2Ch on channel 0 through the BMC",
+						sensors.get(2).problem().get());
+				assertEquals(3, bmc.getCount(NETFN_APP, SEND_MESSAGE), "2 tries at LUN 0, 1 at LUN 1, none for LUN 0 again");
+			}
+		}
+	}
+
+	@Test
+	@Timeout(30)
 	void aBmcWithoutRepositoryIsWalkedThroughItsDeviceSdrs() throws Exception {
 		try (FakeRmcpPlusBmc bmc = new FakeRmcpPlusBmc(SUITES, USER, utf8(PASSWORD), null)) {
 			new FakeSdrRepository()
@@ -1120,6 +1160,13 @@ class IpmiClientTest {
 			try (IpmiClient client = client(bmc).build()) {
 				assertTrue(client.sensors().execute().isEmpty());
 				assertEquals(1, bmc.getCount(NETFN_SENSOR, GET_DEVICE_SDR));
+
+				// A dynamic population may have lost its records between its count and the first read
+				bmc
+						.handle(NETFN_SENSOR, GET_DEVICE_SDR_INFO, data -> new byte[]
+						{ 0x00, 0x01, (byte) 0x81, 0x01, 0x00, 0x00, 0x00 });
+				assertTrue(client.sensors().execute().isEmpty());
+				assertEquals(2, bmc.getCount(NETFN_SENSOR, GET_DEVICE_SDR));
 
 				// A dynamic population without its change indicator is malformed: the walk goes on without the count
 				bmc.handle(NETFN_SENSOR, GET_DEVICE_SDR_INFO, data -> new byte[] { 0x00, 0x01, (byte) 0x81 });

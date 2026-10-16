@@ -27,6 +27,7 @@ import java.util.List;
 
 import org.metricshub.ipmi.core.coding.commands.sdr.GetDeviceSdr;
 import org.metricshub.ipmi.core.coding.commands.sdr.GetDeviceSdrInfo;
+import org.metricshub.ipmi.core.coding.commands.sdr.GetDeviceSdrInfoResponseData;
 import org.metricshub.ipmi.core.coding.commands.sdr.GetSdr;
 import org.metricshub.ipmi.core.coding.commands.sdr.GetSdrRepositoryInfoResponseData;
 import org.metricshub.ipmi.core.coding.commands.sdr.GetSdrResponseData;
@@ -66,18 +67,21 @@ final class SdrWalker {
 	private final Exchange exchange;
 	/** Whether the walk reads the device SDRs (Get Device SDR) rather than the repository (Get SDR). */
 	private final boolean device;
-	/** Whether the number of records is unknown: the BMC did not give it, and there may be none. */
-	private final boolean countUnknown;
+	/**
+	 * Whether the walk may find no record although it was not told so: the BMC did not give the count, or the device
+	 * has a dynamic population that may have lost its records since it gave it.
+	 */
+	private final boolean mayBeEmpty;
 	private final List<SensorRecord> records = new ArrayList<SensorRecord>();
 	private final List<SkippedRecord> skipped = new ArrayList<SkippedRecord>();
 	private int nextRecordId;
 	private int reservationId;
 	private int lastReservationId = -1;
 
-	private SdrWalker(Exchange exchange, boolean device, boolean countUnknown) {
+	private SdrWalker(Exchange exchange, boolean device, boolean mayBeEmpty) {
 		this.exchange = exchange;
 		this.device = device;
-		this.countUnknown = countUnknown;
+		this.mayBeEmpty = mayBeEmpty;
 	}
 
 	/**
@@ -107,17 +111,17 @@ final class SdrWalker {
 	 * @throws IpmiClientException when a record cannot be read at all: the BMC does not answer or refuses the read
 	 */
 	static SdrRepository walkDevice(Exchange exchange) {
-		int count;
+		GetDeviceSdrInfoResponseData info;
 		try {
-			count = exchange.send(new GetDeviceSdrInfo(true)).getCount();
+			info = exchange.send(new GetDeviceSdrInfo(true));
 		} catch (IpmiTimeoutException | IpmiConnectionException e) {
 			throw e;
 		} catch (IpmiClientException e) {
 			// A refused or malformed reply: the walk finds the records without their count
-			count = -1;
+			info = null;
 		}
-		SdrWalker walker = new SdrWalker(exchange, true, count < 0);
-		if (count != 0) {
+		SdrWalker walker = new SdrWalker(exchange, true, info == null || info.isDynamicPopulation());
+		if (info == null || info.getCount() > 0) {
 			walker.walk();
 		}
 		return new SdrRepository(walker.records, walker.skipped, null);
@@ -133,8 +137,8 @@ final class SdrWalker {
 					records.add(record);
 				}
 			} catch (IpmiCompletionCodeException e) {
-				// Without the count of the records, "record not present" to the first one means there is none
-				if (countUnknown && nextRecordId == 0 && e.completionCode() == CompletionCode.DataNotPresent) {
+				// In a walk that may find none, "record not present" to the first record means there is none
+				if (mayBeEmpty && nextRecordId == 0 && e.completionCode() == CompletionCode.DataNotPresent) {
 					return;
 				}
 				// The BMC canceled the reservation (it does so when another session appears): take a new one and read

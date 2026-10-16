@@ -476,7 +476,7 @@ public final class IpmiClient implements AutoCloseable {
 		return run("sensors", deadline, true, true, () -> {
 			SdrRepository sdr = repository();
 			List<Sensor> sensors = new ArrayList<Sensor>();
-			// The controllers behind the BMC that did not answer: the walk does not wait for them again
+			// The controllers behind the BMC, and their LUNs, that did not answer: the walk does not wait for them again
 			Set<Integer> silentOwners = new HashSet<Integer>();
 			for (SensorRecord record : sdr.records()) {
 				// Only the Full and Compact sensor records have a reading (IPMI 2.0 section 43)
@@ -507,7 +507,9 @@ public final class IpmiClient implements AutoCloseable {
 											ownerAddress(record) | 1));
 		}
 		boolean bridged = isBridged(record);
-		int owner = TypeConverter.byteToInt(record.getChannelNumber()) << 8 | ownerAddress(record);
+		int owner = TypeConverter.byteToInt(record.getChannelNumber()) << 10
+				| ownerAddress(record) << 2
+				| TypeConverter.byteToInt(record.getSensorOwnerLun());
 		if (bridged && silentOwners.contains(owner)) {
 			return Sensor.of(record, null, null, "No reply from " + describeOwner(record) + " through the BMC");
 		}
@@ -592,7 +594,8 @@ public final class IpmiClient implements AutoCloseable {
 	}
 
 	private static String describeOwner(AbstractSensorRecord record) {
-		return String.format("the controller at %02Xh on channel %d", ownerAddress(record), record.getChannelNumber());
+		return String.format("the controller at %02Xh on channel %d", ownerAddress(record), record.getChannelNumber())
+				+ (record.getSensorOwnerLun() == 0 ? "" : ", LUN " + record.getSensorOwnerLun());
 	}
 
 	FruList readFrus(Set<Integer> ids, Duration deadline) {
