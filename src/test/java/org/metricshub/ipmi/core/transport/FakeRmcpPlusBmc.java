@@ -1157,8 +1157,11 @@ public class FakeRmcpPlusBmc implements AutoCloseable {
 
 	/**
 	 * Set Session Privilege Level (IPMI 2.0 table 22-24): up to the privilege requested in RAKP Message 1.
+	 *
+	 * @param data the request data
+	 * @return the reply
 	 */
-	private byte[] setSessionPrivilegeLevel(byte[] data) {
+	public byte[] setSessionPrivilegeLevel(byte[] data) {
 		Session current = session;
 		int requested = data[0] & 0x0f;
 		if (requested > current.maxPrivilege) {

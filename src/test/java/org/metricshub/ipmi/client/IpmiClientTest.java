@@ -68,6 +68,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.BooleanSupplier;
 import java.util.stream.Collectors;
 
@@ -81,6 +82,7 @@ import org.metricshub.ipmi.core.coding.commands.sdr.record.EntityId;
 import org.metricshub.ipmi.core.coding.commands.sdr.record.OemRecord;
 import org.metricshub.ipmi.core.coding.commands.sdr.record.ReadingType;
 import org.metricshub.ipmi.core.coding.commands.sdr.record.SensorType;
+import org.metricshub.ipmi.core.coding.commands.session.SetSessionPrivilegeLevel;
 import org.metricshub.ipmi.core.coding.commands.sdr.record.SensorUnit;
 import org.metricshub.ipmi.core.coding.commands.sel.EventDirection;
 import org.metricshub.ipmi.core.coding.commands.sel.SelRecordType;
@@ -1286,6 +1288,30 @@ class IpmiClientTest {
 
 	@Test
 	@Timeout(30)
+	void aMaximumAvailableClientRaisesItsSessionForTheSolConsole() throws Exception {
+		try (FakeRmcpPlusBmc bmc = bmc()) {
+			bmc.enableSol(bmc.getPort(), 255, ADMINISTRATOR);
+			try (IpmiClient client = client(bmc).privilege(PrivilegeLevel.MaximumAvailable).build()) {
+				try (SolConsole console = client.sol().open()) {
+					assertEquals(ADMINISTRATOR, bmc.getPrivilege());
+					assertEquals(
+							3,
+							bmc.getCount(NETFN_APP, SET_SESSION_PRIVILEGE_LEVEL),
+							"User, then Operator and Administrator by the console");
+				}
+				client.chassisControl(PowerCommand.PowerDown);
+				assertEquals(
+						3,
+						bmc.getCount(NETFN_APP, SET_SESSION_PRIVILEGE_LEVEL),
+						"the client knows the level the console reached: no raise");
+				assertFalse(bmc.isPowerOn());
+			}
+			assertEquals(Collections.emptyList(), bmc.getErrors());
+		}
+	}
+
+	@Test
+	@Timeout(30)
 	void aSolConsoleEndsWhenItsSessionIsDropped() throws Exception {
 		try (FakeRmcpPlusBmc bmc = bmc()) {
 			bmc.enableSol(bmc.getPort(), 255, ADMINISTRATOR);
@@ -1568,7 +1594,7 @@ class IpmiClientTest {
 			try (IpmiClient client = client(bmc).privilege(PrivilegeLevel.Operator).build()) {
 				IpmiClientException busy = assertThrows(IpmiClientException.class, client::chassisStatus);
 				assertEquals(IpmiClientException.class, busy.getClass());
-				assertTrue(busy.getMessage().contains("could not raise the session"), busy.getMessage());
+				assertTrue(busy.getMessage().contains("could not set the session"), busy.getMessage());
 				assertTrue(busy.getMessage().contains("(completion code C0h)"), busy.getMessage());
 				assertEquals(2, bmc.getCount(NETFN_APP, SET_SESSION_PRIVILEGE_LEVEL), "busy is sent again");
 			}
@@ -1659,13 +1685,29 @@ class IpmiClientTest {
 				assertEquals(3, bmc.getCount(NETFN_APP, SET_SESSION_PRIVILEGE_LEVEL));
 				assertEquals(2, bmc.getCount(NETFN_APP, SEND_MESSAGE), "refused at Operator, sent again at Administrator");
 
+				// A Set Session Privilege Level the caller sends itself is tracked: User again, raised on the next D4h
+				client.send(new SetSessionPrivilegeLevel(PrivilegeLevel.User));
+				assertEquals(FakeRmcpPlusBmc.USER, bmc.getPrivilege());
+				client.chassisControl(PowerCommand.PowerDown);
+				assertEquals(
+						FakeRmcpPlusBmc.OPERATOR,
+						bmc.getPrivilege(),
+						"raised from User, not from the level reached before");
+				assertEquals(5, bmc.getCount(NETFN_APP, SET_SESSION_PRIVILEGE_LEVEL));
+				// A raw one too, whose reply gives the new level
+				assertEquals(CompletionCode.Ok, client.raw(0x06, 0x3b).data(0x04).execute().completionCode());
+				assertEquals(ADMINISTRATOR, bmc.getPrivilege());
+				client.sensors().execute();
+				assertEquals(6, bmc.getCount(NETFN_APP, SET_SESSION_PRIVILEGE_LEVEL), "at Administrator already: no raise");
+				assertEquals(3, bmc.getCount(NETFN_APP, SEND_MESSAGE));
+
 				// Nothing above Administrator: the D4h reaches the caller
 				bmc.handle(NETFN_CHASSIS, CHASSIS_IDENTIFY, data -> new byte[] { (byte) 0xd4 });
 				IpmiCompletionCodeException refused = assertThrows(
 						IpmiCompletionCodeException.class,
 						() -> client.chassisIdentify(5));
 				assertEquals(CompletionCode.InsufficentPrivilege, refused.completionCode());
-				assertEquals(3, bmc.getCount(NETFN_APP, SET_SESSION_PRIVILEGE_LEVEL));
+				assertEquals(6, bmc.getCount(NETFN_APP, SET_SESSION_PRIVILEGE_LEVEL));
 				assertEquals(1, bmc.getCount(NETFN_CHASSIS, CHASSIS_IDENTIFY), "not sent again");
 				assertEquals(1, bmc.getCount(OPEN_SESSION_REQUEST), "one session throughout");
 			}
@@ -1711,6 +1753,30 @@ class IpmiClientTest {
 				}
 				assertEquals(2, bmc.getCount(NETFN_APP, SET_SESSION_PRIVILEGE_LEVEL), "User, then one refused raise");
 				assertEquals(3, bmc.getCount(NETFN_CHASSIS, GET_CHASSIS_STATUS));
+			}
+			assertEquals(Collections.emptyList(), bmc.getErrors());
+		}
+		try (FakeRmcpPlusBmc bmc = bmc()) {
+			// A busy BMC (C0h) fails the raise, thrown as such, and the raise is tried again at the next D4h: no ceiling
+			AtomicBoolean busy = new AtomicBoolean(true);
+			bmc
+					.handle(NETFN_APP, SET_SESSION_PRIVILEGE_LEVEL, data -> busy.get() ? new byte[]
+					{ (byte) 0xc0 } : bmc.setSessionPrivilegeLevel(data));
+			try (IpmiClient client = client(bmc).privilege(PrivilegeLevel.MaximumAvailable).build()) {
+				IpmiClientException failed = assertThrows(IpmiClientException.class, client::chassisStatus);
+				assertTrue(failed.getMessage().contains("could not set the session"), failed.getMessage());
+				busy.set(false);
+				assertTrue(client.chassisStatus().powerOn(), "logged in on the next operation");
+				busy.set(true);
+				IpmiCompletionCodeException refused = assertThrows(
+						IpmiCompletionCodeException.class,
+						() -> client.chassisControl(PowerCommand.PowerDown));
+				assertEquals(CompletionCode.NodeBusy, refused.completionCode(), "the failure of the raise, not the D4h");
+				assertTrue(bmc.isPowerOn());
+				busy.set(false);
+				client.chassisControl(PowerCommand.PowerDown);
+				assertFalse(bmc.isPowerOn(), "raised at the next D4h");
+				assertEquals(FakeRmcpPlusBmc.OPERATOR, bmc.getPrivilege());
 			}
 			assertEquals(Collections.emptyList(), bmc.getErrors());
 		}

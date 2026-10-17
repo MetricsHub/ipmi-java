@@ -106,7 +106,7 @@ session that Lenovo IMM, Supermicro and Fujitsu iRMC BMCs will not set to any le
 session is set to **User** right after the handshake (some BMCs start it at the requested
 maximum instead), and raised only when the BMC refuses a command for insufficient privilege
 (`D4h`): with Set Session Privilege Level to Operator, then to Administrator, and the refused
-command, which the BMC did not carry out, is sent again. A level the BMC refuses (`80h`, the level is not available for this user, or
+command, which the BMC did not carry out, is sent again. `sol().open()` raises the session the same way when the BMC refuses to activate the payload at its level. A level the BMC refuses (`80h`, the level is not available for this user, or
 `81h`, it exceeds the limit of the channel or of the user) is the ceiling of the session,
 remembered for its lifetime, and the `D4h` reaches the caller as it does at a fixed level
 (`IpmiCompletionCodeException`, or the `problem()` of a sensor).
