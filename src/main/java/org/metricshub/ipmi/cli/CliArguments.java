@@ -548,8 +548,10 @@ final class CliArguments implements AutoCloseable {
 			return PrivilegeLevel.Operator;
 		case "administrator":
 			return PrivilegeLevel.Administrator;
+		case "auto":
+			return PrivilegeLevel.MaximumAvailable;
 		default:
-			throw new CliUsageException(option + " must be user, operator or administrator");
+			throw new CliUsageException(option + " must be user, operator, administrator or auto");
 		}
 	}
 

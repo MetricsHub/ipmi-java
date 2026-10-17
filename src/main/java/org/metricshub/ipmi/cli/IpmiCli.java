@@ -202,19 +202,25 @@ public final class IpmiCli {
 
 	/**
 	 * Reports an error completion code: exit code 77 for {@code D4h}, with the {@code -L} to use above the privilege of
-	 * the session, or none at the Administrator level, where the BMC restricts the command; 70 for the others.
+	 * the session, or none at the Administrator level, where the BMC restricts the command, or at {@code -L auto}, where
+	 * the account has not the level; 70 for the others.
 	 */
 	private static int completionCodeFailure(IpmiCompletionCodeException e, PrintStream err, PrivilegeLevel privilege) {
 		String message = e.getMessage();
 		if (e.completionCode() == CompletionCode.InsufficentPrivilege) {
 			// The message of the library ends with a hint for Java callers: replace it with the CLI's
 			int hint = message.indexOf(". The command requires");
-			diagnostic(
-					err,
-					(hint > 0 ? message.substring(0, hint) : message) + (privilege == PrivilegeLevel.Administrator ?
-							": the BMC refuses the command even at the Administrator level (it restricts or disables it)" :
-							": the session has not the privilege the command needs, use "
-									+ (privilege == PrivilegeLevel.Operator ? "" : "-L operator or ") + "-L administrator"));
+			String reason;
+			if (privilege == PrivilegeLevel.Administrator) {
+				reason = ": the BMC refuses the command even at the Administrator level (it restricts or disables it)";
+			} else if (privilege == PrivilegeLevel.MaximumAvailable) {
+				reason = ": the BMC refuses the command at the highest level of the account (the account has not the level"
+						+ " the command needs, or the BMC restricts or disables the command)";
+			} else {
+				reason = ": the session has not the privilege the command needs, use "
+						+ (privilege == PrivilegeLevel.Operator ? "" : "-L operator or ") + "-L administrator";
+			}
+			diagnostic(err, (hint > 0 ? message.substring(0, hint) : message) + reason);
 			return EXIT_AUTHENTICATION;
 		}
 		diagnostic(err, message);
@@ -1379,7 +1385,8 @@ public final class IpmiCli {
 				+ "  -k, --bmc-key <hex>           BMC key (Kg) of a two-key login, in hexadecimal (at most 20 bytes)\n"
 				+ "  -kf, --bmc-key-file <file>    Read the hexadecimal BMC key from a file\n"
 				+ "  -P, --port <port>             UDP port of the BMC (default: 623)\n"
-				+ "  -L, --privilege <level>       user, operator or administrator (default: the lowest the subcommand needs)\n"
+				+ "  -L, --privilege <level>       user, operator, administrator or auto (default: the lowest the subcommand\n"
+				+ "                                needs); auto runs at user and raises the session when a command needs more\n"
 				+ "  -C, --cipher-suite <id>[,..]  One ID: use exactly this suite; several: preference order"
 				+ " (default: 17,3,8,16,2,7)\n"
 				+ "  -t, --timeout <ms>            Deadline of the subcommand (default: 120000); for sol, of its setup\n"

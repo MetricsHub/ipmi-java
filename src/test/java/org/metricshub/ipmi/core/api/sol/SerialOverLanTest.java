@@ -746,11 +746,12 @@ class SerialOverLanTest {
 				connector.closeSession(session.getConnectionHandle());
 				awaitClose(bmc);
 
-				// A session opened with MaximumAvailable still runs at User: the console raises it after the D4h
+				// A session opened with MaximumAvailable is set to User by openSession(): the console raises it after
+				// the D4h
 				Session unraised = openSession(connector, bmc, null, PrivilegeLevel.MaximumAvailable);
-				assertEquals(1, bmc.getCount(NETFN_APP, SET_SESSION_PRIVILEGE_LEVEL));
+				assertEquals(2, bmc.getCount(NETFN_APP, SET_SESSION_PRIVILEGE_LEVEL), "set to User");
 				new SerialOverLan(connector, unraised).close();
-				assertEquals(2, bmc.getCount(NETFN_APP, SET_SESSION_PRIVILEGE_LEVEL));
+				assertEquals(3, bmc.getCount(NETFN_APP, SET_SESSION_PRIVILEGE_LEVEL), "raised by the console");
 				assertEquals(3, bmc.getCount(NETFN_APP, FakeRmcpPlusBmc.ACTIVATE_PAYLOAD));
 				assertEquals(Collections.emptyList(), bmc.getErrors());
 			} finally {

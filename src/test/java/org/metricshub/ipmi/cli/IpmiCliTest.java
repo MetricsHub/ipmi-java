@@ -266,6 +266,17 @@ class IpmiCliTest {
 			assertTrue(user.err.contains("use -L operator or -L administrator"), user.err);
 			assertEquals("off\n", login(bmc, "power", "status").out, "the refused command did nothing");
 
+			// -L auto: User, raised to Operator on the D4h; the ceiling of the account has its own hint
+			assertEquals(0, login(bmc, "-L", "auto", "power", "on").code);
+			assertEquals("on\n", login(bmc, "power", "status").out);
+			bmc.privilegeLimit(FakeRmcpPlusBmc.USER);
+			Result capped = login(bmc, "-L", "auto", "power", "off");
+			assertEquals(IpmiCli.EXIT_AUTHENTICATION, capped.code, "D4h at the highest level of the account");
+			assertTrue(capped.err.contains("at the highest level of the account"), capped.err);
+			assertFalse(capped.err.contains("-L operator"), capped.err);
+			assertEquals("on\n", login(bmc, "power", "status").out, "the refused command did nothing");
+			bmc.privilegeLimit(ADMINISTRATOR);
+
 			assertEquals(0, login(bmc, "identify").code);
 			assertArrayEquals(new byte[] { 15 }, bmc.getChassisIdentify(), "the default interval of the specification");
 			assertEquals(0, login(bmc, "identify", "5").code);

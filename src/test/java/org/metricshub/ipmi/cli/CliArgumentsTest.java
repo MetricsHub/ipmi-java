@@ -257,7 +257,7 @@ class CliArgumentsTest {
 		assertEquals("--port must be a number", usageError("--port", "six"));
 		assertEquals("-t must be between 1 and 2147483647", usageError("-t", "0"));
 		assertEquals("--retries must be between 0 and 2147483647", usageError("--retries", "-1"));
-		assertEquals("-L must be user, operator or administrator", usageError("-L", "ADMIN"));
+		assertEquals("-L must be user, operator, administrator or auto", usageError("-L", "ADMIN"));
 		assertEquals("-C must be between 0 and 19", usageError("-C", "17,20"));
 		assertEquals("-C must be a number", usageError("-C", ""));
 		assertEquals("-C must be a number", usageError("-C", "17,"));

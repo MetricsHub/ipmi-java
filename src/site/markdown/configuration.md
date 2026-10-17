@@ -91,9 +91,32 @@ operation with `IpmiAuthenticationException`.
 | `User` (default) | Every read operation: `chassisStatus()`, `sensors()`, `frus()`, `sel()`, but for the sensors of other controllers than the BMC on most BMCs |
 | `Operator` | The control operations: `chassisControl()`, `chassisIdentify()`, `chassisIdentifyForever()`; the sensors of other controllers than the BMC, which the BMC reaches with Send Message ([Sensor owners](sensors.html#sensor-owners)), Administrator on some BMCs |
 | `Administrator` | Serial over LAN on most BMCs, the configuration commands |
+| `MaximumAvailable` | Everything the account is allowed: the session runs at User and is raised on demand (below) |
 
 The account must be allowed that level on the LAN channel
 ([Preparing the BMC](preparing-the-bmc.html#creating-the-account)).
+
+#### Raising the session on demand
+
+`privilege(PrivilegeLevel.MaximumAvailable)` requests the highest level the account is allowed:
+Administrator at Open Session and RAKP Message 1, then Operator and User when the BMC refuses
+the role to the account (the role `0h` of the specification, "highest level matching the
+proposed algorithms", is refused by HPE iLO 5, Dell iDRAC and Cisco IMC BMCs, and leaves a
+session that Lenovo IMM, Supermicro and Fujitsu iRMC BMCs will not set to any level). The
+session is set to **User** right after the handshake (some BMCs start it at the requested
+maximum instead), and raised only when the BMC refuses a command for insufficient privilege
+(`D4h`): with Set Session Privilege Level to Operator, then to Administrator, and the refused
+command, which the BMC did not carry out, is sent again. A level the BMC refuses (`80h`, the level is not available for this user, or
+`81h`, it exceeds the limit of the channel or of the user) is the ceiling of the session,
+remembered for its lifetime, and the `D4h` reaches the caller as it does at a fixed level
+(`IpmiCompletionCodeException`, or the `problem()` of a sensor).
+
+This is the mode for a monitoring account on a fleet of BMCs that differ: `sensors()` reads the
+sensors of other controllers than the BMC ([Sensor owners](sensors.html#sensor-owners)) at the
+User level on an HPE iLO 5, after one raise to Operator on most BMCs, and after a second raise to
+Administrator on an AMI-based BMC, each with the same client and without running the whole
+session at the highest level of the account. A session the BMC revoked answers `D4h` to every
+command, Set Session Privilege Level included: the raise is then refused once and not asked again.
 
 ### Cipher suites
 

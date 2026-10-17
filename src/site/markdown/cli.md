@@ -91,7 +91,7 @@ either option can be repeated or given a comma-separated list.
 | `-k, --bmc-key <hex>` | BMC key (Kg) of a two-key login, in hexadecimal (`0x` optional), at most 20 bytes. |
 | `-kf, --bmc-key-file <file>` | Read the hexadecimal BMC key from a file. |
 | `-P, --port <port>` | UDP port of the BMC. Default: 623. |
-| `-L, --privilege <level>` | `user`, `operator` or `administrator` (case-insensitive). Default: the lowest level the subcommand needs (see [below](#default-privilege-per-subcommand)). |
+| `-L, --privilege <level>` | `user`, `operator`, `administrator` or `auto` (case-insensitive). Default: the lowest level the subcommand needs (see [below](#default-privilege-per-subcommand)). |
 | `-C, --cipher-suite <id>[,<id>...]` | One ID: use exactly this cipher suite, without discovery. Several: the preference order among the suites the BMC offers. Default: `17,3,8,16,2,7`. Suites without integrity (0, 1, 6, 15) are refused: their replies could be forged. |
 | `-t, --timeout <ms>` | Deadline of the subcommand, in milliseconds. Default: 120000. For `sol`, it bounds the session setup and the payload activation only. |
 | `--message-timeout <ms>` | Per-message timeout. Default: 5000. |
@@ -119,9 +119,16 @@ for the **least** privilege that works (unlike
 | `power on`, `off`, `cycle`, `reset`, `soft`, `diag`, `identify` | `operator` |
 | `sol`, `raw` | `administrator` |
 
+`-L auto` requests the highest level the account is allowed, runs the session at `user` and
+raises it only when the BMC refuses a command for insufficient privilege (`D4h`), to `operator`
+then `administrator`, as far as the account allows
+([Raising the session on demand](configuration.html#raising-the-session-on-demand)): the same
+command line works on BMCs that need different levels for the same command, and a read-only
+account still logs in.
+
 `sensors` at the `user` level prints the sensors of other controllers than the BMC (power supplies,
 fans, RAID adapter behind an HPE iLO, for instance) without reading on the BMCs that serve them at
-a higher level, with the `D4h` problem in `--long` and `--json`: give `-L operator`, or
+a higher level, with the `D4h` problem in `--long` and `--json`: give `-L auto`, `-L operator`, or
 `-L administrator` on some BMCs ([Sensor owners](sensors.html#sensor-owners)).
 
 A BMC that refuses a command at the session's level answers `D4h`: the CLI exits with 77 and says

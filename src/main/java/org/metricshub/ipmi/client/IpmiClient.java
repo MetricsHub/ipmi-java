@@ -1024,6 +1024,12 @@ public final class IpmiClient implements AutoCloseable {
 		private final Session session;
 		private final String host;
 		private final int tries;
+		/** Raises the session on a D4h: the builder asked for {@link PrivilegeLevel#MaximumAvailable}. */
+		private final boolean onDemand;
+		/** The level the session runs at when raised on demand: User right after the handshake. */
+		private PrivilegeLevel level = PrivilegeLevel.User;
+		/** The highest level the BMC lets the session be raised to: Administrator until it refuses one. */
+		private PrivilegeLevel ceiling = PrivilegeLevel.Administrator;
 		private boolean lost;
 
 		private Link(IpmiConnector connector, ConnectionHandle handle, Session session, String host, int tries) {
@@ -1032,13 +1038,15 @@ public final class IpmiClient implements AutoCloseable {
 			this.session = session;
 			this.host = host;
 			this.tries = tries;
+			this.onDemand = handle.getPrivilegeLevel() == PrivilegeLevel.MaximumAvailable;
 		}
 
 		/**
 		 * Opens the session: cipher suite discovery unless the builder fixed the suite, Get Channel Authentication
 		 * Capabilities, then {@link IpmiConnector#openSession(ConnectionHandle, String, byte[], byte[])}: Open Session,
-		 * RAKP 1 to 4 and, when the builder asked for more than User, Set Session Privilege Level (IPMI 2.0 section
-		 * 22.18: every session starts at User).
+		 * RAKP 1 to 4 and Set Session Privilege Level, to the level the builder asked for when that is more than User
+		 * (IPMI 2.0 section 22.18: every session starts at User), to User for {@link PrivilegeLevel#MaximumAvailable}
+		 * (some BMCs start the session at the requested maximum instead).
 		 */
 		static Link open(IpmiClient client, IpmiConnector connector, InetAddress address) {
 			ConnectionHandle handle = null;
@@ -1086,7 +1094,54 @@ public final class IpmiClient implements AutoCloseable {
 			return exchange(command, true);
 		}
 
+		/**
+		 * Exchanges the command, and again at a higher privilege when the BMC refuses it for insufficient privilege
+		 * (D4h) and the session is raised on demand: the BMC did not carry a refused command out, so even a command sent
+		 * once is safely sent again. A raw request returns its D4h instead of throwing it, and is raised the same way.
+		 */
 		private <R extends ResponseData> R exchange(IpmiCommandCoder<R> command, boolean once) {
+			while (true) {
+				try {
+					R response = attempt(command, once);
+					if (response instanceof RawResponse
+							&& ((RawResponse) response).completionCode() == CompletionCode.InsufficentPrivilege
+							&& raise()) {
+						continue;
+					}
+					return response;
+				} catch (IpmiCompletionCodeException e) {
+					if (e.completionCode() != CompletionCode.InsufficentPrivilege || !raise()) {
+						throw e;
+					}
+				}
+			}
+		}
+
+		/**
+		 * Raises a session raised on demand to the next level, Operator then Administrator, and tells whether it was:
+		 * not when the session runs at a fixed level, at Administrator, or at the ceiling the BMC set. A refusal of the
+		 * level is the ceiling: 80h or 81h when the account or the channel stops there (IPMI 2.0 table 22-24), but also
+		 * any other code, as a session the BMC revoked answers D4h to everything, Set Session Privilege Level included,
+		 * and must not be asked again at every command.
+		 */
+		private boolean raise() {
+			PrivilegeLevel next = level == PrivilegeLevel.User ?
+					PrivilegeLevel.Operator :
+					level == PrivilegeLevel.Operator ? PrivilegeLevel.Administrator : null;
+			if (!onDemand || next == null || next.compareTo(ceiling) > 0) {
+				return false;
+			}
+			try {
+				attempt(new SetSessionPrivilegeLevel(next), false);
+			} catch (IpmiCompletionCodeException e) {
+				ceiling = level;
+				return false;
+			}
+			level = next;
+			return true;
+		}
+
+		private <R extends ResponseData> R attempt(IpmiCommandCoder<R> command, boolean once) {
 			String name = command.getClass().getSimpleName();
 			try {
 				return once ? connector.sendMessage(handle, command, 0) : connector.sendMessage(handle, command);
@@ -1201,19 +1256,26 @@ public final class IpmiClient implements AutoCloseable {
 		 * Privilege Level right after the handshake (every session starts at User, IPMI 2.0 section 22.18). User by
 		 * default, enough for every read operation; Operator for the power control; Administrator for Serial over
 		 * LAN on most BMCs.
+		 * <p>
+		 * {@code MaximumAvailable} requests the highest level the account is allowed, then runs the session at User and
+		 * raises it only when the BMC refuses a command for insufficient privilege ({@code D4h}): to Operator, then to
+		 * Administrator, and the refused command, which the BMC did not carry out, is sent again. A level the BMC refuses
+		 * ({@code 80h}, {@code 81h}) is the ceiling of the session, remembered for its lifetime, and the {@code D4h}
+		 * reaches the caller as it does at a fixed level. The sensors of other controllers than the BMC, which some BMCs
+		 * serve at the Operator or Administrator level only, are then read with any account that has the level, without
+		 * running the whole session at it.
 		 *
-		 * @param level the privilege level: User, Operator or Administrator ({@code MaximumAvailable} is refused, as
-		 *        the session could not be raised to it, and {@code Callback}, at which no operation works)
+		 * @param level the privilege level: User, Operator, Administrator or MaximumAvailable ({@code Callback}, at
+		 *        which no operation works, is refused)
 		 * @return this builder
-		 * @throws IllegalArgumentException for {@code MaximumAvailable} and {@code Callback}
+		 * @throws IllegalArgumentException for {@code Callback}
 		 */
 		public Builder privilege(PrivilegeLevel level) {
 			Objects.requireNonNull(level, "level");
-			if (level != PrivilegeLevel.User && level != PrivilegeLevel.Operator && level != PrivilegeLevel.Administrator) {
-				// MaximumAvailable: Set Session Privilege Level needs a level, and the highest one the user has is not
-				// known here. Callback: no command of the client works at that level
+			if (level == PrivilegeLevel.Callback) {
+				// No command of the client works at that level
 				throw new IllegalArgumentException(
-						"Choose the privilege level of the session: User, Operator or Administrator");
+						"Choose the privilege level of the session: User, Operator, Administrator or MaximumAvailable");
 			}
 			this.privilege = level;
 			return this;

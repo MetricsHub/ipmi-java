@@ -3,6 +3,7 @@ package org.metricshub.ipmi.client;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -1426,8 +1427,8 @@ class IpmiClientTest {
 		assertThrows(IllegalArgumentException.class, () -> builder.retries(-1));
 		assertThrows(NullPointerException.class, () -> builder.credentials(null, new char[0]));
 		assertThrows(NullPointerException.class, () -> builder.privilege(null));
-		assertThrows(IllegalArgumentException.class, () -> builder.privilege(PrivilegeLevel.MaximumAvailable));
 		assertThrows(IllegalArgumentException.class, () -> builder.privilege(PrivilegeLevel.Callback));
+		assertSame(builder, builder.privilege(PrivilegeLevel.MaximumAvailable), "raised on demand");
 		assertThrows(IllegalArgumentException.class, () -> builder.keepAlive(Duration.ofNanos(1)));
 		assertThrows(
 				IllegalArgumentException.class,
@@ -1611,6 +1612,105 @@ class IpmiClientTest {
 				assertEquals(1, bmc.getCount(OPEN_SESSION_REQUEST), "not replayed");
 				assertEquals(1, bmc.getCount(NETFN_APP, SET_SESSION_PRIVILEGE_LEVEL), "the refusal is not sent again");
 				awaitClose(bmc);
+			}
+			assertEquals(Collections.emptyList(), bmc.getErrors());
+		}
+	}
+
+	@Test
+	@Timeout(30)
+	void maximumAvailableRunsAtUserAndRaisesTheSessionOnDemand() throws Exception {
+		try (FakeRmcpPlusBmc bmc = bmc()) {
+			// A BMC that starts the session at the requested maximum, and forwards Send Message at Administrator only
+			bmc.startsAtMaximum(true);
+			bmc.sendMessagePrivilege(ADMINISTRATOR);
+			byte[] sensor = compactSensorRecord(
+					1,
+					7,
+					EntityId.Processor.getCode(),
+					1,
+					SensorType.Processor.getCode(),
+					0x6f,
+					"S");
+			new FakeSdrRepository().add(withOwner(sensor, 0x2c, 6, 0)).install(bmc);
+			bmc.satellite(6, 0x2c, NETFN_SENSOR, GET_SENSOR_READING, data -> new byte[] { 0x00, 0x30, 0x40, 0x00 });
+			try (IpmiClient client = client(bmc).privilege(PrivilegeLevel.MaximumAvailable).build()) {
+				assertTrue(client.chassisStatus().powerOn());
+				assertEquals(FakeRmcpPlusBmc.USER, bmc.getPrivilege(), "set to User right after the handshake");
+				assertEquals(1, bmc.getCount(NETFN_APP, SET_SESSION_PRIVILEGE_LEVEL));
+
+				// Chassis Control sent raw: its D4h is returned, not thrown, and raises the session all the same
+				RawResponse raw = client.raw(0x00, 0x02).data(0x00).execute();
+				assertEquals(CompletionCode.Ok, raw.completionCode(), "refused at User, sent again at Operator");
+				assertEquals(0, bmc.getChassisControl());
+				assertEquals(FakeRmcpPlusBmc.OPERATOR, bmc.getPrivilege());
+				assertEquals(2, bmc.getCount(NETFN_APP, SET_SESSION_PRIVILEGE_LEVEL));
+				assertEquals(2, bmc.getCount(NETFN_CHASSIS, CHASSIS_CONTROL));
+
+				client.chassisControl(PowerCommand.PowerUp);
+				assertEquals(1, bmc.getChassisControl());
+				assertEquals(3, bmc.getCount(NETFN_CHASSIS, CHASSIS_CONTROL), "no D4h at Operator: sent once");
+				assertEquals(2, bmc.getCount(NETFN_APP, SET_SESSION_PRIVILEGE_LEVEL));
+
+				SensorList sensors = client.sensors().execute();
+				assertEquals(0x30, sensors.get(0).rawReading().getAsInt(), "read from its controller at Administrator");
+				assertFalse(sensors.get(0).problem().isPresent(), sensors.get(0).problem().toString());
+				assertEquals(ADMINISTRATOR, bmc.getPrivilege());
+				assertEquals(3, bmc.getCount(NETFN_APP, SET_SESSION_PRIVILEGE_LEVEL));
+				assertEquals(2, bmc.getCount(NETFN_APP, SEND_MESSAGE), "refused at Operator, sent again at Administrator");
+
+				// Nothing above Administrator: the D4h reaches the caller
+				bmc.handle(NETFN_CHASSIS, CHASSIS_IDENTIFY, data -> new byte[] { (byte) 0xd4 });
+				IpmiCompletionCodeException refused = assertThrows(
+						IpmiCompletionCodeException.class,
+						() -> client.chassisIdentify(5));
+				assertEquals(CompletionCode.InsufficentPrivilege, refused.completionCode());
+				assertEquals(3, bmc.getCount(NETFN_APP, SET_SESSION_PRIVILEGE_LEVEL));
+				assertEquals(1, bmc.getCount(NETFN_CHASSIS, CHASSIS_IDENTIFY), "not sent again");
+				assertEquals(1, bmc.getCount(OPEN_SESSION_REQUEST), "one session throughout");
+			}
+			awaitClose(bmc);
+			assertEquals(Collections.emptyList(), bmc.getErrors());
+		}
+	}
+
+	@Test
+	@Timeout(30)
+	void theLevelTheBmcRefusesIsTheCeilingOfTheSession() throws Exception {
+		try (FakeRmcpPlusBmc bmc = bmc()) {
+			bmc.privilegeLimit(FakeRmcpPlusBmc.USER);
+			try (IpmiClient client = client(bmc).privilege(PrivilegeLevel.MaximumAvailable).build()) {
+				IpmiCompletionCodeException refused = assertThrows(
+						IpmiCompletionCodeException.class,
+						() -> client.chassisControl(PowerCommand.PowerDown));
+				assertEquals(
+						CompletionCode.InsufficentPrivilege,
+						refused.completionCode(),
+						"the D4h, not the 81h of the raise");
+				assertEquals(3, bmc.getCount(FakeRmcpPlusBmc.RAKP_1), "logged in at User after two refused roles");
+				assertEquals(2, bmc.getCount(NETFN_APP, SET_SESSION_PRIVILEGE_LEVEL), "User, then Operator refused (81h)");
+				assertEquals(1, bmc.getCount(NETFN_CHASSIS, CHASSIS_CONTROL), "not sent again");
+				assertTrue(bmc.isPowerOn());
+
+				assertThrows(IpmiCompletionCodeException.class, () -> client.chassisIdentify(5));
+				assertEquals(2, bmc.getCount(NETFN_APP, SET_SESSION_PRIVILEGE_LEVEL), "the ceiling is remembered");
+				assertEquals(FakeRmcpPlusBmc.USER, bmc.getPrivilege());
+			}
+			awaitClose(bmc);
+			assertEquals(Collections.emptyList(), bmc.getErrors());
+		}
+		try (FakeRmcpPlusBmc bmc = bmc()) {
+			// A session the BMC revoked answers D4h to everything, Set Session Privilege Level included: asked once
+			try (IpmiClient client = client(bmc).privilege(PrivilegeLevel.MaximumAvailable).build()) {
+				assertTrue(client.chassisStatus().powerOn());
+				bmc.handle(NETFN_APP, SET_SESSION_PRIVILEGE_LEVEL, data -> new byte[] { (byte) 0xd4 });
+				bmc.handle(NETFN_CHASSIS, GET_CHASSIS_STATUS, data -> new byte[] { (byte) 0xd4 });
+				for (int i = 0; i < 2; i++) {
+					IpmiCompletionCodeException refused = assertThrows(IpmiCompletionCodeException.class, client::chassisStatus);
+					assertEquals(CompletionCode.InsufficentPrivilege, refused.completionCode());
+				}
+				assertEquals(2, bmc.getCount(NETFN_APP, SET_SESSION_PRIVILEGE_LEVEL), "User, then one refused raise");
+				assertEquals(3, bmc.getCount(NETFN_CHASSIS, GET_CHASSIS_STATUS));
 			}
 			assertEquals(Collections.emptyList(), bmc.getErrors());
 		}

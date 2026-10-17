@@ -215,6 +215,12 @@ public class FakeRmcpPlusBmc implements AutoCloseable {
 	private volatile int requestLun;
 	private volatile Session session;
 	private volatile SocketAddress console;
+	/** The highest privilege of the account: what a RAKP Message 1 role of 0 (highest available) gets. */
+	private volatile int privilegeLimit = ADMINISTRATOR;
+	/** Starts the session at its maximum instead of User, as an IMM, iDRAC 6, iRMC, GIGABYTE or Supermicro does. */
+	private volatile boolean startsAtMaximum;
+	/** The privilege Send Message to another controller needs: User like an iLO 5 by default, Administrator on AMI. */
+	private volatile int sendMessagePrivilege = USER;
 
 	private volatile boolean powerOn = true;
 	/** The chassis control of the last Chassis Control the BMC accepted, -1 before the first. */
@@ -404,6 +410,43 @@ public class FakeRmcpPlusBmc implements AutoCloseable {
 	 */
 	public void bridgeReply(BridgeReply reply) {
 		bridgeReply = reply;
+	}
+
+	/**
+	 * Sets the highest privilege of the account, {@link #ADMINISTRATOR} by default: a RAKP Message 1 role of 0 gets
+	 * it, and Set Session Privilege Level above it is refused with {@code 81h}.
+	 *
+	 * @param limit the privilege level
+	 */
+	public void privilegeLimit(int limit) {
+		privilegeLimit = limit;
+	}
+
+	/**
+	 * Starts every session at the maximum requested in RAKP Message 1 instead of User, as an IMM, an iDRAC 6, an iRMC,
+	 * a GIGABYTE or a Supermicro BMC does (against IPMI 2.0 section 22.18).
+	 *
+	 * @param enabled whether the session starts at its maximum
+	 */
+	public void startsAtMaximum(boolean enabled) {
+		startsAtMaximum = enabled;
+	}
+
+	/**
+	 * Sets the privilege Send Message to another controller needs; {@link #USER} by default, like an HPE iLO 5, where
+	 * an AMI-based BMC needs {@link #ADMINISTRATOR}.
+	 *
+	 * @param privilege the privilege level
+	 */
+	public void sendMessagePrivilege(int privilege) {
+		sendMessagePrivilege = privilege;
+	}
+
+	/**
+	 * @return the privilege level of the current session, as the BMC holds it
+	 */
+	public int getPrivilege() {
+		return session.privilege;
 	}
 
 	/**
@@ -806,7 +849,14 @@ public class FakeRmcpPlusBmc implements AutoCloseable {
 		}
 		current.rm = Arrays.copyOfRange(request, 8, 24);
 		// RoleM: the maximum privilege requested, 0 for the highest one the user has
-		current.maxPrivilege = (request[24] & 0x0f) == 0 ? ADMINISTRATOR : request[24] & 0x0f;
+		int role = request[24] & 0x0f;
+		if (role > privilegeLimit) {
+			return out.put((byte) 0x0a).putShort((short) 0).putInt(current.consoleId).array(); // unauthorized role
+		}
+		current.maxPrivilege = role == 0 ? privilegeLimit : role;
+		if (startsAtMaximum) {
+			current.privilege = current.maxPrivilege;
+		}
 		current.rc = new byte[16];
 		random.nextBytes(current.rc);
 		current.identity = concat(new byte[] { request[24], request[27] }, name);
@@ -1235,6 +1285,9 @@ public class FakeRmcpPlusBmc implements AutoCloseable {
 				|| checksum(request, 3, request.length) != 0) {
 			errors.add("Bad Send Message request: " + hex(data));
 			return new byte[] { (byte) 0xcc }; // invalid data field
+		}
+		if (session.privilege < sendMessagePrivilege) {
+			return new byte[] { (byte) 0xd4 }; // insufficient privilege
 		}
 		bridgedRequests.add(request);
 		int channel = data[0] & 0x0f;
