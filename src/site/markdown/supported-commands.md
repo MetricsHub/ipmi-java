@@ -73,12 +73,11 @@ client with [`send()`](low-level-api.html#sending-a-command-through-the-client),
 | Algorithm | Implemented |
 | --- | --- |
 | Authentication | RAKP-none, RAKP-HMAC-SHA1, RAKP-HMAC-MD5, RAKP-HMAC-SHA256 |
-| Integrity | none, HMAC-SHA1-96, HMAC-MD5-128, HMAC-SHA256-128 — **not** MD5-128 |
-| Confidentiality | none, AES-CBC-128 — **not** xRC4-128 or xRC4-40 |
+| Integrity | none, HMAC-SHA1-96, HMAC-MD5-128, MD5-128, HMAC-SHA256-128 |
+| Confidentiality | none, AES-CBC-128 — **not** xRC4-128 or xRC4-40, which the specification deprecates |
 
-Hence the cipher suites 0 to 3, 6 to 8, and 15 to 17; see the
-[full table](preparing-the-bmc.html#cipher-suites). MD5-128 and xRC4 are tracked in
-[#106](https://github.com/metricshub/ipmi-java/issues/106).
+Hence the cipher suites 0 to 3, 6 to 8, 11, 12, and 15 to 17; see the
+[full table](preparing-the-bmc.html#cipher-suites).
 
 ## SDR records
 

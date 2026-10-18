@@ -287,6 +287,9 @@ public class FakeRmcpPlusBmc implements AutoCloseable {
 		}
 	}
 
+	/** The authentication, integrity and confidentiality algorithms of the suites the BMC accepts: 3, 17 and 12. */
+	private static final int[][] SUITES = { { 1, 1, 1 }, { 3, 4, 1 }, { 2, 3, 1 } };
+
 	/**
 	 * State of the session being opened or open.
 	 */
@@ -294,9 +297,12 @@ public class FakeRmcpPlusBmc implements AutoCloseable {
 		private final int consoleId;
 		private final int managedId;
 		private final int[] algorithms;
-		/** HMAC of the authentication and integrity algorithms: HmacSHA1 for suite 3, HmacSHA256 for suite 17. */
+		/**
+		 * HMAC of the authentication algorithm (and of the integrity algorithm when it is an HMAC): HmacSHA1 for suite
+		 * 3, HmacSHA256 for suite 17, HmacMD5 for suite 12.
+		 */
 		private final String mac;
-		/** Length of the RAKP 4 Integrity Check Value and of the AuthCode: 12 for SHA1-96, 16 for SHA256-128. */
+		/** Length of the RAKP 4 Integrity Check Value and of the AuthCode: 12 for SHA1-96, 16 for the others. */
 		private final int macLength;
 		private byte[] rm;
 		private byte[] rc;
@@ -317,7 +323,7 @@ public class FakeRmcpPlusBmc implements AutoCloseable {
 			this.consoleId = consoleId;
 			this.managedId = managedId;
 			this.algorithms = algorithms;
-			mac = algorithms[0] == 1 ? "HmacSHA1" : "HmacSHA256";
+			mac = algorithms[0] == 1 ? "HmacSHA1" : algorithms[0] == 2 ? "HmacMD5" : "HmacSHA256";
 			macLength = algorithms[0] == 1 ? 12 : 16;
 		}
 	}
@@ -810,7 +816,7 @@ public class FakeRmcpPlusBmc implements AutoCloseable {
 		int[] algorithms = { request[12] & 0x3f, request[20] & 0x3f, request[28] & 0x3f };
 		ByteBuffer out = ByteBuffer.allocate(36).order(ByteOrder.LITTLE_ENDIAN);
 		out.put(request[0]);
-		if (!Arrays.equals(algorithms, new int[] { 1, 1, 1 }) && !Arrays.equals(algorithms, new int[] { 3, 4, 1 })) {
+		if (Arrays.stream(SUITES).noneMatch(suite -> Arrays.equals(suite, algorithms))) {
 			return out.put((byte) 0x11).putShort((short) 0).putInt(consoleId).array(); // no cipher suite match
 		}
 		Session opened = new Session(consoleId, random.nextInt(Integer.MAX_VALUE - 1) + 1, algorithms);
@@ -1217,10 +1223,18 @@ public class FakeRmcpPlusBmc implements AutoCloseable {
 
 	/**
 	 * @return the AuthCode of a packet: HMAC-K1 of AuthType/Format up to Next Header, truncated (IPMI 2.0 section
-	 *         13.28.4)
+	 *         13.28.4), or for MD5-128 (suite 12) the MD5 of the password around that range
 	 */
-	private static byte[] authCode(Session current, byte[] datagram, int end) throws GeneralSecurityException {
-		return Arrays.copyOf(hmac(current.mac, current.k1, Arrays.copyOfRange(datagram, 4, end)), current.macLength);
+	private byte[] authCode(Session current, byte[] datagram, int end) throws GeneralSecurityException {
+		byte[] range = Arrays.copyOfRange(datagram, 4, end);
+		if (current.algorithms[1] == 3) {
+			MessageDigest md5 = MessageDigest.getInstance("MD5");
+			md5.update(kuid);
+			md5.update(range);
+			md5.update(kuid);
+			return md5.digest();
+		}
+		return Arrays.copyOf(hmac(current.mac, current.k1, range), current.macLength);
 	}
 
 	/**

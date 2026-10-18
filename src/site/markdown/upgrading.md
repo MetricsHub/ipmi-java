@@ -7,6 +7,17 @@ description: What changes when upgrading the IPMI Java Client — from 2.0.00, f
 
 ## Upgrading from 2.0.00
 
+* The MD5-128 integrity algorithm (IPMI 2.0 section 13.28.4: a plain MD5 of the password around
+  each message) is implemented: cipher suites 11 and 12 open sessions, where 2.0.00 failed with
+  `IllegalArgumentException: Integrity algorithm MD5-128 is not yet implemented.`, and
+  `CipherSuite.isSupported()` is `true` for them. The default preference of the builder and of
+  `ipmicli -C` becomes `17, 3, 8, 16, 2, 7, 12, 11`: a BMC that offers one of the first six still
+  gets the same suite as before, and one that offers only MD5-128 suites with integrity now connects
+  instead of failing with *offers none of the cipher suites*. In the protocol core,
+  `CipherSuite.initializeAlgorithms(sik, password)` keys MD5-128 with the password; the one-argument
+  `initializeAlgorithms(sik)` still works for every other suite. The xRC4 suites (4, 5, 9, 10,
+  13, 14, 18, 19) stay unsupported, by decision: the specification deprecates xRC4 and no BMC
+  requires it; their exception now says `is not implemented.` rather than `is not yet implemented.`
 * `privilege(PrivilegeLevel.MaximumAvailable)` is accepted by the builder, which 2.0.00 refused:
   the session requests the highest level the account is allowed, runs at User, and is raised
   with Set Session Privilege Level only when the BMC refuses a command for insufficient

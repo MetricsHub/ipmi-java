@@ -157,9 +157,10 @@ public final class IpmiClient implements AutoCloseable {
 	 * The cipher suites the client may choose when the builder sets none, by order of preference (IPMI 2.0 table
 	 * 22-20): those that sign every message, and encrypt it when possible (17: RAKP-HMAC-SHA256, HMAC-SHA256-128,
 	 * AES-CBC-128; 3: RAKP-HMAC-SHA1, HMAC-SHA1-96, AES-CBC-128; 8: RAKP-HMAC-MD5, HMAC-MD5-128, AES-CBC-128; then
-	 * 16, 2 and 7, the same without encryption).
+	 * 16, 2 and 7, the same without encryption; last 12 and 11, whose MD5-128 integrity is a plain MD5 of the
+	 * password around the message, for the older BMCs that offer nothing better).
 	 */
-	private static final int[] DEFAULT_CIPHER_SUITES = { 17, 3, 8, 16, 2, 7 };
+	private static final int[] DEFAULT_CIPHER_SUITES = { 17, 3, 8, 16, 2, 7, 12, 11 };
 
 	/**
 	 * The suites without integrity (0, 1, 6, 15), which the builder refuses: the list of suites comes unauthenticated,
@@ -1350,7 +1351,7 @@ public final class IpmiClient implements AutoCloseable {
 
 		/**
 		 * Sets the cipher suites the client may use, by order of preference: the first one the BMC offers is used.
-		 * Default: 17, 3, 8, 16, 2, 7. The suites without integrity (0, 1, 6, 15) are refused.
+		 * Default: 17, 3, 8, 16, 2, 7, 12, 11. The suites without integrity (0, 1, 6, 15) are refused.
 		 *
 		 * @param ids the suite IDs (IPMI 2.0 table 22-20)
 		 * @return this builder

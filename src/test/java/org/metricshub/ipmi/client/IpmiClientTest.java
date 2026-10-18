@@ -1582,6 +1582,13 @@ class IpmiClientTest {
 			}
 			assertEquals(discoveries, bmc.getCount(NETFN_APP, GET_CHANNEL_CIPHER_SUITES), "no discovery with a fixed suite");
 			awaitClose(bmc);
+			// Suite 12: RAKP-HMAC-MD5, MD5-128 integrity (the password around the message, not an HMAC of the SIK)
+			try (IpmiClient client = client(bmc).cipherSuite(12).build()) {
+				assertTrue(client.chassisStatus().powerOn());
+				assertEquals(2, bmc.getAlgorithms()[0], "RAKP-HMAC-MD5: suite 12");
+				assertEquals(3, bmc.getAlgorithms()[1], "MD5-128: suite 12");
+			}
+			awaitClose(bmc);
 			assertEquals(Collections.emptyList(), bmc.getErrors());
 		}
 	}

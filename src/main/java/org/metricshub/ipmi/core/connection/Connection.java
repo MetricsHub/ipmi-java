@@ -580,7 +580,7 @@ public class Connection extends TimerTask implements MachineObserver {
 			throw new ConnectionException("Session Integrity Key is null");
 		}
 
-		cipherSuite.initializeAlgorithms(sik);
+		cipherSuite.initializeAlgorithms(sik, password);
 
 		lastAction = null;
 

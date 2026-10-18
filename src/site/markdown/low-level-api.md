@@ -262,7 +262,7 @@ being delivered to the listeners, and its timeout is not reported.
 the algorithms of the [table](preparing-the-bmc.html#cipher-suites) (the OEM suites are left
 out), including suites the library does not implement. Choose one it implements, with integrity:
 **3** or **17** in practice; `CipherSuite.isSupported()` tells whether the library implements the
-algorithms of a suite, and a suite with an xRC4 or MD5-128 algorithm fails when the session is
+algorithms of a suite, and a suite with an xRC4 algorithm fails when the session is
 opened. Do not fall back to a suite without integrity (0, 1, 6, 15) just because the BMC lists
 nothing else: the list is not authenticated. To skip the discovery when you already know the
 suite, build it with `CipherSuite.forId()` and pass it to `createConnection()` (Get Channel

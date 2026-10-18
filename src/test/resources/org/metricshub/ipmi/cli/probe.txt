@@ -17,8 +17,8 @@ Cipher suites
   8   RAKP-HMAC-MD5     HMAC-MD5-128     AES-CBC-128      supported
   9   RAKP-HMAC-MD5     HMAC-MD5-128     xRC4-128         not implemented
   10  RAKP-HMAC-MD5     HMAC-MD5-128     xRC4-40          not implemented
-  11  RAKP-HMAC-MD5     MD5-128          none             not implemented
-  12  RAKP-HMAC-MD5     MD5-128          AES-CBC-128      not implemented
+  11  RAKP-HMAC-MD5     MD5-128          none             supported
+  12  RAKP-HMAC-MD5     MD5-128          AES-CBC-128      supported
   13  RAKP-HMAC-MD5     MD5-128          xRC4-128         not implemented
   14  RAKP-HMAC-MD5     MD5-128          xRC4-40          not implemented
   15  RAKP-HMAC-SHA256  none             none             supported

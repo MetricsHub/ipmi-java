@@ -1388,7 +1388,7 @@ public final class IpmiCli {
 				+ "  -L, --privilege <level>       user, operator, administrator or auto (default: the lowest the subcommand\n"
 				+ "                                needs); auto runs at user and raises the session when a command needs more\n"
 				+ "  -C, --cipher-suite <id>[,..]  One ID: use exactly this suite; several: preference order"
-				+ " (default: 17,3,8,16,2,7)\n"
+				+ " (default: 17,3,8,16,2,7,12,11)\n"
 				+ "  -t, --timeout <ms>            Deadline of the subcommand (default: 120000); for sol, of its setup\n"
 				+ "      --message-timeout <ms>    Per-message timeout (default: 5000)\n"
 				+ "      --retries <n>             Resends of a message without reply (default: 3)\n"
