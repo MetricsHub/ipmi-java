@@ -139,14 +139,14 @@ public class CipherSuite {
 	}
 
 	/**
-	 * Initializes algorithms contained in this {@link CipherSuite}. A suite with MD5-128 integrity needs the password
-	 * too: see {@link #initializeAlgorithms(byte[], byte[])}.
+	 * Initializes algorithms contained in this {@link CipherSuite}. A suite with MD5-128 integrity (11 to 14) is keyed
+	 * with the password, which this method does not have: use {@link #initializeAlgorithms(byte[], byte[])} for it.
 	 *
 	 * @param sik
 	 *        - Session Integrity Key calculated during the opening of the
 	 *        session or user password if 'one-key' logins are enabled.
 	 * @throws IllegalArgumentException
-	 *         - when an algorithm of the suite is not implemented
+	 *         - when an algorithm of the suite is not implemented, or when the suite uses MD5-128 integrity
 	 * @throws InvalidKeyException
 	 *         - when initiation of the algorithm fails
 	 * @throws NoSuchAlgorithmException
@@ -158,6 +158,10 @@ public class CipherSuite {
 			throws InvalidKeyException,
 			NoSuchAlgorithmException,
 			NoSuchPaddingException {
+		if (integrityAlgorithm == SecurityConstants.IA_MD5_128) {
+			throw new IllegalArgumentException(
+					"Integrity algorithm MD5-128 is keyed with the password: use initializeAlgorithms(sik, password)");
+		}
 		initializeAlgorithms(sik, null);
 	}
 

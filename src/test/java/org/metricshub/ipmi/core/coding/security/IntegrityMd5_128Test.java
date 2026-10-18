@@ -62,6 +62,9 @@ class IntegrityMd5_128Test {
 		CipherSuite suite11 = CipherSuite.forId(11);
 		suite11.initializeAlgorithms(sik, password);
 		assertArrayEquals(AUTH_CODE, suite11.getIntegrityAlgorithm().generateAuthCode(BASE));
+		// Without the password, the SIK-only initializer refuses the suite rather than signing with an empty password
+		assertThrows(IllegalArgumentException.class, () -> CipherSuite.forId(12).initializeAlgorithms(sik));
+		CipherSuite.forId(8).initializeAlgorithms(sik);
 		CipherSuite suite7 = CipherSuite.forId(7);
 		suite7.initializeAlgorithms(sik, password);
 		IntegrityHmacMd5_128 hmac = new IntegrityHmacMd5_128();

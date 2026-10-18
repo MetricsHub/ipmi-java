@@ -15,7 +15,8 @@ description: What changes when upgrading the IPMI Java Client — from 2.0.00, f
   gets the same suite as before, and one that offers only MD5-128 suites with integrity now connects
   instead of failing with *offers none of the cipher suites*. In the protocol core,
   `CipherSuite.initializeAlgorithms(sik, password)` keys MD5-128 with the password; the one-argument
-  `initializeAlgorithms(sik)` still works for every other suite. The xRC4 suites (4, 5, 9, 10,
+  `initializeAlgorithms(sik)` still works for every other suite and refuses the MD5-128 suites with
+  `IllegalArgumentException` rather than signing with an empty password. The xRC4 suites (4, 5, 9, 10,
   13, 14, 18, 19) stay unsupported, by decision: the specification deprecates xRC4 and no BMC
   requires it; their exception now says `is not implemented.` rather than `is not yet implemented.`
 * `privilege(PrivilegeLevel.MaximumAvailable)` is accepted by the builder, which 2.0.00 refused:
