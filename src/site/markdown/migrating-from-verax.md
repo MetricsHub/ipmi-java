@@ -56,7 +56,7 @@ Code written for the Verax library keeps working after a package rename.
 
 | Area | Change |
 | --- | --- |
-| Cipher suites | RAKP-HMAC-SHA256 and RAKP-HMAC-MD5 authentication, HMAC-SHA256-128 and HMAC-MD5-128 integrity: suites 6 to 8 and 15 to 17 work, in addition to 0 to 3. |
+| Cipher suites | RAKP-HMAC-SHA256 and RAKP-HMAC-MD5 authentication, HMAC-SHA256-128, HMAC-MD5-128 and MD5-128 integrity: suites 6 to 8, 11, 12 and 15 to 17 work, in addition to 0 to 3. |
 | Keep-alive | `IpmiConnector(int port, long pingPeriod)` sets the keep-alive period of the connector, or disables it (`0`). |
 | SDR repository | Every OEM record type (`C0h` – `FFh`, not only `C0h`) is decoded as `OemRecord`, and a record that cannot be decoded is skipped instead of aborting the walk. Truncated Get SDR replies are read again in chunks. |
 | Sensor records | Full, Compact and Event-Only records share `AbstractSensorRecord` ([Upgrading](upgrading.html#sensor-records)). |

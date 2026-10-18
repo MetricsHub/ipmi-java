@@ -87,30 +87,36 @@ them). The client implements:
 | 7 | RAKP-HMAC-MD5 | HMAC-MD5-128 | none | yes |
 | 8 | RAKP-HMAC-MD5 | HMAC-MD5-128 | AES-CBC-128 | yes |
 | 9, 10 | RAKP-HMAC-MD5 | HMAC-MD5-128 | xRC4-128, xRC4-40 | no |
-| 11 – 14 | RAKP-HMAC-MD5 | MD5-128 | none, AES-CBC-128, xRC4 | no |
+| 11 | RAKP-HMAC-MD5 | MD5-128 | none | yes |
+| 12 | RAKP-HMAC-MD5 | MD5-128 | AES-CBC-128 | yes |
+| 13, 14 | RAKP-HMAC-MD5 | MD5-128 | xRC4-128, xRC4-40 | no |
 | 15 | RAKP-HMAC-SHA256 | none | none | yes |
 | 16 | RAKP-HMAC-SHA256 | HMAC-SHA256-128 | none | yes |
 | **17** | RAKP-HMAC-SHA256 | HMAC-SHA256-128 | AES-CBC-128 | **yes** |
 | 18, 19 | RAKP-HMAC-SHA256 | HMAC-SHA256-128 | xRC4-128, xRC4-40 | no |
 
 Suites **3** and **17** sign and encrypt every message, and every current BMC offers at least
-one of them. Prefer **17** where available.
+one of them. Prefer **17** where available. The xRC4 suites are not implemented: the IPMI 2.0
+specification deprecates xRC4, and no BMC requires it. MD5-128 (suites 11 and 12) is a plain MD5 of
+the password around each message rather than an HMAC of the session key: it is implemented for the
+older BMCs that offer nothing better, and comes last in the default preference.
 
 ### How `IpmiClient` chooses the suite
 
-By default (`cipherSuites(17, 3, 8, 16, 2, 7)`), the client first asks the BMC for its list of
-cipher suites (Get Channel Cipher Suites) when it opens its session, then picks the first of these
-suites that the BMC offers:
+By default (`cipherSuites(17, 3, 8, 16, 2, 7, 12, 11)`), the client first asks the BMC for its
+list of cipher suites (Get Channel Cipher Suites) when it opens its session, then picks the first of
+these suites that the BMC offers:
 
 1. **17**, then **3**, then 8: messages signed and encrypted;
-2. 16, then 2, then 7: messages signed, not encrypted.
+2. 16, then 2, then 7: messages signed, not encrypted;
+3. 12, then 11: messages signed with MD5-128, encrypted or not.
 
 A Lenovo XCC that offers suites 1 to 19 gets suite 17, a Cisco IMC that offers 0 to 14 gets
 suite 3. The client never chooses a suite without integrity (0, 1, 6, 15), even when the BMC
 offers nothing else: the list of suites is not authenticated, so an attacker on the network
 could otherwise make the client fall back to a session whose replies can be forged. A BMC that
-offers none of the six fails the first operation with `IpmiClientException: The BMC ... offers
-none of the cipher suites [17, 3, 8, 16, 2, 7] (offered: ...)`. The algorithms of a suite are those of the
+offers none of the eight fails the first operation with `IpmiClientException: The BMC ... offers
+none of the cipher suites [17, 3, 8, 16, 2, 7, 12, 11] (offered: ...)`. The algorithms of a suite are those of the
 table above, whatever the BMC's record of the suite says, and the OEM suites a BMC may list (as
 Cisco IMC does) are ignored.
 

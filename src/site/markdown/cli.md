@@ -92,7 +92,7 @@ either option can be repeated or given a comma-separated list.
 | `-kf, --bmc-key-file <file>` | Read the hexadecimal BMC key from a file. |
 | `-P, --port <port>` | UDP port of the BMC. Default: 623. |
 | `-L, --privilege <level>` | `user`, `operator`, `administrator` or `auto` (case-insensitive). Default: the lowest level the subcommand needs (see [below](#default-privilege-per-subcommand)). |
-| `-C, --cipher-suite <id>[,<id>...]` | One ID: use exactly this cipher suite, without discovery. Several: the preference order among the suites the BMC offers. Default: `17,3,8,16,2,7`. Suites without integrity (0, 1, 6, 15) are refused: their replies could be forged. |
+| `-C, --cipher-suite <id>[,<id>...]` | One ID: use exactly this cipher suite, without discovery. Several: the preference order among the suites the BMC offers. Default: `17,3,8,16,2,7,12,11`. Suites without integrity (0, 1, 6, 15) are refused: their replies could be forged. |
 | `-t, --timeout <ms>` | Deadline of the subcommand, in milliseconds. Default: 120000. For `sol`, it bounds the session setup and the payload activation only. |
 | `--message-timeout <ms>` | Per-message timeout. Default: 5000. |
 | `--retries <n>` | Resends of a message that got no reply. Default: 3. |

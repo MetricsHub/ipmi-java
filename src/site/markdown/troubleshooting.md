@@ -116,9 +116,9 @@ interface, or with `ipmitool lan set 1 cipher_privs`), or list the suites the BM
 `cipherSuites()` on the builder, among those the library implements.
 
 With the [low-level API](low-level-api.html#choosing-the-cipher-suite), a suite that uses an
-algorithm the client does not implement fails with
-`IllegalArgumentException: Confidentiality algorithm XRC4-128 is not yet implemented.` (or
-MD5-128 integrity): choose a suite whose `isSupported()` is `true`.
+algorithm the client does not implement (xRC4) fails with
+`IllegalArgumentException: Confidentiality algorithm XRC4-128 is not implemented.`: choose a
+suite whose `isSupported()` is `true`.
 
 ## Sensors or FRUs are missing
 

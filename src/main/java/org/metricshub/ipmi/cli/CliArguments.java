@@ -72,7 +72,7 @@ final class CliArguments implements AutoCloseable {
 	static final long DEFAULT_MESSAGE_TIMEOUT_MS = 5_000L;
 	static final int DEFAULT_RETRIES = 3;
 	/** The preference of the client, repeated here for the usage text and the {@code probe} output. */
-	static final int[] DEFAULT_CIPHER_SUITES = { 17, 3, 8, 16, 2, 7 };
+	static final int[] DEFAULT_CIPHER_SUITES = { 17, 3, 8, 16, 2, 7, 12, 11 };
 	static final char DEFAULT_ESCAPE = '~';
 	static final String SUBCOMMANDS = "probe, info, chassis, power, identify, sensors, fru, sel, sol or raw";
 	static final String POWER_ACTIONS = "status, on, off, cycle, reset, soft or diag";

@@ -92,8 +92,8 @@ class CipherSuiteTest {
 				.filter(CipherSuite::isSupported)
 				.map(suite -> (int) suite.getId())
 				.collect(Collectors.toList());
-		// No xRC4 (4, 5, 9, 10, 13, 14, 18, 19) and no MD5-128 integrity (11 to 14)
-		assertEquals(Arrays.asList(1, 2, 3, 6, 7, 8, 15, 16, 17), supported);
+		// No xRC4 (4, 5, 9, 10, 13, 14, 18, 19)
+		assertEquals(Arrays.asList(1, 2, 3, 6, 7, 8, 11, 12, 15, 16, 17), supported);
 		assertFalse(new CipherSuite((byte) 3, (byte) 1, (byte) 1, (byte) -1).isSupported()); // no integrity algorithm
 		assertTrue(CipherSuite.getEmpty().isSupported());
 	}

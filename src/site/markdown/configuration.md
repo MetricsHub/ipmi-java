@@ -16,7 +16,7 @@ try (IpmiClient bmc = IpmiClient.builder("bmc.example.com")
 		.bmcKey(kg)                              // optional: two-key login (Kg), raw bytes
 		.port(623)                               // default
 		.privilege(PrivilegeLevel.Operator)      // maximum privilege of the session; default User
-		.cipherSuites(17, 3)                     // preference among the suites the BMC offers; default 17, 3, 8, 16, 2, 7
+		.cipherSuites(17, 3)                     // preference among the suites the BMC offers; default 17, 3, 8, 16, 2, 7, 12, 11
 		.timeout(Duration.ofMinutes(2))          // overall deadline of each operation; default 2 min
 		.messageTimeout(Duration.ofSeconds(5))   // per-message timeout; default 5 s
 		.retries(3)                              // resends of a message without reply; default 3
@@ -39,7 +39,7 @@ message timeouts, retries or keep-alive periods. Nothing is configured globally.
 | `credentials(user, password)` | required by every operation but `capabilities()` | [Credentials](#credentials) |
 | `bmcKey(byte[])` | none | [BMC key](#bmc-key) |
 | `privilege(PrivilegeLevel)` | `User` | [Privilege level](#privilege-level) |
-| `cipherSuites(int...)`, `cipherSuite(int)` | `17, 3, 8, 16, 2, 7` | [Cipher suites](#cipher-suites) |
+| `cipherSuites(int...)`, `cipherSuite(int)` | `17, 3, 8, 16, 2, 7, 12, 11` | [Cipher suites](#cipher-suites) |
 | `timeout(Duration)` | 2 minutes | [Timeout](#timeout) |
 | `messageTimeout(Duration)` | 5 seconds | [Message timeout and retries](#message-timeout-and-retries) |
 | `retries(int)` | `3` | [Message timeout and retries](#message-timeout-and-retries) |
@@ -122,10 +122,12 @@ command, Set Session Privilege Level included: the raise is then refused once an
 
 `cipherSuites(int...)` lists the suites the client may use, by order of preference: before opening
 the session, the client asks the BMC which suites it offers (Get Channel Cipher Suites) and takes
-the first of the list that the BMC offers. The default, `17, 3, 8, 16, 2, 7`, prefers the suites
-that sign and encrypt every message (17: RAKP-HMAC-SHA256, HMAC-SHA256-128, AES-CBC-128; 3:
+the first of the list that the BMC offers. The default, `17, 3, 8, 16, 2, 7, 12, 11`, prefers the
+suites that sign and encrypt every message (17: RAKP-HMAC-SHA256, HMAC-SHA256-128, AES-CBC-128; 3:
 RAKP-HMAC-SHA1, HMAC-SHA1-96, AES-CBC-128; 8: RAKP-HMAC-MD5, HMAC-MD5-128, AES-CBC-128), then
-the same without encryption. A BMC that offers none of the listed suites fails the first operation
+the same without encryption, and last the MD5-128 suites (12 with AES-CBC-128, 11 without), whose
+signature is a plain MD5 of the password around the message. A BMC that offers none of the listed
+suites fails the first operation
 with `IpmiClientException: The BMC ... offers none of the cipher suites ...`.
 
 `cipherSuite(int)` uses exactly that suite without asking the BMC, which saves the Get Channel

@@ -139,13 +139,14 @@ public class CipherSuite {
 	}
 
 	/**
-	 * Initializes algorithms contained in this {@link CipherSuite}.
+	 * Initializes algorithms contained in this {@link CipherSuite}. A suite with MD5-128 integrity (11 to 14) is keyed
+	 * with the password, which this method does not have: use {@link #initializeAlgorithms(byte[], byte[])} for it.
 	 *
 	 * @param sik
 	 *        - Session Integrity Key calculated during the opening of the
 	 *        session or user password if 'one-key' logins are enabled.
 	 * @throws IllegalArgumentException
-	 *         - when an algorithm of the suite is not implemented
+	 *         - when an algorithm of the suite is not implemented, or when the suite uses MD5-128 integrity
 	 * @throws InvalidKeyException
 	 *         - when initiation of the algorithm fails
 	 * @throws NoSuchAlgorithmException
@@ -157,7 +158,35 @@ public class CipherSuite {
 			throws InvalidKeyException,
 			NoSuchAlgorithmException,
 			NoSuchPaddingException {
-		getIntegrityAlgorithm().initialize(sik);
+		if (integrityAlgorithm == SecurityConstants.IA_MD5_128) {
+			throw new IllegalArgumentException(
+					"Integrity algorithm MD5-128 is keyed with the password: use initializeAlgorithms(sik, password)");
+		}
+		initializeAlgorithms(sik, null);
+	}
+
+	/**
+	 * Initializes algorithms contained in this {@link CipherSuite}: the HMAC integrity algorithms and the
+	 * confidentiality algorithm are keyed with the Session Integrity Key, MD5-128 integrity (suites 11 to 14) with the
+	 * user's password (IPMI 2.0 section 13.28.4).
+	 *
+	 * @param sik the Session Integrity Key calculated during the opening of the session
+	 * @param password the password of the user, as sent to the BMC; null for an empty password
+	 * @throws IllegalArgumentException
+	 *         - when an algorithm of the suite is not implemented
+	 * @throws InvalidKeyException
+	 *         - when initiation of the algorithm fails
+	 * @throws NoSuchAlgorithmException
+	 *         - when initiation of the algorithm fails
+	 * @throws NoSuchPaddingException
+	 *         - when initiation of the algorithm fails
+	 */
+	public void initializeAlgorithms(byte[] sik, byte[] password)
+			throws InvalidKeyException,
+			NoSuchAlgorithmException,
+			NoSuchPaddingException {
+		IntegrityAlgorithm integrity = getIntegrityAlgorithm();
+		integrity.initialize(integrity.getCode() == SecurityConstants.IA_MD5_128 ? password : sik);
 		getConfidentialityAlgorithm().initialize(sik, getAuthenticationAlgorithm());
 	}
 
@@ -202,8 +231,7 @@ public class CipherSuite {
 		case SecurityConstants.IA_HMAC_SHA1_96:
 			return instantiateIntegrityAlgorithm(IntegrityHmacSha1_96::new);
 		case SecurityConstants.IA_MD5_128:
-			// TODO: MD5-128
-			throw new IllegalArgumentException("Integrity algorithm MD5-128 is not yet implemented.");
+			return instantiateIntegrityAlgorithm(IntegrityMd5_128::new);
 		case SecurityConstants.IA_HMAC_MD5_128:
 			return instantiateIntegrityAlgorithm(IntegrityHmacMd5_128::new);
 		case SecurityConstants.IA_HMAC_SHA256_128:
@@ -237,11 +265,11 @@ public class CipherSuite {
 			}
 			return ca;
 		case SecurityConstants.CA_XRC4_40:
-			// TODO: XRc4-40
-			throw new IllegalArgumentException("Confidentiality algorithm XRC4-40 is not yet implemented.");
+			// xRC4 is deprecated by the IPMI 2.0 specification (section 13.29) and no current BMC requires it: not
+			// implemented, the suites 4, 5, 9, 10, 13, 14, 18 and 19 are reported as unsupported
+			throw new IllegalArgumentException("Confidentiality algorithm XRC4-40 is not implemented.");
 		case SecurityConstants.CA_XRC4_128:
-			// TODO: XRc4-128
-			throw new IllegalArgumentException("Confidentiality algorithm XRC4-128 is not yet implemented.");
+			throw new IllegalArgumentException("Confidentiality algorithm XRC4-128 is not implemented.");
 		default:
 			throw new IllegalArgumentException(
 					"Invalid confidentiality algorithm.");
@@ -300,8 +328,8 @@ public class CipherSuite {
 
 	/**
 	 * Tells whether this library implements the algorithms of this suite. The suites listed by
-	 * {@link #getCipherSuites(byte[])} include the ones it does not implement (MD5-128 integrity, xRC4
-	 * confidentiality), which fail when the session is opened.
+	 * {@link #getCipherSuites(byte[])} include the ones it does not implement (xRC4 confidentiality: suites 4, 5, 9,
+	 * 10, 13, 14, 18 and 19), which fail when the session is opened.
 	 *
 	 * @return true when the authentication, integrity and confidentiality algorithms are all implemented
 	 */
