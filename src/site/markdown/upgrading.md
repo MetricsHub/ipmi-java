@@ -7,6 +7,16 @@ description: What changes when upgrading the IPMI Java Client — from 2.0.00, f
 
 ## Upgrading from 2.0.00
 
+* `privilege(PrivilegeLevel.MaximumAvailable)` is accepted by the builder, which 2.0.00 refused:
+  the session requests the highest level the account is allowed, runs at User, and is raised
+  with Set Session Privilege Level only when the BMC refuses a command for insufficient
+  privilege (`D4h`), to Operator then Administrator, the refused command being sent again; a
+  level the BMC refuses is the ceiling of the session
+  ([Raising the session on demand](configuration.html#raising-the-session-on-demand)). `ipmicli`
+  takes `-L auto`. In the protocol core, `openSession()` of a connection created with
+  `MaximumAvailable` now sets the session to User right after the handshake, where 2.0.00 left
+  it at whatever level the BMC started it (the requested maximum on IMM, iDRAC 6, iRMC, GIGABYTE
+  and Supermicro BMCs); a `SetSessionPrivilegeLevel` sent after it raises the session as before.
 * `Sensor.name()` (and `getName()` of the Full, Compact and Event-Only sensor records) is never
   `null`: a Compact record that ends before its ID string gives the empty name, as an ID string of
   length 0 does. 2.0.00 returned `null`, which made `ipmicli sensors` fail with a

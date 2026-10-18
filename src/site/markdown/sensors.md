@@ -63,7 +63,10 @@ BMCs allow it at the User level (HPE iLO 5), others only at the Administrator le
 GIGABYTE BMC). A client below the level the BMC requires gets the sensors of the BMC as usual,
 and those of the other controllers without reading, their `problem()` saying
 `Get Sensor Reading through the BMC to the controller at 2Ch on channel 6 failed: ... (completion code D4h)`
-([Privilege level](configuration.html#privilege-level)).
+([Privilege level](configuration.html#privilege-level)). A client built with
+`privilege(PrivilegeLevel.MaximumAvailable)` raises the session to the level the BMC requires on
+that first `D4h`, as far as the account allows, and reads these sensors with the same code on
+every BMC ([Raising the session on demand](configuration.html#raising-the-session-on-demand)).
 
 ### Selecting sensors
 

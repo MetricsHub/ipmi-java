@@ -82,6 +82,16 @@ public class SetSessionPrivilegeLevel extends IpmiCommandCoder<SetSessionPrivile
 		this.privilegeLevel = privilegeLevel;
 	}
 
+	/**
+	 * Returns the level the command requests.
+	 *
+	 * @return the privilege level, {@link PrivilegeLevel#MaximumAvailable} when the command only returns the present
+	 *         level of the session
+	 */
+	public PrivilegeLevel getPrivilegeLevel() {
+		return privilegeLevel;
+	}
+
 	@Override
 	public byte getCommandCode() {
 		return CommandCodes.SET_SESSION_PRIVILEGE_LEVEL;

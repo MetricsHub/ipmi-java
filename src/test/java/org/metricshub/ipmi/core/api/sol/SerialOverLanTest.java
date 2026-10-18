@@ -33,10 +33,13 @@ import java.util.stream.IntStream;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.metricshub.ipmi.core.api.async.ConnectionHandle;
+import org.metricshub.ipmi.core.api.sol.SOLException;
 import org.metricshub.ipmi.core.api.sync.IpmiConnector;
 import org.metricshub.ipmi.core.coding.commands.PrivilegeLevel;
 import org.metricshub.ipmi.core.coding.commands.chassis.GetChassisStatus;
 import org.metricshub.ipmi.core.coding.commands.chassis.GetChassisStatusResponseData;
+import org.metricshub.ipmi.core.coding.commands.session.SetSessionPrivilegeLevel;
+import org.metricshub.ipmi.core.coding.payload.lan.IPMIException;
 import org.metricshub.ipmi.core.coding.payload.sol.SolOperation;
 import org.metricshub.ipmi.core.coding.payload.sol.SolStatus;
 import org.metricshub.ipmi.core.coding.security.CipherSuite;
@@ -746,12 +749,46 @@ class SerialOverLanTest {
 				connector.closeSession(session.getConnectionHandle());
 				awaitClose(bmc);
 
-				// A session opened with MaximumAvailable still runs at User: the console raises it after the D4h
+				// A session opened with MaximumAvailable is set to User by openSession(): the console raises it after
+				// the D4h
 				Session unraised = openSession(connector, bmc, null, PrivilegeLevel.MaximumAvailable);
-				assertEquals(1, bmc.getCount(NETFN_APP, SET_SESSION_PRIVILEGE_LEVEL));
+				assertEquals(2, bmc.getCount(NETFN_APP, SET_SESSION_PRIVILEGE_LEVEL), "set to User");
 				new SerialOverLan(connector, unraised).close();
-				assertEquals(2, bmc.getCount(NETFN_APP, SET_SESSION_PRIVILEGE_LEVEL));
+				assertEquals(3, bmc.getCount(NETFN_APP, SET_SESSION_PRIVILEGE_LEVEL), "raised by the console");
 				assertEquals(3, bmc.getCount(NETFN_APP, FakeRmcpPlusBmc.ACTIVATE_PAYLOAD));
+				assertEquals(FakeRmcpPlusBmc.OPERATOR, bmc.getPrivilege(), "raised to the level the payload needs, no further");
+				assertEquals(Collections.emptyList(), bmc.getErrors());
+			} finally {
+				connector.tearDown();
+			}
+		}
+	}
+
+	@Test
+	@Timeout(30)
+	void theConsoleRaisesAMaximumAvailableSessionAsFarAsTheAccountAllows() throws Exception {
+		try (FakeRmcpPlusBmc bmc = new FakeRmcpPlusBmc(SUITES, USER, utf8(PASSWORD), null)) {
+			bmc.enableSol(bmc.getPort(), PAYLOAD_SIZE, ADMINISTRATOR);
+			IpmiConnector connector = new IpmiConnector(0, 0);
+			try {
+				// Operator, refused, then Administrator
+				Session session = openSession(connector, bmc, null, PrivilegeLevel.MaximumAvailable);
+				SerialOverLan console = new SerialOverLan(connector, session);
+				assertEquals(PrivilegeLevel.Administrator, console.getRaisedPrivilegeLevel());
+				assertEquals(3, bmc.getCount(NETFN_APP, FakeRmcpPlusBmc.ACTIVATE_PAYLOAD));
+				assertEquals(3, bmc.getCount(NETFN_APP, SET_SESSION_PRIVILEGE_LEVEL), "User, Operator, Administrator");
+				console.close();
+				connector.closeSession(session.getConnectionHandle());
+				awaitClose(bmc);
+
+				// An account limited to Operator: the raise to Administrator is refused, and the console fails on it
+				bmc.privilegeLimit(FakeRmcpPlusBmc.OPERATOR);
+				Session limited = openSession(connector, bmc, null, PrivilegeLevel.MaximumAvailable);
+				SOLException refused = assertThrows(SOLException.class, () -> new SerialOverLan(connector, limited));
+				assertEquals(
+						SetSessionPrivilegeLevel.LEVEL_ABOVE_LIMIT,
+						((IPMIException) refused.getCause()).getRawCode(),
+						refused.getMessage());
 				assertEquals(Collections.emptyList(), bmc.getErrors());
 			} finally {
 				connector.tearDown();

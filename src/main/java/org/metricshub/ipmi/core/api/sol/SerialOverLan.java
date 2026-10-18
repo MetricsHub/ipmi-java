@@ -119,6 +119,8 @@ public class SerialOverLan implements Closeable {
 	 * The connection of the session where the payload was last activated, or null, and the instance activated there.
 	 */
 	private ConnectionHandle activatedConnection;
+	/** The level the console raised a MaximumAvailable session of the payload to, or null. */
+	private PrivilegeLevel raisedTo;
 	private int activatedInstance;
 
 	/**
@@ -378,11 +380,12 @@ public class SerialOverLan implements Closeable {
 	}
 
 	/**
-	 * Sends Activate Payload, and once more after raising the privilege of a session opened with
-	 * {@link PrivilegeLevel#MaximumAvailable} when it is too low, or after deactivating the payload when a lost reply
-	 * left it active in this session. {@code openSession()} raised a session opened at Operator or Administrator, and a
-	 * User session cannot go higher; the session the console opens on the port of the payload has the level of the
-	 * given session, so a MaximumAvailable one is raised here too.
+	 * Sends Activate Payload, and again after raising the privilege of a session opened with
+	 * {@link PrivilegeLevel#MaximumAvailable} when it is too low (to Operator, then to Administrator, as far as the
+	 * account allows), or after deactivating the payload when a lost reply left it active in this session.
+	 * {@code openSession()} raised a session opened at Operator or Administrator, and a User session cannot go higher;
+	 * the session the console opens on the port of the payload has the level of the given session, so a
+	 * MaximumAvailable one is raised here too.
 	 */
 	private ActivateSolPayloadResponseData getActivatePayloadResponse(
 			IpmiConnector ipmiConnector,
@@ -390,16 +393,20 @@ public class SerialOverLan implements Closeable {
 			ActivateSolPayload activatePayload)
 			throws Exception {
 		ConnectionHandle connectionHandle = payloadSession.getConnectionHandle();
-		boolean raised = connectionHandle.getPrivilegeLevel() != PrivilegeLevel.MaximumAvailable;
+		boolean onDemand = connectionHandle.getPrivilegeLevel() == PrivilegeLevel.MaximumAvailable;
+		PrivilegeLevel level = PrivilegeLevel.User;
 		boolean deactivated = false;
 		while (true) {
 			try {
 				return ipmiConnector.sendMessage(connectionHandle, activatePayload);
 			} catch (IPMIException e) {
 				boolean alreadyActive = !deactivated && e.getRawCode() == PAYLOAD_ALREADY_ACTIVE;
-				if (!raised && e.getCompletionCode() == CompletionCode.InsufficentPrivilege) {
-					raiseSessionPrivileges(ipmiConnector, connectionHandle);
-					raised = true;
+				if (onDemand
+						&& level != PrivilegeLevel.Administrator
+						&& e.getCompletionCode() == CompletionCode.InsufficentPrivilege) {
+					level = level == PrivilegeLevel.User ? PrivilegeLevel.Operator : PrivilegeLevel.Administrator;
+					ipmiConnector.sendMessage(connectionHandle, new SetSessionPrivilegeLevel(level));
+					raisedTo = level;
 				} else if (alreadyActive && isActiveInSession(ipmiConnector, payloadSession)) {
 					// The reply to Activate Payload was lost, and the request sent again found the payload active in this
 					// session: the port and the sizes of the payload are only in that reply, which a new activation gives
@@ -458,18 +465,14 @@ public class SerialOverLan implements Closeable {
 	}
 
 	/**
-	 * Raises a session opened with {@link PrivilegeLevel#MaximumAvailable}, which still runs at User (IPMI 2.0 section
-	 * 22.18), to Administrator.
+	 * Returns the privilege the console raised the session of the payload to, when that session was opened with
+	 * {@link PrivilegeLevel#MaximumAvailable} and the BMC refused to activate the payload at its level: the owner of the
+	 * session (see {@link #getConnectionHandle()}) runs it at that level from then on.
 	 *
-	 * @param ipmiConnector
-	 *        {@link IpmiConnector} that will be used for communication
-	 * @param connectionHandle
-	 *        {@link ConnectionHandle} representing single connection to managed system.
-	 * @throws Exception
-	 *         If any exception occurred during communication.
+	 * @return Operator or Administrator, or null when the console did not raise the session
 	 */
-	private void raiseSessionPrivileges(IpmiConnector ipmiConnector, ConnectionHandle connectionHandle) throws Exception {
-		ipmiConnector.sendMessage(connectionHandle, new SetSessionPrivilegeLevel(PrivilegeLevel.Administrator));
+	public PrivilegeLevel getRaisedPrivilegeLevel() {
+		return raisedTo;
 	}
 
 	/**

@@ -31,6 +31,7 @@ import org.metricshub.ipmi.core.coding.commands.PrivilegeLevel;
 import org.metricshub.ipmi.core.coding.commands.ResponseData;
 import org.metricshub.ipmi.core.coding.commands.session.GetChannelAuthenticationCapabilitiesResponseData;
 import org.metricshub.ipmi.core.coding.commands.session.SetSessionPrivilegeLevel;
+import org.metricshub.ipmi.core.coding.payload.CompletionCode;
 import org.metricshub.ipmi.core.coding.payload.IpmiPayload;
 import org.metricshub.ipmi.core.coding.payload.lan.IPMIException;
 import org.metricshub.ipmi.core.coding.protocol.PayloadType;
@@ -333,7 +334,10 @@ public class IpmiAsyncConnector implements ConnectionListener {
 	 * Establishes the session with the remote host, with the password as bytes: the caller can then clear them
 	 * once the session is open, which an immutable {@link String} does not allow. When the requested privilege is
 	 * Operator or Administrator, the session is raised to it with Set Session Privilege Level right after the
-	 * handshake (IPMI 2.0 section 22.18: every session starts at User); a refusal closes the session.
+	 * handshake (IPMI 2.0 section 22.18: every session starts at User); a refusal closes the session. For
+	 * {@link PrivilegeLevel#MaximumAvailable}, the session is requested at Administrator, then at Operator and at User
+	 * when the BMC refuses the role to the account, and set to User right after the handshake: the caller raises it
+	 * when a command needs more.
 	 *
 	 * @param connectionHandle
 	 *        - {@link ConnectionHandle} associated with the remote host.
@@ -361,28 +365,28 @@ public class IpmiAsyncConnector implements ConnectionListener {
 			byte[] password,
 			byte[] bmcKey)
 			throws Exception {
-		int sessionId = 0;
-		int tries = 0;
-		boolean succeded = false;
-
 		connectionHandle.setUser(username);
 		connectionHandle.setPasswordBytes(password);
 		connectionHandle.setBmcKey(bmcKey);
 
-		while (tries <= retries && !succeded) {
+		// MaximumAvailable: the role 0 of the specification (highest level matching the proposed algorithms, section
+		// 13.17) is refused at Open Session by iLO 5, iDRAC and Cisco IMC BMCs, and leaves a session that IMM, Supermicro
+		// and iRMC BMCs will not set to any level (D4h), so the levels are requested from the highest down, and a role
+		// the BMC refuses to the account is tried one level lower
+		PrivilegeLevel[] roles = connectionHandle.getPrivilegeLevel() == PrivilegeLevel.MaximumAvailable ?
+				new PrivilegeLevel[]
+				{ PrivilegeLevel.Administrator, PrivilegeLevel.Operator, PrivilegeLevel.User } :
+				new PrivilegeLevel[]
+				{ connectionHandle.getPrivilegeLevel() };
+		int sessionId = 0;
+		for (int i = 0; i < roles.length; i++) {
 			try {
-				++tries;
-				sessionId = connectionManager
-						.startSession(
-								connectionHandle.getHandle(),
-								connectionHandle.getCipherSuite(),
-								connectionHandle.getPrivilegeLevel(),
-								username,
-								password,
-								bmcKey);
-				succeded = true;
-			} catch (Exception e) {
-				if (tries > retries || !isRetriable(e)) {
+				sessionId = startSession(connectionHandle, roles[i], username, password, bmcKey);
+				break;
+			} catch (IPMIException e) {
+				CompletionCode code = e.getCompletionCode();
+				if (i == roles.length - 1
+						|| code != CompletionCode.UnauthorizedRole && code != CompletionCode.InvalidRole) {
 					throw e;
 				}
 			}
@@ -399,17 +403,53 @@ public class IpmiAsyncConnector implements ConnectionListener {
 	}
 
 	/**
-	 * Raises the new session to the privilege requested for it when that is Operator or Administrator: the BMC starts
-	 * every session at User whatever the maximum requested in RAKP Message 1 (IPMI 2.0 section 22.18). Sent again, like
-	 * a handshake step, when no reply comes or the BMC is busy; any failure closes the session.
+	 * Open Session and RAKP Messages 1 to 4 with the given role, sent again when no reply comes or the BMC is busy.
+	 *
+	 * @return the console session ID
+	 */
+	private int startSession(
+			ConnectionHandle connectionHandle,
+			PrivilegeLevel role,
+			String username,
+			byte[] password,
+			byte[] bmcKey)
+			throws Exception {
+		int tries = 0;
+		while (true) {
+			try {
+				++tries;
+				return connectionManager
+						.startSession(
+								connectionHandle.getHandle(),
+								connectionHandle.getCipherSuite(),
+								role,
+								username,
+								password,
+								bmcKey);
+			} catch (Exception e) {
+				if (tries > retries || !isRetriable(e)) {
+					throw e;
+				}
+			}
+		}
+	}
+
+	/**
+	 * Sets the new session to the privilege requested for it: raised to Operator or Administrator, as the BMC starts
+	 * every session at User whatever the maximum requested in RAKP Message 1 (IPMI 2.0 section 22.18); set to User for
+	 * {@link PrivilegeLevel#MaximumAvailable}, as some BMCs (IMM, iDRAC 6, iRMC, GIGABYTE, Supermicro) start the
+	 * session at the requested maximum instead, which for the highest level available is the limit of the account.
+	 * Sent again, like a handshake step, when no reply comes or the BMC is busy; any failure closes the session.
 	 *
 	 * @throws SessionException when the BMC answers with an error completion code, with the {@link IPMIException} as
 	 *         cause
 	 */
 	private void raisePrivilege(ConnectionHandle connectionHandle) throws Exception {
 		PrivilegeLevel level = connectionHandle.getPrivilegeLevel();
-		if (level != PrivilegeLevel.Operator && level != PrivilegeLevel.Administrator) {
-			// User: nothing to raise. Callback cannot be changed (section 22.18), MaximumAvailable names no level
+		if (level == PrivilegeLevel.MaximumAvailable) {
+			level = PrivilegeLevel.User;
+		} else if (level != PrivilegeLevel.Operator && level != PrivilegeLevel.Administrator) {
+			// User: nothing to raise. Callback cannot be changed (section 22.18)
 			return;
 		}
 		MessageListener listener = new MessageListener(connectionHandle);
@@ -432,7 +472,7 @@ public class IpmiAsyncConnector implements ConnectionListener {
 			closeSessionQuietly(connectionHandle);
 			if (e instanceof IPMIException) {
 				throw new SessionException(
-						"The BMC refused to raise the session to the " + level + " privilege: "
+						"The BMC refused to set the session to the " + level + " privilege: "
 								+ SetSessionPrivilegeLevel.describeRefusal((IPMIException) e),
 						e);
 			}

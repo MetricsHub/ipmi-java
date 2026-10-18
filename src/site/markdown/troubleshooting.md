@@ -81,7 +81,10 @@ The BMC refused a command at the session's privilege level, which the client req
 and sets right after it: the command needs a higher level than the requested one. The default
 **User** level is enough for everything the client reads; `send()` of a control command (Chassis Control, chassis
 identify) needs `privilege(PrivilegeLevel.Operator)` on the builder, and Serial over LAN
-`Administrator` on most BMCs. If a BMC refuses a read command at the User level, check:
+`Administrator` on most BMCs; `privilege(PrivilegeLevel.MaximumAvailable)` raises the session
+on that `D4h`, as far as the account allows
+([Raising the session on demand](configuration.html#raising-the-session-on-demand)). If a BMC
+refuses a read command at the User level, check:
 
 * the privilege of the account on the LAN channel (`ipmitool channel getaccess 1 <user id>`),
 * the maximum privilege of the cipher suite in use (`Cipher Suite Priv Max` in
@@ -127,7 +130,7 @@ MD5-128 integrity): choose a suite whose `isSupported()` is `true`.
 | `Fru.problems()` says `Cannot read FRU <id>` or `Cannot decode FRU <id>` | The BMC refused Get FRU Inventory Area Info for that FRU, or its data is neither in the IPMI FRU format nor the SPD data of a DDR3, DDR4 or DDR5 memory module nor the processor information ROM of an Intel Xeon processor (the SPD data of a DDR2 or LPDDR module, and a processor information ROM of another data format revision than 7, are reported as not decoded). The other FRUs are still returned. |
 | `Fru.problems()` says `The <area> info area at offset <n> is truncated` | The read stopped before the end of that area (see above): the complete areas of the FRU are still returned. |
 | `Sensor.problem()` says `The sensor belongs to system software` | The record names system software, the BIOS for instance, as the owner of the sensor: no controller holds its reading ([Sensor owners](sensors.html#sensor-owners)). `ipmiutil` shows it as not available. |
-| `Sensor.problem()` says `... through the BMC to the controller at ... failed` or `No reply from the controller at ...` | The sensor belongs to another controller than the BMC, which the BMC forwards the request to with Send Message. `D4h`: the session needs a higher privilege for Send Message, Operator or, on some BMCs, Administrator; `83h` (NAK on write): no controller answered at that address; no reply: the controller is absent or does not answer ([Sensor owners](sensors.html#sensor-owners)). |
+| `Sensor.problem()` says `... through the BMC to the controller at ... failed` or `No reply from the controller at ...` | The sensor belongs to another controller than the BMC, which the BMC forwards the request to with Send Message. `D4h`: the session needs a higher privilege for Send Message, Operator or, on some BMCs, Administrator (`privilege(PrivilegeLevel.MaximumAvailable)` raises it there when the account has the level); `83h` (NAK on write): no controller answered at that address; no reply: the controller is absent or does not answer ([Sensor owners](sensors.html#sensor-owners)). |
 | A sensor known to `ipmitool` is not returned | Only Full and Compact sensor records are read, and shared Compact records are not expanded ([#100](https://github.com/metricshub/ipmi-java/issues/100)). A sensor whose reading the BMC flags as unavailable or not scanned (`ipmitool` shows `na` or `disabled`) is returned without reading or states, with `problem()` set. |
 | Negative processor temperatures (`CPU1 DTS = -44.0`) | Not an error: Intel *Digital Thermal Sensor* readings are the margin below the maximum junction temperature. |
 

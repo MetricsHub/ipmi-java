@@ -28,6 +28,7 @@ import org.metricshub.ipmi.core.coding.commands.chassis.GetChassisStatus;
 import org.metricshub.ipmi.core.coding.commands.chassis.ChassisIdentify;
 import org.metricshub.ipmi.core.coding.commands.chassis.GetChassisStatusResponseData;
 import org.metricshub.ipmi.core.coding.commands.session.GetSessionInfo;
+import org.metricshub.ipmi.core.coding.commands.session.SetSessionPrivilegeLevel;
 import org.metricshub.ipmi.core.coding.payload.CompletionCode;
 import org.metricshub.ipmi.core.coding.payload.lan.IPMIException;
 import org.metricshub.ipmi.core.coding.security.CipherSuite;
@@ -402,6 +403,38 @@ class RmcpPlusSessionTest {
 				// The connection is ready for another login
 				connector.openSession(handle, USER, PASSWORD, null);
 				assertChassisStatus(getChassisStatus(connector, handle));
+				assertEquals(Collections.emptyList(), bmc.getErrors());
+			} finally {
+				connector.tearDown();
+			}
+		}
+	}
+
+	@Test
+	@Timeout(30)
+	void openSessionSetsAMaximumAvailableSessionToUser() throws Exception {
+		try (FakeRmcpPlusBmc bmc = new FakeRmcpPlusBmc(XCC_SUITES, USER, utf8(PASSWORD), null)) {
+			// A BMC that starts the session at the requested maximum, and an account limited to Operator
+			bmc.startsAtMaximum(true);
+			bmc.privilegeLimit(FakeRmcpPlusBmc.OPERATOR);
+			IpmiConnector connector = new IpmiConnector(0, 0);
+			try {
+				ConnectionHandle handle = openSession(connector, bmc, 17, PASSWORD, null, PrivilegeLevel.MaximumAvailable);
+				assertEquals(2, bmc.getCount(FakeRmcpPlusBmc.RAKP_1), "Administrator refused to the account, then Operator");
+				assertEquals(1, bmc.getCount(NETFN_APP, SET_SESSION_PRIVILEGE_LEVEL), "set to User after the handshake");
+				assertEquals(FakeRmcpPlusBmc.USER, bmc.getPrivilege());
+				int sessionId = connector
+						.getExistingSessionForCriteria(bmc.getAddress(), bmc.getPort(), USER)
+						.getManagedSystemSessionId();
+				assertEquals(2, connector.sendMessage(handle, new GetSessionInfo(sessionId)).getPrivilegeLevel());
+
+				// The caller raises it when a command needs more, up to the limit of the account
+				connector.sendMessage(handle, new SetSessionPrivilegeLevel(PrivilegeLevel.Operator));
+				assertEquals(FakeRmcpPlusBmc.OPERATOR, bmc.getPrivilege());
+				IPMIException refused = assertThrows(
+						IPMIException.class,
+						() -> connector.sendMessage(handle, new SetSessionPrivilegeLevel(PrivilegeLevel.Administrator)));
+				assertEquals(SetSessionPrivilegeLevel.LEVEL_ABOVE_LIMIT, refused.getRawCode());
 				assertEquals(Collections.emptyList(), bmc.getErrors());
 			} finally {
 				connector.tearDown();
