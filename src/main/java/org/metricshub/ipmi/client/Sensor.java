@@ -35,6 +35,7 @@ import org.metricshub.ipmi.core.coding.commands.sdr.GetSensorReadingResponseData
 import org.metricshub.ipmi.core.coding.commands.sdr.record.AbstractSensorRecord;
 import org.metricshub.ipmi.core.coding.commands.sdr.record.EntityId;
 import org.metricshub.ipmi.core.coding.commands.sdr.record.FullSensorRecord;
+import org.metricshub.ipmi.core.coding.commands.sdr.record.InstanceModifierType;
 import org.metricshub.ipmi.core.coding.commands.sdr.record.ReadingType;
 import org.metricshub.ipmi.core.coding.commands.sdr.record.SensorReadingFactors;
 import org.metricshub.ipmi.core.coding.commands.sdr.record.SensorRecord;
@@ -55,10 +56,14 @@ import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 		+ "are handed out by reference for the callers that need their every field")
 public final class Sensor {
 
+	/** Letters of an alpha ID string instance modifier (IPMI 2.0 section 43.2). */
+	private static final int ALPHABET = 26;
+
 	/** Event/reading type code of the threshold sensors (IPMI 2.0 table 42-1). */
 	private static final int THRESHOLD_EVENT_READING_TYPE = 1;
 
 	private final AbstractSensorRecord record;
+	private final int instance;
 	private final GetSensorReadingResponseData reading;
 	private final SensorReadingFactors factors;
 	private final String problem;
@@ -67,10 +72,12 @@ public final class Sensor {
 
 	private Sensor(
 			AbstractSensorRecord record,
+			int instance,
 			GetSensorReadingResponseData reading,
 			SensorReadingFactors factors,
 			String problem) {
 		this.record = record;
+		this.instance = instance;
 		this.reading = reading;
 		this.factors = factors;
 		this.problem = problem;
@@ -96,6 +103,26 @@ public final class Sensor {
 			GetSensorReadingResponseData reading,
 			SensorReadingFactors factors,
 			String problem) {
+		return of(record, 0, reading, factors, problem);
+	}
+
+	/**
+	 * Creates one of the sensors sharing a record (IPMI 2.0 table 43-2, bytes 24 and 25) from the record, its index
+	 * among them and the replies of the BMC.
+	 *
+	 * @param record the Full or Compact sensor record of the sensor
+	 * @param instance the index of the sensor among those sharing the record: 0 for the sensor number of the record
+	 * @param reading the reply to Get Sensor Reading, or null when the BMC gave none
+	 * @param factors the factors of the reading of a non-linear sensor, or null
+	 * @param problem why the BMC gave no reading, or null when it gave one
+	 * @return the sensor
+	 */
+	static Sensor of(
+			AbstractSensorRecord record,
+			int instance,
+			GetSensorReadingResponseData reading,
+			SensorReadingFactors factors,
+			String problem) {
 		String why = problem;
 		if (why == null && reading != null) {
 			if (!reading.isSensorStateValid()) {
@@ -104,7 +131,54 @@ public final class Sensor {
 				why = "Sensor scanning is disabled";
 			}
 		}
-		return new Sensor(record, reading, factors, why);
+		return new Sensor(record, instance, reading, factors, why);
+	}
+
+	/**
+	 * Returns the number of sensors a record describes: its share count, 1 for a Full record and for a Compact record
+	 * whose share count is 0 or 1 (IPMI 2.0 table 43-2, byte 24).
+	 *
+	 * @param record the Full or Compact sensor record
+	 * @return the number of sensors, at least 1
+	 */
+	static int instances(AbstractSensorRecord record) {
+		return Math.max(1, record.getShareCount());
+	}
+
+	/**
+	 * Names one of the sensors sharing a record (IPMI 2.0 section 43.2, "ID String Instance Modifier"): the ID string
+	 * followed by a space and the number (instance modifier offset plus the index of the sensor) for a numeric
+	 * modifier, or the letters of that number in base 26 (0 is A, 25 is Z, 26 is AA) for an alpha modifier. When the ID
+	 * string of a numeric modifier already ends with a number, that number is the one of the first sensor and is
+	 * incremented instead: Dell iDRACs name their drive slots {@code Drive 0} (15 sensors) and {@code Drive 15} (9
+	 * sensors), which this rule names {@code Drive 0} to {@code Drive 23}.
+	 *
+	 * @param record the Full or Compact sensor record
+	 * @param instance the index of the sensor among those sharing the record
+	 * @return the name, the ID string itself for a record that describes a single sensor
+	 */
+	static String instanceName(AbstractSensorRecord record, int instance) {
+		String id = record.getName();
+		if (instances(record) == 1) {
+			return id;
+		}
+		int number = record.getIdInstanceModifierOffset() + instance;
+		if (record.getIdInstanceModifierType() == InstanceModifierType.Alpha) {
+			String letters = number < ALPHABET ?
+					String.valueOf((char) ('A' + number)) :
+					new String(new char[]
+					{ (char) ('A' + number / ALPHABET - 1), (char) ('A' + number % ALPHABET) });
+			return id.trim() + ' ' + letters;
+		}
+		String base = id.trim();
+		int digits = base.length();
+		while (digits > 0 && Character.isDigit(base.charAt(digits - 1))) {
+			digits--;
+		}
+		if (digits < base.length() && base.length() - digits < 10) {
+			return base.substring(0, digits) + (Integer.parseInt(base.substring(digits)) + instance);
+		}
+		return base + ' ' + number;
 	}
 
 	static boolean isValid(GetSensorReadingResponseData reading) {
@@ -136,21 +210,26 @@ public final class Sensor {
 	}
 
 	/**
-	 * Returns the name of the sensor, from the ID string of its record.
+	 * Returns the name of the sensor, from the ID string of its record. A sensor sharing its record with others (a
+	 * Compact record with a share count above 1) gets the ID string followed by its instance modifier: {@code Drive 0},
+	 * {@code Drive 1}... for a numeric modifier, {@code Temp A}, {@code Temp B}... for an alpha one (IPMI 2.0 section
+	 * 43.2). When the ID string already ends with a number, as on Dell iDRACs ({@code Drive 0} for 15 drive slots), that
+	 * number is incremented instead.
 	 *
 	 * @return the name, empty (never {@code null}) when the record has no ID string
 	 */
 	public String name() {
-		return record.getName();
+		return instanceName(record, instance);
 	}
 
 	/**
-	 * Returns the sensor number, unique for the owner of the sensor.
+	 * Returns the sensor number, unique for the owner of the sensor: the number of the record plus the index of the
+	 * sensor among those sharing it.
 	 *
 	 * @return the sensor number, 0 to 255
 	 */
 	public int number() {
-		return TypeConverter.byteToInt(record.getSensorNumber());
+		return TypeConverter.byteToInt(record.getSensorNumber()) + instance;
 	}
 
 	/**
@@ -172,12 +251,15 @@ public final class Sensor {
 	}
 
 	/**
-	 * Returns the instance of the entity the sensor monitors: 1 for the first processor, 2 for the second one.
+	 * Returns the instance of the entity the sensor monitors: 1 for the first processor, 2 for the second one. For a
+	 * sensor sharing its record with others, the instance of the record plus the index of the sensor when the record
+	 * says the entity instance increments (IPMI 2.0 table 43-2, byte 25 bit 7), the instance of the record otherwise.
 	 *
 	 * @return the entity instance, 0 to 255
 	 */
 	public int entityInstance() {
-		return TypeConverter.byteToInt(record.getEntityInstanceNumber());
+		return TypeConverter.byteToInt(record.getEntityInstanceNumber())
+				+ (record.isEntityInstanceIncrements() ? instance : 0);
 	}
 
 	/**

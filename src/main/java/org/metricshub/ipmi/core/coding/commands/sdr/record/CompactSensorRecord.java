@@ -38,6 +38,4 @@ public class CompactSensorRecord extends AbstractSensorRecord {
 			populateName(recordData, 31);
 		}
 	}
-
-	// TODO: Generate multiple records from instance modifiers (?)
 }

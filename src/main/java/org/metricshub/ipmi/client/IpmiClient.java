@@ -44,7 +44,7 @@ import java.util.concurrent.Future;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
-import java.util.function.Predicate;
+import java.util.function.BiPredicate;
 
 import org.metricshub.ipmi.core.api.async.ConnectionHandle;
 import org.metricshub.ipmi.core.api.sol.SOLException;
@@ -475,7 +475,7 @@ public final class IpmiClient implements AutoCloseable {
 		}
 	}
 
-	SensorList readSensors(Predicate<AbstractSensorRecord> selection, Duration deadline) {
+	SensorList readSensors(BiPredicate<AbstractSensorRecord, String> selection, Duration deadline) {
 		return run("sensors", deadline, true, true, () -> {
 			SdrRepository sdr = repository();
 			List<Sensor> sensors = new ArrayList<Sensor>();
@@ -483,9 +483,17 @@ public final class IpmiClient implements AutoCloseable {
 			Set<Integer> silentOwners = new HashSet<Integer>();
 			for (SensorRecord record : sdr.records()) {
 				// Only the Full and Compact sensor records have a reading (IPMI 2.0 section 43)
-				if ((record instanceof FullSensorRecord || record instanceof CompactSensorRecord)
-						&& selection.test((AbstractSensorRecord) record)) {
-					sensors.add(readSensor((AbstractSensorRecord) record, silentOwners));
+				if (!(record instanceof FullSensorRecord || record instanceof CompactSensorRecord)) {
+					continue;
+				}
+				AbstractSensorRecord sensorRecord = (AbstractSensorRecord) record;
+				// A Compact record with a share count of N describes N sensors with consecutive numbers (IPMI 2.0 table
+				// 43-2, byte 24); a count that runs past sensor number 255 is cut there
+				int first = TypeConverter.byteToInt(sensorRecord.getSensorNumber());
+				for (int instance = 0; instance < Sensor.instances(sensorRecord) && first + instance <= 0xff; instance++) {
+					if (selection.test(sensorRecord, Sensor.instanceName(sensorRecord, instance))) {
+						sensors.add(readSensor(sensorRecord, instance, silentOwners));
+					}
 				}
 			}
 			return new SensorList(sensors, sdr.skippedRecords());
@@ -497,11 +505,12 @@ public final class IpmiClient implements AutoCloseable {
 	 * another controller, through the BMC (Send Message); none for a sensor of system software, whose number the BMC
 	 * would answer for one of its own sensors.
 	 */
-	private Sensor readSensor(AbstractSensorRecord record, Set<Integer> silentOwners) {
+	private Sensor readSensor(AbstractSensorRecord record, int instance, Set<Integer> silentOwners) {
 		if (record.getAddressType() == AddressType.SystemSoftwareId) {
 			return Sensor
 					.of(
 							record,
+							instance,
 							null,
 							null,
 							String
@@ -514,9 +523,9 @@ public final class IpmiClient implements AutoCloseable {
 				| ownerAddress(record) << 2
 				| TypeConverter.byteToInt(record.getSensorOwnerLun());
 		if (bridged && silentOwners.contains(owner)) {
-			return Sensor.of(record, null, null, "No reply from " + describeOwner(record) + " through the BMC");
+			return Sensor.of(record, instance, null, null, "No reply from " + describeOwner(record) + " through the BMC");
 		}
-		int number = TypeConverter.byteToInt(record.getSensorNumber());
+		int number = TypeConverter.byteToInt(record.getSensorNumber()) + instance;
 		int lun = TypeConverter.byteToInt(record.getSensorOwnerLun());
 		GetSensorReadingResponseData reading = null;
 		try {
@@ -528,9 +537,14 @@ public final class IpmiClient implements AutoCloseable {
 				// IPMI 2.0 section 36.2: the factors of the record hold at the nominal reading only
 				int raw = (int) reading.getPlainSensorReading();
 				return Sensor
-						.of(record, reading, sendToOwner(record, new GetSensorReadingFactors(number, raw, lun)).getFactors(), null);
+						.of(
+								record,
+								instance,
+								reading,
+								sendToOwner(record, new GetSensorReadingFactors(number, raw, lun)).getFactors(),
+								null);
 			}
-			return Sensor.of(record, reading, null, null);
+			return Sensor.of(record, instance, reading, null, null);
 		} catch (IpmiCompletionCodeException e) {
 			// A reading the BMC refuses (not present, insufficient privilege...) costs that sensor, not the whole walk;
 			// refused factors cost its reading only
@@ -538,6 +552,7 @@ public final class IpmiClient implements AutoCloseable {
 			return Sensor
 					.of(
 							record,
+							instance,
 							reading,
 							null,
 							(reading == null ? "Get Sensor Reading" : "Get Sensor Reading Factors")
@@ -558,6 +573,7 @@ public final class IpmiClient implements AutoCloseable {
 			return Sensor
 					.of(
 							record,
+							instance,
 							reading,
 							null,
 							"No reply from " + describeOwner(record) + " through the BMC"
@@ -566,7 +582,7 @@ public final class IpmiClient implements AutoCloseable {
 			throw e;
 		} catch (IpmiClientException e) {
 			// A reply the BMC malformed costs that sensor too
-			return Sensor.of(record, reading, null, e.getMessage());
+			return Sensor.of(record, instance, reading, null, e.getMessage());
 		}
 	}
 

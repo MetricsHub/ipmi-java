@@ -7,6 +7,13 @@ description: What changes when upgrading the IPMI Java Client — from 2.0.00, f
 
 ## Upgrading from 2.0.00
 
+* A Compact sensor record shared by several sensors (share count above 1, IPMI 2.0 section 43.2)
+  gives one `Sensor` per sensor: `sensors()` and `ipmicli sensors` list every drive slot and DIMM
+  slot sensor of a Dell iDRAC (`Drive 0` to `Drive 23`, `A 1` to `A 12`), each with its own
+  reading, where 2.0.00 listed the first one only, under the bare ID string of the record. The
+  `number()`, `name()` and `entityInstance()` of each sensor follow the record sharing fields
+  ([Shared records](sensors.html#shared-records)); the `record()` is the same object for all of
+  them. A BMC without shared records gets the same sensors as before.
 * The MD5-128 integrity algorithm (IPMI 2.0 section 13.28.4: a plain MD5 of the password around
   each message) is implemented: cipher suites 11 and 12 open sessions, where 2.0.00 failed with
   `IllegalArgumentException: Integrity algorithm MD5-128 is not yet implemented.`, and

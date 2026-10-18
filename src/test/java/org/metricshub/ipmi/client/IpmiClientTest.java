@@ -47,6 +47,7 @@ import static org.metricshub.ipmi.core.transport.FakeSdrRepository.compactSensor
 import static org.metricshub.ipmi.core.transport.FakeSdrRepository.fruDeviceLocatorRecord;
 import static org.metricshub.ipmi.core.transport.FakeSdrRepository.record;
 import static org.metricshub.ipmi.core.transport.FakeSdrRepository.withOwner;
+import static org.metricshub.ipmi.core.transport.FakeSdrRepository.withSharing;
 import static org.metricshub.ipmi.core.transport.FakeSel.GET_SEL_ENTRY;
 import static org.metricshub.ipmi.core.transport.FakeSel.GET_SEL_INFO;
 import static org.metricshub.ipmi.core.transport.FakeSel.RESERVE_SEL;
@@ -995,6 +996,87 @@ class IpmiClientTest {
 					assertTrue(sensor.problem().get().contains("GetSensorReading"), sensor.problem().get());
 				}
 				assertEquals(1, bmc.getCount(OPEN_SESSION_REQUEST), "a malformed reply does not lose the session");
+			}
+		}
+	}
+
+	@Test
+	@Timeout(30)
+	void aSharedRecordYieldsOneSensorPerInstance() throws Exception {
+		try (FakeRmcpPlusBmc bmc = new FakeRmcpPlusBmc(SUITES, USER, utf8(PASSWORD), null)) {
+			byte[] drives = compactSensorRecord(
+					1,
+					0x80,
+					EntityId.DiskDriveBay.getCode(),
+					1,
+					SensorType.DriveBay.getCode(),
+					0x6f,
+					"Drive");
+			byte[] dellDrives = compactSensorRecord(
+					2,
+					0x90,
+					EntityId.SystemBoard.getCode(),
+					1,
+					SensorType.DriveBay.getCode(),
+					0x6f,
+					"Drive 15");
+			byte[] temperatures = compactSensorRecord(
+					3,
+					0xa0,
+					EntityId.Processor.getCode(),
+					1,
+					SensorType.Temperature.getCode(),
+					0x05,
+					"Temp ");
+			new FakeSdrRepository()
+					// Three drive slots: the spec example, numeric modifier from 0
+					.add(withSharing(drives, 3, false, 0, false))
+					// Dell style: the ID string already carries the number of the first slot
+					.add(withSharing(dellDrives, 2, false, 0, false))
+					// Alpha modifier from Z, one processor each
+					.add(withSharing(temperatures, 2, true, 25, true))
+					.reading(0x80, 0x00, 0x40, 0x01)
+					.reading(0x81, 0x00, 0x40, 0x00)
+					// 0x82 is not present: the BMC refuses its reading
+					.reading(0x90, 0x00, 0x40, 0x01)
+					.reading(0x91, 0x00, 0x40, 0x01)
+					.reading(0xa0, 0x00, 0x40, 0x00)
+					.reading(0xa1, 0x00, 0x40, 0x00)
+					.install(bmc);
+			try (IpmiClient client = client(bmc).build()) {
+				SensorList sensors = client.sensors().execute();
+				assertEquals(7, sensors.size(), sensors.toString());
+				assertEquals("Drive 0", sensors.get(0).name());
+				assertEquals(0x80, sensors.get(0).number());
+				assertEquals(1, sensors.get(0).entityInstance());
+				assertEquals(ReadingType.DrivePresence, sensors.get(0).rawStates().get(0));
+				assertEquals("Drive 1", sensors.get(1).name());
+				assertEquals(0x81, sensors.get(1).number());
+				assertEquals(1, sensors.get(1).entityInstance(), "the entity instance does not increment");
+				assertTrue(sensors.get(1).rawStates().isEmpty());
+				assertEquals("Drive 2", sensors.get(2).name());
+				assertEquals(0x82, sensors.get(2).number());
+				assertEquals(SensorStatus.UNAVAILABLE, sensors.get(2).status(), "a refused instance costs itself only");
+				assertTrue(sensors.get(2).problem().get().contains("CBh"), sensors.get(2).problem().get());
+				assertEquals("Drive 15", sensors.get(3).name());
+				assertEquals("Drive 16", sensors.get(4).name());
+				assertEquals(0x91, sensors.get(4).number());
+				assertEquals("Temp Z", sensors.get(5).name());
+				assertEquals(1, sensors.get(5).entityInstance());
+				assertEquals("Temp AA", sensors.get(6).name());
+				assertEquals(0xa1, sensors.get(6).number());
+				assertEquals(2, sensors.get(6).entityInstance(), "the entity instance increments");
+				assertSame(sensors.get(5).record(), sensors.get(6).record(), "one record for both sensors");
+				assertEquals(7, bmc.getCount(NETFN_SENSOR, GET_SENSOR_READING));
+
+				SensorList selected = client.sensors().names("drive 1*").execute();
+				assertEquals(3, selected.size(), selected.toString());
+				assertEquals("Drive 1", selected.get(0).name());
+				assertEquals("Drive 15", selected.get(1).name());
+				assertEquals("Drive 16", selected.get(2).name());
+				assertEquals(10, bmc.getCount(NETFN_SENSOR, GET_SENSOR_READING), "only the selected instances are read");
+				assertEquals(1, bmc.getCount(OPEN_SESSION_REQUEST));
+				assertEquals(Collections.emptyList(), bmc.getErrors());
 			}
 		}
 	}

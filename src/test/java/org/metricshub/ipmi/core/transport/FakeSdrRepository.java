@@ -376,6 +376,28 @@ public final class FakeSdrRepository {
 	}
 
 	/**
+	 * Returns a copy of a Compact sensor record shared by several sensors (IPMI 2.0 table 43-2, bytes 24 and 25).
+	 *
+	 * @param record the Compact sensor record
+	 * @param shareCount the number of sensors sharing the record, 2 to 15
+	 * @param alpha whether the ID string instance modifier is alpha (numeric otherwise)
+	 * @param modifierOffset the ID string instance modifier offset, 0 to 127
+	 * @param entityIncrements whether the entity instance increments for each sensor
+	 * @return the copy
+	 */
+	public static byte[] withSharing(
+			byte[] record,
+			int shareCount,
+			boolean alpha,
+			int modifierOffset,
+			boolean entityIncrements) {
+		byte[] copy = record.clone();
+		copy[23] = (byte) (copy[23] & 0xc0 | (alpha ? 0x10 : 0) | shareCount);
+		copy[24] = (byte) ((entityIncrements ? 0x80 : 0) | modifierOffset);
+		return copy;
+	}
+
+	/**
 	 * Builds a FRU Device Locator Record (IPMI 2.0 table 43-7) of a logical FRU device.
 	 *
 	 * @param recordId the record ID
