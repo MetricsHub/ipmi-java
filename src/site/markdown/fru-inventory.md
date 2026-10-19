@@ -43,9 +43,10 @@ the deadline of the client for this operation:
 FruList frus = bmc.frus().ids(0, 1).timeout(Duration.ofSeconds(30)).execute();
 ```
 
-The FRU data is read in chunks of 16 bytes, which keeps the requests small but makes large FRUs
-slow to read: a few seconds per FRU on some BMCs
-([#102](https://github.com/metricshub/ipmi-java/issues/102)).
+The FRU data is read in chunks of as many bytes as the controller returns at once: the first Read
+FRU Data asks for 255 bytes, and a refusal (`C7h` to `CAh`) halves the count, down to the 16 bytes
+every BMC answers. The count a controller accepts serves its other FRUs. Most BMCs answer 255
+bytes; a Dell iDRAC 8 or a Cisco IMC answers 16, which makes a large FRU take a few seconds there.
 
 A FRU whose data cannot be read entirely — not present, a read refused at some offset, an area
 that cannot be decoded — is returned with what could be decoded, `complete()` false and the

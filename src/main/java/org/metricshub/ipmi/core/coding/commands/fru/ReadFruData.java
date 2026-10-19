@@ -169,7 +169,8 @@ public class ReadFruData extends IpmiCommandCoder<ReadFruDataResponseData> {
 
 		byte[] raw = validateResponse(message);
 
-		if (raw == null || raw.length < 2) {
+		// Table 34-3: the count returned, then that many bytes; a count of 0 with no data is a well-formed reply
+		if (raw == null || raw.length < 1) {
 			throw new IllegalArgumentException(
 					"Invalid response payload length");
 		}
@@ -177,6 +178,11 @@ public class ReadFruData extends IpmiCommandCoder<ReadFruDataResponseData> {
 		ReadFruDataResponseData responseData = new ReadFruDataResponseData();
 
 		int sizeFromResponse = TypeConverter.byteToInt(raw[0]);
+
+		if (raw.length < 1 + sizeFromResponse) {
+			throw new IllegalArgumentException(
+					"Response shorter than its count: " + (raw.length - 1) + " of " + sizeFromResponse + " byte(s)");
+		}
 
 		byte[] fruData = new byte[sizeFromResponse];
 

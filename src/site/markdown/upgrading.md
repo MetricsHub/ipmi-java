@@ -7,6 +7,13 @@ description: What changes when upgrading the IPMI Java Client — from 2.0.00, f
 
 ## Upgrading from 2.0.00
 
+* Read FRU Data asks for 255 bytes at a time instead of 16, and halves the count when the
+  controller refuses it (`C7h` to `CAh`), down to 16
+  ([How the FRUs are read](fru-inventory.html#how-the-frus-are-read)): the FRUs of a BMC that
+  answers large reads come back up to 16 times faster, and the others as before. A FRU truncated
+  by a lost reply or a refused read reports the exact offset reached in its `problems()`, where
+  2.0.00 reported a multiple of 16; a controller that returns no data within the size it declared
+  is now reported (`No data returned`) instead of being read again at the same offset.
 * Each FRU is read from the controller and at the LUN its FRU Device Locator record names
   (IPMI 2.0 table 43-7, [How the FRUs are read](fru-inventory.html#how-the-frus-are-read)):
   at the access LUN of the record when the BMC holds it, where 2.0.00 always addressed LUN 0, and

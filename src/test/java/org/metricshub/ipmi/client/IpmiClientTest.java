@@ -831,6 +831,119 @@ class IpmiClientTest {
 
 	@Test
 	@Timeout(30)
+	void aBmcThatRefusesLargeReadsIsReadInSmallerChunksAndAskedOnce() throws Exception {
+		try (FakeRmcpPlusBmc bmc = new FakeRmcpPlusBmc(SUITES, USER, utf8(PASSWORD), null)) {
+			new FakeSdrRepository()
+					.add(fruDeviceLocatorRecord(1, 0, EntityId.SystemBoard.getCode(), 1, "Board"))
+					.add(fruDeviceLocatorRecord(2, PSU_FRU, EntityId.PowerSupply.getCode(), 1, "PSU 1"))
+					.fru(0, BASE_BOARD_PRODUCT_INFO)
+					.fru(PSU_FRU, DDR4_SPD)
+					.readLimit(32)
+					.install(bmc);
+			try (IpmiClient client = client(bmc).build()) {
+				FruList frus = client.frus().execute();
+				assertEquals(2, frus.size(), frus.toString());
+				for (Fru fru : frus) {
+					assertTrue(fru.complete(), fru.problems().toString());
+				}
+				assertEquals("Samsung", frus.get(1).manufacturer());
+				int refused = 3; // 255, 128 and 64 refused, 32 accepted, once for both FRUs of the BMC
+				int chunks = (BASE_BOARD_PRODUCT_INFO.length + 31) / 32 + (DDR4_SPD.length + 31) / 32;
+				assertEquals(refused + chunks, bmc.getCount(NETFN_STORAGE, READ_FRU_DATA));
+			}
+		}
+	}
+
+	@Test
+	@Timeout(30)
+	void aRefusedCountBacksOffFromTheCountSent() throws Exception {
+		try (FakeRmcpPlusBmc bmc = new FakeRmcpPlusBmc(SUITES, USER, utf8(PASSWORD), null)) {
+			// A 40-byte FRU on a controller that answers 32 bytes at most: 40 refused, then 32 and 8
+			new FakeSdrRepository()
+					.add(fruDeviceLocatorRecord(1, 0, EntityId.SystemBoard.getCode(), 1, "Board"))
+					.fru(0, Arrays.copyOf(BASE_BOARD_PRODUCT_INFO, 40))
+					.readLimit(32)
+					.install(bmc);
+			try (IpmiClient client = client(bmc).build()) {
+				Fru fru = client.frus().ids(0).execute().get(0);
+				assertEquals(3, bmc.getCount(NETFN_STORAGE, READ_FRU_DATA), "40 refused, 32 and 8 answered");
+				assertFalse(fru.problems().toString().contains("CAh"), fru.problems().toString());
+			}
+		}
+	}
+
+	@Test
+	@Timeout(30)
+	void aWordAddressedFruIsReadAnEvenNumberOfBytesAtATime() throws Exception {
+		try (FakeRmcpPlusBmc bmc = new FakeRmcpPlusBmc(SUITES, USER, utf8(PASSWORD), null)) {
+			new FakeSdrRepository()
+					.add(fruDeviceLocatorRecord(1, 0, EntityId.SystemBoard.getCode(), 1, "Board"))
+					.wordFru(0, BASE_BOARD_PRODUCT_INFO)
+					.install(bmc);
+			try (IpmiClient client = client(bmc).build()) {
+				Fru fru = client.frus().ids(0).execute().get(0);
+				assertTrue(fru.complete(), fru.problems().toString());
+				assertEquals("IBM", fru.manufacturer());
+				assertEquals("System x3650 M2", fru.model(), "the product area lies in the second chunk");
+				assertEquals("KD9098C", fru.serialNumber());
+				int chunks = (BASE_BOARD_PRODUCT_INFO.length + 253) / 254;
+				assertEquals(chunks, bmc.getCount(NETFN_STORAGE, READ_FRU_DATA), "254 bytes at a time, 255 would be odd");
+			}
+		}
+	}
+
+	@Test
+	@Timeout(30)
+	void aReadRefusedAtTheSmallestCountIsReported() throws Exception {
+		try (FakeRmcpPlusBmc bmc = new FakeRmcpPlusBmc(SUITES, USER, utf8(PASSWORD), null)) {
+			new FakeSdrRepository()
+					.add(fruDeviceLocatorRecord(1, 0, EntityId.SystemBoard.getCode(), 1, "Board"))
+					.fru(0, BASE_BOARD_PRODUCT_INFO)
+					.readLimit(8)
+					.install(bmc);
+			try (IpmiClient client = client(bmc).build()) {
+				Fru fru = client.frus().ids(0).execute().get(0);
+				assertFalse(fru.complete());
+				assertTrue(fru.problems().get(0).startsWith("Cannot read FRU 0: "), fru.problems().toString());
+				assertTrue(fru.problems().get(0).contains("CAh"), fru.problems().toString());
+				assertEquals(5, bmc.getCount(NETFN_STORAGE, READ_FRU_DATA), "255, 128, 64, 32 and 16 refused");
+			}
+		}
+	}
+
+	@Test
+	@Timeout(30)
+	void aReplyShorterThanAskedAdvancesByTheBytesReturned() throws Exception {
+		try (FakeRmcpPlusBmc bmc = new FakeRmcpPlusBmc(SUITES, USER, utf8(PASSWORD), null)) {
+			FakeSdrRepository repository = new FakeSdrRepository()
+					.add(fruDeviceLocatorRecord(1, 0, EntityId.SystemBoard.getCode(), 1, "Board"))
+					.fru(0, BASE_BOARD_PRODUCT_INFO);
+			repository.install(bmc);
+			// At most 10 bytes per reply, whatever the count asked, and none from offset 40 on
+			bmc.handle(NETFN_STORAGE, READ_FRU_DATA, data -> {
+				byte[] reply = repository.readFruData(bmc.getRequestLun(), data);
+				int offset = (data[1] & 0xff) | (data[2] & 0xff) << 8;
+				if (offset >= 40) {
+					return new byte[] { 0x00, 0x00 };
+				}
+				if (reply.length <= 12) {
+					return reply;
+				}
+				byte[] cut = Arrays.copyOf(reply, 12);
+				cut[1] = 10;
+				return cut;
+			});
+			try (IpmiClient client = client(bmc).build()) {
+				Fru fru = client.frus().ids(0).execute().get(0);
+				assertFalse(fru.complete());
+				assertEquals("FRU 0 is truncated at offset 40: No data returned", fru.problems().get(0));
+				assertEquals(5, bmc.getCount(NETFN_STORAGE, READ_FRU_DATA), "four replies of 10 bytes, then an empty one");
+			}
+		}
+	}
+
+	@Test
+	@Timeout(30)
 	void aMalformedFruReplyCostsThatFruOnly() throws Exception {
 		try (FakeRmcpPlusBmc bmc = bmc()) {
 			// A byte count larger than the bytes returned: the reply cannot be decoded
@@ -1225,7 +1338,7 @@ class IpmiClientTest {
 						"the same address on another channel is another controller");
 
 				assertEquals(3, bmc.getCount(NETFN_STORAGE, GET_FRU_INVENTORY_AREA_INFO), "FRU 0, FRU 5 at LUN 0 and at LUN 1");
-				int chunks = (BASE_BOARD_PRODUCT_INFO.length + 15) / 16;
+				int chunks = (BASE_BOARD_PRODUCT_INFO.length + 254) / 255;
 				assertEquals(
 						(1 + chunks) + 1 + 2 + 2 + (1 + 2) + (1 + chunks) + 1,
 						bmc.getCount(NETFN_APP, SEND_MESSAGE),
