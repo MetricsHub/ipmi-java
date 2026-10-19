@@ -1,4 +1,4 @@
-keywords: sensors, sdr, sensor data record, sensor reading, thresholds, temperature, voltage, fan, power, states, non-linear, get sensor reading factors, sensor owner, lun, satellite controller, send message, bridging, get device sdr
+keywords: sensors, sdr, sensor data record, sensor reading, thresholds, temperature, voltage, fan, power, states, non-linear, get sensor reading factors, sensor owner, lun, satellite controller, send message, bridging, get device sdr, shared record, share count, instance modifier
 description: Read the sensors of a server through its BMC — how the SDR repository is walked, selecting sensors, and the Sensor object with its reading, thresholds, status and states.
 
 # Sensors
@@ -27,7 +27,8 @@ try (IpmiClient bmc = IpmiClient.builder(host).credentials(user, password).build
    (**Reserve SDR Repository**) when the BMC requires it or cancels the reservation; the walk is
    done once per client and shared with `frus()` ([SDR cache](configuration.html#sdr-cache));
 2. sends **Get Sensor Reading** for every selected **Full Sensor** and **Compact Sensor** record,
-   to the owner the record names ([Sensor owners](#sensor-owners)).
+   to the owner the record names ([Sensor owners](#sensor-owners)); a Compact record shared by
+   several sensors is read once per sensor ([Shared records](#shared-records)).
 
 Event-Only records (sensors without a reading), the locator and association records, and the
 OEM records are part of the walk but are not returned. A record the library cannot decode is
@@ -90,7 +91,7 @@ Each [`Sensor`](apidocs/org/metricshub/ipmi/client/Sensor.html) is immutable and
 
 | Method | Content |
 | --- | --- |
-| `name()` | The sensor name of the SDR record (`CPU1 Temp`, `PSU2 Present`, ...) |
+| `name()` | The sensor name of the SDR record (`CPU1 Temp`, `PSU2 Present`, ...), with its instance modifier for a sensor that shares its record (`Drive 3`, `Temp B`) |
 | `number()` | The sensor number |
 | `type()` | What it measures or monitors: [`SensorType`](apidocs/org/metricshub/ipmi/core/coding/commands/sdr/record/SensorType.html) (`Temperature`, `Voltage`, `Fan`, `PowerSupply`, ...) |
 | `entity()`, `entityInstance()` | The entity the sensor belongs to: its type (`EntityId.Processor`, `EntityId.PowerSupply`, ...) and instance number |
@@ -137,9 +138,26 @@ threshold the BMC finds the reading at or beyond.
 disabled), when the record has no analog reading, or when it refused the reading or the factors
 of a non-linear sensor: `problem()` says which.
 
-> [!NOTE]
-> A Compact record that describes several shared sensors is reported as a single sensor
-> ([#100](https://github.com/metricshub/ipmi-java/issues/100)).
+### Shared records
+
+A Compact record with a **share count** of N describes N discrete sensors with consecutive
+sensor numbers (IPMI 2.0 section 43.2): Dell iDRACs describe their drive slots with one `Drive 0`
+record shared by 15 sensors, and their DIMM slots with an `A` record shared by 12. `sensors()`
+returns one `Sensor` per shared sensor, each read with its own Get Sensor Reading, with the same
+`record()`:
+
+- `number()` is the sensor number of the record plus the index of the sensor;
+- `name()` is the ID string followed by its **instance modifier**: the modifier offset plus the
+  index for a numeric modifier (`Drive 0`, `Drive 1`, ...), the letters of that number in base 26
+  for an alpha one (`Temp A`, ..., `Temp Z`, `Temp AA`). When the ID string already ends with a
+  number, as on Dell iDRACs (`Drive 0` for the first 15 slots, `Drive 15` for the next 9), that
+  number is the one of the first sensor and is incremented instead (`Drive 0` to `Drive 23`);
+- `entityInstance()` increments with the index when the record says so, and is the instance of
+  the record otherwise.
+
+`names()` globs match the expanded names (`names("Drive 1?")` selects `Drive 10` to `Drive 19`),
+and a sensor the BMC refuses (an empty drive slot answers `CBh` on some BMCs) costs that sensor
+only: its `problem()` says so and the others are read.
 
 ### States
 

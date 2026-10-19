@@ -100,14 +100,13 @@ public final class SensorsRequest {
 		return client.readSensors(this::selects, timeout);
 	}
 
-	boolean selects(AbstractSensorRecord record) {
+	boolean selects(AbstractSensorRecord record, String name) {
 		if (types != null && !types.contains(record.getSensorType())) {
 			return false;
 		}
 		if (names == null) {
 			return true;
 		}
-		String name = record.getName();
 		for (Pattern pattern : names) {
 			if (pattern.matcher(name).matches()) {
 				return true;
