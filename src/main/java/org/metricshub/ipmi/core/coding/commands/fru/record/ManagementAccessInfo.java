@@ -47,7 +47,6 @@ public class ManagementAccessInfo extends MultiRecordInfo {
 	 */
 	public ManagementAccessInfo(byte[] fruData, int offset, int length) {
 		super();
-		// TODO: Test when server containing such records will be available
 
 		recordType = ManagementAccessRecordType
 				.parseInt(

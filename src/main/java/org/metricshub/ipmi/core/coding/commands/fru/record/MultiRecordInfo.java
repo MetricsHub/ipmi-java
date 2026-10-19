@@ -44,8 +44,6 @@ public abstract class MultiRecordInfo extends FruRecord {
 	public static MultiRecordInfo populateMultiRecord(final byte[] fruData, final int offset) {
 		MultiRecordInfo recordInfo = null;
 
-		// TODO: Test when server containing such records will be available
-
 		if ((TypeConverter.byteToInt(fruData[offset + 1]) & 0xf) != 0x2) {
 			throw new IllegalArgumentException("Invalid FRU record version");
 		}

@@ -68,7 +68,6 @@ public class DcLoadInfo extends MultiRecordInfo {
 	 */
 	public DcLoadInfo(byte[] fruData, int offset) {
 		super();
-		// TODO: Test when server containing such records will be available
 
 		outputNumber = TypeConverter.byteToInt(fruData[offset]) & 0xf;
 
