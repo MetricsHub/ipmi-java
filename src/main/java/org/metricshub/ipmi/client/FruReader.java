@@ -260,16 +260,21 @@ final class FruReader {
 			int size = info.getFruInventoryAreaSize();
 			BaseUnit unit = info.getFruUnit();
 			// The inventory is read in chunks of as many bytes as the controller answers at once: the first read asks
-			// for the most, and a refusal halves the count, as ipmitool does, down to what every BMC answers. The
-			// count a controller accepted serves its other FRUs
+			// for the most, and a refusal brings the count down to the power of two below it, as ipmitool backs off,
+			// to the least every BMC answers. The count a controller accepted serves its other FRUs. A word-addressed
+			// device (offsets sent in words) is read an even number of bytes at a time, but for the last read
 			int readSize = readSizes.getOrDefault(controller, MAX_READ_SIZE);
+			if (unit == BaseUnit.Words) {
+				readSize &= ~1;
+			}
 			while (offset < size) {
+				int count = Math.min(readSize, size - offset);
 				ReadFruDataResponseData chunk;
 				try {
-					chunk = send(locator, new ReadFruData(fruId, unit, offset, Math.min(readSize, size - offset), lun));
+					chunk = send(locator, new ReadFruData(fruId, unit, offset, count, lun));
 				} catch (IpmiCompletionCodeException e) {
-					if (readSize > MIN_READ_SIZE && isTooLong(e.rawCompletionCode())) {
-						readSize = Math.max(MIN_READ_SIZE, (readSize + 1) / 2);
+					if (count > MIN_READ_SIZE && isTooLong(e.rawCompletionCode())) {
+						readSize = Math.max(MIN_READ_SIZE, Integer.highestOneBit(count - 1));
 						readSizes.put(controller, readSize);
 						continue;
 					}

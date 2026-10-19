@@ -61,6 +61,7 @@ public final class FakeSdrRepository {
 	private volatile int deleteTimestamp = 1;
 	private volatile boolean infoSupported = true;
 	private volatile int readLimit = 255;
+	private final java.util.Set<Integer> wordFrus = ConcurrentHashMap.newKeySet();
 	private volatile boolean device;
 	private FakeRmcpPlusBmc bmc;
 
@@ -172,6 +173,19 @@ public final class FakeSdrRepository {
 	public FakeSdrRepository fruAtLun(int lun, int fruId, byte[] image) {
 		frus.put(lun << 8 | fruId, image.clone());
 		return this;
+	}
+
+	/**
+	 * Sets the inventory of a word-addressed FRU of the BMC at LUN 0: its area info says words, and Read FRU Data
+	 * takes its offset in words.
+	 *
+	 * @param fruId the FRU device ID
+	 * @param image the FRU inventory bytes
+	 * @return this repository
+	 */
+	public FakeSdrRepository wordFru(int fruId, byte[] image) {
+		wordFrus.add(fruId);
+		return fru(fruId, image);
 	}
 
 	/**
@@ -340,7 +354,7 @@ public final class FakeSdrRepository {
 				.order(ByteOrder.LITTLE_ENDIAN)
 				.put((byte) 0x00)
 				.putShort((short) image.length)
-				.put((byte) 0x00)
+				.put((byte) (wordFrus.contains(data[0] & 0xff) ? 0x01 : 0x00))
 				.array();
 	}
 
@@ -356,7 +370,8 @@ public final class FakeSdrRepository {
 		if (image == null) {
 			return new byte[] { (byte) 0xc3 };
 		}
-		int offset = (data[1] & 0xff) | (data[2] & 0xff) << 8;
+		// A word-addressed device takes its offset in words (table 34-3)
+		int offset = ((data[1] & 0xff) | (data[2] & 0xff) << 8) * (wordFrus.contains(data[0] & 0xff) ? 2 : 1);
 		int count = data[3] & 0xff;
 		if (count > readLimit) {
 			return new byte[] { (byte) 0xca }; // cannot return number of requested data bytes
