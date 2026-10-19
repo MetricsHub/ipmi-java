@@ -45,6 +45,7 @@ import org.metricshub.ipmi.core.coding.commands.sdr.record.CompactSensorRecord;
 import org.metricshub.ipmi.core.coding.commands.sdr.record.EntityId;
 import org.metricshub.ipmi.core.coding.commands.sdr.record.FruDeviceLocatorRecord;
 import org.metricshub.ipmi.core.coding.commands.sdr.record.SensorRecord;
+import org.metricshub.ipmi.core.coding.payload.CompletionCode;
 import org.metricshub.ipmi.core.coding.payload.lan.IpmiLanConstants;
 
 /**
@@ -108,7 +109,7 @@ final class FruReader {
 		for (SensorRecord record : records) {
 			if (record instanceof FruDeviceLocatorRecord) {
 				FruDeviceLocatorRecord locator = (FruDeviceLocatorRecord) record;
-				int key = key(address(locator), locator.getAccessLun(), locator.getDeviceId());
+				int key = key(locator);
 				if (locator.isLogical() && isSelected(locator.getDeviceId()) && returned.add(key)) {
 					if (key == SYSTEM_BOARD_KEY) {
 						frus.add(new Fru(locator, systemBoard, systemBoardProblems));
@@ -141,6 +142,15 @@ final class FruReader {
 
 	private static int key(int address, int lun, int id) {
 		return address << 10 | lun << 8 | id;
+	}
+
+	/**
+	 * Identifies the FRU a locator points at: by controller, LUN and ID, the controller being the BMC whatever the
+	 * channel of the record, or another address on a channel.
+	 */
+	private static int key(FruDeviceLocatorRecord locator) {
+		int channel = isBridged(locator) ? locator.getManagementChannelNumber() : 0;
+		return channel << 18 | key(address(locator), locator.getAccessLun(), locator.getDeviceId());
 	}
 
 	/** A locator of FRU 0 of the BMC at LUN 0, for the system board when no record locates it. */
@@ -228,8 +238,9 @@ final class FruReader {
 			return Collections.emptyList();
 		}
 		List<ReadFruDataResponseData> chunks = new ArrayList<ReadFruDataResponseData>();
+		GetFruInventoryAreaInfoResponseData info = null;
 		try {
-			GetFruInventoryAreaInfoResponseData info = send(locator, new GetFruInventoryAreaInfo(fruId, lun));
+			info = send(locator, new GetFruInventoryAreaInfo(fruId, lun));
 			int size = info.getFruInventoryAreaSize();
 			BaseUnit unit = info.getFruUnit();
 			// The inventory is read in chunks, as its size exceeds what one message carries
@@ -244,7 +255,7 @@ final class FruReader {
 			// The controller behind the BMC did not answer (absent, or the BMC does not forward its response): the
 			// session is fine, and the FRUs of the other controllers are read. A controller that answered the area
 			// info and not a chunk only costs this FRU
-			if (chunks.isEmpty()) {
+			if (info == null) {
 				silentControllers.add(controller);
 			}
 			problems.add(prefix(fruId, chunks.size()) + where + ": No reply through the BMC");
@@ -254,7 +265,11 @@ final class FruReader {
 			// A read the controller refused, or a reply it malformed. Stop here: the chunks after a gap would shift into
 			// its place and decode into wrong fields
 			String reason = e.getMessage();
-			if (bridged && e instanceof IpmiCompletionCodeException) {
+			if (bridged
+					&& e instanceof IpmiCompletionCodeException
+					&& ((IpmiCompletionCodeException) e).completionCode() == CompletionCode.Unknown) {
+				// A code neither command knows: the BMC's own answer to Send Message. A code the carried command
+				// knows (81h: FRU device busy) is the controller's, whatever Send Message makes of the same value
 				int code = ((IpmiCompletionCodeException) e).rawCompletionCode();
 				String meaning = SendMessage.describeCompletionCode(code);
 				if (meaning != null) {
