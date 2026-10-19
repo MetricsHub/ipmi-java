@@ -42,4 +42,12 @@ interface Exchange {
 	 * @throws IpmiClientException when the command cannot be sent
 	 */
 	<R extends ResponseData> R send(IpmiCommandCoder<R> command);
+
+	/**
+	 * Tells whether the session is lost: the BMC stopped answering. A command forwarded by the BMC to another
+	 * controller (Send Message) that got no reply of that controller does not lose the session.
+	 *
+	 * @return whether the BMC stopped answering
+	 */
+	boolean isLost();
 }

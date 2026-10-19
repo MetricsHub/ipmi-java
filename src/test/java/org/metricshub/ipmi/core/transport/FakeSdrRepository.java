@@ -78,8 +78,8 @@ public final class FakeSdrRepository {
 		bmc.handle(NETFN_SENSOR, GET_DEVICE_SDR, data -> deviceSdr(getSdr(data)));
 		bmc.handle(NETFN_SENSOR, GET_SENSOR_READING, this::getSensorReading);
 		bmc.handle(NETFN_SENSOR, GET_SENSOR_READING_FACTORS, this::getSensorReadingFactors);
-		bmc.handle(NETFN_STORAGE, GET_FRU_INVENTORY_AREA_INFO, this::fruInventoryAreaInfo);
-		bmc.handle(NETFN_STORAGE, READ_FRU_DATA, this::readFruData);
+		bmc.handle(NETFN_STORAGE, GET_FRU_INVENTORY_AREA_INFO, data -> fruInventoryAreaInfo(bmc.getRequestLun(), data));
+		bmc.handle(NETFN_STORAGE, READ_FRU_DATA, data -> readFruData(bmc.getRequestLun(), data));
 	}
 
 	/**
@@ -157,7 +157,19 @@ public final class FakeSdrRepository {
 	 * @return this repository
 	 */
 	public FakeSdrRepository fru(int fruId, byte[] image) {
-		frus.put(fruId, image.clone());
+		return fruAtLun(0, fruId, image);
+	}
+
+	/**
+	 * Sets the inventory of a FRU at a LUN of the BMC.
+	 *
+	 * @param lun the LUN the FRU commands are addressed to
+	 * @param fruId the FRU device ID
+	 * @param image the FRU inventory bytes
+	 * @return this repository
+	 */
+	public FakeSdrRepository fruAtLun(int lun, int fruId, byte[] image) {
+		frus.put(lun << 8 | fruId, image.clone());
 		return this;
 	}
 
@@ -296,8 +308,17 @@ public final class FakeSdrRepository {
 		return reply.length == 1 ? reply : concat(new byte[1], reply);
 	}
 
-	private byte[] fruInventoryAreaInfo(byte[] data) {
-		byte[] image = frus.get(data[0] & 0xff);
+	/**
+	 * Get FRU Inventory Area Info (IPMI 2.0 table 34-2) for a FRU of this repository. Public so that a controller
+	 * behind the BMC serves its own FRUs from a repository of its own:
+	 * {@code bmc.satellite(0, 0x2c, NETFN_STORAGE, GET_FRU_INVENTORY_AREA_INFO, data -> controller.fruInventoryAreaInfo(0, data))}.
+	 *
+	 * @param lun the LUN the request is addressed to
+	 * @param data the request data
+	 * @return the reply, completion code first
+	 */
+	public byte[] fruInventoryAreaInfo(int lun, byte[] data) {
+		byte[] image = frus.get(lun << 8 | data[0] & 0xff);
 		if (image == null) {
 			return new byte[] { (byte) 0xc3 }; // timeout while processing the command: the FRU is absent
 		}
@@ -310,8 +331,15 @@ public final class FakeSdrRepository {
 				.array();
 	}
 
-	private byte[] readFruData(byte[] data) {
-		byte[] image = frus.get(data[0] & 0xff);
+	/**
+	 * Read FRU Data (IPMI 2.0 table 34-3) for a FRU of this repository; public like {@link #fruInventoryAreaInfo}.
+	 *
+	 * @param lun the LUN the request is addressed to
+	 * @param data the request data
+	 * @return the reply, completion code first
+	 */
+	public byte[] readFruData(int lun, byte[] data) {
+		byte[] image = frus.get(lun << 8 | data[0] & 0xff);
 		if (image == null) {
 			return new byte[] { (byte) 0xc3 };
 		}
@@ -372,6 +400,24 @@ public final class FakeSdrRepository {
 		byte[] copy = record.clone();
 		copy[5] = (byte) ownerId;
 		copy[6] = (byte) (channel << 4 | lun);
+		return copy;
+	}
+
+	/**
+	 * Returns a copy of a logical FRU Device Locator record on another controller or LUN (IPMI 2.0 table 43-7, bytes
+	 * 6, 8 and 9).
+	 *
+	 * @param record the FRU Device Locator record
+	 * @param address the 8-bit slave address of the controller that holds the FRU
+	 * @param channel the channel of the controller
+	 * @param lun the LUN of the FRU device
+	 * @return the copy
+	 */
+	public static byte[] withAccess(byte[] record, int address, int channel, int lun) {
+		byte[] copy = record.clone();
+		copy[5] = (byte) address;
+		copy[7] = (byte) (0x80 | lun << 3);
+		copy[8] = (byte) (channel << 4);
 		return copy;
 	}
 

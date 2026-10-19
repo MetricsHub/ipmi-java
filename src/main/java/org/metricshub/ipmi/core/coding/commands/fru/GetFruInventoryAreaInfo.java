@@ -41,19 +41,35 @@ public class GetFruInventoryAreaInfo extends IpmiCommandCoder<GetFruInventoryAre
 
 	private int fruId;
 
+	private final byte lun;
+
 	/**
-	 * Initiates GetFruInventoryAreaInfo for both encoding and decoding.
+	 * Initiates GetFruInventoryAreaInfo for both encoding and decoding, addressed to LUN 0.
 	 *
 	 * @param fruId
 	 *        - ID of the FRU to get info from. Must be less than 256.
 	 */
 	public GetFruInventoryAreaInfo(int fruId) {
+		this(fruId, 0);
+	}
+
+	/**
+	 * Initiates GetFruInventoryAreaInfo for both encoding and decoding.
+	 *
+	 * @param fruId
+	 *        - ID of the FRU to get info from. Must be less than 256.
+	 * @param lun the LUN of the FRU device, the access LUN of its FRU Device Locator record (IPMI 2.0 table 43-7),
+	 *        0 to 3
+	 * @throws IllegalArgumentException when the FRU ID exceeds 255 or the LUN is not 0 to 3
+	 */
+	public GetFruInventoryAreaInfo(int fruId, int lun) {
 
 		if (fruId > 255) {
 			throw new IllegalArgumentException("FRU ID cannot exceed 255");
 		}
 
 		this.fruId = fruId;
+		this.lun = checkLun(lun);
 	}
 
 	@Override
@@ -75,7 +91,8 @@ public class GetFruInventoryAreaInfo extends IpmiCommandCoder<GetFruInventoryAre
 				getNetworkFunction(),
 				getCommandCode(),
 				payload,
-				TypeConverter.intToByte(sequenceNumber));
+				TypeConverter.intToByte(sequenceNumber),
+				lun);
 	}
 
 	@Override

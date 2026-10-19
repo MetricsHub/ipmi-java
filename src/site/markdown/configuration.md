@@ -88,8 +88,8 @@ operation with `IpmiAuthenticationException`.
 
 | Level | Enough for |
 | --- | --- |
-| `User` (default) | Every read operation: `chassisStatus()`, `sensors()`, `frus()`, `sel()`, but for the sensors of other controllers than the BMC on most BMCs |
-| `Operator` | The control operations: `chassisControl()`, `chassisIdentify()`, `chassisIdentifyForever()`; the sensors of other controllers than the BMC, which the BMC reaches with Send Message ([Sensor owners](sensors.html#sensor-owners)), Administrator on some BMCs |
+| `User` (default) | Every read operation: `chassisStatus()`, `sensors()`, `frus()`, `sel()`, but for the sensors and FRUs of other controllers than the BMC on most BMCs |
+| `Operator` | The control operations: `chassisControl()`, `chassisIdentify()`, `chassisIdentifyForever()`; the sensors and FRUs of other controllers than the BMC, which the BMC reaches with Send Message ([Sensor owners](sensors.html#sensor-owners), [How the FRUs are read](fru-inventory.html#how-the-frus-are-read)), Administrator on some BMCs |
 | `Administrator` | Serial over LAN on most BMCs, the configuration commands |
 | `MaximumAvailable` | Everything the account is allowed: the session runs at User and is raised on demand (below) |
 

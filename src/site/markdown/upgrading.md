@@ -7,6 +7,17 @@ description: What changes when upgrading the IPMI Java Client — from 2.0.00, f
 
 ## Upgrading from 2.0.00
 
+* Each FRU is read from the controller and at the LUN its FRU Device Locator record names
+  (IPMI 2.0 table 43-7, [How the FRUs are read](fru-inventory.html#how-the-frus-are-read)):
+  at the access LUN of the record when the BMC holds it, where 2.0.00 always addressed LUN 0, and
+  through the BMC with Send Message when another controller holds it, where 2.0.00 asked the BMC
+  for its own FRU of the same ID, which came back absent or with the inventory of an unrelated
+  device. Two FRUs with the same ID on different controllers or LUNs are now both returned, where
+  2.0.00 returned the first one only. The FRUs of other controllers need the Operator privilege on
+  most BMCs: below it they are returned without inventory, with the `D4h` in their `problems()`;
+  a controller that does not answer costs its own FRUs only. No lab BMC has such a FRU: the
+  change is by the specification. In the protocol core, `GetFruInventoryAreaInfo` and
+  `ReadFruData` take a LUN argument.
 * A Compact sensor record shared by several sensors (share count above 1, IPMI 2.0 section 43.2)
   gives one `Sensor` per sensor: `sensors()` and `ipmicli sensors` list every drive slot and DIMM
   slot sensor of a Dell iDRAC (`Drive 0` to `Drive 23`, `A 1` to `A 12`), each with its own

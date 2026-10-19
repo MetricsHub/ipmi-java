@@ -29,7 +29,7 @@ included), or sent as bytes with [`raw()`](low-level-api.html#raw-requests).
 | Close Session | `CloseSession` | App / `3Ch` | `close()` |
 | **BMC** | | | |
 | Get Device ID | `GetDeviceId` | App / `01h` | `deviceId()`, and the [keep-alive](configuration.html#keep-alive) of every session; `sensors()`, `frus()`: does a BMC that refuses Get SDR Repository Info hold Device SDRs? |
-| Send Message | `SendMessage` | App / `34h` | `sensors()`: the sensors of the other controllers than the BMC ([Sensor owners](sensors.html#sensor-owners)) |
+| Send Message | `SendMessage` | App / `34h` | `sensors()`, `frus()`: the sensors and FRUs of the other controllers than the BMC ([Sensor owners](sensors.html#sensor-owners), [How the FRUs are read](fru-inventory.html#how-the-frus-are-read)) |
 | **Chassis** | | | |
 | Get Chassis Status | `GetChassisStatus` | Chassis / `01h` | `chassisStatus()` |
 | Chassis Control | `ChassisControl` | Chassis / `02h` | `chassisControl()` |
@@ -44,8 +44,8 @@ included), or sent as bytes with [`raw()`](low-level-api.html#raw-requests).
 | Get Sensor Reading | `GetSensorReading` | Sensor/Event / `2Dh` | `sensors()` |
 | Get Sensor Reading Factors | `GetSensorReadingFactors` | Sensor/Event / `23h` | `sensors()`: the reading of a non-linear sensor (linearization `70h`-`7Fh`) |
 | **FRU** | | | |
-| Get FRU Inventory Area Info | `GetFruInventoryAreaInfo` | Storage / `10h` | `frus()` |
-| Read FRU Data | `ReadFruData` | Storage / `11h` | `frus()` |
+| Get FRU Inventory Area Info | `GetFruInventoryAreaInfo` | Storage / `10h` | `frus()`, at the access LUN of the FRU Device Locator record, through Send Message for a FRU of another controller |
+| Read FRU Data | `ReadFruData` | Storage / `11h` | `frus()`, like Get FRU Inventory Area Info |
 | **System Event Log** | | | |
 | Get SEL Info | `GetSelInfo` | Storage / `40h` | `sel()` |
 | Reserve SEL | `ReserveSel` | Storage / `42h` | `sel()`, when the BMC asks for a reservation |
@@ -58,7 +58,7 @@ included), or sent as bytes with [`raw()`](low-level-api.html#raw-requests).
 | Get Payload Instance Info | `GetPayloadInstanceInfo` | App / `4Bh` | `sol()` |
 | Get Channel Payload Support | `GetChannelPayloadSupport` | App / `4Eh` | |
 
-The read operations of `IpmiClient` need nothing above the **User** privilege, but for the sensors
+The read operations of `IpmiClient` need nothing above the **User** privilege, but for the sensors and FRUs
 of other controllers than the BMC, which Send Message reaches at the **Operator** level (some BMCs
 allow it at User, others require Administrator); Chassis Control and Chassis Identify need
 **Operator**, the payload commands and Serial over LAN **Administrator**

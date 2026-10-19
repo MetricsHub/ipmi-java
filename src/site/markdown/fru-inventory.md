@@ -26,9 +26,15 @@ try (IpmiClient bmc = IpmiClient.builder(host).credentials(user, password).build
    Inventory Area Info and Read FRU Data;
 2. walks the **SDR repository** (once per client, see the [SDR cache](configuration.html#sdr-cache))
    and, for each **FRU Device Locator** record of a *logical* FRU device (one accessed with the FRU
-   commands of the BMC), reads that FRU the same way;
+   commands of a management controller), reads that FRU the same way from the controller and at
+   the LUN the record names (IPMI 2.0, table 43-7): the BMC, at its access LUN, or another
+   controller, the two commands being forwarded by the BMC with **Send Message**, as the readings
+   of its sensors are ([Sensor owners](sensors.html#sensor-owners));
 3. attaches FRU 0 to the first **Compact Sensor** record of the system board entity, under the
    name `<board product name> <entity instance>`, when no locator record pointed at it before.
+
+A FRU device ID is unique per controller and LUN only: a FRU of another controller may have the
+ID of a FRU of the BMC, and both are returned, each with its `locator()`.
 
 `ids(int...)` restricts the read to the given FRU device IDs, and `timeout(Duration)` overrides
 the deadline of the client for this operation:
@@ -43,8 +49,14 @@ slow to read: a few seconds per FRU on some BMCs
 
 A FRU whose data cannot be read entirely — not present, a read refused at some offset, an area
 that cannot be decoded — is returned with what could be decoded, `complete()` false and the
-reasons in `problems()`; a BMC that stops answering fails the operation. Physical FRU devices
-(EEPROMs on a private I²C bus, read with Master Write-Read) are not read.
+reasons in `problems()`; a BMC that stops answering fails the operation. A controller behind the
+BMC that does not answer costs its own FRUs only, whose `problems()` say
+`Cannot read FRU 5 from the controller at 44h on channel 0: No reply through the BMC`: the
+session is kept, and the other FRUs of that controller are not requested again during the same
+operation. Send Message needs the **Operator** privilege on most BMCs: below it, the FRUs of
+other controllers come back with a `D4h` in their `problems()`
+([Sensor owners](sensors.html#sensor-owners)). Physical FRU devices (EEPROMs on a private I²C
+bus, read with Master Write-Read) are not read.
 
 ## The `Fru` object
 

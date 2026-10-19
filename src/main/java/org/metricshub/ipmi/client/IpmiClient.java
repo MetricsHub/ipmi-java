@@ -1113,6 +1113,11 @@ public final class IpmiClient implements AutoCloseable {
 			return exchange(command, false);
 		}
 
+		@Override
+		public boolean isLost() {
+			return lost;
+		}
+
 		/**
 		 * Sends a command once, never again when its reply is lost or is a C3h: a control command the BMC may have
 		 * carried out (a reset) must not reach it twice. A lost reply says nothing about the session, which is kept.
