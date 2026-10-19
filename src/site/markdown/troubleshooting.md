@@ -136,8 +136,9 @@ suite whose `isSupported()` is `true`.
 
 ## Collecting is slow
 
-* **FRUs**: each FRU is read 16 bytes at a time, one round trip per chunk: a few seconds per FRU
-  on some BMCs ([#102](https://github.com/metricshub/ipmi-java/issues/102)).
+* **FRUs**: a BMC that returns at most 16 bytes per Read FRU Data (Dell iDRAC 8, Cisco IMC) costs
+  one round trip per 16 bytes of FRU, a few seconds per large FRU
+  ([How the FRUs are read](fru-inventory.html#how-the-frus-are-read)).
 * **Lost replies** stall an operation until the message timeout: shorten it
   ([Timeouts and Errors](timeouts-and-errors.html#message-timeout-and-retries)).
 * **Unselected sensors** still cost a round trip each unless they are excluded with

@@ -24,8 +24,10 @@ package org.metricshub.ipmi.client;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.function.Function;
 
@@ -59,9 +61,20 @@ final class FruReader {
 	static final int SYSTEM_BOARD_FRU_ID = 0;
 
 	/**
-	 * Bytes read by one Read FRU Data: BMCs answer "Invalid data field in request" above this.
+	 * Bytes asked of the first Read FRU Data of a controller: the most the count byte can carry. Supermicro, Lenovo
+	 * IMM, GIGABYTE, Fujitsu iRMC and Dell iDRAC 6 answer it; iLO 5 refuses it (C8h) and answers 240; Lenovo XCC and
+	 * Dell F200 refuse it (C9h); Dell iDRAC 8, Cisco IMC and Dell F200 refuse everything above 16 (CAh).
 	 */
-	private static final int READ_SIZE = 16;
+	private static final int MAX_READ_SIZE = 255;
+
+	/** Bytes a Read FRU Data goes down to before a refusal is taken for a failure: every BMC answers 16. */
+	private static final int MIN_READ_SIZE = 16;
+
+	/** Completion code C7h, the first of the four that say the count asked is too large. */
+	private static final int REQUEST_DATA_LENGTH_INVALID = 0xC7;
+
+	/** Completion code CAh, the last of the four that say the count asked is too large. */
+	private static final int CANNOT_RETURN_REQUESTED_BYTES = 0xCA;
 
 	/** Name of the system board FRU when none of its areas names it. */
 	private static final String SYSTEM_BOARD_NAME = "System Board";
@@ -78,6 +91,8 @@ final class FruReader {
 	private final Set<Integer> returned = new HashSet<Integer>();
 	/** The controllers behind the BMC, and their LUNs, that did not answer: the walk does not wait for them again. */
 	private final Set<Integer> silentControllers = new HashSet<Integer>();
+	/** The bytes each controller and LUN answers to one Read FRU Data, once a refusal made the reader back off. */
+	private final Map<Integer, Integer> readSizes = new HashMap<Integer, Integer>();
 	private final List<Fru> frus = new ArrayList<Fru>();
 
 	private FruReader(Exchange exchange, Set<Integer> selectedIds) {
@@ -231,21 +246,43 @@ final class FruReader {
 		int fruId = locator.getDeviceId();
 		int lun = locator.getAccessLun();
 		boolean bridged = isBridged(locator);
-		int controller = locator.getManagementChannelNumber() << 10 | address(locator) << 2 | lun;
+		int controller = (bridged ? locator.getManagementChannelNumber() : 0) << 10 | address(locator) << 2 | lun;
 		String where = bridged ? " from " + describe(locator) : "";
 		if (bridged && silentControllers.contains(controller)) {
 			problems.add("Cannot read FRU " + fruId + where + ": No reply through the BMC");
 			return Collections.emptyList();
 		}
 		List<ReadFruDataResponseData> chunks = new ArrayList<ReadFruDataResponseData>();
+		int offset = 0;
 		GetFruInventoryAreaInfoResponseData info = null;
 		try {
 			info = send(locator, new GetFruInventoryAreaInfo(fruId, lun));
 			int size = info.getFruInventoryAreaSize();
 			BaseUnit unit = info.getFruUnit();
-			// The inventory is read in chunks, as its size exceeds what one message carries
-			for (int offset = 0; offset < size; offset += READ_SIZE) {
-				chunks.add(send(locator, new ReadFruData(fruId, unit, offset, Math.min(READ_SIZE, size - offset), lun)));
+			// The inventory is read in chunks of as many bytes as the controller answers at once: the first read asks
+			// for the most, and a refusal halves the count, as ipmitool does, down to what every BMC answers. The
+			// count a controller accepted serves its other FRUs
+			int readSize = readSizes.getOrDefault(controller, MAX_READ_SIZE);
+			while (offset < size) {
+				ReadFruDataResponseData chunk;
+				try {
+					chunk = send(locator, new ReadFruData(fruId, unit, offset, Math.min(readSize, size - offset), lun));
+				} catch (IpmiCompletionCodeException e) {
+					if (readSize > MIN_READ_SIZE && isTooLong(e.rawCompletionCode())) {
+						readSize = Math.max(MIN_READ_SIZE, (readSize + 1) / 2);
+						readSizes.put(controller, readSize);
+						continue;
+					}
+					throw e;
+				}
+				int read = chunk.getFruData().length;
+				if (read == 0) {
+					// No data at an offset within the size the controller declared: the rest cannot be read
+					problems.add(prefix(fruId, offset) + where + ": No data returned");
+					break;
+				}
+				chunks.add(chunk);
+				offset += read;
 			}
 		} catch (IpmiTimeoutException e) {
 			if (!bridged || exchange.isLost()) {
@@ -258,7 +295,7 @@ final class FruReader {
 			if (info == null) {
 				silentControllers.add(controller);
 			}
-			problems.add(prefix(fruId, chunks.size()) + where + ": No reply through the BMC");
+			problems.add(prefix(fruId, offset) + where + ": No reply through the BMC");
 		} catch (IpmiConnectionException e) {
 			throw e;
 		} catch (IpmiClientException e) {
@@ -276,7 +313,7 @@ final class FruReader {
 					reason = String.format("%s (completion code %02Xh)", meaning, code);
 				}
 			}
-			problems.add(prefix(fruId, chunks.size()) + where + ": " + reason);
+			problems.add(prefix(fruId, offset) + where + ": " + reason);
 		}
 		if (chunks.isEmpty()) {
 			return Collections.emptyList();
@@ -289,9 +326,16 @@ final class FruReader {
 		}
 	}
 
-	private static String prefix(int fruId, int chunksRead) {
-		return chunksRead == 0 ?
-				"Cannot read FRU " + fruId :
-				"FRU " + fruId + " is truncated at offset " + chunksRead * READ_SIZE;
+	/**
+	 * Tells whether a completion code of Read FRU Data says the count asked exceeds what the controller returns at
+	 * once: request data length invalid (C7h), request data field length limit exceeded (C8h), parameter out of range
+	 * (C9h, Lenovo XCC and Dell F200) or cannot return number of requested data bytes (CAh, IPMI 2.0 table 5-2).
+	 */
+	private static boolean isTooLong(int completionCode) {
+		return completionCode >= REQUEST_DATA_LENGTH_INVALID && completionCode <= CANNOT_RETURN_REQUESTED_BYTES;
+	}
+
+	private static String prefix(int fruId, int bytesRead) {
+		return bytesRead == 0 ? "Cannot read FRU " + fruId : "FRU " + fruId + " is truncated at offset " + bytesRead;
 	}
 }
