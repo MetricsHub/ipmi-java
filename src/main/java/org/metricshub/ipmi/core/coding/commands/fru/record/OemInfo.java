@@ -45,7 +45,6 @@ public class OemInfo extends MultiRecordInfo {
 	 */
 	public OemInfo(byte[] fruData, int offset, int length) {
 		super();
-		// TODO: Test when server containing such records will be available
 
 		byte[] buffer = new byte[4];
 

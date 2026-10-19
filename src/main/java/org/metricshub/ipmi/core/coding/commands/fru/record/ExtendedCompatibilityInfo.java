@@ -41,7 +41,6 @@ public class ExtendedCompatibilityInfo extends BaseCompatibilityInfo {
 	 */
 	public ExtendedCompatibilityInfo(byte[] fruData, int offset, int length) {
 		super(fruData, offset, length);
-		// TODO: Test when server containing such records will be available
 	}
 
 }

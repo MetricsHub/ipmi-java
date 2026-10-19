@@ -17,13 +17,21 @@ import org.junit.jupiter.api.Test;
 import org.metricshub.ipmi.client.Fixtures;
 import org.metricshub.ipmi.core.coding.commands.fru.record.BaseCompatibilityInfo;
 import org.metricshub.ipmi.core.coding.commands.fru.record.BoardInfo;
+import org.metricshub.ipmi.core.coding.commands.fru.record.DcLoadInfo;
+import org.metricshub.ipmi.core.coding.commands.fru.record.DcOutputInfo;
+import org.metricshub.ipmi.core.coding.commands.fru.record.ExtendedCompatibilityInfo;
 import org.metricshub.ipmi.core.coding.commands.fru.record.FruRecord;
 import org.metricshub.ipmi.core.coding.commands.fru.record.InternalUseInfo;
+import org.metricshub.ipmi.core.coding.commands.fru.record.ManagementAccessInfo;
+import org.metricshub.ipmi.core.coding.commands.fru.record.ManagementAccessRecordType;
+import org.metricshub.ipmi.core.coding.commands.fru.record.MultiRecordInfo;
+import org.metricshub.ipmi.core.coding.commands.fru.record.OemInfo;
 import org.metricshub.ipmi.core.coding.commands.fru.record.PiromInfo;
 import org.metricshub.ipmi.core.coding.commands.fru.record.PowerSupplyInfo;
 import org.metricshub.ipmi.core.coding.commands.fru.record.RawMultiRecordInfo;
 import org.metricshub.ipmi.core.coding.commands.fru.record.ProductInfo;
 import org.metricshub.ipmi.core.coding.commands.fru.record.SpdInfo;
+import org.metricshub.ipmi.core.coding.commands.sdr.record.EntityId;
 
 class ReadFruDataTest {
 
@@ -306,5 +314,108 @@ class ReadFruDataTest {
 
 		assertEquals(0x4c4c, info.getManufacturerId());
 		assertArrayEquals(bytes(0xaa, 0xbb, 0xcc), info.getCodeRangeMasks());
+	}
+
+	@Test
+	void everyModeledMultirecordTypeIsDecodedAtItsOffset() {
+		// Platform Management FRU Information Storage Definition v1.0, sections 18.2 to 18.6 and OEM type C0h
+		byte[] dcOutput = multirecord(
+				0x01,
+				false,
+				bytes(
+						0x81, // standby output, output number 1
+						0xe0,
+						0x2e, // nominal 12000 (10 mV units)
+						0xa8,
+						0xfd, // maximum negative deviation -600
+						0x58,
+						0x02, // maximum positive deviation +600
+						0x64,
+						0x00, // ripple and noise, not modeled
+						0x00,
+						0x00,
+						0xe8,
+						0x03)); // current draw, not modeled
+		byte[] dcLoad = multirecord(
+				0x02,
+				false,
+				bytes(
+						0xf2, // output number 2, high nibble reserved
+						0x78,
+						0xec, // nominal -5000
+						0x3f,
+						0x0c, // minimum voltage 3135
+						0x89,
+						0x0d, // maximum voltage 3465
+						0x32,
+						0x00, // ripple and noise, not modeled
+						0x64,
+						0x00, // minimum current load 100
+						0xc4,
+						0x09)); // maximum current load 2500
+		byte[] managementAccess = multirecord(
+				0x03,
+				false,
+				concat(bytes(0x02), "node-1".getBytes(StandardCharsets.ISO_8859_1))); // system name, a bare string
+		byte[] extendedCompatibility = multirecord(
+				0x05,
+				false,
+				bytes(
+						0x57,
+						0x01,
+						0x00, // manufacturer 343 (Intel)
+						0x07, // entity ID 7, system board
+						0x01, // compatibility base
+						0x82, // code start 2, bit 7 reserved
+						0xaa,
+						0xbb));
+		byte[] oem = multirecord(0xc0, true, bytes(0x57, 0x01, 0x00, 0xde, 0xad));
+		byte[] junk = new byte[7];
+		byte[] image = concat(junk, dcOutput, dcLoad, managementAccess, extendedCompatibility, oem);
+
+		int offset = junk.length;
+		DcOutputInfo output = assertInstanceOf(DcOutputInfo.class, MultiRecordInfo.populateMultiRecord(image, offset));
+		assertEquals(1, output.getOutputNumber());
+		assertEquals(12000, output.getNominalVoltage());
+		assertEquals(-600, output.getMaximumNegativeDeviation());
+		assertEquals(600, output.getMaximumPositiveDeviation());
+
+		offset += dcOutput.length;
+		DcLoadInfo load = assertInstanceOf(DcLoadInfo.class, MultiRecordInfo.populateMultiRecord(image, offset));
+		assertEquals(2, load.getOutputNumber());
+		assertEquals(-5000, load.getNominalVoltage());
+		assertEquals(3135, load.getMinimumVoltage());
+		assertEquals(3465, load.getMaximumVoltage());
+		assertEquals(100, load.getMinimumCurrentLoad());
+		assertEquals(2500, load.getMaximumCurrentLoad());
+
+		offset += dcLoad.length;
+		ManagementAccessInfo access = assertInstanceOf(
+				ManagementAccessInfo.class,
+				MultiRecordInfo.populateMultiRecord(image, offset));
+		assertEquals(ManagementAccessRecordType.SystemName, access.getRecordType());
+		assertEquals("node-1", access.getAccessInfo());
+
+		offset += managementAccess.length;
+		ExtendedCompatibilityInfo extended = assertInstanceOf(
+				ExtendedCompatibilityInfo.class,
+				MultiRecordInfo.populateMultiRecord(image, offset));
+		assertEquals(343, extended.getManufacturerId());
+		assertEquals(EntityId.SystemBoard, extended.getEntityId());
+		assertEquals(1, extended.getCompatibilityBase());
+		assertEquals(2, extended.getCodeStart());
+		assertArrayEquals(bytes(0xaa, 0xbb), extended.getCodeRangeMasks());
+
+		offset += extendedCompatibility.length;
+		OemInfo oemInfo = assertInstanceOf(OemInfo.class, MultiRecordInfo.populateMultiRecord(image, offset));
+		assertEquals(343, oemInfo.getManufacturerId());
+		assertArrayEquals(bytes(0xde, 0xad), oemInfo.getOemData());
+	}
+
+	@Test
+	void aMultirecordHeaderOfAnotherFormatVersionIsRejected() {
+		byte[] header = bytes(0x00, 0x81, 0x00, 0x00, 0x00); // power supply, end of list, format version 1
+
+		assertThrows(IllegalArgumentException.class, () -> MultiRecordInfo.populateMultiRecord(header, 0));
 	}
 }
