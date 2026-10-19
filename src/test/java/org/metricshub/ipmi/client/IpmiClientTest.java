@@ -8,6 +8,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
+import static org.metricshub.ipmi.client.Fixtures.BASE_BOARD_PRODUCT_INFO;
 import static org.metricshub.ipmi.client.Fixtures.BOARD_SENSOR;
 import static org.metricshub.ipmi.client.Fixtures.CPU_FRU;
 import static org.metricshub.ipmi.client.Fixtures.DDR4_SPD;
@@ -38,6 +39,8 @@ import static org.metricshub.ipmi.core.transport.FakeRmcpPlusBmc.SEND_MESSAGE;
 import static org.metricshub.ipmi.core.transport.FakeRmcpPlusBmc.SET_SESSION_PRIVILEGE_LEVEL;
 import static org.metricshub.ipmi.core.transport.FakeSdrRepository.GET_DEVICE_SDR;
 import static org.metricshub.ipmi.core.transport.FakeSdrRepository.GET_DEVICE_SDR_INFO;
+import static org.metricshub.ipmi.core.transport.FakeSdrRepository.GET_FRU_INVENTORY_AREA_INFO;
+import static org.metricshub.ipmi.core.transport.FakeSdrRepository.READ_FRU_DATA;
 import static org.metricshub.ipmi.core.transport.FakeSdrRepository.GET_SDR;
 import static org.metricshub.ipmi.core.transport.FakeSdrRepository.GET_SDR_REPOSITORY_INFO;
 import static org.metricshub.ipmi.core.transport.FakeSdrRepository.GET_SENSOR_READING;
@@ -46,6 +49,7 @@ import static org.metricshub.ipmi.core.transport.FakeSdrRepository.NETFN_STORAGE
 import static org.metricshub.ipmi.core.transport.FakeSdrRepository.compactSensorRecord;
 import static org.metricshub.ipmi.core.transport.FakeSdrRepository.fruDeviceLocatorRecord;
 import static org.metricshub.ipmi.core.transport.FakeSdrRepository.record;
+import static org.metricshub.ipmi.core.transport.FakeSdrRepository.withAccess;
 import static org.metricshub.ipmi.core.transport.FakeSdrRepository.withOwner;
 import static org.metricshub.ipmi.core.transport.FakeSdrRepository.withSharing;
 import static org.metricshub.ipmi.core.transport.FakeSel.GET_SEL_ENTRY;
@@ -1130,6 +1134,72 @@ class IpmiClientTest {
 					assertEquals(1, bmc.getCount(OPEN_SESSION_REQUEST));
 					assertEquals(Collections.emptyList(), bmc.getErrors());
 				}
+			}
+		}
+	}
+
+	@Test
+	@Timeout(30)
+	void aFruIsReadFromTheControllerAndAtTheLunOfItsLocator() throws Exception {
+		try (FakeRmcpPlusBmc bmc = new FakeRmcpPlusBmc(SUITES, USER, utf8(PASSWORD), null)) {
+			// Five FRUs numbered 5: at LUN 0 and LUN 1 of the BMC, on a controller behind it, on an absent controller
+			// and on a silent one, which also holds FRU 6; and the "BMC FRU" of a Supermicro BMC, at 20h on channel 2
+			int psu = EntityId.PowerSupply.getCode();
+			new FakeSdrRepository()
+					.add(fruDeviceLocatorRecord(1, 5, psu, 1, "BMC LUN 0"))
+					.add(withAccess(fruDeviceLocatorRecord(2, 5, psu, 2, "BMC LUN 1"), 0x20, 0, 1))
+					.add(withAccess(fruDeviceLocatorRecord(3, 5, psu, 3, "Satellite"), 0x2c, 6, 0))
+					.add(withAccess(fruDeviceLocatorRecord(4, 5, psu, 4, "Absent"), 0x42, 0, 0))
+					.add(withAccess(fruDeviceLocatorRecord(5, 5, psu, 5, "Silent"), 0x44, 0, 0))
+					.add(withAccess(fruDeviceLocatorRecord(6, 6, psu, 6, "Silent too"), 0x44, 0, 0))
+					.add(withAccess(fruDeviceLocatorRecord(7, 0, EntityId.SystemBoard.getCode(), 1, "BMC FRU"), 0x20, 2, 0))
+					.fru(0, BASE_BOARD_PRODUCT_INFO)
+					.fru(5, DDR4_SPD)
+					.fruAtLun(1, 5, PIROM)
+					.install(bmc);
+			FakeSdrRepository controller = new FakeSdrRepository().fru(5, BASE_BOARD_PRODUCT_INFO);
+			bmc
+					.satellite(
+							6,
+							0x2c,
+							NETFN_STORAGE,
+							GET_FRU_INVENTORY_AREA_INFO,
+							data -> controller.fruInventoryAreaInfo(bmc.getRequestLun(), data));
+			bmc.satellite(6, 0x2c, NETFN_STORAGE, READ_FRU_DATA, data -> controller.readFruData(bmc.getRequestLun(), data));
+			bmc.satellite(0, 0x44, NETFN_STORAGE, GET_FRU_INVENTORY_AREA_INFO, data -> null);
+			try (IpmiClient client = client(bmc).build()) {
+				FruList frus = client.frus().execute();
+				assertEquals(7, frus.size(), frus.toString());
+				assertEquals("Samsung", frus.get(0).manufacturer());
+				assertEquals("Intel", frus.get(1).manufacturer(), "read at the LUN of its record");
+				assertEquals("IBM", frus.get(2).manufacturer(), "read from its controller");
+				assertTrue(frus.get(2).complete(), frus.get(2).problems().toString());
+				assertEquals(
+						Collections
+								.singletonList(
+										"Cannot read FRU 5 from the controller at 42h on channel 0: NAK on write: no controller"
+												+ " acknowledged the address (completion code 83h)"),
+						frus.get(3).problems());
+				assertEquals(
+						Collections
+								.singletonList("Cannot read FRU 5 from the controller at 44h on channel 0: No reply through the BMC"),
+						frus.get(4).problems());
+				assertEquals(
+						Collections
+								.singletonList("Cannot read FRU 6 from the controller at 44h on channel 0: No reply through the BMC"),
+						frus.get(5).problems());
+				assertEquals("IBM", frus.get(6).manufacturer(), "the BMC FRU on channel 2 is FRU 0 of the BMC");
+
+				assertEquals(3, bmc.getCount(NETFN_STORAGE, GET_FRU_INVENTORY_AREA_INFO), "FRU 0, FRU 5 at LUN 0 and at LUN 1");
+				int chunks = (BASE_BOARD_PRODUCT_INFO.length + 15) / 16;
+				assertEquals(1 + chunks + 1 + 2, bmc.getCount(NETFN_APP, SEND_MESSAGE), "2 tries for 44h, none for FRU 6");
+				byte[] bridged = bmc.getBridgedRequests().get(0);
+				assertEquals(0x2c, bridged[0] & 0xff, "addressed to the controller");
+				assertEquals(NETFN_STORAGE << 2, bridged[1] & 0xff, "Storage at LUN 0");
+				assertEquals(GET_FRU_INVENTORY_AREA_INFO, bridged[5] & 0xff);
+				assertEquals(5, bridged[6]);
+				assertEquals(1, bmc.getCount(OPEN_SESSION_REQUEST), "the session is kept");
+				assertEquals(Collections.emptyList(), bmc.getErrors());
 			}
 		}
 	}

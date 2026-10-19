@@ -70,9 +70,10 @@ public class ReadFruData extends IpmiCommandCoder<ReadFruDataResponseData> {
 
 	private int fruId;
 
+	private final byte lun;
+
 	/**
-	 * Initiates ReadFruData for both encoding and decoding. Sets session
-	 * parameters to default.
+	 * Initiates ReadFruData for both encoding and decoding, addressed to LUN 0.
 	 *
 	 * @param fruId
 	 *        - ID of the FRU to get info from. Must be less than 256. To
@@ -87,6 +88,26 @@ public class ReadFruData extends IpmiCommandCoder<ReadFruDataResponseData> {
 	 *        - number of bytes to read. Cannot exceed 255;
 	 */
 	public ReadFruData(int fruId, BaseUnit unit, int offset, int countToRead) {
+		this(fruId, unit, offset, countToRead, 0);
+	}
+
+	/**
+	 * Initiates ReadFruData for both encoding and decoding.
+	 *
+	 * @param fruId
+	 *        - ID of the FRU to get info from. Must be less than 256.
+	 * @param unit
+	 *        - {@link BaseUnit} indicating if the FRU device is accessed in
+	 *        {@link BaseUnit#Bytes} or {@link BaseUnit#Words}
+	 * @param offset
+	 *        - offset to read, in bytes (sent in words when the device is word-addressed, so it must be even then)
+	 * @param countToRead
+	 *        - number of bytes to read. Cannot exceed 255;
+	 * @param lun the LUN of the FRU device, the access LUN of its FRU Device Locator record (IPMI 2.0 table 43-7),
+	 *        0 to 3
+	 * @throws IllegalArgumentException when the count or the FRU ID exceeds 255, or the LUN is not 0 to 3
+	 */
+	public ReadFruData(int fruId, BaseUnit unit, int offset, int countToRead, int lun) {
 		super();
 
 		if (countToRead > 255) {
@@ -102,6 +123,7 @@ public class ReadFruData extends IpmiCommandCoder<ReadFruDataResponseData> {
 		this.offset = offset / unit.getSize();
 		size = countToRead;
 		this.fruId = fruId;
+		this.lun = checkLun(lun);
 	}
 
 	@Override
@@ -129,7 +151,8 @@ public class ReadFruData extends IpmiCommandCoder<ReadFruDataResponseData> {
 				getNetworkFunction(),
 				getCommandCode(),
 				payload,
-				TypeConverter.intToByte(sequenceNumber));
+				TypeConverter.intToByte(sequenceNumber),
+				lun);
 	}
 
 	@Override
