@@ -34,9 +34,16 @@ public class IpmiCompletionCodeException extends IpmiClientException {
 
 	private static final long serialVersionUID = 1L;
 
+	/** The completion code, {@link CompletionCode#Unknown} when the library does not model it. */
 	private final CompletionCode completionCode;
+
+	/** The completion code byte as the BMC sent it, 0 to 255. */
 	private final int rawCompletionCode;
+
+	/** The network function of the command the BMC answered, null when unknown or not in {@link NetworkFunction}. */
 	private final NetworkFunction networkFunction;
+
+	/** The command code of the command the BMC answered, 0 to 255, or -1 when the command is not known. */
 	private final int command;
 
 	/**

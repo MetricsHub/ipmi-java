@@ -36,8 +36,9 @@ public enum SensorStatus {
 	/** The reading is at or beyond a non-recoverable threshold. */
 	NON_RECOVERABLE,
 	/**
-	 * The sensor has no reading and no states: the BMC did not answer the reading, or the sensor is not scanned or
-	 * its reading is not valid yet ({@link Sensor#problem()} says which).
+	 * The sensor has no reading and no states: the BMC or the controller that owns the sensor refused the reading or
+	 * sent a malformed reply, that controller did not answer through the BMC, the sensor belongs to system software,
+	 * or the sensor is not scanned or its reading is not valid yet ({@link Sensor#problem()} says which).
 	 */
 	UNAVAILABLE
 }

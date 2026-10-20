@@ -28,15 +28,25 @@ import org.metricshub.ipmi.core.coding.commands.ResponseData;
  * Wrapper for Read FRU Data response. Contains only raw data, because size of
  * the FRU Inventory Area might exceed size of the communication packet so it
  * might come in many {@link ReadFruDataResponseData} packets and it must be
- * decoded by {@link ReadFruData#decodeFruData(java.util.List)}.
+ * decoded by {@link ReadFruData#decodeFruData(java.util.List, java.util.List)}.
  */
 public class ReadFruDataResponseData implements ResponseData {
 	private byte[] fruData;
 
+	/**
+	 * Sets the bytes returned by the command.
+	 *
+	 * @param fruData the bytes returned by one Read FRU Data command
+	 */
 	public void setFruData(byte[] fruData) {
 		this.fruData = fruData;
 	}
 
+	/**
+	 * Returns the bytes returned by the command.
+	 *
+	 * @return the bytes returned by one Read FRU Data command
+	 */
 	public byte[] getFruData() {
 		return fruData;
 	}

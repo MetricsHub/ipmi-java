@@ -52,7 +52,7 @@ class StandaloneJarIT {
 		assertEquals(0, help.exitCode, help.stderr);
 		assertTrue(help.stdout.startsWith("Usage:"), help.stdout);
 		assertTrue(
-				help.stdout.contains("java -jar ipmi-java-" + projectVersion + "-standalone.jar -h <host> probe"),
+				help.stdout.contains("java -jar ipmi-java-" + projectVersion + "-standalone.jar -h <host> [options] probe"),
 				help.stdout);
 		assertEquals("", help.stderr);
 

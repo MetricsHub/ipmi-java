@@ -42,7 +42,9 @@ public final class FrusRequest {
 	}
 
 	/**
-	 * Reads only the FRUs with the given device IDs (0 is the system board on most BMCs).
+	 * Reads only the FRUs with the given device IDs (0 is the system board on most BMCs), on every controller and LUN:
+	 * a device ID is unique per controller and LUN only. The SDR repository is read all the same. Without argument, it
+	 * reads none. A later call replaces the IDs.
 	 *
 	 * @param deviceIds the FRU device IDs to read
 	 * @return this request
@@ -61,6 +63,8 @@ public final class FrusRequest {
 	 *
 	 * @param deadline the time the request may take, session setup included
 	 * @return this request
+	 * @throws IllegalArgumentException when the duration is shorter than one millisecond or longer than
+	 *         {@link Integer#MAX_VALUE} milliseconds
 	 */
 	public FrusRequest timeout(Duration deadline) {
 		this.timeout = IpmiClient.checkTimeout(deadline, "timeout");
@@ -72,7 +76,8 @@ public final class FrusRequest {
 	 *
 	 * @return the FRUs, in the order of their locator records; a FRU that could not be read entirely is returned
 	 *         with its problems
-	 * @throws IpmiClientException when the repository cannot be read, or the BMC stops answering
+	 * @throws IpmiClientException when the session cannot be opened, the SDR repository cannot be read, the BMC stops
+	 *         answering, or the deadline expires
 	 */
 	public FruList execute() {
 		return client.readFrus(ids, timeout);

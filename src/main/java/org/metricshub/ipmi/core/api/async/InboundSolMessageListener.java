@@ -104,6 +104,13 @@ public class InboundSolMessageListener implements InboundMessageListener {
 	 */
 	private volatile Set<SolOperation> lineOperations = Collections.emptySet();
 
+	/**
+	 * Creates the listener of the SOL packets of a connection.
+	 *
+	 * @param connector the connector the packets arrive on
+	 * @param connectionHandle the connection of the console
+	 * @param eventListeners the listeners notified of the statuses the BMC reports
+	 */
 	public InboundSolMessageListener(IpmiConnector connector, ConnectionHandle connectionHandle,
 			List<SolEventListener> eventListeners) {
 		this.connector = connector;

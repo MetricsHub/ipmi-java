@@ -1,7 +1,9 @@
 /**
- * The command-line client of the library, {@link org.metricshub.ipmi.cli.IpmiCli}, run from the standalone jar:
- * {@code java -jar ipmi-java-<version>-standalone.jar [options] <subcommand> [subcommand options]}. Every subcommand
- * is a thin layer over one operation of {@link org.metricshub.ipmi.client.IpmiClient}.
+ * The command-line client of the library, {@code ipmicli} ({@link org.metricshub.ipmi.cli.IpmiCli}):
+ * {@code ipmicli [options] <subcommand> [subcommand options]}, installed with a launcher by the installer, or run with
+ * {@code java -jar ipmi-java-<version>-standalone.jar}. Every subcommand is a thin layer over one operation of
+ * {@link org.metricshub.ipmi.client.IpmiClient}. See the
+ * <a href="https://metricshub.org/ipmi-java/cli.html">manual</a>.
  */
 package org.metricshub.ipmi.cli;
 

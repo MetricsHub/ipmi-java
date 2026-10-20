@@ -25,64 +25,26 @@ package org.metricshub.ipmi.core.coding.commands.fru.record;
 import org.metricshub.ipmi.core.common.TypeConverter;
 
 /**
- * Power Supply Information record from FRU Multi Record Area
+ * Power Supply Information record (type 00h) from the FRU MultiRecord area
  */
 public class PowerSupplyInfo extends MultiRecordInfo {
 
-	/**
-	 * Overall Capacity in Watts
-	 */
 	private int capacity;
 
-	/**
-	 * The highest instantaneous VA value that this supply draws during
-	 * operation.
-	 */
 	private int peakVa;
 
-	/**
-	 * Maximum inrush of current, in Amps, into the power supply.
-	 */
 	private int maximumInrush;
 
-	/**
-	 * This specifies the low end of acceptable voltage into the power supply.
-	 * The units are 10mV.
-	 */
 	private int lowEndInputVoltage1;
 
-	/**
-	 * This specifies the high end of acceptable voltage into the power supply.
-	 * The units are 10mV.
-	 */
 	private int highEndInputVoltage1;
 
-	/**
-	 * This specifies the low end of acceptable voltage into the power supply.
-	 * This field would be used if the power supply did not support autoswitch.
-	 * Range 1 would define the 110V range, while range 2 would be used for
-	 * 220V. The units are 10mV.
-	 */
 	private int lowEndInputVoltage2;
 
-	/**
-	 * This specifies the high end of acceptable voltage into the power supply.
-	 * This field would be used if the power supply did not support autoswitch.
-	 * Range 1 would define the 110V range, while range 2 would be used for
-	 * 220V. The units are 10mV.
-	 */
 	private int highEndInputVoltage2;
 
-	/**
-	 * This specifies the low end of acceptable frequency range into the power
-	 * supply.
-	 */
 	private int lowEndInputFrequencyRange;
 
-	/**
-	 * This specifies the high end of acceptable frequency range into the power
-	 * supply.
-	 */
 	private int highEndInputFrequencyRange;
 
 	/**
@@ -127,74 +89,172 @@ public class PowerSupplyInfo extends MultiRecordInfo {
 				.byteToInt(fruData[offset + 15]);
 	}
 
+	/**
+	 * Returns the overall capacity of the power supply.
+	 *
+	 * @return the overall capacity in watts (12 bits)
+	 */
 	public int getCapacity() {
 		return capacity;
 	}
 
+	/**
+	 * Sets the overall capacity of the power supply.
+	 *
+	 * @param capacity the overall capacity in watts (12 bits)
+	 */
 	public void setCapacity(int capacity) {
 		this.capacity = capacity;
 	}
 
+	/**
+	 * Returns the highest instantaneous VA value that the power supply draws during operation.
+	 *
+	 * @return the peak VA, -1 when the record leaves it unspecified (FFFFh)
+	 */
 	public int getPeakVa() {
 		return peakVa;
 	}
 
+	/**
+	 * Sets the highest instantaneous VA value that the power supply draws during operation.
+	 *
+	 * @param peakVa the peak VA, -1 when the record leaves it unspecified (FFFFh)
+	 */
 	public void setPeakVa(int peakVa) {
 		this.peakVa = peakVa;
 	}
 
+	/**
+	 * Returns the maximum inrush of current into the power supply.
+	 *
+	 * @return the maximum inrush current in amperes
+	 */
 	public int getMaximumInrush() {
 		return maximumInrush;
 	}
 
+	/**
+	 * Sets the maximum inrush of current into the power supply.
+	 *
+	 * @param maximumInrush the maximum inrush current in amperes
+	 */
 	public void setMaximumInrush(int maximumInrush) {
 		this.maximumInrush = maximumInrush;
 	}
 
+	/**
+	 * Returns the low end of the acceptable input voltage range 1.
+	 * Range 2 is used when the power supply does not autoswitch: range 1 is then the 110 V range and
+	 * range 2 the 220 V range.
+	 *
+	 * @return the voltage in units of 10 mV
+	 */
 	public int getLowEndInputVoltage1() {
 		return lowEndInputVoltage1;
 	}
 
+	/**
+	 * Sets the low end of the acceptable input voltage range 1.
+	 *
+	 * @param lowEndInputVoltage1 the voltage in units of 10 mV
+	 */
 	public void setLowEndInputVoltage1(int lowEndInputVoltage1) {
 		this.lowEndInputVoltage1 = lowEndInputVoltage1;
 	}
 
+	/**
+	 * Returns the high end of the acceptable input voltage range 1.
+	 * Range 2 is used when the power supply does not autoswitch: range 1 is then the 110 V range and
+	 * range 2 the 220 V range.
+	 *
+	 * @return the voltage in units of 10 mV
+	 */
 	public int getHighEndInputVoltage1() {
 		return highEndInputVoltage1;
 	}
 
+	/**
+	 * Sets the high end of the acceptable input voltage range 1.
+	 *
+	 * @param highEndInputVoltage1 the voltage in units of 10 mV
+	 */
 	public void setHighEndInputVoltage1(int highEndInputVoltage1) {
 		this.highEndInputVoltage1 = highEndInputVoltage1;
 	}
 
+	/**
+	 * Returns the low end of the acceptable input voltage range 2.
+	 * Range 2 is used when the power supply does not autoswitch: range 1 is then the 110 V range and
+	 * range 2 the 220 V range.
+	 *
+	 * @return the voltage in units of 10 mV
+	 */
 	public int getLowEndInputVoltage2() {
 		return lowEndInputVoltage2;
 	}
 
+	/**
+	 * Sets the low end of the acceptable input voltage range 2.
+	 *
+	 * @param lowEndInputVoltage2 the voltage in units of 10 mV
+	 */
 	public void setLowEndInputVoltage2(int lowEndInputVoltage2) {
 		this.lowEndInputVoltage2 = lowEndInputVoltage2;
 	}
 
+	/**
+	 * Returns the high end of the acceptable input voltage range 2.
+	 * Range 2 is used when the power supply does not autoswitch: range 1 is then the 110 V range and
+	 * range 2 the 220 V range.
+	 *
+	 * @return the voltage in units of 10 mV
+	 */
 	public int getHighEndInputVoltage2() {
 		return highEndInputVoltage2;
 	}
 
+	/**
+	 * Sets the high end of the acceptable input voltage range 2.
+	 *
+	 * @param highEndInputVoltage2 the voltage in units of 10 mV
+	 */
 	public void setHighEndInputVoltage2(int highEndInputVoltage2) {
 		this.highEndInputVoltage2 = highEndInputVoltage2;
 	}
 
+	/**
+	 * Returns the low end of the acceptable input frequency range.
+	 *
+	 * @return the frequency in Hz
+	 */
 	public int getLowEndInputFrequencyRange() {
 		return lowEndInputFrequencyRange;
 	}
 
+	/**
+	 * Sets the low end of the acceptable input frequency range.
+	 *
+	 * @param lowEndInputFrequencyRange the frequency in Hz
+	 */
 	public void setLowEndInputFrequencyRange(int lowEndInputFrequencyRange) {
 		this.lowEndInputFrequencyRange = lowEndInputFrequencyRange;
 	}
 
+	/**
+	 * Returns the high end of the acceptable input frequency range.
+	 *
+	 * @return the frequency in Hz
+	 */
 	public int getHighEndInputFrequencyRange() {
 		return highEndInputFrequencyRange;
 	}
 
+	/**
+	 * Sets the high end of the acceptable input frequency range.
+	 *
+	 * @param highEndInputFrequencyRange the frequency in Hz
+	 */
 	public void setHighEndInputFrequencyRange(int highEndInputFrequencyRange) {
 		this.highEndInputFrequencyRange = highEndInputFrequencyRange;
 	}

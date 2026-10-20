@@ -61,7 +61,7 @@ public enum SensorState {
 	}
 
 	/**
-	 * Decodes the threshold comparison status (IPMI 2.0 Table 35-15, byte 3 bits [5:0]) into the most severe
+	 * Decodes the threshold comparison status (IPMI 2.0 Table 35-15, byte 4 bits [5:0]) into the most severe
 	 * threshold crossed.
 	 *
 	 * @param value bits [5:0]: LNC, LC, LNR, UNC, UC, UNR

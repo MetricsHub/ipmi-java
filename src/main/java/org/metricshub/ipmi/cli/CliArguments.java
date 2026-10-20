@@ -76,13 +76,13 @@ final class CliArguments implements AutoCloseable {
 	static final char DEFAULT_ESCAPE = '~';
 	static final String SUBCOMMANDS = "probe, info, chassis, power, identify, sensors, fru, sel, sol or raw";
 	static final String POWER_ACTIONS = "status, on, off, cycle, reset, soft or diag";
-	/** The identify interval of {@code identify} without argument: the default of the specification (section 28.5). */
+	/** The interval of {@code identify} without argument: the default of IPMI 2.0 section 28.5. */
 	static final int DEFAULT_IDENTIFY_SECONDS = 15;
 
 	private static final int MAX_PORT = 65_535;
 	private static final int MAX_KEY_BYTES = 20;
 	private static final int MAX_FRU_ID = 255;
-	/** 0000h and FFFFh are not the IDs of entries (IPMI 2.0 section 31.6). */
+	/** 0000h and FFFFh are not the IDs of entries (IPMI 2.0 section 31.5 and table 32-1). */
 	private static final int MAX_SEL_RECORD_ID = 0xfffe;
 	private static final int LAST_STANDARD_SUITE = 19;
 	private static final int HEX_RADIX = 16;

@@ -78,7 +78,7 @@ public final class Fixtures {
 	}
 
 	/**
-	 * The System Event Log of {@link #bmc()}: as a Lenovo IMM logs it, a log reset, an OEM record, a temperature
+	 * The System Event Log of {@link #bmc()}: as a Lenovo TSM logs it, a log reset, an OEM record, a temperature
 	 * threshold crossed, a power-off deassertion, a non-timestamped OEM record, and an event logged before the BMC
 	 * had the time.
 	 *

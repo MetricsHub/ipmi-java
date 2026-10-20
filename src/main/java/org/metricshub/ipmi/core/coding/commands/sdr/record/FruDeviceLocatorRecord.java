@@ -25,9 +25,8 @@ package org.metricshub.ipmi.core.coding.commands.sdr.record;
 import org.metricshub.ipmi.core.common.TypeConverter;
 
 /**
- * This record is used for locating FRU information that is on the IPMB, on a
- * Private Bus behind or management controller, or accessed via FRU commands to
- * a management controller.
+ * A FRU Device Locator record (SDR type 11h, IPMI 2.0 table 43-7): it locates FRU information that is on the IPMB,
+ * on a private bus behind a management controller, or accessed with the FRU commands of a management controller.
  */
 public class FruDeviceLocatorRecord extends SensorRecord {
 
@@ -96,82 +95,190 @@ public class FruDeviceLocatorRecord extends SensorRecord {
 		setName(decodeName(recordData[15], nameData));
 	}
 
+	/**
+	 * Returns the slave address of the controller used to access the FRU device, in its 7-bit form (byte 6 bits 7:1 of
+	 * the record), 0 when the device is directly on the IPMB.
+	 * {@link org.metricshub.ipmi.core.coding.commands.app.SendMessage} takes the slave address in its 8-bit form: this
+	 * value shifted left by one.
+	 *
+	 * @return the 7-bit slave address of the controller
+	 */
 	public int getDeviceAccessAddress() {
 		return deviceAccessAddress;
 	}
 
+	/**
+	 * Sets the slave address of the controller used to access the FRU device.
+	 *
+	 * @param deviceAccessAddress the 7-bit slave address of the controller
+	 */
 	public void setDeviceAccessAddress(int deviceAccessAddress) {
 		this.deviceAccessAddress = deviceAccessAddress;
 	}
 
+	/**
+	 * Returns the FRU device ID of a logical FRU device (byte 7 of the record), the ID that the FRU commands of its
+	 * controller take, or the 7-bit I2C slave address of a non-logical FRU device (byte 7 bits 7:1).
+	 *
+	 * @return the FRU device ID, or the 7-bit slave address of a non-logical FRU device
+	 */
 	public int getDeviceId() {
 		return deviceId;
 	}
 
+	/**
+	 * Sets the FRU device ID, or the slave address of a non-logical FRU device.
+	 *
+	 * @param deviceId the FRU device ID, or the 7-bit slave address of a non-logical FRU device
+	 */
 	public void setDeviceId(int deviceId) {
 		this.deviceId = deviceId;
 	}
 
+	/**
+	 * Tells whether the FRU device is a logical FRU device, accessed with the FRU commands of its management
+	 * controller, rather than a non-intelligent device accessed with Master Write-Read (byte 8 bit 7 of the record).
+	 *
+	 * @return whether the FRU device is a logical FRU device
+	 */
 	public boolean isLogical() {
 		return logical;
 	}
 
+	/**
+	 * Sets whether the FRU device is a logical FRU device.
+	 *
+	 * @param logical whether the FRU device is a logical FRU device
+	 */
 	public void setLogical(boolean logical) {
 		this.logical = logical;
 	}
 
+	/**
+	 * Returns the LUN of the FRU commands or Master Write-Read commands that access the FRU device (byte 8 bits 4:3 of
+	 * the record).
+	 *
+	 * @return the LUN, 0 to 3
+	 */
 	public int getAccessLun() {
 		return accessLun;
 	}
 
+	/**
+	 * Sets the LUN of the commands that access the FRU device.
+	 *
+	 * @param accessLun the LUN, 0 to 3
+	 */
 	public void setAccessLun(int accessLun) {
 		this.accessLun = accessLun;
 	}
 
+	/**
+	 * Returns the channel number of the management controller used to access the FRU device (byte 9 bits 7:4 of the
+	 * record), 0 when the device or its controller is on the primary IPMB.
+	 *
+	 * @return the channel number, 0 to 15
+	 */
 	public int getManagementChannelNumber() {
 		return managementChannelNumber;
 	}
 
+	/**
+	 * Sets the channel number of the management controller used to access the FRU device.
+	 *
+	 * @param managementChannelNumber the channel number, 0 to 15
+	 */
 	public void setManagementChannelNumber(int managementChannelNumber) {
 		this.managementChannelNumber = managementChannelNumber;
 	}
 
+	/**
+	 * Returns the type of the FRU device (byte 11 of the record, IPMI 2.0 table 43-12).
+	 *
+	 * @return the device type
+	 */
 	public DeviceType getDeviceType() {
 		return deviceType;
 	}
 
+	/**
+	 * Sets the type of the FRU device.
+	 *
+	 * @param deviceType the device type
+	 */
 	public void setDeviceType(DeviceType deviceType) {
 		this.deviceType = deviceType;
 	}
 
+	/**
+	 * Returns the device type modifier of the FRU device (byte 12 of the record, IPMI 2.0 table 43-12).
+	 *
+	 * @return the device type modifier code
+	 */
 	public int getDeviceTypeModifier() {
 		return deviceTypeModifier;
 	}
 
+	/**
+	 * Sets the device type modifier of the FRU device.
+	 *
+	 * @param deviceTypeModifier the device type modifier code
+	 */
 	public void setDeviceTypeModifier(int deviceTypeModifier) {
 		this.deviceTypeModifier = deviceTypeModifier;
 	}
 
+	/**
+	 * Returns the ID of the entity associated with this FRU information (byte 13 of the record, IPMI 2.0 table 43-13).
+	 *
+	 * @return the entity ID code
+	 */
 	public int getFruEntityId() {
 		return fruEntityId;
 	}
 
+	/**
+	 * Sets the ID of the entity associated with this FRU information.
+	 *
+	 * @param fruEntityId the entity ID code
+	 */
 	public void setFruEntityId(int fruEntityId) {
 		this.fruEntityId = fruEntityId;
 	}
 
+	/**
+	 * Returns the instance number of the entity associated with this FRU information (byte 14 of the record).
+	 *
+	 * @return the entity instance number
+	 */
 	public int getFruEntityInstance() {
 		return fruEntityInstance;
 	}
 
+	/**
+	 * Sets the instance number of the entity associated with this FRU information.
+	 *
+	 * @param fruEntityInstance the entity instance number
+	 */
 	public void setFruEntityInstance(int fruEntityInstance) {
 		this.fruEntityInstance = fruEntityInstance;
 	}
 
+	/**
+	 * Sets the device ID string of the FRU device.
+	 *
+	 * @param name the device ID string
+	 */
 	public void setName(String name) {
 		this.name = name;
 	}
 
+	/**
+	 * Returns the device ID string of the FRU device (from byte 17 of the record), decoded by its type/length byte
+	 * (byte 16).
+	 *
+	 * @return the device ID string, empty when the record has none
+	 */
 	public String getName() {
 		return name;
 	}

@@ -50,7 +50,7 @@ import java.security.NoSuchAlgorithmException;
 public abstract class IpmiCommandCoder<R extends ResponseData> extends PayloadCoder {
 
 	/**
-	 * Creates the command, with the session parameters of the session that will send it.
+	 * Creates the command. The session that sends it sets its IPMI version, cipher suite and authentication type.
 	 */
 	protected IpmiCommandCoder() {}
 
@@ -210,7 +210,7 @@ public abstract class IpmiCommandCoder<R extends ResponseData> extends PayloadCo
 	 * {@link org.metricshub.ipmi.core.coding.payload.lan.IpmiLanRequest#IpmiLanRequest(int, byte, byte[], byte)}: its
 	 * reply is the one under this code plus one.
 	 *
-	 * @return the network function code of the request, 00h to 3Fh
+	 * @return the network function code of the request, an even number from 00h to 3Eh
 	 */
 	public int getNetworkFunctionCode() {
 		return getNetworkFunction().getCode();
@@ -220,7 +220,7 @@ public abstract class IpmiCommandCoder<R extends ResponseData> extends PayloadCo
 	 * Used in several derived classes - converts {@link PrivilegeLevel} to
 	 * byte.
 	 *
-	 * @param privilegeLevel
+	 * @param privilegeLevel the privilege level to encode
 	 * @return privilegeLevel encoded as a byte due to {@link CommandsConstants}
 	 */
 	protected byte encodePrivilegeLevel(PrivilegeLevel privilegeLevel) {

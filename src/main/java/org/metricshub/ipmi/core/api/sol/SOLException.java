@@ -23,16 +23,27 @@ package org.metricshub.ipmi.core.api.sol;
  */
 
 /**
- * Exception representing problem that might have been encoutered during Serial over LAN communication.
+ * Exception representing problem that might have been encountered during Serial over LAN communication.
  */
 public class SOLException extends Exception {
 
 	private static final long serialVersionUID = 1L;
 
+	/**
+	 * Creates the exception.
+	 *
+	 * @param message the description of the failure
+	 */
 	public SOLException(String message) {
 		super(message);
 	}
 
+	/**
+	 * Creates the exception with its cause.
+	 *
+	 * @param message the description of the failure
+	 * @param cause the exception that made the operation fail
+	 */
 	public SOLException(String message, Throwable cause) {
 		super(message, cause);
 	}

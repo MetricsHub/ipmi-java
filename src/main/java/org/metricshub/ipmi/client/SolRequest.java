@@ -25,9 +25,12 @@ package org.metricshub.ipmi.client;
 import java.time.Duration;
 
 /**
- * Opens a Serial over LAN console in the session of the client (IPMI 2.0 section 15). The BMC usually requires the
- * Administrator privilege to activate the SOL payload: open the client with
- * {@code privilege(PrivilegeLevel.Administrator)}.
+ * Opens a Serial over LAN console (IPMI 2.0 section 15) in the session of the client or, when the BMC serves SOL on
+ * another UDP port, in a session the client opens there with the same credentials, cipher suite and privilege. Most
+ * BMCs require the Administrator privilege to activate the SOL payload: build the client with
+ * {@code privilege(PrivilegeLevel.Administrator)}, or with {@code privilege(PrivilegeLevel.MaximumAvailable)}, which
+ * raises the session to Operator, then to Administrator, as far as the account allows, when the BMC refuses the
+ * activation for insufficient privilege.
  */
 public final class SolRequest {
 
@@ -43,6 +46,8 @@ public final class SolRequest {
 	 *
 	 * @param deadline the time the activation may take, session setup included
 	 * @return this request
+	 * @throws IllegalArgumentException when the duration is shorter than one millisecond or longer than
+	 *         {@link Integer#MAX_VALUE} milliseconds
 	 */
 	public SolRequest timeout(Duration deadline) {
 		this.timeout = IpmiClient.checkTimeout(deadline, "timeout");
@@ -53,8 +58,19 @@ public final class SolRequest {
 	 * Activates the SOL payload and opens the console.
 	 *
 	 * @return the console, to close when done: closing it deactivates the payload
-	 * @throws IpmiCompletionCodeException when the BMC refuses the activation, for a lack of privilege for instance
-	 * @throws IpmiClientException when the BMC offers no SOL payload instance, or the activation fails
+	 * @throws IpmiCompletionCodeException when the BMC refuses a command of the activation: {@code D4h} when the
+	 *         session runs below the privilege the BMC requires for SOL, or a code of Activate Payload (IPMI 2.0 table
+	 *         24-2)
+	 * @throws IpmiAuthenticationException when the BMC refuses the login or the privilege of the client in its
+	 *         session or, for a BMC that serves SOL on another UDP port, the privilege of the client in the session
+	 *         there
+	 * @throws IpmiConnectionException when the session of the client, or the one on the SOL port, cannot be
+	 *         established
+	 * @throws IpmiTimeoutException when the activation does not complete within the deadline, or the BMC stops
+	 *         answering
+	 * @throws IpmiClientException when every SOL payload instance is held by another live session, or the activation
+	 *         fails otherwise
+	 * @throws IllegalStateException when the client is closed, or was built without credentials
 	 */
 	public SolConsole open() {
 		return client.openSol(timeout);

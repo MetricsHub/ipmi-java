@@ -89,8 +89,9 @@ import org.metricshub.ipmi.core.coding.security.SecurityConstants;
 /**
  * The command-line client: {@code java -jar ipmi-java-<version>-standalone.jar [options] <subcommand> [...]}. Every
  * subcommand is a thin layer over one operation of {@link IpmiClient}; the text output is for humans, {@code --json}
- * prints JSON Lines, diagnostics go to stderr only, and the exit code follows the sysexits convention of the
- * MetricsHub command-line clients. See the <a href="https://metricshub.org/ipmi-java/cli.html">manual</a>.
+ * prints JSON Lines, diagnostics go to stderr only, and the exit codes are those of the MetricsHub command-line
+ * clients: the sysexits values, 1 for a partial result and 124 for a timeout. See the
+ * <a href="https://metricshub.org/ipmi-java/cli.html">manual</a>.
  */
 public final class IpmiCli {
 
@@ -1367,49 +1368,66 @@ public final class IpmiCli {
 
 	static String usage() {
 		String program = programName();
-		return "Usage:\n" + "  " + program + " -h <host> probe [--json]\n" + "  " + program
-				+ " -h <host> -u <user> [options] info [--json]\n" + "  " + program
-				+ " -h <host> -u <user> [options] chassis [--json]\n" + "  " + program
-				+ " -h <host> -u <user> [options] power status | on | off | cycle | reset | soft | diag\n" + "  " + program
-				+ " -h <host> -u <user> [options] identify [<seconds> | force | off]\n" + "  " + program
-				+ " -h <host> -u <user> [options] sensors [--type <type>,...] [--name <glob>,...] [--long] [--json]\n"
-				+ "  " + program + " -h <host> -u <user> [options] fru [<id>...] [--json]\n" + "  " + program
-				+ " -h <host> -u <user> [options] sel [--since <id>] [--json]\n" + "  " + program
-				+ " -h <host> -u <user> [options] sol [--escape <char> | --no-escape]\n" + "  " + program
-				+ " -h <host> -u <user> [options] raw <netfn> <command> [<data byte>...] [--json]\n" + "  " + program
-				+ " --help | --version\n" + "\n" + "Connection options (before the subcommand):\n"
+		// Wrapped for an 80-column terminal (the descriptions start at column 33), except the usage lines, which name
+		// the program and run longer with java -jar
+		return "Usage:\n" + "  " + program + " -h <host> [options] probe [--json]\n" + "  " + program
+				+ " -h <host> -u <user> [options] <subcommand> [arguments]\n" + "  " + program + " --help | --version\n"
+				+ "\n" + "<subcommand> [arguments]:\n" + "  info [--json]\n" + "  chassis [--json]\n"
+				+ "  power status | on | off | cycle | reset | soft | diag\n" + "  identify [<seconds> | force | off]\n"
+				+ "  sensors [--type <type>,...] [--name <glob>,...] [--long] [--json]\n" + "  fru [<id>...] [--json]\n"
+				+ "  sel [--since <id>] [--json]\n" + "  sol [--escape <char> | --no-escape]\n"
+				+ "  raw <netfn> <command> [<data byte>...] [--json]\n" + "\n"
+				+ "Connection options (before the subcommand):\n"
 				+ "  -h, --hostname <host>         BMC host name or IP address (required)\n"
-				+ "  -u, --username <user>         User name (required, except for probe); \"\" is the null user\n"
-				+ "  -p, --password <password>     Password (visible to local processes; avoid in automation)\n"
-				+ "  -pf, --password-file <file>   Read a UTF-8 password from a file (preferred for automation)\n"
-				+ "  -k, --bmc-key <hex>           BMC key (Kg) of a two-key login, in hexadecimal (at most 20 bytes)\n"
+				+ "  -u, --username <user>         User name (required, except for probe); the\n"
+				+ "                                empty name \"\" is the null user name\n"
+				+ "  -p, --password <password>     Password (visible to local processes; avoid\n"
+				+ "                                in automation)\n"
+				+ "  -pf, --password-file <file>   Read a UTF-8 password from a file\n"
+				+ "                                (preferred for automation)\n"
+				+ "  -k, --bmc-key <hex>           BMC key (Kg) of a two-key login, in\n"
+				+ "                                hexadecimal (at most 20 bytes)\n"
 				+ "  -kf, --bmc-key-file <file>    Read the hexadecimal BMC key from a file\n"
 				+ "  -P, --port <port>             UDP port of the BMC (default: 623)\n"
-				+ "  -L, --privilege <level>       user, operator, administrator or auto (default: the lowest the subcommand\n"
-				+ "                                needs); auto runs at user and raises the session when a command needs more\n"
-				+ "  -C, --cipher-suite <id>[,..]  One ID: use exactly this suite; several: preference order"
-				+ " (default: 17,3,8,16,2,7,12,11)\n"
-				+ "  -t, --timeout <ms>            Deadline of the subcommand (default: 120000); for sol, of its setup\n"
+				+ "  -L, --privilege <level>       user, operator, administrator or auto\n"
+				+ "                                (default: the lowest the subcommand needs);\n"
+				+ "                                auto runs at user and raises the session\n"
+				+ "                                when a command needs more\n"
+				+ "  -C, --cipher-suite <id>[,..]  One ID: use exactly this suite; several:\n"
+				+ "                                preference order (default: 17,3,8,16,2,7,12,11)\n"
+				+ "  -t, --timeout <ms>            Deadline of the subcommand (default:\n"
+				+ "                                120000); for sol, of its setup\n"
 				+ "      --message-timeout <ms>    Per-message timeout (default: 5000)\n"
-				+ "      --retries <n>             Resends of a message without reply (default: 3)\n"
-				+ "  -v, --verbose                 Print the connection details and the time of each step to stderr\n"
+				+ "      --retries <n>             Resends of a message without reply\n"
+				+ "                                (default: 3)\n"
+				+ "  -v, --verbose                 Print the connection details and the time\n"
+				+ "                                of each step to stderr\n"
 				+ "      --help                    Show this help\n"
 				+ "      --version                 Show the project version\n" + "\n"
 				+ "Subcommand options (after the subcommand, in any order with its arguments):\n"
-				+ "      --json                    probe, info, chassis, sensors, fru, sel, raw: print JSON Lines instead of text\n"
-				+ "      --type <type>,...         sensors: only these sensor types (Temperature, Fan, Voltage, ...)\n"
-				+ "      --name <glob>,...         sensors: only the sensors whose name matches (* and ?, case-insensitive)\n"
-				+ "      --long                    sensors: add the number, the entity, the thresholds and the problem\n"
-				+ "      --since <id>              sel: only the entries after this record ID (the last one read before)\n"
-				+ "      --escape <char>           sol: the escape character (default: ~)\n"
-				+ "      --no-escape               sol: no escape sequences (binary transfers); end of input closes\n"
-				+ "                                (in the console, ~. at the start of a line closes it, ~? lists the sequences)\n"
-				+ "\n"
-				+ "Default privilege: user for info, chassis, power status, sensors, fru and sel; operator for the other\n"
-				+ "power actions and identify; administrator for sol and raw.\n"
+				+ "      --json                    probe, info, chassis, sensors, fru, sel,\n"
+				+ "                                raw: print JSON Lines instead of text\n"
+				+ "      --type <type>,...         sensors: only these sensor types\n"
+				+ "                                (Temperature, Fan, Voltage, ...)\n"
+				+ "      --name <glob>,...         sensors: only the sensors whose name\n"
+				+ "                                matches (* and ?, case-insensitive)\n"
+				+ "      --long                    sensors: add the number, the entity, the\n"
+				+ "                                thresholds and the problem\n"
+				+ "      --since <id>              sel: only the entries after this record ID\n"
+				+ "                                (the last one read before)\n"
+				+ "      --escape <char>           sol: the escape character (default: ~); at\n"
+				+ "                                the start of a line, ~. closes the console\n"
+				+ "                                and ~? lists the sequences\n"
+				+ "      --no-escape               sol: no escape sequences (binary\n"
+				+ "                                transfers); the end of the input closes\n"
+				+ "                                the console\n" + "\n"
+				+ "Default privilege: user for info, chassis, power status, sensors, fru and\n"
+				+ "sel; operator for the other power actions and identify; administrator for\n"
+				+ "sol and raw.\n"
 				+ "raw takes bytes in hexadecimal, 0x optional: raw 0x06 0x01 is Get Device ID.\n"
-				+ "If neither password option is given, the password is requested from the interactive console.\n" + "\n"
-				+ "Full manual - output formats, the SOL console, exit codes, ipmitool equivalents:\n"
+				+ "If neither password option is given, the password is requested from the\n"
+				+ "interactive console.\n" + "\n"
+				+ "Full manual (output formats, SOL console, exit codes, ipmitool equivalents):\n"
 				+ "  https://metricshub.org/ipmi-java/cli.html\n";
 	}
 

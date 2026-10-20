@@ -25,21 +25,27 @@ package org.metricshub.ipmi.core.coding.commands.fru.record;
 import org.metricshub.ipmi.core.common.TypeConverter;
 
 /**
- * Record from FRU Multi Record Area
+ * Record from the FRU MultiRecord area
  */
 public abstract class MultiRecordInfo extends FruRecord {
 
+	/**
+	 * Creates an empty record, for the subclasses.
+	 */
 	public MultiRecordInfo() {
 		super();
 	}
 
 	/**
-	 * Creates and populates record
+	 * Decodes the record of the MultiRecord area that starts at the given offset, with its 5-byte header.
 	 *
 	 * @param fruData
 	 *        - raw data containing record
 	 * @param offset
 	 *        - offset to the record in the data
+	 * @return the decoded record: a subclass for the types the library models, a {@link RawMultiRecordInfo}
+	 *         otherwise
+	 * @throws IllegalArgumentException when the record format version is not 2
 	 */
 	public static MultiRecordInfo populateMultiRecord(final byte[] fruData, final int offset) {
 		MultiRecordInfo recordInfo = null;

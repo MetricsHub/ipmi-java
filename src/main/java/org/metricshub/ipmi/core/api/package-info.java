@@ -1,5 +1,6 @@
 /**
- * The part of library responsible for message encoding and decoding.
+ * The API of the protocol core: synchronous ({@link org.metricshub.ipmi.core.api.sync}), asynchronous
+ * ({@link org.metricshub.ipmi.core.api.async}) and Serial over LAN ({@link org.metricshub.ipmi.core.api.sol}).
  */
 package org.metricshub.ipmi.core.api;
 /*-

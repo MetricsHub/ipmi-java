@@ -27,7 +27,7 @@ import org.metricshub.ipmi.core.common.TypeConverter;
 import java.nio.charset.StandardCharsets;
 
 /**
- * Management Access Information record from FRU Multi Record Area
+ * Management Access record (type 03h) from the FRU MultiRecord area
  */
 public class ManagementAccessInfo extends MultiRecordInfo {
 
@@ -60,18 +60,40 @@ public class ManagementAccessInfo extends MultiRecordInfo {
 		accessInfo = new String(buffer, StandardCharsets.ISO_8859_1);
 	}
 
+	/**
+	 * Returns the kind of management access information the record holds.
+	 *
+	 * @return the sub-record type, {@link ManagementAccessRecordType#Unspecified} for a code the enumeration does not
+	 *         list
+	 */
 	public ManagementAccessRecordType getRecordType() {
 		return recordType;
 	}
 
+	/**
+	 * Sets the kind of management access information the record holds.
+	 *
+	 * @param recordType the sub-record type
+	 */
 	public void setRecordType(ManagementAccessRecordType recordType) {
 		this.recordType = recordType;
 	}
 
+	/**
+	 * Returns the management access information: a URL, a name or a ping address of the system or of a component,
+	 * or the 16-byte unique ID of the system.
+	 *
+	 * @return the bytes that follow the sub-record type, decoded as Latin 1
+	 */
 	public String getAccessInfo() {
 		return accessInfo;
 	}
 
+	/**
+	 * Sets the management access information.
+	 *
+	 * @param accessInfo the management access information
+	 */
 	public void setAccessInfo(String accessInfo) {
 		this.accessInfo = accessInfo;
 	}

@@ -54,8 +54,7 @@ import java.util.Random;
  * <br>
  * Creating connection consists of the following steps:
  * <ul>
- * <li>Create {@link Connection} and get associated with it {@link ConnectionHandle} via
- * {@link #createConnection(InetAddress)}</li>
+ * <li>Create a {@link Connection} and get its {@link ConnectionHandle} with {@link #createConnection(InetAddress)}</li>
  * <li>Get {@link CipherSuite}s that are available for the connection via
  * {@link #getAvailableCipherSuites(ConnectionHandle)}</li>
  * <li>Pick {@link CipherSuite} and {@link PrivilegeLevel} that will
@@ -64,18 +63,15 @@ import java.util.Random;
  * {@link #getChannelAuthenticationCapabilities(ConnectionHandle, CipherSuite, PrivilegeLevel)}</li>
  * <li>Provide username,
  * password and (if the BMC needs it) the BMC Kg key and start session via
- * {@link #openSession(ConnectionHandle, String, String, byte[])}, which also raises it to the requested Operator or
- * Administrator privilege</li>
+ * {@link #openSession(ConnectionHandle, String, String, byte[])} or
+ * {@link #openSession(ConnectionHandle, String, byte[], byte[])} (password as bytes, which the caller can clear),
+ * which also raises it to the requested Operator or Administrator privilege</li>
  * </ul>
  * <br>
  * <p>
- * Send message register via
- * {@link #sendMessage(ConnectionHandle, PayloadCoder)}
- * </p>
- * <br>
- * <p>
- * To close session call
- * {@link #closeSession(ConnectionHandle)}
+ * Send commands with {@link #sendMessage(ConnectionHandle, IpmiCommandCoder)}, which returns the typed response of
+ * the command, and close the session with {@link #closeSession(ConnectionHandle)}, in a finally block: BMCs have few
+ * session slots.
  * </p>
  * <p>
  * When done with work, clean up via {@link #tearDown()}
@@ -98,10 +94,11 @@ public class IpmiConnector {
 
 	/**
 	 * Starts {@link IpmiConnector} and initiates the {@link ConnectionManager} at the given port. Wildcard IP address
-	 * will be used.
+	 * will be used. Keep-alive messages are sent every 30 000 ms ({@link ConnectionManager#DEFAULT_PING_PERIOD}).
 	 *
 	 * @param port
-	 *        - the port that will be used by {@link IpmiAsyncConnector} to communicate with the remote hosts.
+	 *        - the local UDP port that {@link IpmiAsyncConnector} binds to communicate with the remote hosts, 0 for any
+	 *        free port
 	 * @throws IOException
 	 *         when the port cannot be bound
 	 */
@@ -111,9 +108,11 @@ public class IpmiConnector {
 
 	/**
 	 * Starts {@link IpmiConnector} and initiates the {@link ConnectionManager} at the given port and IP interface.
+	 * Keep-alive messages are sent every 30 000 ms ({@link ConnectionManager#DEFAULT_PING_PERIOD}).
 	 *
 	 * @param port
-	 *        - the port that will be used by {@link IpmiAsyncConnector} to communicate with the remote hosts.
+	 *        - the local UDP port that {@link IpmiAsyncConnector} binds to communicate with the remote hosts, 0 for any
+	 *        free port
 	 * @param address
 	 *        - the IP address that will be used by {@link IpmiAsyncConnector} to communicate with the remote hosts.
 	 * @throws IOException
@@ -127,8 +126,8 @@ public class IpmiConnector {
 	 * Starts {@link IpmiConnector} and initiates the {@link ConnectionManager} at
 	 * the given port. Wildcard IP address will be used.
 	 *
-	 * @param port the port that will be used by {@link IpmiAsyncConnector} to
-	 *        communicate with the remote hosts.
+	 * @param port the local UDP port that {@link IpmiAsyncConnector} binds to communicate with the remote hosts, 0 for
+	 *        any free port
 	 * @param pingPeriod the period in milliseconds used to send the keep alive
 	 *        messages.<br>
 	 *        0 If keep-alive messages should be disabled.
@@ -172,6 +171,10 @@ public class IpmiConnector {
 	 *
 	 * @param address
 	 *        - {@link InetAddress} of the remote host
+	 * @param cipherSuite
+	 *        - the cipher suite of the session
+	 * @param privilegeLevel
+	 *        - the privilege level requested for the session
 	 * @return handle to the connection to the remote host
 	 * @throws IOException
 	 *         when the connection cannot be created
@@ -189,6 +192,10 @@ public class IpmiConnector {
 	 *        - {@link InetAddress} of the remote host
 	 * @param port
 	 *        - remote UDP port
+	 * @param cipherSuite
+	 *        - the cipher suite of the session
+	 * @param privilegeLevel
+	 *        - the privilege level requested for the session
 	 * @return handle to the connection to the remote host
 	 * @throws IOException
 	 *         when the connection cannot be created
@@ -250,7 +257,10 @@ public class IpmiConnector {
 
 	/**
 	 * Establishes the session with the remote host, and raises it to the requested privilege when that is Operator or
-	 * Administrator (Set Session Privilege Level, IPMI 2.0 section 22.18: every session starts at User).
+	 * Administrator (Set Session Privilege Level, IPMI 2.0 section 22.18: every session starts at User). For
+	 * {@link PrivilegeLevel#MaximumAvailable}, the session is requested at Administrator, then at Operator and at User
+	 * when the BMC refuses the role to the account, and set to User right after the handshake: the caller raises it
+	 * when a command needs more.
 	 *
 	 * @param connectionHandle
 	 *        - {@link ConnectionHandle} associated with the remote host.
@@ -279,7 +289,10 @@ public class IpmiConnector {
 	 * Establishes the session with the remote host, with the password as bytes: the caller can then clear them
 	 * once the session is open, which an immutable {@link String} does not allow. When the requested privilege is
 	 * Operator or Administrator, the session is raised to it with Set Session Privilege Level right after the
-	 * handshake (IPMI 2.0 section 22.18: every session starts at User); a refusal closes the session.
+	 * handshake (IPMI 2.0 section 22.18: every session starts at User); a refusal closes the session. For
+	 * {@link PrivilegeLevel#MaximumAvailable}, the session is requested at Administrator, then at Operator and at User
+	 * when the BMC refuses the role to the account, and set to User right after the handshake: the caller raises it
+	 * when a command needs more.
 	 *
 	 * @param connectionHandle
 	 *        - {@link ConnectionHandle} associated with the remote host.
@@ -512,7 +525,7 @@ public class IpmiConnector {
 
 	/**
 	 * Throws the exception when the request was already sent again {@code limit} times (limit + 1 tries), otherwise
-	 * lets the caller send it again, after a random pause of up to {@link #idleTime} ms if asked.
+	 * lets the caller send it again, after a random pause of up to {@link #IDLE_TIME} ms if asked.
 	 */
 	private void handleRetriesWhenException(int tries, Exception e, boolean pause, int limit) throws Exception {
 		if (tries > limit) {
@@ -611,7 +624,8 @@ public class IpmiConnector {
 	}
 
 	/**
-	 * Sets how many times a message without a reply, or a handshake step without a reply, is sent again.
+	 * Sets how many times a message without a reply is sent again, or a login whose step got no reply is started
+	 * again from Open Session.
 	 *
 	 * @param retries the number of resends, 0 to send every message once
 	 * @throws IllegalArgumentException when negative
@@ -623,7 +637,7 @@ public class IpmiConnector {
 
 	/**
 	 * Sets the timeout of the messages of the connections created from now on; {@link #setTimeout(ConnectionHandle, int)}
-	 * changes it for an existing connection.
+	 * changes it for an existing connection. 5 000 ms by default.
 	 *
 	 * @param timeout the time in milliseconds after which a message without a reply is reported as timed out
 	 * @throws IllegalArgumentException when the timeout is less than one millisecond

@@ -30,6 +30,10 @@ import org.metricshub.ipmi.core.common.TypeConverter;
  * FRU record containing Chassis info.<br>
  * This area is used to hold Serial Number, Part Number, and other information
  * about the system chassis.
+ * <p>
+ * Each string field is decoded according to its type/length byte: text without its leading and trailing spaces, BCD
+ * plus, 6-bit ASCII, or binary data as lowercase hexadecimal digits. A field the area does not give is empty, never
+ * null.
  */
 public class ChassisInfo extends FruRecord {
 
@@ -126,30 +130,65 @@ public class ChassisInfo extends FruRecord {
 		customChassisInfo = customInfo.toArray(customChassisInfo);
 	}
 
+	/**
+	 * Returns the type of the chassis, coded as the SMBIOS chassis types.
+	 *
+	 * @return the chassis type, {@link ChassisType#Other} for a code that {@link ChassisType} does not list
+	 */
 	public ChassisType getChassisType() {
 		return chassisType;
 	}
 
+	/**
+	 * Sets the type of the chassis.
+	 *
+	 * @param chassisType the chassis type
+	 */
 	public void setChassisType(ChassisType chassisType) {
 		this.chassisType = chassisType;
 	}
 
+	/**
+	 * Returns the chassis part number.
+	 *
+	 * @return the chassis part number, empty when the area does not give it
+	 */
 	public String getChassisPartNumber() {
 		return chassisPartNumber;
 	}
 
+	/**
+	 * Sets the chassis part number.
+	 *
+	 * @param chassisPartNumber the chassis part number
+	 */
 	public void setChassisPartNumber(String chassisPartNumber) {
 		this.chassisPartNumber = chassisPartNumber;
 	}
 
+	/**
+	 * Returns the chassis serial number.
+	 *
+	 * @return the chassis serial number, empty when the area does not give it
+	 */
 	public String getChassisSerialNumber() {
 		return chassisSerialNumber;
 	}
 
+	/**
+	 * Sets the chassis serial number.
+	 *
+	 * @param chassisSerialNumber the chassis serial number
+	 */
 	public void setChassisSerialNumber(String chassisSerialNumber) {
 		this.chassisSerialNumber = chassisSerialNumber;
 	}
 
+	/**
+	 * Returns the custom fields of the chassis area, those that follow its predefined fields.
+	 *
+	 * @return the custom fields in order, empty when there are none
+	 */
 	public String[] getCustomChassisInfo() {
 		return customChassisInfo;
 	}

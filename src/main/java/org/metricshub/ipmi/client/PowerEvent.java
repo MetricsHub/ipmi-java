@@ -23,17 +23,17 @@ package org.metricshub.ipmi.client;
  */
 
 /**
- * What caused the last power-down or power-up of the system (Get Chassis Status, IPMI 2.0 table 28-3).
+ * What caused the last power down or power on of the system (Get Chassis Status, IPMI 2.0 table 28-3).
  */
 public enum PowerEvent {
 	/** The system lost its AC supply. */
 	AC_FAILED,
-	/** The system was powered down by a power overload. */
+	/** The last power down of the system was caused by a power overload. */
 	POWER_OVERLOAD,
-	/** The system was powered down by a chassis interlock, such as an open panel. */
+	/** The last power down of the system was caused by a chassis interlock, such as an open panel. */
 	INTERLOCK,
-	/** The system was powered down by a power fault. */
+	/** The last power down of the system was caused by a power fault. */
 	POWER_FAULT,
-	/** The system was powered on or off by an IPMI command. */
+	/** The last power on of the system was requested by an IPMI command, such as Chassis Control. */
 	IPMI_COMMAND
 }

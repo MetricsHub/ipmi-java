@@ -1,5 +1,5 @@
 /**
- * The RMCP-level encoder, decoder and mesage classes.
+ * The RMCP-level encoder, decoder and message classes.
  */
 package org.metricshub.ipmi.core.coding.rmcp;
 /*-

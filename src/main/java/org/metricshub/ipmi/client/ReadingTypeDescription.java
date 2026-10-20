@@ -34,7 +34,9 @@ import java.util.Map;
 import org.metricshub.ipmi.core.coding.commands.sdr.record.ReadingType;
 
 /**
- * {@link ReadingType} mapping to match the IPMIUtil event sensor types (states)
+ * The descriptions of the {@link ReadingType} states and events, in the wording of {@code ipmiutil} (of
+ * {@code ipmitool} for the few that {@code ipmiutil} does not name), used by {@link Sensor#states()} and
+ * {@link SelEntry#description()}.
  */
 public final class ReadingTypeDescription {
 
@@ -53,18 +55,16 @@ public final class ReadingTypeDescription {
 		map.put(FruLatchOpen, "FRU Latch");
 		map.put(FruActivationRequested, "Activation Requested");
 		map.put(SlotConnectorDeviceInstalled, "Device Installed");
-		map.put(WarmReset, "Warm Reset"); // No correspondence found in ipmiTool code - Update MS_HW_IpmiTool.hdf (Awk)
+		map.put(WarmReset, "Warm Reset");
 		map.put(FruActivationInProgress, "Activation in Progress");
 		map.put(SlotConnectorReadyForDeviceInstallation, "Ready for Device Installation");
 		map.put(PxeBootRequested, "User requested PXE boot");
 		map.put(FruActive, "Active");
-		map.put(InvalidUsernameOrPassword, "Invalid Username Or Password"); // No correspondence found in ipmiTool code -
-																																				// Update MS_HW_IpmiTool.hdf (Awk)
+		map.put(InvalidUsernameOrPassword, "Invalid Username Or Password");
 		map.put(SlotConnectorReadyForDeviceRemoval, "Ready for Device Removal");
 		map.put(AutomaticBootToDiagnostic, "Automatic boot to diagnostic");
 		map.put(FruDeactivationRequested, "Deactivation Requested");
-		map.put(InvalidPasswordDisable, "Invalid Password Disable"); // No correspondence found in ipmiTool code - Update
-																																	// MS_HW_IpmiTool.hdf (Awk)
+		map.put(InvalidPasswordDisable, "Invalid Password Disable");
 		map.put(EntityPresent, "Device Present");
 		map.put(SlotPowerOff, "Slot Power is Off");
 		map.put(SoftwareInitiatedHardReset, "OS initiated hard reset");
@@ -99,15 +99,13 @@ public final class ReadingTypeDescription {
 		map.put(ProcessorDisabled, "Disabled");
 		map.put(ConsistencyOrParityCheckInProgress, "Parity Check In Progress");
 		map.put(TerminatorPresenceDetected, "Terminator presence detected");
-		map.put(SecureModeViolationAttempt, "Secure Mode Violation Attempt"); // No correspondence found in ipmiTool code -
-																																					// Update MS_HW_IpmiTool.hdf (Awk)
+		map.put(SecureModeViolationAttempt, "Secure Mode Violation Attempt");
 		map.put(OsGracefulStop, "OS graceful stop");
 		map.put(InCriticalArray, "In Critical Array");
 		map.put(ProcessorAutomaticallyThrottled, "Throttled");
 		map.put(PreBootUserPasswordViolation, "Pre-boot password violation - user password");
 		map.put(OsGracefulShutdown, "OS graceful shutdown");
-		map.put(MachineCheckException, "Machine Check Exception"); // No correspondence found in ipmiTool code - Update
-																																// MS_HW_IpmiTool.hdf (Awk)
+		map.put(MachineCheckException, "Machine Check Exception");
 		map.put(PreBootSetupPasswordViolation, "Pre-boot password violation - setup password");
 		map.put(SoftOsShutdown, "PEF initiated soft shutdown");
 		map.put(PreBootNetworkPasswordViolation, "Pre-boot password violation - network boot password");
@@ -126,8 +124,7 @@ public final class ReadingTypeDescription {
 		map.put(MemoryConfigurationError, "Configuration Error");
 		map.put(SpareMemoryUnit, "Spare");
 		map.put(MemoryAutomaticallyThrottled, "Throttled");
-		map.put(MemoryCriticalOvertemperature, "Critical Overtemperature"); // No correspondence found in ipmiTool code -
-																																				// Update MS_HW_IpmiTool.hdf (Awk)
+		map.put(MemoryCriticalOvertemperature, "Critical Overtemperature");
 		map.put(SystemReconfigured, "System Reconfigured");
 		map.put(OemSystemBootEvent, "OEM System boot event");
 		map.put(ABootCompleted, "A: boot completed");
@@ -169,7 +166,7 @@ public final class ReadingTypeDescription {
 		map.put(TransitionToDegraded, "Transition to Degraded");
 		map.put(TimerPowerDown, "Power down");
 		map.put(AcpiS5EnteredByOverride, "S5: entered by override");
-		map.put(LANLeashLost, "Leash Lost"); // No correspondence found in ipmiTool code - Update MS_HW_IpmiTool.hdf (Awk)
+		map.put(LANLeashLost, "Leash Lost");
 		map.put(Predictive, "Predictive Failure Asserted");
 		map.put(TransitionToPowerSave, "Transition to Power Save");
 		map.put(TimerPowerCycle, "Power cycle");
@@ -198,7 +195,7 @@ public final class ReadingTypeDescription {
 		map.put(PowerUnitPredictiveFailure, PREDICTIVE_FAILURE);
 		map.put(BusFatalError, "Bus Fatal Error");
 		map.put(CorrectableMemoryErrorLoggingDisabled, "Correctable memory error logging disabled");
-		map.put(BusDegraded, "Bus Degraded"); // No correspondence found in ipmiTool code - Update MS_HW_IpmiTool.hdf (Awk)
+		map.put(BusDegraded, "Bus Degraded");
 		map.put(EventTypeLoggingDisabled, "Event logging disabled");
 		map.put(LogAreaReset, "Log area reset/cleared");
 		map.put(TransitionToOK, "Transition to OK");
@@ -209,15 +206,7 @@ public final class ReadingTypeDescription {
 		map.put(TransitionToCriticalFromLessSevere, "Transition to Critical from less severe");
 		map.put(SelAlmostFull, "Log almost full");
 		map.put(TransitionToNonRecoverableFromLessSevere, "Transition to Non-recoverable from less severe");
-		map.put(CorrectableMachineCheckErrorLoggingDisabled, "Correctable Machine Check Error Logging Disabled"); // No
-																																																							// correspondence
-																																																							// found
-																																																							// in
-																																																							// ipmiTool
-																																																							// code -
-																																																							// Update
-																																																							// MS_HW_IpmiTool.hdf
-																																																							// (Awk)
+		map.put(CorrectableMachineCheckErrorLoggingDisabled, "Correctable Machine Check Error Logging Disabled");
 		map.put(TransitionToNonCriticalFromMoreSevere, "Transition to Non-critical from more severe");
 		map.put(TransitionToCriticalFromNonRecoverable, "Transition to Critical from Non-recoverable");
 		map.put(SlotConnectorDeviceRemovalRequest, "Device Removal Request");
@@ -239,8 +228,7 @@ public final class ReadingTypeDescription {
 		map.put(SuccessfulSoftwareOrFWChangeDetected, "Firmware or software change success");
 		map.put(InFailedArray, "In Failed Array");
 		map.put(RebuildRemapInProgress, "Rebuild In Progress");
-		map.put(CorrectableMachineCheckError, "Correctable Machine Check Error"); // No correspondence found in ipmiTool
-																																							// code - Update MS_HW_IpmiTool.hdf (Awk)
+		map.put(CorrectableMachineCheckError, "Correctable Machine Check Error");
 		map.put(RebuildRemapAborted, "Rebuild Aborted");
 		map.put(Ierr, "IERR");
 		map.put(ChipsetSoftPowerControlFailure, "Soft-power control failure");
@@ -310,7 +298,7 @@ public final class ReadingTypeDescription {
 		map.put(SleepButtonPressed, "Sleep Button pressed");
 		map.put(FruNotInstalled, "Not Installed");
 		map.put(SlotConnectorFaultStatusAsserted, "Fault Status");
-		map.put(PowerUp, "Power up"); // No correspondence found in ipmiTool code - Update MS_HW_IpmiTool.hdf (Awk)
+		map.put(PowerUp, "Power up");
 		map.put(ResetButtonPressed, "Reset Button pressed");
 		map.put(Unknown, Unknown.name());
 
@@ -318,9 +306,11 @@ public final class ReadingTypeDescription {
 	}
 
 	/**
-	 * @param readingType The {@link ReadingType} key
-	 * @return {@link String} value extracted from the internal lookup matching the output of IPMIUtil and the java verax
-	 *         IPMI lib
+	 * Returns the description of a state or event.
+	 *
+	 * @param readingType the state or event
+	 * @return the description, or {@code null} for a state or event that has none, such as
+	 *         {@link ReadingType#UnknownOEMEvent}
 	 */
 	public static String getReadingType(ReadingType readingType) {
 		return READING_TYPE_TO_DESCRIPTION.get(readingType);

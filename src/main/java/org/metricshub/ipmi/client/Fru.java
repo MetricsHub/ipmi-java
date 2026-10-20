@@ -43,7 +43,7 @@ import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 /**
  * A Field Replaceable Unit of the system: the board, chassis, product and multirecord areas of its FRU inventory
  * (IPMI Platform Management FRU Information Storage Definition), or the SPD data of a memory module, or the
- * processor information ROM of a processor, located by an SDR record. A FRU that could not be read entirely is not
+ * Processor Information ROM of a processor, located by an SDR record. A FRU that could not be read entirely is not
  * {@link #complete()} and lists its {@link #problems()}.
  */
 // EI_EXPOSE_REP also matches EI_EXPOSE_REP2
@@ -216,7 +216,7 @@ public final class Fru {
 	}
 
 	/**
-	 * Returns the processor information ROM of a processor, as the protocol core decodes it: the FRU device of a
+	 * Returns the Processor Information ROM of a processor, as the protocol core decodes it: the FRU device of a
 	 * processor cartridge returns the Intel PIROM of the CPU (S-spec, cores, frequencies, caches, part number, TDP,
 	 * PPIN) instead of a FRU inventory.
 	 *
@@ -252,9 +252,13 @@ public final class Fru {
 	}
 
 	/**
-	 * Returns every area and multirecord decoded from the FRU inventory.
+	 * Returns the records decoded from the FRU inventory: the internal use area
+	 * ({@link org.metricshub.ipmi.core.coding.commands.fru.record.InternalUseInfo}), the chassis, board and product
+	 * areas, then the multirecords, each when the inventory has it and it could be decoded. For a memory module or a
+	 * processor whose FRU device returns its SPD data or its Processor Information ROM, the list holds the single
+	 * {@link SpdInfo} or {@link PiromInfo} instead.
 	 *
-	 * @return the records, in the order of the FRU inventory
+	 * @return the records, in that order
 	 */
 	public List<FruRecord> records() {
 		return records;

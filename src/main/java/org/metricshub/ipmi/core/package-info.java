@@ -1,8 +1,6 @@
 /**
- * The library for communicating with server via IPMI protocol. <br>
- * The API is included in {@link org.metricshub.ipmi.core.api}
- *
- * @see org.metricshub.ipmi.core.api
+ * The protocol core: RMCP+ sessions, IPMI commands and their decoders. Most applications use
+ * {@link org.metricshub.ipmi.client.IpmiClient}.
  */
 // Applies to all the subpackages. EI_EXPOSE_REP also matches EI_EXPOSE_REP2
 @SuppressFBWarnings(value = { "CT_CONSTRUCTOR_THROW", "EI_EXPOSE_REP" }, justification = "CT_CONSTRUCTOR_THROW: "

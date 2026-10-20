@@ -223,8 +223,8 @@ public final class Sensor {
 	}
 
 	/**
-	 * Returns the sensor number, unique for the owner of the sensor: the number of the record plus the index of the
-	 * sensor among those sharing it.
+	 * Returns the sensor number, unique for the owner and LUN of the sensor: the number of the record plus the index of
+	 * the sensor among those sharing it.
 	 *
 	 * @return the sensor number, 0 to 255
 	 */
@@ -276,7 +276,8 @@ public final class Sensor {
 	 * linearization of its record, or for a non-linear sensor with the factors the BMC returned for the reading.
 	 *
 	 * @return the reading, or empty when the sensor has none: a discrete sensor, an unavailable reading
-	 *         ({@link #problem()}), or a record without analog reading
+	 *         ({@link #problem()}), a Compact record (which holds no conversion formula), a record without analog
+	 *         reading, or a non-linear sensor whose reading factors are missing ({@link #problem()} says why)
 	 */
 	public OptionalDouble reading() {
 		if (!rawReading().isPresent() || !(record instanceof FullSensorRecord)) {
@@ -302,8 +303,9 @@ public final class Sensor {
 	}
 
 	/**
-	 * Returns the status of the sensor: for a threshold sensor, the worst threshold the reading is at or beyond; for
-	 * a discrete sensor, {@link SensorStatus#OK} when it answers.
+	 * Returns the status of the sensor: for a threshold sensor, the worst threshold the reading is at or beyond, as the
+	 * BMC reports it in its reply to Get Sensor Reading; for a discrete sensor, {@link SensorStatus#OK} when it
+	 * answers.
 	 *
 	 * @return the status, {@link SensorStatus#UNAVAILABLE} when the reading is unavailable ({@link #problem()})
 	 */
@@ -332,10 +334,11 @@ public final class Sensor {
 	}
 
 	/**
-	 * Returns the asserted states of a discrete sensor, in the wording of {@code ipmiutil} ("Present", "Device
-	 * Absent", "Power Supply Failure detected"...; of {@code ipmitool} for the few states {@code ipmiutil} does not
-	 * name), each once. The states of a threshold sensor are the thresholds
-	 * its reading is at or beyond. For an OEM event/reading type, the single state is the hexadecimal state bytes.
+	 * Returns the asserted states of a discrete sensor, in the wording of {@code ipmiutil} ("Device Present", "Device
+	 * Absent", "Fully Redundant", "Failure detected"...; of {@code ipmitool} for the few states {@code ipmiutil} does
+	 * not name), each once, and "Unknown" for a state its event/reading type does not define. The states of a
+	 * threshold sensor are the thresholds its reading is at or beyond. For an OEM event/reading type (70h-7Fh), the
+	 * single state is the hexadecimal state bytes.
 	 *
 	 * @return the states, empty when none is asserted, when the reading is unavailable, or when the library does
 	 *         not describe the asserted states ({@link #rawStates()} still lists them)
@@ -356,7 +359,9 @@ public final class Sensor {
 	/**
 	 * Returns the lower non-critical threshold, in the {@link #unit()} of the sensor.
 	 *
-	 * @return the threshold, or empty when the sensor does not define it (a threshold of 0 is a threshold)
+	 * @return the threshold, or empty when the record does not define it, for a Compact record (which holds no
+	 *         thresholds), for a record without analog reading, and for a non-linear sensor (each threshold would need
+	 *         factors of its own); a threshold of 0 is a threshold
 	 */
 	public OptionalDouble lowerNonCritical() {
 		return threshold(
@@ -366,7 +371,9 @@ public final class Sensor {
 	/**
 	 * Returns the lower critical threshold, in the {@link #unit()} of the sensor.
 	 *
-	 * @return the threshold, or empty when the sensor does not define it
+	 * @return the threshold, or empty when the record does not define it, for a Compact record (which holds no
+	 *         thresholds), for a record without analog reading, and for a non-linear sensor (each threshold would need
+	 *         factors of its own)
 	 */
 	public OptionalDouble lowerCritical() {
 		return threshold(
@@ -376,7 +383,9 @@ public final class Sensor {
 	/**
 	 * Returns the lower non-recoverable threshold, in the {@link #unit()} of the sensor.
 	 *
-	 * @return the threshold, or empty when the sensor does not define it
+	 * @return the threshold, or empty when the record does not define it, for a Compact record (which holds no
+	 *         thresholds), for a record without analog reading, and for a non-linear sensor (each threshold would need
+	 *         factors of its own)
 	 */
 	public OptionalDouble lowerNonRecoverable() {
 		return threshold(
@@ -387,7 +396,9 @@ public final class Sensor {
 	/**
 	 * Returns the upper non-critical threshold, in the {@link #unit()} of the sensor.
 	 *
-	 * @return the threshold, or empty when the sensor does not define it
+	 * @return the threshold, or empty when the record does not define it, for a Compact record (which holds no
+	 *         thresholds), for a record without analog reading, and for a non-linear sensor (each threshold would need
+	 *         factors of its own)
 	 */
 	public OptionalDouble upperNonCritical() {
 		return threshold(
@@ -397,7 +408,9 @@ public final class Sensor {
 	/**
 	 * Returns the upper critical threshold, in the {@link #unit()} of the sensor.
 	 *
-	 * @return the threshold, or empty when the sensor does not define it
+	 * @return the threshold, or empty when the record does not define it, for a Compact record (which holds no
+	 *         thresholds), for a record without analog reading, and for a non-linear sensor (each threshold would need
+	 *         factors of its own)
 	 */
 	public OptionalDouble upperCritical() {
 		return threshold(
@@ -407,7 +420,9 @@ public final class Sensor {
 	/**
 	 * Returns the upper non-recoverable threshold, in the {@link #unit()} of the sensor.
 	 *
-	 * @return the threshold, or empty when the sensor does not define it
+	 * @return the threshold, or empty when the record does not define it, for a Compact record (which holds no
+	 *         thresholds), for a record without analog reading, and for a non-linear sensor (each threshold would need
+	 *         factors of its own)
 	 */
 	public OptionalDouble upperNonRecoverable() {
 		return threshold(
@@ -420,19 +435,25 @@ public final class Sensor {
 	}
 
 	/**
-	 * Returns why the sensor has no reading and, unless only the factors of a non-linear sensor are missing, no states.
+	 * Returns why the sensor has no reading. A sensor with a problem has no states either, except a non-linear sensor
+	 * whose reading factors are missing (refused, not answered or malformed): it keeps its raw reading, states and
+	 * status.
 	 *
-	 * @return the problem: the BMC refused the reading or the factors of a non-linear sensor (with its completion
-	 *         code), the reading is not valid yet, or scanning is disabled; empty when the sensor has a reading
+	 * @return the problem: the BMC or the controller that owns the sensor refused the reading or the factors of a
+	 *         non-linear sensor (with the completion code), the controller behind the BMC that owns the sensor did not
+	 *         answer, a reply was malformed, the sensor belongs to system software (no controller holds its reading),
+	 *         the reading is not valid yet, or scanning is disabled; empty otherwise
 	 */
 	public Optional<String> problem() {
 		return Optional.ofNullable(problem);
 	}
 
 	/**
-	 * Returns the SDR record of the sensor, as the protocol core decodes it: a {@link FullSensorRecord} for a
-	 * threshold sensor, a {@link org.metricshub.ipmi.core.coding.commands.sdr.record.CompactSensorRecord} for a
-	 * discrete one.
+	 * Returns the SDR record of the sensor, as the protocol core decodes it: a {@link FullSensorRecord}, which holds
+	 * the conversion formula and the thresholds, or a
+	 * {@link org.metricshub.ipmi.core.coding.commands.sdr.record.CompactSensorRecord}, which holds neither. Either kind
+	 * can describe a threshold or a discrete sensor: cast it to {@link AbstractSensorRecord} for what both share, such
+	 * as the unit and the owner.
 	 *
 	 * @return the record
 	 */
@@ -441,9 +462,12 @@ public final class Sensor {
 	}
 
 	/**
-	 * Returns the reply of the BMC to Get Sensor Reading, as the protocol core decodes it.
+	 * Returns the reply to Get Sensor Reading, of the BMC or of the controller behind it that owns the sensor, as the
+	 * protocol core decodes it.
 	 *
-	 * @return the reply, or empty when the BMC refused the reading
+	 * @return the reply, or empty when no reading came back: the BMC or the controller that owns the sensor refused
+	 *         it, that controller did not answer through the BMC, the reply was malformed, or the sensor belongs to
+	 *         system software
 	 */
 	public Optional<GetSensorReadingResponseData> readingData() {
 		return Optional.ofNullable(reading);

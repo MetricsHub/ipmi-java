@@ -31,6 +31,11 @@ import org.metricshub.ipmi.core.common.TypeConverter;
 
 import java.util.Arrays;
 
+/**
+ * A System Event Log record as the BMC sent it (IPMI 2.0 section 32), decoded: its type, its timestamp and, for a
+ * system event, the sensor and the event. {@link org.metricshub.ipmi.client.SelEntry} wraps it with the timestamps
+ * interpreted.
+ */
 public class SelRecord {
 
 	/** The size of every SEL record, whatever its type (IPMI 2.0 section 32): 16 bytes. */
@@ -89,6 +94,8 @@ public class SelRecord {
 	private byte[] rawData;
 
 	/**
+	 * Returns the 16 bytes of the record as the BMC sent them.
+	 *
 	 * @return the 16 bytes of the record as the BMC sent them, null for a record built by hand
 	 */
 	public byte[] getRawData() {
@@ -96,6 +103,8 @@ public class SelRecord {
 	}
 
 	/**
+	 * Sets the bytes of the record as the BMC sent them.
+	 *
 	 * @param rawData the 16 bytes of the record as the BMC sent them
 	 */
 	public void setRawData(byte[] rawData) {
@@ -195,6 +204,8 @@ public class SelRecord {
 	}
 
 	/**
+	 * Returns the generator ID of a system event (bytes 8 and 9 of the record).
+	 *
 	 * @return the generator ID of a system event (IPMI 2.0 section 32.1): the slave address or system software ID
 	 *         of the controller or software that logged the event in the low byte, its channel number and LUN in the
 	 *         high byte; 0 for the other record types
@@ -204,6 +215,8 @@ public class SelRecord {
 	}
 
 	/**
+	 * Sets the generator ID of a system event.
+	 *
 	 * @param generatorId the generator ID of a system event
 	 */
 	public void setGeneratorId(int generatorId) {
@@ -211,6 +224,8 @@ public class SelRecord {
 	}
 
 	/**
+	 * Returns the event/reading type code of a system event (byte 13 bits 6:0 of the record).
+	 *
 	 * @return the event/reading type code of a system event (IPMI 2.0 table 42-1: 01h threshold, 02h to 0Ch generic
 	 *         discrete, 6Fh sensor-specific, 70h to 7Fh OEM); 0 for the other record types
 	 */
@@ -219,6 +234,8 @@ public class SelRecord {
 	}
 
 	/**
+	 * Sets the event/reading type code of a system event.
+	 *
 	 * @param eventType the event/reading type code of a system event
 	 */
 	public void setEventType(int eventType) {
@@ -226,6 +243,8 @@ public class SelRecord {
 	}
 
 	/**
+	 * Returns the three event data bytes of a system event (bytes 14 to 16 of the record).
+	 *
 	 * @return the three event data bytes of a system event as the BMC sent them (IPMI 2.0 table 32-1): the event
 	 *         offset and the usage of the next two bytes in the first one, then the reading and the threshold of a
 	 *         threshold event, or what the sensor type defines; null for the other record types
@@ -235,6 +254,8 @@ public class SelRecord {
 	}
 
 	/**
+	 * Sets the three event data bytes of a system event.
+	 *
 	 * @param eventData the three event data bytes of a system event, null for the other record types
 	 */
 	public void setEventData(byte[] eventData) {
@@ -242,6 +263,8 @@ public class SelRecord {
 	}
 
 	/**
+	 * Returns the manufacturer ID of a timestamped OEM record (bytes 8 to 10 of the record).
+	 *
 	 * @return the manufacturer ID (IANA enterprise number) of an OEM timestamped record, null for the other record
 	 *         types
 	 */
@@ -250,6 +273,8 @@ public class SelRecord {
 	}
 
 	/**
+	 * Sets the manufacturer ID of a timestamped OEM record.
+	 *
 	 * @param manufacturerId the manufacturer ID of an OEM timestamped record, null for the other record types
 	 */
 	public void setManufacturerId(Integer manufacturerId) {
@@ -257,6 +282,8 @@ public class SelRecord {
 	}
 
 	/**
+	 * Returns the OEM-defined bytes of an OEM record.
+	 *
 	 * @return the OEM-defined bytes of an OEM record (6 for a timestamped one, 13 otherwise), null for the other
 	 *         record types
 	 */
@@ -265,76 +292,162 @@ public class SelRecord {
 	}
 
 	/**
+	 * Sets the OEM-defined bytes of an OEM record.
+	 *
 	 * @param oemData the OEM-defined bytes of an OEM record, null for the other record types
 	 */
 	public void setOemData(byte[] oemData) {
 		this.oemData = oemData;
 	}
 
+	/**
+	 * Sets the record ID.
+	 *
+	 * @param recordId the record ID
+	 */
 	public void setRecordId(int recordId) {
 		this.recordId = recordId;
 	}
 
+	/**
+	 * Returns the record ID of the entry (bytes 1 and 2 of the record).
+	 *
+	 * @return the record ID
+	 */
 	public int getRecordId() {
 		return recordId;
 	}
 
+	/**
+	 * Returns the type of the record (byte 3 of the record, IPMI 2.0 section 31.6.1): a system event, an OEM record
+	 * with or without a timestamp, or a reserved type. The record type byte itself is {@code getRawData()[2]}.
+	 *
+	 * @return the record type
+	 */
 	public SelRecordType getRecordType() {
 		return recordType;
 	}
 
+	/**
+	 * Sets the type of the record.
+	 *
+	 * @param recordType the record type
+	 */
 	public void setRecordType(SelRecordType recordType) {
 		this.recordType = recordType;
 	}
 
+	/**
+	 * Returns the timestamp of the record as the BMC sent it (bytes 4 to 7 of the record): a {@link Date} of the
+	 * unsigned 32-bit number of seconds, with no UTC offset applied. FFFFFFFFh (unspecified) and the values up to
+	 * 20000000h (seconds since the initialization of the SEL device, IPMI 2.0 section 37.1) are not dates:
+	 * {@link org.metricshub.ipmi.client.SelEntry#timestamp()} tells them apart.
+	 *
+	 * @return the timestamp, null for a non-timestamped OEM record or a record of a reserved type
+	 */
 	public Date getTimestamp() {
 		return timestamp;
 	}
 
+	/**
+	 * Sets the timestamp of the record.
+	 *
+	 * @param timestamp the timestamp as the BMC sent it, null for a record without one
+	 */
 	public void setTimestamp(Date timestamp) {
 		this.timestamp = timestamp;
 	}
 
+	/**
+	 * Returns the type of the sensor that generated a system event (byte 11 of the record).
+	 *
+	 * @return the sensor type, null for the other record types
+	 */
 	public SensorType getSensorType() {
 		return sensorType;
 	}
 
+	/**
+	 * Sets the type of the sensor that generated a system event.
+	 *
+	 * @param sensorType the sensor type
+	 */
 	public void setSensorType(SensorType sensorType) {
 		this.sensorType = sensorType;
 	}
 
+	/**
+	 * Returns the number of the sensor that generated a system event (byte 12 of the record): with the generator ID
+	 * ({@link #getGeneratorId()}), it identifies the sensor.
+	 *
+	 * @return the sensor number, 0 for the other record types
+	 */
 	public int getSensorNumber() {
 		return sensorNumber;
 	}
 
+	/**
+	 * Sets the number of the sensor that generated a system event.
+	 *
+	 * @param sensorNumber the sensor number, 0 to 255
+	 */
 	public void setSensorNumber(int sensorNumber) {
 		this.sensorNumber = sensorNumber;
 	}
 
+	/**
+	 * Tells whether a system event is an assertion or a deassertion (byte 13 bit 7 of the record).
+	 *
+	 * @return the event direction, null for the other record types
+	 */
 	public EventDirection getEventDirection() {
 		return eventDirection;
 	}
 
+	/**
+	 * Sets whether a system event is an assertion or a deassertion.
+	 *
+	 * @param eventDirection the event direction
+	 */
 	public void setEventDirection(EventDirection eventDirection) {
 		this.eventDirection = eventDirection;
 	}
 
+	/**
+	 * Returns the event of a system event: the state that the event offset (the low 4 bits of byte 14 of the record)
+	 * designates for the event/reading type and the sensor type.
+	 *
+	 * @return the event, null for the other record types
+	 */
 	public ReadingType getEvent() {
 		return event;
 	}
 
+	/**
+	 * Sets the event of a system event.
+	 *
+	 * @param event the event
+	 */
 	public void setEvent(ReadingType event) {
 		this.event = event;
 	}
 
 	/**
-	 * Reading that triggered event. Provided in raw value (need to do
-	 * {@link FullSensorRecord#calcFormula(int)}). Only for threshold sensors.
+	 * Returns the reading that triggered a threshold event (event data 2, byte 15 of the record), as the raw byte that
+	 * {@link FullSensorRecord#calcFormula(int)} converts. Only meaningful for a threshold sensor whose event data 1
+	 * says that event data 2 holds the trigger reading.
+	 *
+	 * @return the raw reading byte, 0 for the other record types
 	 */
 	public byte getReading() {
 		return reading;
 	}
 
+	/**
+	 * Sets the raw reading that triggered a threshold event.
+	 *
+	 * @param reading the raw reading byte
+	 */
 	public void setReading(byte reading) {
 		this.reading = reading;
 	}

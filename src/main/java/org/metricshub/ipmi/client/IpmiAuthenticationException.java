@@ -31,6 +31,7 @@ public class IpmiAuthenticationException extends IpmiClientException {
 
 	private static final long serialVersionUID = 1L;
 
+	/** The status code the BMC sent, null when the console side rejected the login. */
 	private final CompletionCode statusCode;
 
 	/**
@@ -56,11 +57,14 @@ public class IpmiAuthenticationException extends IpmiClientException {
 	}
 
 	/**
-	 * Returns the status code the BMC sent when it refused the login (IPMI 2.0 table 13-15): unauthorized name,
-	 * unauthorized role, invalid integrity check value...
+	 * Returns the status code the BMC sent when it refused the login: the status code of its Open Session or RAKP
+	 * reply (IPMI 2.0 table 13-15: unauthorized name, unauthorized role, invalid integrity check value...), or the
+	 * completion code of the Set Session Privilege Level it refused right after the login.
 	 *
-	 * @return the status code, or null when the login failed on the console side, which checks the key exchange
-	 *         codes of the BMC against the password and the BMC key
+	 * @return the status code: the Open Session or RAKP status code of a refused login, the completion code of a
+	 *         refused Set Session Privilege Level ({@link CompletionCode#Unknown} for its {@code 80h} and {@code 81h},
+	 *         {@code InsufficentPrivilege} for {@code D4h}), or null when the login failed on the console side, which
+	 *         checks the key exchange codes of the BMC against the password and the BMC key
 	 */
 	public CompletionCode statusCode() {
 		return statusCode;

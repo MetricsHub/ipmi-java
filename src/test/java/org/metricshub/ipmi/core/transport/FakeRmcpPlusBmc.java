@@ -217,7 +217,7 @@ public class FakeRmcpPlusBmc implements AutoCloseable {
 	private volatile SocketAddress console;
 	/** The highest privilege of the account: what a RAKP Message 1 role of 0 (highest available) gets. */
 	private volatile int privilegeLimit = ADMINISTRATOR;
-	/** Starts the session at its maximum instead of User, as an IMM, iDRAC 6, iRMC, GIGABYTE or Supermicro does. */
+	/** Starts the session at its maximum instead of User, as a Lenovo TSM, iDRAC 6, iRMC, GIGABYTE or Supermicro does. */
 	private volatile boolean startsAtMaximum;
 	/** The privilege Send Message to another controller needs: User like an iLO 5 by default, Administrator on AMI. */
 	private volatile int sendMessagePrivilege = USER;
@@ -429,7 +429,8 @@ public class FakeRmcpPlusBmc implements AutoCloseable {
 	}
 
 	/**
-	 * Starts every session at the maximum requested in RAKP Message 1 instead of User, as an IMM, an iDRAC 6, an iRMC,
+	 * Starts every session at the maximum requested in RAKP Message 1 instead of User, as a Lenovo TSM, an iDRAC 6, an
+	 * iRMC,
 	 * a GIGABYTE or a Supermicro BMC does (against IPMI 2.0 section 22.18).
 	 *
 	 * @param enabled whether the session starts at its maximum

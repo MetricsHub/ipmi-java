@@ -70,7 +70,7 @@ public final class ChassisStatus {
 	}
 
 	/**
-	 * Returns what caused the last power-down or power-up: several causes can be flagged at once.
+	 * Returns what caused the last power down or power on: several causes can be flagged at once.
 	 *
 	 * @return the causes, empty when the BMC flags none
 	 */
@@ -104,9 +104,9 @@ public final class ChassisStatus {
 	}
 
 	/**
-	 * Tells whether a power overload is active.
+	 * Tells whether the system was shut down because of a power overload.
 	 *
-	 * @return true when the power overload is active
+	 * @return true when the system was shut down because of a power overload
 	 */
 	public boolean powerOverload() {
 		return data.isPowerOverload();

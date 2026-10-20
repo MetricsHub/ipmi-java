@@ -33,18 +33,38 @@ public class GetFruInventoryAreaInfoResponseData implements ResponseData {
 
 	private BaseUnit fruUnit;
 
+	/**
+	 * Returns the size of the FRU inventory area.
+	 *
+	 * @return the size of the FRU inventory area in bytes (IPMI 2.0 table 34-2)
+	 */
 	public int getFruInventoryAreaSize() {
 		return fruInventoryAreaSize;
 	}
 
+	/**
+	 * Sets the size of the FRU inventory area.
+	 *
+	 * @param fruInventoryAreaSize the size of the FRU inventory area in bytes
+	 */
 	public void setFruInventoryAreaSize(int fruInventoryAreaSize) {
 		this.fruInventoryAreaSize = fruInventoryAreaSize;
 	}
 
+	/**
+	 * Returns how the FRU device is accessed.
+	 *
+	 * @return whether the device takes its offsets in bytes or in words
+	 */
 	public BaseUnit getFruUnit() {
 		return fruUnit;
 	}
 
+	/**
+	 * Sets how the FRU device is accessed.
+	 *
+	 * @param fruUnit whether the device takes its offsets in bytes or in words
+	 */
 	public void setFruUnit(BaseUnit fruUnit) {
 		this.fruUnit = fruUnit;
 	}

@@ -51,7 +51,8 @@ public final class SensorsRequest {
 	}
 
 	/**
-	 * Reads only the sensors of the given types.
+	 * Reads only the sensors of the given types; without argument, it reads none. A later call replaces the types.
+	 * With {@link #names(String...)}, a sensor is read when it matches both.
 	 *
 	 * @param sensorTypes the types to read
 	 * @return this request
@@ -65,7 +66,9 @@ public final class SensorsRequest {
 
 	/**
 	 * Reads only the sensors whose name matches one of the given patterns, case-insensitively: {@code *} matches
-	 * any characters and {@code ?} one character ({@code "CPU? Temp"}, {@code "*Fan*"}).
+	 * any characters and {@code ?} one character ({@code "CPU? Temp"}, {@code "*Fan*"}). A pattern matches the whole
+	 * name. Without argument, it reads none. A later call replaces the patterns. With {@link #types(SensorType...)}, a
+	 * sensor is read when it matches both.
 	 *
 	 * @param globs the name patterns
 	 * @return this request
@@ -84,6 +87,8 @@ public final class SensorsRequest {
 	 *
 	 * @param deadline the time the request may take, session setup included
 	 * @return this request
+	 * @throws IllegalArgumentException when the duration is shorter than one millisecond or longer than
+	 *         {@link Integer#MAX_VALUE} milliseconds
 	 */
 	public SensorsRequest timeout(Duration deadline) {
 		this.timeout = IpmiClient.checkTimeout(deadline, "timeout");
@@ -94,7 +99,10 @@ public final class SensorsRequest {
 	 * Reads the selected sensors.
 	 *
 	 * @return the sensors, in the order of the SDR repository
-	 * @throws IpmiClientException when the repository or a reading cannot be read
+	 * @throws IpmiClientException when the session cannot be opened, the SDR repository cannot be read, the BMC stops
+	 *         answering, or the deadline expires; a reading that the BMC or a controller behind it refuses or answers
+	 *         with a malformed reply, or that such a controller does not answer, costs that sensor only
+	 *         ({@link Sensor#problem()})
 	 */
 	public SensorList execute() {
 		return client.readSensors(this::selects, timeout);

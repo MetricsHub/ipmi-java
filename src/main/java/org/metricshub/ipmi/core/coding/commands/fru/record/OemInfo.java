@@ -25,7 +25,7 @@ package org.metricshub.ipmi.core.coding.commands.fru.record;
 import org.metricshub.ipmi.core.common.TypeConverter;
 
 /**
- * OEM record from FRU Multi Record Area
+ * OEM record (types C0h-FFh) from the FRU MultiRecord area
  */
 public class OemInfo extends MultiRecordInfo {
 
@@ -59,18 +59,38 @@ public class OemInfo extends MultiRecordInfo {
 
 	}
 
+	/**
+	 * Returns the manufacturer ID of the record, which identifies the vendor that defines it.
+	 *
+	 * @return the IANA manufacturer ID (3 bytes in the record, least significant byte first)
+	 */
 	public int getManufacturerId() {
 		return manufacturerId;
 	}
 
+	/**
+	 * Sets the manufacturer ID of the record.
+	 *
+	 * @param manufacturerId the IANA manufacturer ID
+	 */
 	public void setManufacturerId(int manufacturerId) {
 		this.manufacturerId = manufacturerId;
 	}
 
+	/**
+	 * Returns the OEM data of the record.
+	 *
+	 * @return the bytes that follow the manufacturer ID
+	 */
 	public byte[] getOemData() {
 		return oemData;
 	}
 
+	/**
+	 * Sets the OEM data of the record.
+	 *
+	 * @param oemData the bytes that follow the manufacturer ID
+	 */
 	public void setOemData(byte[] oemData) {
 		this.oemData = oemData;
 	}

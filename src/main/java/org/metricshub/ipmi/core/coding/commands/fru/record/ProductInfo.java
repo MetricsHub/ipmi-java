@@ -27,11 +27,15 @@ import org.metricshub.ipmi.core.common.TypeConverter;
 import java.util.ArrayList;
 
 /**
- * FRU record containing Board info.<br>
+ * FRU record containing Product info.<br>
  * This area is present if the FRU itself is a separate product. This is
  * typically seen when the FRU is an add-in card. When this area is provided in
  * the FRU Information Device that contains the Chassis Info Area, the product
  * info is for the overall system, as initially manufactured.
+ * <p>
+ * Each string field is decoded according to its type/length byte: text without its leading and trailing spaces, BCD
+ * plus, 6-bit ASCII, or binary data as lowercase hexadecimal digits. A field the area does not give is empty, never
+ * null.
  */
 public class ProductInfo extends FruRecord {
 
@@ -187,66 +191,146 @@ public class ProductInfo extends FruRecord {
 		return partDataLength > 0 && partDataLength + currentOffset < fruData.length;
 	}
 
+	/**
+	 * Returns the product manufacturer name.
+	 *
+	 * @return the product manufacturer name, empty when the area does not give it
+	 */
 	public String getManufacturerName() {
 		return manufacturerName;
 	}
 
+	/**
+	 * Sets the product manufacturer name.
+	 *
+	 * @param manufacturerName the product manufacturer name
+	 */
 	public void setManufacturerName(String manufacturerName) {
 		this.manufacturerName = manufacturerName;
 	}
 
+	/**
+	 * Returns the product name.
+	 *
+	 * @return the product name, empty when the area does not give it
+	 */
 	public String getProductName() {
 		return productName;
 	}
 
+	/**
+	 * Sets the product name.
+	 *
+	 * @param productName the product name
+	 */
 	public void setProductName(String productName) {
 		this.productName = productName;
 	}
 
+	/**
+	 * Returns the product part or model number.
+	 *
+	 * @return the product part or model number, empty when the area does not give it
+	 */
 	public String getProductModelNumber() {
 		return productModelNumber;
 	}
 
+	/**
+	 * Sets the product part or model number.
+	 *
+	 * @param productModelNumber the product part or model number
+	 */
 	public void setProductModelNumber(String productModelNumber) {
 		this.productModelNumber = productModelNumber;
 	}
 
+	/**
+	 * Returns the product version.
+	 *
+	 * @return the product version, empty when the area does not give it
+	 */
 	public String getProductVersion() {
 		return productVersion;
 	}
 
+	/**
+	 * Sets the product version.
+	 *
+	 * @param productVersion the product version
+	 */
 	public void setProductVersion(String productVersion) {
 		this.productVersion = productVersion;
 	}
 
+	/**
+	 * Sets the product serial number.
+	 *
+	 * @param productSerialNumber the product serial number
+	 */
 	public void setProductSerialNumber(String productSerialNumber) {
 		this.productSerialNumber = productSerialNumber;
 	}
 
+	/**
+	 * Returns the product serial number.
+	 *
+	 * @return the product serial number, empty when the area does not give it
+	 */
 	public String getProductSerialNumber() {
 		return productSerialNumber;
 	}
 
+	/**
+	 * Returns the asset tag.
+	 *
+	 * @return the asset tag, empty when the area does not give it
+	 */
 	public String getAssetTag() {
 		return assetTag;
 	}
 
+	/**
+	 * Sets the asset tag.
+	 *
+	 * @param assetTag the asset tag
+	 */
 	public void setAssetTag(String assetTag) {
 		this.assetTag = assetTag;
 	}
 
+	/**
+	 * Returns the FRU File ID field, a manufacturing aid that identifies the file the FRU information was loaded from.
+	 *
+	 * @return the raw bytes of the field, empty when the product area does not give it
+	 */
 	public byte[] getFruFileId() {
 		return fruFileId;
 	}
 
+	/**
+	 * Sets the FRU File ID field.
+	 *
+	 * @param fruFileId the raw bytes of the field
+	 */
 	public void setFruFileId(byte[] fruFileId) {
 		this.fruFileId = fruFileId;
 	}
 
+	/**
+	 * Returns the custom fields of the product area, those that follow its predefined fields.
+	 *
+	 * @return the custom fields in order, empty when there are none
+	 */
 	public String[] getCustomProductInfo() {
 		return customProductInfo;
 	}
 
+	/**
+	 * Sets the custom fields of the product area.
+	 *
+	 * @param customProductInfo the custom fields in order
+	 */
 	public void setCustomProductInfo(String[] customProductInfo) {
 		this.customProductInfo = customProductInfo;
 	}

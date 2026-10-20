@@ -22,13 +22,27 @@ package org.metricshub.ipmi.core.coding.commands.sel;
  * ╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱
  */
 
+/**
+ * The record type of a SEL entry (IPMI 2.0 section 31.6.1): one constant per range of record type codes.
+ */
 public enum SelRecordType {
+	/**
+	 * A timestamped OEM record (C0h-DFh, IPMI 2.0 section 32.2): a timestamp, a manufacturer ID and 6 OEM-defined
+	 * bytes.
+	 */
 	OemTimestamped(SelRecordType.OEMTIMESTAMPED),
+	/**
+	 * A system event record (02h, IPMI 2.0 section 32.1).
+	 */
 	System(SelRecordType.SYSTEM),
+	/**
+	 * A non-timestamped OEM record (E0h-FFh, IPMI 2.0 section 32.3): 13 OEM-defined bytes.
+	 */
 	OemNonTimestamped(
 			SelRecordType.OEMNONTIMESTAMPED),
 	/**
-	 * A reserved record type (03h-BFh, IPMI 2.0 section 32): only the record ID of such an entry is meaningful.
+	 * A reserved record type (00h-01h and 03h-BFh, IPMI 2.0 section 31.6.1): only the record ID of such an entry is
+	 * meaningful.
 	 */
 	Reserved(SelRecordType.RESERVED),;
 
@@ -38,7 +52,7 @@ public enum SelRecordType {
 	private static final int OEMTIMESTAMPED = 192;
 	private static final int SYSTEM = 2;
 	/**
-	 * Represents OEM timestamped record type (E0h-FFh)
+	 * Represents OEM non-timestamped record type (E0h-FFh)
 	 */
 	private static final int OEMNONTIMESTAMPED = 224;
 	private static final int RESERVED = -1;
@@ -49,10 +63,22 @@ public enum SelRecordType {
 		this.code = code;
 	}
 
+	/**
+	 * Returns the code of the record type: the code of a system event, the first code of the range for the OEM types,
+	 * -1 for a reserved type. The record type byte of an entry is {@code getRawData()[2]} of its {@link SelRecord}.
+	 *
+	 * @return 02h for System, C0h for every timestamped OEM record, E0h for every non-timestamped one, -1 for Reserved
+	 */
 	public int getCode() {
 		return code;
 	}
 
+	/**
+	 * Returns the record type of a record type code.
+	 *
+	 * @param value the record type byte, 0 to 255
+	 * @return System for 02h, OemTimestamped for C0h-DFh, OemNonTimestamped for E0h-FFh, Reserved for the other codes
+	 */
 	public static SelRecordType parseInt(int value) {
 		if (value == SYSTEM) {
 			return System;

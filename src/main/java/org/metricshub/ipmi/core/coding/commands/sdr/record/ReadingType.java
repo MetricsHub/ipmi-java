@@ -1198,8 +1198,8 @@ public enum ReadingType {
 	}
 
 	/**
-	 * Determines type of discrete sensor reading. The states of an OEM event/reading type or of an OEM sensor type are
-	 * {@link #UnknownOEMEvent}.
+	 * Determines type of discrete sensor reading. The states of an OEM event/reading type (70h to 7Fh), and of an OEM
+	 * sensor type (C0h to FFh) with the sensor-specific event/reading type (6Fh), are {@link #UnknownOEMEvent}.
 	 *
 	 * @param sensorType
 	 *        - {@link SensorType} of the sensor

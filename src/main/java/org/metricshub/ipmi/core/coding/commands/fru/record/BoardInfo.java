@@ -31,6 +31,10 @@ import java.util.Date;
  * FRU record containing Board info. <br>
  * This area provides Serial Number, Part Number, and other information about
  * the board that the FRU Information Device is located on.
+ * <p>
+ * Each string field is decoded according to its type/length byte: text without its leading and trailing spaces, BCD
+ * plus, 6-bit ASCII, or binary data as lowercase hexadecimal digits. A field the area does not give is empty, never
+ * null.
  */
 public class BoardInfo extends FruRecord {
 
@@ -182,58 +186,129 @@ public class BoardInfo extends FruRecord {
 		return partDataLength > 0 && partDataLength + currentOfset < fruData.length;
 	}
 
+	/**
+	 * Returns the manufacturing date and time of the board, which the area gives as minutes since 1996-01-01 00:00
+	 * UTC (FRU specification section 11).
+	 *
+	 * @return the date, null when the area leaves it unspecified
+	 */
 	public Date getMfgDate() {
 		return mfgDate;
 	}
 
+	/**
+	 * Sets the manufacturing date and time of the board.
+	 *
+	 * @param mfgDate the date, null when unspecified
+	 */
 	public void setMfgDate(Date mfgDate) {
 		this.mfgDate = mfgDate;
 	}
 
+	/**
+	 * Returns the board manufacturer.
+	 *
+	 * @return the board manufacturer, empty when the area does not give it
+	 */
 	public String getBoardManufacturer() {
 		return boardManufacturer;
 	}
 
+	/**
+	 * Sets the board manufacturer.
+	 *
+	 * @param boardManufacturer the board manufacturer
+	 */
 	public void setBoardManufacturer(String boardManufacturer) {
 		this.boardManufacturer = boardManufacturer;
 	}
 
+	/**
+	 * Returns the board product name.
+	 *
+	 * @return the board product name, empty when the area does not give it
+	 */
 	public String getBoardProductName() {
 		return boardProductName;
 	}
 
+	/**
+	 * Sets the board product name.
+	 *
+	 * @param boardProductName the board product name
+	 */
 	public void setBoardProductName(String boardProductName) {
 		this.boardProductName = boardProductName;
 	}
 
+	/**
+	 * Returns the board serial number.
+	 *
+	 * @return the board serial number, empty when the area does not give it
+	 */
 	public String getBoardSerialNumber() {
 		return boardSerialNumber;
 	}
 
+	/**
+	 * Sets the board serial number.
+	 *
+	 * @param boardSerialNumber the board serial number
+	 */
 	public void setBoardSerialNumber(String boardSerialNumber) {
 		this.boardSerialNumber = boardSerialNumber;
 	}
 
+	/**
+	 * Returns the board part number.
+	 *
+	 * @return the board part number, empty when the area does not give it
+	 */
 	public String getBoardPartNumber() {
 		return boardPartNumber;
 	}
 
+	/**
+	 * Sets the board part number.
+	 *
+	 * @param boardPartNumber the board part number
+	 */
 	public void setBoardPartNumber(String boardPartNumber) {
 		this.boardPartNumber = boardPartNumber;
 	}
 
+	/**
+	 * Returns the FRU File ID field, a manufacturing aid that identifies the file the FRU information was loaded from.
+	 *
+	 * @return the raw bytes of the field, empty when the board area does not give it
+	 */
 	public byte[] getFruFileId() {
 		return fruFileId;
 	}
 
+	/**
+	 * Sets the FRU File ID field.
+	 *
+	 * @param fruFileId the raw bytes of the field
+	 */
 	public void setFruFileId(byte[] fruFileId) {
 		this.fruFileId = fruFileId;
 	}
 
+	/**
+	 * Returns the custom fields of the board area, those that follow its predefined fields.
+	 *
+	 * @return the custom fields in order, empty when there are none
+	 */
 	public String[] getCustomBoardInfo() {
 		return customBoardInfo;
 	}
 
+	/**
+	 * Sets the custom fields of the board area.
+	 *
+	 * @param customBoardInfo the custom fields in order
+	 */
 	public void setCustomBoardInfo(String[] customBoardInfo) {
 		this.customBoardInfo = customBoardInfo;
 	}

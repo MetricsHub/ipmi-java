@@ -62,7 +62,7 @@ final class FruReader {
 
 	/**
 	 * Bytes asked of the first Read FRU Data of a controller: the most the count byte can carry. Supermicro, Lenovo
-	 * IMM, GIGABYTE, Fujitsu iRMC and Dell iDRAC 6 answer it; iLO 5 refuses it (C8h) and answers 240; Lenovo XCC and
+	 * TSM, GIGABYTE, Fujitsu iRMC and Dell iDRAC 6 answer it; iLO 5 refuses it (C8h) and answers 240; Lenovo XCC and
 	 * Dell F200 refuse it (C9h); Dell iDRAC 8, Cisco IMC and Dell F200 refuse everything above 16 (CAh).
 	 */
 	private static final int MAX_READ_SIZE = 255;

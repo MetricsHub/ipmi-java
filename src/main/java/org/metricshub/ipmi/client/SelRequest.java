@@ -31,7 +31,10 @@ import java.util.Objects;
  */
 public final class SelRequest {
 
-	/** The first record ID of the log (0000h) and the last (FFFFh) are not IDs of entries (IPMI 2.0 section 31.6). */
+	/**
+	 * The first record ID of the log (0000h) and the last (FFFFh) are not IDs of entries (IPMI 2.0 section 31.5 and
+	 * table 32-1).
+	 */
 	private static final int LAST_ENTRY_ID = 0xFFFE;
 
 	private final IpmiClient client;
@@ -58,14 +61,15 @@ public final class SelRequest {
 	}
 
 	/**
-	 * Reads only the entries added after the one with the given record ID, the {@link SelEntry#id() ID} of the last
-	 * entry of a previous read, when that entry itself is not at hand (a cursor kept across restarts). When the log
-	 * does not hold the ID any more (the log was cleared since), the whole log is read; but a log cleared and filled
-	 * again up to that ID goes unnoticed, which {@link #since(SelEntry)} catches: compare
-	 * {@link SelEntryList#lastErase()} with the previous read to tell.
+	 * Reads only the entries added after the one with the given record ID: the {@link SelEntry#id() ID} of the last
+	 * entry of a previous read, for a cursor kept without the entry itself (across restarts, for instance). When the
+	 * log no longer holds that ID (it was cleared), the whole log is read. A log cleared and filled again up to that ID
+	 * is not detected: compare {@link SelEntryList#lastErase()} with that of the previous read, or use
+	 * {@link #since(SelEntry)}, which detects it.
 	 *
 	 * @param recordId the record ID of the last entry already read, 1 to 65534
 	 * @return this request
+	 * @throws IllegalArgumentException when the record ID is not between 1 and 65534
 	 */
 	public SelRequest since(int recordId) {
 		if (recordId < 1 || recordId > LAST_ENTRY_ID) {
@@ -81,6 +85,8 @@ public final class SelRequest {
 	 *
 	 * @param deadline the time the request may take, session setup included
 	 * @return this request
+	 * @throws IllegalArgumentException when the duration is shorter than one millisecond or longer than
+	 *         {@link Integer#MAX_VALUE} milliseconds
 	 */
 	public SelRequest timeout(Duration deadline) {
 		this.timeout = IpmiClient.checkTimeout(deadline, "timeout");
@@ -88,14 +94,17 @@ public final class SelRequest {
 	}
 
 	/**
-	 * Reads the entries: Get SEL Info, Get SEL Time UTC Offset, then one Get SEL Entry per entry, each read whole (so
-	 * without a reservation, IPMI 2.0 section 31.5; one is taken when the BMC asks for it). A log that changes while
-	 * it is read (an entry deleted, the log cleared) is read again from the start, once, and whole: the entry given to
-	 * {@code since()} may be another one by then.
+	 * Reads the entries: Get SEL Time UTC Offset, Get SEL Info, then one Get SEL Entry per entry, each read whole (so
+	 * without a reservation, IPMI 2.0 section 31.5; one is taken when the BMC asks for it). The first entry read (the
+	 * one given to {@code since()}, when the log still holds it) is then read again and Get SEL Info sent again, to
+	 * tell whether the log changed during the read. A log that changes while it is read (an entry deleted, the log
+	 * cleared) is read again from the start, once, and whole: the entry given to {@code since()} may be another one
+	 * by then.
 	 *
 	 * @return the entries, in the order of the log
-	 * @throws IpmiClientException when the log cannot be read: the BMC does not answer, refuses an entry, returns a
-	 *         malformed one, or changed the log twice during the read
+	 * @throws IpmiClientException when the session cannot be opened, the deadline expires, or the log cannot be read:
+	 *         the BMC does not answer, refuses an entry, returns a malformed one, or changed the log twice during the
+	 *         read
 	 */
 	public SelEntryList execute() {
 		return client.readSel(since, sinceEntry, timeout);

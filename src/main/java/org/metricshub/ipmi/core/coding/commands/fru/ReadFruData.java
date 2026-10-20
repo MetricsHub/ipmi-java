@@ -215,9 +215,9 @@ public class ReadFruData extends IpmiCommandCoder<ReadFruDataResponseData> {
 	 *        data read, or impossible to decode
 	 * @return the records of the chassis, board and product areas and of the multirecord area that could be decoded,
 	 *         or the single {@link SpdInfo} of a memory module whose FRU device returns its SPD data, or the single
-	 *         {@link PiromInfo} of a processor whose FRU device returns its processor information ROM
+	 *         {@link PiromInfo} of a processor whose FRU device returns its Processor Information ROM
 	 * @throws IllegalArgumentException when the common header is missing, of an unknown format or corrupt, or when
-	 *         the SPD data or the processor information ROM is of a revision the library does not decode or is
+	 *         the SPD data or the Processor Information ROM is of a revision the library does not decode or is
 	 *         truncated
 	 */
 	public static List<FruRecord> decodeFruData(List<ReadFruDataResponseData> fruData, List<String> problems) {
@@ -244,7 +244,7 @@ public class ReadFruData extends IpmiCommandCoder<ReadFruDataResponseData> {
 			return Collections.<FruRecord>singletonList(new SpdInfo(data, 0));
 		}
 		if (PiromInfo.isPirom(data, 0)) {
-			// The FRU device of a processor cartridge returns the Intel processor information ROM of the CPU
+			// The FRU device of a processor cartridge returns the Intel Processor Information ROM of the CPU
 			return Collections.<FruRecord>singletonList(new PiromInfo(data, 0));
 		}
 		if (data.length < COMMON_HEADER_SIZE) {
