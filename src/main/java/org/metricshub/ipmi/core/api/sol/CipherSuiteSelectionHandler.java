@@ -37,7 +37,8 @@ public interface CipherSuiteSelectionHandler {
 	 *
 	 * @param availableCipherSuites
 	 *        {@link CipherSuite}s returned by the server as avaialble to use.
-	 * @return chosen cipher suite
+	 * @return the suite to use, never null: a selector that refuses every suite the BMC offers throws an exception
+	 *         (a null suite fails the session setup, and is never taken for suite 0)
 	 */
 	CipherSuite choose(List<CipherSuite> availableCipherSuites);
 

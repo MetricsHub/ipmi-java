@@ -121,8 +121,11 @@ public class SessionManager {
 			List<CipherSuite> availableCipherSuites = connector.getAvailableCipherSuites(handle);
 			CipherSuite cipherSuite = cipherSuiteSelectionHandler.choose(availableCipherSuites);
 
+			// Never fall back to suite 0: the offer is unauthenticated, so that would be a downgrade path
 			if (cipherSuite == null) {
-				cipherSuite = CipherSuite.getEmpty();
+				throw new IllegalArgumentException(
+						"The cipher suite selector chose none of the suites the BMC offers (offered: "
+								+ CipherSuite.listIds(availableCipherSuites) + ")");
 			}
 
 			connector.getChannelAuthenticationCapabilities(handle, cipherSuite, PrivilegeLevel.Administrator);

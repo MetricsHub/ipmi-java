@@ -128,17 +128,11 @@ class IpmiCliTest {
 			assertEquals(golden("probe-json.txt"), run(bmc, NO_PROMPT, "probe", "--json").out);
 			assertEquals(0, bmc.getCount(OPEN_SESSION_REQUEST), "no session");
 
+			// The xRC4 suites, which the library does not implement, are refused by the builder (#202)
 			Result fixed = run(bmc, NO_PROMPT, "-C", "4", "probe");
-			assertTrue(
-					fixed.out.endsWith("Chosen cipher suite         4 (not implemented by the library: the login would fail)\n"),
-					fixed.out);
-			Result preference = run(bmc, NO_PROMPT, "-C", "4,3", "probe", "--json");
-			assertTrue(
-					preference.out
-							.endsWith(
-									"\"chosenCipherSuite\":4,\"chosenCipherSuiteProblem\":\"not implemented by the "
-											+ "library: the login would fail\"}\n"),
-					"the client takes the first offered suite, implemented or not");
+			assertEquals(IpmiCli.EXIT_USAGE, fixed.code, fixed.err);
+			assertTrue(fixed.err.contains("xRC4"), fixed.err);
+			assertEquals(IpmiCli.EXIT_USAGE, run(bmc, NO_PROMPT, "-C", "4,3", "probe", "--json").code);
 			assertTrue(run(bmc, NO_PROMPT, "-C", "3", "probe").out.endsWith("Chosen cipher suite         3\n"));
 		}
 	}
@@ -230,6 +224,13 @@ class IpmiCliTest {
 			assertTrue(verbose.err.contains("with the User privilege"), verbose.err);
 			assertTrue(verbose.err.contains("ipmicli: chassis status: "), verbose.err);
 			assertFalse(verbose.err.contains("secret"), verbose.err);
+
+			// The reserved identify state 11b is decoded, not thrown (#207)
+			bmc.handle(NETFN_CHASSIS, GET_CHASSIS_STATUS, data -> new byte[] { 0x00, 0x01, 0x00, 0x70 });
+			Result reserved = login(bmc, "chassis");
+			assertEquals(0, reserved.code, reserved.err);
+			assertTrue(reserved.out.contains("Identify") && reserved.out.contains("Unknown"), reserved.out);
+			assertTrue(login(bmc, "chassis", "--json").out.contains("\"identifyState\":\"Unknown\""));
 		}
 	}
 

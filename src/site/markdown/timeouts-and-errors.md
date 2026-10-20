@@ -47,7 +47,8 @@ Below the deadline, each message has its own timeout and is retried:
 The control commands are an exception too: `chassisControl()`, `chassisIdentify()` and
 `chassisIdentifyForever()` send their command **once**, since a BMC that carried out a reset and
 lost the reply would carry it out again; a lost reply fails them with `IpmiTimeoutException`
-without losing the session, a `C3h` reply (which says the response is unavailable, not that
+and leaves the session in doubt (the next operation checks it first, see
+[Session recovery](#session-recovery)), a `C3h` reply (which says the response is unavailable, not that
 nothing was done) with `IpmiCompletionCodeException` at once, and `chassisStatus()` tells what
 the BMC did ([Controlling the power](chassis-status.html#controlling-the-power)). A busy reply
 (`C0h` or `D2h`, below) is still retried, as it says that the BMC did not carry the command out.
@@ -101,7 +102,10 @@ fail with the `IpmiTimeoutException` of the message without reply. `capabilities
 session.
 
 A session is considered lost when a message of the session got no reply after all its tries, when
-the connection was closed, or when the deadline of a running operation expired. Two timeouts keep
+the connection was closed, or when the deadline of a running operation expired. A control
+operation sends its command once, so its lost reply says nothing about the session: the next
+operation first sends a Get Device ID, with the retries, and the session is lost if that gets no
+reply either. Two timeouts keep
 the session: that of a control command, sent once ([above](#message-timeout-and-retries)), and
 that of a request forwarded with Send Message that the BMC acknowledged but the controller behind
 it did not answer
@@ -178,7 +182,7 @@ sent to the BMC:
 | `IpmiClient.builder(host)` | A `null` or blank host |
 | `port(int)` | A port outside 1-65535 |
 | `privilege(PrivilegeLevel)` | `Callback` |
-| `cipherSuites(int...)`, `cipherSuite(int)` | No suite, a suite outside 0-19, a suite without integrity (0, 1, 6, 15) |
+| `cipherSuites(int...)`, `cipherSuite(int)` | No suite, a suite outside 0-19, a suite without integrity (0, 1, 6, 15), an xRC4 suite (4, 5, 9, 10, 13, 14, 18, 19) |
 | `timeout(Duration)` of the builder or of an operation builder, `messageTimeout(Duration)` | A duration under 1 millisecond (zero included) or above `Integer.MAX_VALUE` milliseconds |
 | `retries(int)` | A negative count |
 | `keepAlive(Duration)` | A negative period, or one under 1 millisecond other than `Duration.ZERO` |

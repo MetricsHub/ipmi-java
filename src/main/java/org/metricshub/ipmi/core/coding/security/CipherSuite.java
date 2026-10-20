@@ -370,6 +370,22 @@ public class CipherSuite {
 	}
 
 	/**
+	 * Lists the IDs of the given suites, for messages.
+	 *
+	 * @param suites the suites, or null
+	 * @return the comma-separated IDs, or "none" when there is no suite
+	 */
+	public static String listIds(List<CipherSuite> suites) {
+		StringBuilder ids = new StringBuilder();
+		if (suites != null) {
+			for (CipherSuite suite : suites) {
+				ids.append(ids.length() == 0 ? "" : ", ").append(suite.getId());
+			}
+		}
+		return ids.length() == 0 ? "none" : ids.toString();
+	}
+
+	/**
 	 * Creates an instance of AuthenticationAlgorithm.
 	 *
 	 * @param constructor constructor of the algorithm

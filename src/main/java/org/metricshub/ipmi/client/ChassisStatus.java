@@ -169,7 +169,8 @@ public final class ChassisStatus {
 	/**
 	 * Returns the state of the chassis identify LED.
 	 *
-	 * @return the identify state, empty when the BMC does not report it
+	 * @return the identify state ({@link ChassisIdentifyState#Unknown} when the BMC reports the reserved value 11b),
+	 *         empty when the BMC does not report it
 	 */
 	public Optional<ChassisIdentifyState> identifyState() {
 		return data.isChassisIdentifyCommandSupported() ? Optional.of(data.getChassisIdentifyState()) : Optional.empty();

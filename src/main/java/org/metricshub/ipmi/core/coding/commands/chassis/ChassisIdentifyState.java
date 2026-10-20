@@ -28,11 +28,16 @@ package org.metricshub.ipmi.core.coding.commands.chassis;
 public enum ChassisIdentifyState {
 	Off(ChassisIdentifyState.OFF),
 	TemporaryOn(ChassisIdentifyState.TEMPORARYON),
-	IndefiniteOn(ChassisIdentifyState.INDEFINITEON),;
+	IndefiniteOn(ChassisIdentifyState.INDEFINITEON),
+	/**
+	 * The BMC reports the reserved value 11b.
+	 */
+	Unknown(ChassisIdentifyState.UNKNOWN),;
 
 	private static final int OFF = 0;
 	private static final int TEMPORARYON = 1;
 	private static final int INDEFINITEON = 2;
+	private static final int UNKNOWN = 3;
 
 	private int code;
 
@@ -52,6 +57,8 @@ public enum ChassisIdentifyState {
 			return TemporaryOn;
 		case INDEFINITEON:
 			return IndefiniteOn;
+		case UNKNOWN:
+			return Unknown;
 		default:
 			throw new IllegalArgumentException("Invalid value: " + value);
 		}

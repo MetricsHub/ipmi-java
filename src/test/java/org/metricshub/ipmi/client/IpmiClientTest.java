@@ -1435,6 +1435,50 @@ class IpmiClientTest {
 
 	@Test
 	@Timeout(30)
+	void aLoopingNextRecordIdEndsTheWalk() throws Exception {
+		// The last record names 0000h (the first record), itself, or the first record by its ID (#210)
+		for (boolean device : new boolean[] { false, true }) {
+			for (int next : new int[] { 0x0000, 0x0002, 0x0001 }) {
+				try (FakeRmcpPlusBmc bmc = new FakeRmcpPlusBmc(SUITES, USER, utf8(PASSWORD), null)) {
+					FakeSdrRepository sdr = new FakeSdrRepository()
+							.add(
+									compactSensorRecord(1, 1, EntityId.Processor.getCode(), 1, SensorType.Processor.getCode(), 0x6f, "A"))
+							.add(
+									compactSensorRecord(2, 2, EntityId.Processor.getCode(), 2, SensorType.Processor.getCode(), 0x6f, "B"))
+							.reading(1, 0x10, 0x40, 0x00)
+							.reading(2, 0x10, 0x40, 0x00)
+							.nextRecordId(2, next);
+					if (device) {
+						sdr.deviceSdrs();
+					}
+					sdr.install(bmc);
+					if (device) {
+						holdsDeviceSdrsOnly(bmc);
+					}
+					try (IpmiClient client = client(bmc).build()) {
+						SensorList sensors = client.sensors().execute();
+						String what = (device ? "device SDRs, " : "repository, ") + "next " + next;
+						assertEquals(2, sensors.size(), what);
+						assertEquals(1, sensors.skippedRecords().size(), what);
+						assertEquals(
+								String
+										.format(
+												"SDR record 0002h (type 02h): Names record %04Xh as the next one, which was read already: the walk ends there",
+												next),
+								sensors.skippedRecords().get(0).toString(),
+								what);
+						assertEquals(
+								2,
+								bmc.getCount(device ? NETFN_SENSOR : NETFN_STORAGE, device ? GET_DEVICE_SDR : GET_SDR),
+								what);
+					}
+				}
+			}
+		}
+	}
+
+	@Test
+	@Timeout(30)
 	void aBmcWithoutRepositoryIsWalkedThroughItsDeviceSdrs() throws Exception {
 		try (FakeRmcpPlusBmc bmc = new FakeRmcpPlusBmc(SUITES, USER, utf8(PASSWORD), null)) {
 			new FakeSdrRepository()
@@ -1695,6 +1739,35 @@ class IpmiClientTest {
 
 	@Test
 	@Timeout(30)
+	void aSessionLostUnderACommandSentOnceIsReplacedByTheNextOperation() throws Exception {
+		// #209: a client that only sends control commands recovers from a dead session
+		try (
+				FakeRmcpPlusBmc bmc = bmc();
+				IpmiClient client = client(bmc).privilege(PrivilegeLevel.Operator).build()) {
+			client.chassisIdentify(5);
+			bmc.expireSession();
+			assertThrows(IpmiTimeoutException.class, () -> client.chassisIdentify(5));
+			assertEquals(1, bmc.getCount(OPEN_SESSION_REQUEST));
+
+			client.chassisIdentify(5);
+			assertEquals(2, bmc.getCount(OPEN_SESSION_REQUEST), "the session is checked, then replaced");
+			assertEquals(2, bmc.getCount(NETFN_CHASSIS, CHASSIS_IDENTIFY), "the lost command is not sent again");
+
+			// A single lost reply: the BMC carried the command out, and the session is kept
+			int identifies = bmc.getCount(NETFN_CHASSIS, CHASSIS_IDENTIFY);
+			bmc.inject(bmc.getSessionRequests() + 1, FakeRmcpPlusBmc.Fault.DROP);
+			assertThrows(IpmiTimeoutException.class, () -> client.chassisIdentify(5));
+			assertEquals(identifies + 1, bmc.getCount(NETFN_CHASSIS, CHASSIS_IDENTIFY));
+			int deviceIds = bmc.getCount(NETFN_APP, GET_DEVICE_ID);
+			client.chassisIdentify(5);
+			assertEquals(deviceIds + 1, bmc.getCount(NETFN_APP, GET_DEVICE_ID), "one check of the session");
+			assertEquals(identifies + 2, bmc.getCount(NETFN_CHASSIS, CHASSIS_IDENTIFY), "not resent, sent once more");
+			assertEquals(2, bmc.getCount(OPEN_SESSION_REQUEST), "the session is kept");
+		}
+	}
+
+	@Test
+	@Timeout(30)
 	void rawRequestsOfAnyNetworkFunction() throws Exception {
 		try (FakeRmcpPlusBmc bmc = bmc(); IpmiClient client = client(bmc).build()) {
 			// Get DCMI Capabilities Info (Group Extension 2Ch), answered under 2Dh
@@ -1746,6 +1819,10 @@ class IpmiClientTest {
 		assertThrows(IllegalArgumentException.class, () -> builder.cipherSuites(17, 1));
 		assertThrows(IllegalArgumentException.class, () -> builder.cipherSuite(15));
 		assertThrows(IllegalArgumentException.class, () -> builder.cipherSuite(20));
+		// xRC4, which the library does not implement (#202)
+		IllegalArgumentException xrc4 = assertThrows(IllegalArgumentException.class, () -> builder.cipherSuite(4));
+		assertEquals("Cipher suite 4 uses xRC4 confidentiality, which the library does not implement", xrc4.getMessage());
+		assertThrows(IllegalArgumentException.class, () -> builder.cipherSuites(18, 17));
 		assertThrows(IllegalArgumentException.class, () -> builder.cipherSuites());
 		assertThrows(IllegalArgumentException.class, () -> builder.timeout(Duration.ZERO));
 		assertThrows(IllegalArgumentException.class, () -> builder.timeout(Duration.ofNanos(1)));
