@@ -24,7 +24,9 @@ package org.metricshub.ipmi.client;
 
 /**
  * The overall deadline of the operation expired, or a message of an established session got no reply after all the
- * tries. The session is then considered lost, and the next operation opens a new one.
+ * tries. The session is then considered lost, and the next operation opens a new one, except when the deadline
+ * expired while the operation was still queued behind those of other threads: the operation was never sent, and the
+ * session is kept.
  * <p>
  * Two messages without reply keep the session: a command sent once
  * ({@link IpmiClient#chassisControl(org.metricshub.ipmi.core.coding.commands.chassis.PowerCommand)},

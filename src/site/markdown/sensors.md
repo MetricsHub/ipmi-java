@@ -12,6 +12,14 @@ processor, a power supply, the system board, ...), its unit, the formula that co
 reading, and its thresholds. `sensors()` walks this repository and returns a `Sensor` for each
 sensor of its Full and Compact records, read from the controller that owns it.
 
+A sensor is a **threshold** or a **discrete** sensor, as the *event/reading type* of its record
+says (IPMI 2.0 table 42-1). A threshold sensor (event/reading type `01h`) has a numeric reading, a
+temperature, a voltage or a fan speed for instance, which the BMC compares with its thresholds
+([Readings](#readings)). A discrete sensor (the other event/reading types: generic `02h` to
+`0Ch`, sensor-specific `6Fh`, OEM `70h` to `7Fh`) reports a set of asserted **states** instead,
+such as a presence, a redundancy or a power supply failure ([States](#states)). `status()` grades
+the reading of a threshold sensor only: check the `states()` of the discrete sensors.
+
 ```java
 try (IpmiClient bmc = IpmiClient.builder(host).credentials(user, password).build()) {
 	for (Sensor sensor : bmc.sensors().execute()) {
@@ -84,7 +92,9 @@ The message names the LUN when it is not 0 (`..., LUN 1 through the BMC`). The s
 and the client does not request the other sensors of that controller and LUN during the same
 operation: they get the same `problem()`. A BMC that does not even acknowledge the Send Message
 request is treated as for any other command: the session is lost, the read is replayed once on a
-new session, and the operation fails with `IpmiTimeoutException` when the replay fails too
+new session, and the operation fails when the replay fails too, with `IpmiTimeoutException` when
+a request of the replay gets no reply and with `IpmiConnectionException` when the BMC does not
+answer the setup of the new session
 ([Session recovery](timeouts-and-errors.html#session-recovery)).
 
 Send Message to another controller needs the **Operator** privilege (IPMI 2.0 table G-1), but
@@ -304,7 +314,8 @@ reported in that sensor ([Problems](#problems)), and the other sensors are retur
 - `IpmiTimeoutException` when the BMC does not answer a command of the walk or a Get Sensor
   Reading (or Get Sensor Reading Factors) of one of its own sensors, or does not acknowledge a
   Send Message: the session is then lost, the read is replayed once on a new session, and the
-  operation fails when the replay fails too
+  operation fails when the replay fails too (with `IpmiConnectionException` when the BMC does
+  not answer the setup of the new session)
   ([Session recovery](timeouts-and-errors.html#session-recovery)).
 
 No sensor is returned when `execute()` throws. A failure of the walk fails `frus()` the same way,

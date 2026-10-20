@@ -12,6 +12,7 @@ See **[Project Documentation](https://metricshub.org/ipmi-java)** and the [Javad
 The IPMI Java Client talks to the Baseboard Management Controller (BMC) of a server over IPMI 2.0 over LAN (RMCP+). It requires Java 8 or later and has no dependency. It:
 
 * identifies the BMC (manufacturer, product, firmware revision),
+* reads what the BMC offers before any login, without credentials (its cipher suites and login options),
 * reads the chassis status, and controls the power and the identify LED,
 * reads the Field Replaceable Units (FRUs), including the SPD data of the memory modules and the Processor Information ROM (PIROM) of Intel processors,
 * reads the sensors of the SDR repository with their readings, thresholds and states, including those of the controllers that the BMC reaches with Send Message (power supplies, fans, RAID adapters),

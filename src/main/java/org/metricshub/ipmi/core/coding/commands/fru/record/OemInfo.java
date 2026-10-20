@@ -25,7 +25,7 @@ package org.metricshub.ipmi.core.coding.commands.fru.record;
 import org.metricshub.ipmi.core.common.TypeConverter;
 
 /**
- * OEM record from FRU Multi Record Area
+ * OEM record (types C0h-FFh) from the FRU MultiRecord area
  */
 public class OemInfo extends MultiRecordInfo {
 

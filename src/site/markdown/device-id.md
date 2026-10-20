@@ -70,7 +70,7 @@ What the BMCs of a few servers answer ([`ipmicli ... info`](cli.html#info)):
 
 | BMC | `manufacturerId()` | `productId()` | `firmwareRevision()` | `ipmiVersion()` |
 | --- | ---: | ---: | --- | --- |
-| Lenovo IMM | 19046 | 502 | 5.38 | 2.0 |
+| Lenovo ThinkServer System Manager (TSM) | 19046 | 502 | 5.38 | 2.0 |
 | Supermicro | 10876 | 2366 | 7.02 | 2.0 |
 | Dell iDRAC | 674 | 256 | 2.92 | 2.0 |
 | HPE iLO 5 | 47196 | 8192 | 3.18 | 2.0 |
@@ -97,7 +97,19 @@ answer, and with `IpmiClientException` on a BMC without IPMI 2.0 (RMCP+), so `ip
 `deviceId()` opens the session when needed and fails with an
 [`IpmiClientException`](timeouts-and-errors.html#exceptions): `IpmiAuthenticationException` when
 the login is refused, `IpmiConnectionException` when the BMC does not answer the session setup,
-`IpmiTimeoutException` when it stops answering in the session. Like the other read operations,
-it is retried once on a new session when the session was lost while it ran. The command itself
-is mandatory in every IPMI implementation and needs only the User privilege, the lowest level a
-session of the client runs at: a BMC that refuses it is not an IPMI BMC.
+`IpmiTimeoutException` when the deadline expires. Like the other read operations, it is retried
+once on a new session when the session was lost while it ran
+([Session recovery](timeouts-and-errors.html#session-recovery)): a BMC that stopped answering
+then fails it with `IpmiConnectionException`, as it does not answer the setup of the new session
+either, and with `IpmiTimeoutException` when the new session opens but Get Device ID again gets
+no reply. The command itself is mandatory in every IPMI implementation and needs only the User
+privilege, the lowest level a session of the client runs at: a BMC that refuses it is not an IPMI
+BMC.
+
+## With the command-line client
+
+`ipmicli ... info` prints the same identity, one field per line: device ID and revision, firmware
+revision, IPMI version, manufacturer and product IDs, the device-available and device-SDR flags,
+the `DeviceFunction` names and the auxiliary firmware revision; `info --json` gives the fields of
+`DeviceId`. `ipmicli probe` prints what the BMC supports before the login. See
+[`info`](cli.html#info) and [`probe`](cli.html#probe).

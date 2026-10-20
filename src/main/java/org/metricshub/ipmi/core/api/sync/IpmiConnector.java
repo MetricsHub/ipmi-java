@@ -624,7 +624,8 @@ public class IpmiConnector {
 	}
 
 	/**
-	 * Sets how many times a message without a reply, or a handshake step without a reply, is sent again.
+	 * Sets how many times a message without a reply is sent again, or a login whose step got no reply is started
+	 * again from Open Session.
 	 *
 	 * @param retries the number of resends, 0 to send every message once
 	 * @throws IllegalArgumentException when negative

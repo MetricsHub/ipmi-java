@@ -25,7 +25,7 @@ package org.metricshub.ipmi.core.coding.commands.fru.record;
 import org.metricshub.ipmi.core.common.TypeConverter;
 
 /**
- * Record from FRU Multi Record Area
+ * Record from the FRU MultiRecord area
  */
 public abstract class MultiRecordInfo extends FruRecord {
 

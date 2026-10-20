@@ -27,7 +27,7 @@ SEL entry 7 at 2024-05-15T08:24:15Z: VersionChange sensor 0, Firmware or softwar
 SEL entry 640 315532807 s after initialization: PowerSupply sensor 219, Presence detected (assertion)
 ```
 
-(An excerpt of the 643 entries of a Lenovo IMM.)
+(An excerpt of the 643 entries of the Lenovo ThinkServer System Manager (TSM) of a ThinkServer RD350.)
 
 ## How the log is read
 
@@ -63,7 +63,7 @@ When the log changes during the read, or the BMC does not answer as expected:
 Every record type is decoded: the system events, the OEM records with and without timestamp,
 and the reserved types, of which only the record ID is defined
 ([Supported Commands](supported-commands.html#sel-records)). A log of 643 entries takes about
-20 s on a Lenovo IMM (one round trip per entry); a Supermicro BMC answers its 18 entries in
+20 s on a Lenovo TSM (one round trip per entry); a Supermicro BMC answers its 18 entries in
 half a second.
 
 The read must end within the [deadline](timeouts-and-errors.html#deadline) of the client, 2
@@ -85,15 +85,22 @@ Like every operation, `execute()` fails with an
 [`IpmiClientException`](timeouts-and-errors.html#exceptions) when the session cannot be opened.
 The read itself fails with:
 
-* `IpmiCompletionCodeException` when the BMC refuses a command: a refusal of Get SEL Entry other
-  than `CBh`, `81h` and a first `C5h` (`C1h` from a BMC without a SEL, a second `C5h` for the
-  same entry after a new reservation), `D4h` when a command needs more privilege than the session
-  has (or, with `MaximumAvailable`, can be
-  [raised](configuration.html#raising-the-session-on-demand) to), a refusal of Reserve SEL, or a
-  refusal of Get SEL Time UTC Offset or Get SEL Info other than `C1h` and `D5h` (Get SEL Info
-  waits out `81h`);
+* `IpmiCompletionCodeException` when the BMC refuses a command with a code the read does not work
+  around:
+  * Get SEL Entry: any code but `CBh` (no such entry: an empty log, or a log changed during the
+    read, which is read again [above](#how-the-log-is-read)), `81h` (a Clear SEL in progress,
+    waited out) and a first `C5h` (a new reservation is taken and the entry read again), for
+    instance `C1h` from a BMC without a SEL, or a second `C5h` for the same entry;
+  * Reserve SEL: any code;
+  * Get SEL Time UTC Offset and Get SEL Info: any code but `C1h` and `D5h` (the command is not
+    implemented) and, for Get SEL Info only, `81h` (waited out);
+  * any of these commands: `D4h`, when it needs more privilege than the session has, or than it
+    can be [raised](configuration.html#raising-the-session-on-demand) to with `MaximumAvailable`;
 * `IpmiTimeoutException` when the [deadline](timeouts-and-errors.html#deadline) expires, or when
-  a request gets no reply after all its tries;
+  a request gets no reply after all its tries, on the session and again on the new session of
+  the retry;
+* `IpmiConnectionException` when the BMC does not answer the setup of that new session (it is
+  still rebooting, or is off the network);
 * `IpmiClientException` itself when the log changed twice during the read, its next record IDs
   loop, the BMC answers another entry than the one asked for, a malformed entry or an entry whose
   record ID is `0000h` or `FFFFh`, or a Clear SEL is still in progress after 10 s.
@@ -105,20 +112,29 @@ Each [`SelEntry`](apidocs/org/metricshub/ipmi/client/SelEntry.html) holds:
 | Method | Content |
 | --- | --- |
 | `id()` | The record ID, 1 to 65534, unique in the log; after a Clear SEL or a Delete SEL Entry, the BMC may give it to another entry |
-| `type()` | [`SelRecordType`](apidocs/org/metricshub/ipmi/core/coding/commands/sel/SelRecordType.html): `System` for a system event, `OemTimestamped` (`C0h`–`DFh`), `OemNonTimestamped` (`E0h`–`FFh`) or `Reserved` (`00h`–`01h`, `03h`–`BFh`) |
+| `type()` | [`SelRecordType`](apidocs/org/metricshub/ipmi/core/coding/commands/sel/SelRecordType.html): `System` for a system event, `OemTimestamped` (`C0h`-`DFh`), `OemNonTimestamped` (`E0h`-`FFh`) or `Reserved` (`00h`-`01h`, `03h`-`BFh`) |
 | `timestamp()` | When the event was logged (`Optional<Instant>`), for a system event or a timestamped OEM entry whose timestamp is a date ([below](#timestamps)) |
 | `preInitSeconds()` | For an event logged before the BMC had the time: the seconds since the initialization of the SEL device (`OptionalLong`) |
 | `sensorType()` | The [`SensorType`](apidocs/org/metricshub/ipmi/core/coding/commands/sdr/record/SensorType.html) of the sensor that reported a system event (`Optional<SensorType>`): `Temperature`, `PowerSupply`, `Memory`, `PhysicalSecurity`, ... |
 | `sensorNumber()` | Its sensor number (`OptionalInt`): the [`Sensor.number()`](sensors.html#the-sensor-object) of the sensor in the SDR repository, unique for a given `generatorId()` |
 | `generatorId()` | What logged the event (`OptionalInt`). Low byte: the 7-bit slave address or system software ID in bits 7:1, bit 0 set for a software ID (`20h` for the BMC, `01h` for the BIOS). High byte: the channel in bits 7:4 and the LUN in bits 1:0 |
 | `isFrom(sensor)` | Whether a [`Sensor`](sensors.html#the-sensor-object) of the SDR repository is the one that reported the event: same owner (address or software ID, LUN) and same number |
-| `eventType()` | The event/reading type code (`OptionalInt`): `01h` for a threshold event, `02h`–`0Ch` generic discrete, `6Fh` sensor-specific, `70h`–`7Fh` OEM |
+| `eventType()` | The event/reading type code (`OptionalInt`): `01h` for a threshold event, `02h`-`0Ch` generic discrete, `6Fh` sensor-specific, `70h`-`7Fh` OEM |
 | `event()` | What happened, as the [`ReadingType`](apidocs/org/metricshub/ipmi/core/coding/commands/sdr/record/ReadingType.html) of the event offset (`Optional<ReadingType>`): `UpperCriticalGoingHigh`, `PowerSupplyInputLost`, `LogAreaReset`, ... |
 | `direction()` | [`EventDirection`](apidocs/org/metricshub/ipmi/core/coding/commands/sel/EventDirection.html) (`Optional<EventDirection>`): `Assertion` (the threshold crossed, the failure detected) or `Deassertion` (back within the threshold, the failure gone) |
-| `description()` | The entry in words. For a system event: the wording of `ipmiutil`, as in [`Sensor.states()`](sensors.html#states) (`Failure detected`, `Log area reset/cleared`, `Power Supply AC lost`); that of `ipmitool` for the few events `ipmiutil` does not name, such as the OS Boot installation events of IPMI 2.0 revision 1.1 and the Watchdog 1 events (`Installation started`, `BIOS Reset`); the name of the `ReadingType` spaced out when neither tool names it (`Upper Critical Going High`); the codes when the specification does not define the offset (`Unknown event type 08h offset 6h`) or the event is OEM (`OEM event type 71h offset 2h`). For an OEM entry, its OEM bytes (`OEM data 02 01 05 00 00 00`); for a reserved record type, `Reserved record type` |
+| `description()` | The entry in words: the event of a system event (wording below the table), the OEM bytes of an OEM entry (`OEM data 02 01 05 00 00 00`), `Reserved record type` for a reserved one |
 | `eventData()` | The three event data bytes as the BMC sent them (`byte[]`, a copy): the offset in the low nibble of the first; for a threshold event, the raw reading that triggered it and the threshold in the next two ([below](#threshold-events)) |
 | `manufacturerId()`, `oemData()` | The IANA enterprise number of a timestamped OEM entry (`OptionalInt`), and the OEM bytes of an OEM entry (`byte[]`, a copy): 6 with a timestamp, 13 without |
 | `record()` | The decoded [`SelRecord`](apidocs/org/metricshub/ipmi/core/coding/commands/sel/SelRecord.html) of the protocol core, for everything else |
+
+The `description()` of a system event uses the wording of `ipmiutil`, as
+[`Sensor.states()`](sensors.html#states) does (`Failure detected`, `Log area reset/cleared`,
+`Power Supply AC lost`), and that of `ipmitool` for the few events `ipmiutil` does not name, such
+as the OS Boot installation events of IPMI 2.0 revision 1.1 and the Watchdog 1 events
+(`Installation started`, `BIOS Reset`). An event neither tool names gives the name of its
+`ReadingType` spaced out (`Upper Critical Going High`). An offset the specification does not
+define, or an OEM event, gives the codes (`Unknown event type 08h offset 6h`,
+`OEM event type 71h offset 2h`).
 
 The accessors of a system event (`sensorType()`, `event()`, ...) are empty for the OEM and
 reserved entries (an empty `Optional`, or a zero-length array for `eventData()`), and so are
@@ -148,7 +164,7 @@ A SEL timestamp is a number of seconds since 1970, but not always: the values up
 (January 1987) stamp the events logged **before the BMC had the time**, counted from the
 initialization of the SEL device (IPMI 2.0 section 37.1), and `FFFFFFFFh` is an unspecified
 timestamp. `timestamp()` is empty in both cases; `preInitSeconds()` gives the former, like the
-`Pre-Init` of `ipmitool`. A Lenovo IMM logs the events of its first boot with its clock at 1980,
+`Pre-Init` of `ipmitool`. A Lenovo TSM logs the events of its first boot with its clock at 1980,
 which falls in that range: they are reported as `preInitSeconds()` of about 315 million.
 
 A BMC that keeps its SEL time as **local time** reports its offset from UTC with Get SEL Time UTC
@@ -168,7 +184,7 @@ entry logged under another offset (before a daylight saving change, or a change 
 of the BMC) comes out shifted by the difference, usually an hour.
 
 The timestamps are only as good as the clock of the BMC. On the lab BMCs, a Supermicro BMC keeps
-its SEL time in UTC and a Lenovo IMM reports an offset of 60 minutes (that of its time zone
+its SEL time in UTC and a Lenovo TSM reports an offset of 60 minutes (that of its time zone
 setting), but a Dell iDRAC keeps its SEL clock on the local time of its time zone setting
 *without* implementing the command: its timestamps come out ahead of UTC by the offset of that
 time zone (two hours in summer, set to Central European time), and nothing in the protocol says
@@ -222,7 +238,7 @@ for (SelEntry entry : bmc.sel().execute()) {
 }
 ```
 
-`calcFormula(int)` returns `NaN` for a non-linear sensor (linearization `70h`–`7Fh`,
+`calcFormula(int)` returns `NaN` for a non-linear sensor (linearization `70h`-`7Fh`,
 `isNonLinear()`), whose factors vary with the reading. Ask the BMC for the factors of that
 reading byte with Get Sensor Reading Factors and convert with them; the threshold in the third
 byte converts the same way, with the factors of that byte:
@@ -243,16 +259,16 @@ if (record.isNonLinear()) {
 
 ### OEM entries
 
-Vendors log a lot in their own format: of the 643 entries of a Lenovo IMM, 358 are timestamped
+Vendors log a lot in their own format: of the 643 entries of a Lenovo TSM, 358 are timestamped
 OEM records, 342 of manufacturer 311 (Microsoft) and 16 of manufacturer 19046 (Lenovo). An OEM
 entry comes with its OEM bytes, which only the vendor documents (`oemData()`, also in
 `description()`: `OEM data 02 01 05 00 00 00`): six bytes, a timestamp and a `manufacturerId()`
-for a timestamped record (`C0h`–`DFh`), 13 bytes and neither for a non-timestamped one
-(`E0h`–`FFh`). `type()` gives only the range: the record type byte itself is
+for a timestamped record (`C0h`-`DFh`), 13 bytes and neither for a non-timestamped one
+(`E0h`-`FFh`). `type()` gives only the range: the record type byte itself is
 `record().getRawData()[2] & 0xFF`.
 
-A system event of an OEM event/reading type (`70h`–`7Fh`), or of an OEM sensor type
-(`C0h`–`FFh`) with a sensor-specific event/reading type (`6Fh`), is decoded like any other system
+A system event of an OEM event/reading type (`70h`-`7Fh`), or of an OEM sensor type
+(`C0h`-`FFh`) with a sensor-specific event/reading type (`6Fh`), is decoded like any other system
 event, with `event()` = `UnknownOEMEvent` and a `description()` that gives the codes:
 `OEM event type 71h offset 2h`.
 

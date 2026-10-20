@@ -204,6 +204,9 @@ A raw request:
 * runs under the [deadline](timeouts-and-errors.html#deadline) of the client, or under its own,
   set with `timeout(Duration)`.
 
+From the command line, [`ipmicli raw`](cli.html#raw) sends the same requests:
+`ipmicli ... raw 0x2c 0x01 0xdc 0x01`.
+
 ## A complete session with `IpmiConnector`
 
 The connector is the layer below the client: several connections and sessions on one UDP port,
@@ -296,8 +299,8 @@ before anything is sent. The handshake fails with:
   (`UnauthorizedName`) for an unknown user name, `0Ah` (`UnauthorizedRole`) or `09h`
   (`InvalidRole`) for a privilege level the account is not allowed (with `MaximumAvailable`, only
   when User is refused too, as each refused level is followed by the next one down). On `01h`
-  (`InsufficientResources`, no free session slot), the step is first sent again like a step
-  without reply;
+  (`InsufficientResources`, no free session slot), the login is first started again from Open
+  Session, like a login whose step got no reply;
 * `IllegalArgumentException: ... does not match the request` when a reply is not for this
   session or does not confirm the requested algorithms;
 * `SessionException` when the BMC refuses to set the session to its privilege level
@@ -317,7 +320,7 @@ port (or always pass `0`), and call `tearDown()` when you are done with it.
 | `IpmiConnector(int port, long pingPeriod)` | The same, with a [keep-alive period](configuration.html#keep-alive) in ms (`0`: none). |
 | `setTimeout(int ms)`, `setTimeout(handle, int ms)` | The [message timeout](#timeouts) of the connections created from now on (5 000 ms by default), or of one connection; less than 1 ms fails with `IllegalArgumentException`. |
 | `getTimeout(handle)` | The message timeout of one connection. |
-| `setRetries(int)`, `getRetries()` | How many times a message or a handshake step without reply is sent again (3 by default); a negative count fails with `IllegalArgumentException`. |
+| `setRetries(int)`, `getRetries()` | How many times a message without reply is sent again, or a login whose step got no reply is started again from Open Session (3 by default); a negative count fails with `IllegalArgumentException`. |
 | `createConnection(InetAddress address[, int port])` | Register a connection to a BMC (port 623 by default). |
 | `createConnection(InetAddress address, [int port,] CipherSuite cipherSuite, PrivilegeLevel level)` | The same, skipping the cipher suite and capabilities steps: call `openSession()` next. |
 | `sendMessage(handle, command)` | Send a command and wait for its typed response ([Sending commands](#sending-commands)). |
@@ -377,12 +380,15 @@ specification starts every session at the User level whatever that maximum (IPMI
 right after the handshake, as `IpmiClient` and `ipmitool` do: the session it returns runs at the
 requested level.
 
-An account (or a cipher suite) limited to a lower level can be refused at login (`0Ah`), or log
-in, the BMC capping the session at its limit, and then be refused the raise: `80h` (the level is
-not available for this user), `81h` (it exceeds the privilege limit of the channel or of the
-user), or another completion code. `openSession()` then closes the session and throws
-`SessionException`, whose cause is the `IPMIException` of the completion code: request the level
-the commands need.
+An account (or a cipher suite) limited to a lower level can be refused at login: `openSession()`
+then throws the `IPMIException` of the RMCP+ status, `0Ah` (`UnauthorizedRole`) or `09h`
+(`InvalidRole`) for the account, `11h`, `04h` or `05h` for the cipher suite
+([The BMC refuses the session](troubleshooting.html#the-bmc-refuses-the-session)), and no session
+is open. It can also log in, the BMC capping the session at its limit, and then be refused the
+raise: `80h` (the level is not available for this user), `81h` (it exceeds the privilege limit of
+the channel or of the user), or another completion code. `openSession()` then closes the session
+and throws `SessionException`, whose cause is the `IPMIException` of the completion code. Either
+way, request the level the commands need.
 
 A `User` session is not raised. `MaximumAvailable` asks for the highest level the account is
 allowed: `openSession()` requests Administrator at Open Session and RAKP Message 1, then Operator
@@ -415,6 +421,8 @@ command declares, or throws:
   whose reply was lost. Any other code is thrown at once.
 * `ConnectionException` when no reply came after all the tries, or the connection is not in a
   state that allows sending.
+* `IllegalStateException` when the connection was closed with `closeConnection()`: its handle is
+  no longer usable.
 * `IllegalArgumentException` when the response is malformed.
 
 A reply is matched to its request by its tag, its command code and its network function, which

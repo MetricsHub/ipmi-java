@@ -52,7 +52,7 @@ The message says which wait ran out:
 
 | Message | Cause | What to do |
 | --- | --- | --- |
-| `The <operation> operation on <host> did not complete within PT2M` | The [deadline](configuration.html#timeout) of the operation expired: a large SDR repository or many FRUs on a slow BMC, a network that loses many replies, or a deadline shorter than the handshake tries. The client drops the session. | Raise the timeout (2 minutes by default). |
+| `The <operation> operation on <host> did not complete within PT2M` | The [deadline](configuration.html#timeout) of the operation expired: a large SDR repository or many FRUs on a slow BMC, a network that loses many replies, or a deadline shorter than the handshake tries. The client drops the session when the operation was already running. | Raise the timeout (2 minutes by default). |
 | `No reply from <host> to <command> after 4 tries: the session is lost` | A message of the session got no reply: the BMC rebooted or expired the session, or drops replies under load. | The next operation opens a new session. A read operation has already run again once on a new session before failing ([Session recovery](timeouts-and-errors.html#session-recovery)); `send()` and `raw()` are not run again. |
 | `No reply from <host> to ChassisControl, which is sent once and not again: ...` (or `ChassisIdentify`) | `chassisControl()`, `chassisIdentify()` or `chassisIdentifyForever()` got no reply. The command is not sent again, as the BMC may have carried it out, and the session is kept. | Read `chassisStatus()` to see whether the BMC carried it out ([Controlling the power](chassis-status.html#controlling-the-power)). |
 | `No reply from the controller behind <host> to SendMessage after 4 tries: ...` | A request sent with `send(new SendMessage<>(...))` was forwarded by the BMC, but the controller behind it did not answer. The session is kept. | Check the channel and the address of the controller ([Commands for another controller](low-level-api.html#commands-for-another-controller)). |
@@ -70,11 +70,11 @@ requested privilege right after it (Set Session Privilege Level answered `80h`, 
 the session is not opened. A BMC that answers Set Session Privilege Level with another error, a
 busy one for instance, fails with an `IpmiClientException` instead
 (`The BMC ... could not set the session to the ... privilege: ...`). A login the BMC refuses is
-not tried again, as sending the credentials again can lock the account out: only a handshake step
-that got no reply, or that the BMC answered with a transient completion code (node busy, out of
-resources), is sent again. With `MaximumAvailable`, a role the BMC refuses (`UnauthorizedRole`,
-`InvalidRole`) is requested one level lower: Administrator, then Operator, then User.
-`statusCode()` says why:
+not tried again, as sending the credentials again can lock the account out: only a login whose
+step got no reply, or that the BMC answered with a transient completion code (node busy, out of
+resources), is started again, from Open Session. With `MaximumAvailable`, a role the BMC refuses
+(`UnauthorizedRole`, `InvalidRole`) is requested one level lower: Administrator, then Operator,
+then User. `statusCode()` says why:
 
 | `statusCode()` | Meaning |
 | --- | --- |
@@ -113,8 +113,20 @@ answered Open Session or a RAKP message with an error status that is not about t
 
 | Message ending | Cause |
 | --- | --- |
-| `Insufficient resources to create a session.` (`01h`) | Every session slot of the BMC is in use, by other tools or by clients that were not closed. The request is sent again up to `retries` times before it fails. Close the clients you no longer need: BMCs typically expire an idle session after 60 seconds. |
-| `No Cipher Suite match with proposed security algorithms.` (`11h`), `Invalid authentication algorithm.` (`04h`), `Invalid integrity algorithm.` (`05h`) | The BMC refuses the cipher suite, or does not allow it at the requested privilege (`Cipher Suite Priv Max` in `ipmitool lan print 1`). With `cipherSuite(id)` (`-C` with one ID), use `cipherSuites()` instead, which picks a suite the BMC offers. For a suite the BMC offers, request a lower [privilege](configuration.html#privilege-level), or raise the maximum privilege of that suite on the BMC. Some BMCs list a suite they refuse at Open Session: a Lenovo XClarity Controller (XCC) lists suite 12, a Cisco IMC suite 11, and `ipmiutil -J <id>` gets the same refusal. The client does not try another suite: enable that suite on the BMC, or list with `cipherSuites()` the suites the BMC accepts ([How `IpmiClient` chooses the suite](preparing-the-bmc.html#how-ipmiclient-chooses-the-suite)). |
+| `Insufficient resources to create a session.` (`01h`) | Every session slot of the BMC is in use, by other tools or by clients that were not closed. The login is started again from Open Session up to `retries` times before it fails. Close the clients you no longer need: BMCs typically expire an idle session after 60 seconds. |
+| `No Cipher Suite match with proposed security algorithms.` (`11h`), `Invalid authentication algorithm.` (`04h`), `Invalid integrity algorithm.` (`05h`) | The BMC refuses the cipher suite, or does not allow it at the requested privilege (`Cipher Suite Priv Max` in `ipmitool lan print 1`): see below the table. |
+
+When the BMC refuses the cipher suite:
+
+* with `cipherSuite(id)` (`-C` with one ID), use `cipherSuites()` instead, which picks a suite the
+  BMC offers;
+* for a suite the BMC offers, request a lower [privilege](configuration.html#privilege-level), or
+  raise the maximum privilege of that suite on the BMC;
+* some BMCs list a suite they refuse at Open Session: a Lenovo XClarity Controller (XCC) lists
+  suite 12 and a Cisco IMC suite 11, and `ipmiutil -J <id>` gets the same refusal. The client
+  does not try another suite: enable that suite on the BMC, or list with `cipherSuites()` the
+  suites the BMC accepts
+  ([How `IpmiClient` chooses the suite](preparing-the-bmc.html#how-ipmiclient-chooses-the-suite)).
 
 ## `IpmiCompletionCodeException` with `InsufficentPrivilege` (`D4h`)
 
@@ -199,11 +211,11 @@ the session is opened, with an `IllegalArgumentException`
 | `Fru.problems()` says `Cannot read FRU <id>: ...` or `FRU <id> is truncated at offset <n>: ...` with `Requested Sensor, data, or record not present` (`CBh`) | The FRU is declared in the SDR repository but not present, for example an empty power supply bay or DIMM slot. Usually harmless: the reading stops there, and the areas read before, if any, are decoded. |
 | `Fru.problems()` says `Cannot read FRU <id>: No data returned` or `FRU <id> is truncated at offset <n>: No data returned` | The controller returned no data at an offset within the size it declared in Get FRU Inventory Area Info: the reading stops there and the areas read so far are decoded. |
 | `Fru.problems()` says `Cannot read FRU <id>: ...` | The BMC refused Get FRU Inventory Area Info or the first Read FRU Data of that FRU, or malformed its reply: nothing of that FRU is decoded. The other FRUs are still returned. |
-| `Fru.problems()` says `Cannot decode FRU <id>: ...` | The data read is not in a format the library decodes, or it is corrupt or truncated. The library decodes the IPMI FRU format (a common header with a valid checksum), the SPD data of a DDR3, DDR4 or DDR5 memory module, and the processor information ROM (data format revision 7) of an Intel Xeon processor. The SPD data of another DRAM type (DDR, DDR2 and its FB-DIMM variants, DDR4E, LPDDR3 to LPDDR5X, DDR5 NVDIMM-P) or that ends before the end of the part number, and a processor information ROM of another revision, are reported this way ([Memory modules](fru-inventory.html#memory-modules)). The other FRUs are still returned. |
+| `Fru.problems()` says `Cannot decode FRU <id>: ...` | The data read is not in a format the library decodes, or it is corrupt or truncated. The library decodes the IPMI FRU format (a common header with a valid checksum), the SPD data of a DDR3, DDR4 or DDR5 memory module, and the Processor Information ROM (data format revision 7) of an Intel Xeon processor. The SPD data of another DRAM type (DDR, DDR2 and its FB-DIMM variants, DDR4E, LPDDR3 to LPDDR5X, DDR5 NVDIMM-P) or that ends before the end of the part number, and a Processor Information ROM of another revision, are reported this way ([Memory modules](fru-inventory.html#memory-modules)). The other FRUs are still returned. |
 | `Fru.problems()` says `The <area> info area at offset <n> is truncated` | The read stopped before the end of that area (see above): the complete areas of the FRU are still returned ([Incomplete FRUs](fru-inventory.html#incomplete-frus) lists every message). |
 | `Fru.problems()` says `The multirecord ...` or `Cannot decode the multirecord at offset <n>: ...` | The MultiRecord area is cut short or has a corrupt record header, or one of its records cannot be decoded: the records before it, or around that record, are still returned. |
 | `Sensor.problem()` says `The sensor belongs to system software` | The record names system software, the BIOS for instance, as the owner of the sensor: no controller holds its reading ([Sensor owners](sensors.html#sensor-owners)). `ipmiutil` shows it as not available. |
-| `Sensor.problem()` says `Get Sensor Reading through the BMC to the controller at ... failed: ... (completion code D4h)`; `Fru.problems()` says `Cannot read FRU <id> from the controller at ...: ...` with `(completion code D4h)` | The sensor or FRU belongs to another controller than the BMC, which the BMC forwards the request to with Send Message, and Send Message needs a higher privilege than the session has: Operator or, on some BMCs, Administrator. `privilege(PrivilegeLevel.MaximumAvailable)` raises the session there when the account has the level ([Sensor owners](sensors.html#sensor-owners)). |
+| `Sensor.problem()` says `Get Sensor Reading through the BMC to the controller at ... failed: ... (completion code D4h)`; `Fru.problems()` says `Cannot read FRU <id> from the controller at ...: ...` with `(completion code D4h)` | The sensor or FRU belongs to a controller other than the BMC, which the BMC forwards the request to with Send Message, and Send Message needs a higher privilege than the session has: Operator or, on some BMCs, Administrator. `privilege(PrivilegeLevel.MaximumAvailable)` raises the session there when the account has the level ([Sensor owners](sensors.html#sensor-owners)). |
 | `Sensor.problem()` or `Fru.problems()` names `the controller at ...` and says `NAK on write: no controller acknowledged the address (completion code 83h)` | No controller answered at that address on the bus behind the BMC. |
 | `Sensor.problem()` says `No reply from the controller at ... through the BMC`; `Fru.problems()` says `Cannot read FRU <id> from the controller at ...: No reply through the BMC` | The controller is absent or does not answer. The sensors and FRUs of the other controllers are still read ([Sensor owners](sensors.html#sensor-owners)). |
 | A sensor known to `ipmitool` is not returned | Only the sensors of Full and Compact sensor records are returned: an Event-Only record has no reading ([How the sensors are read](sensors.html#how-the-sensors-are-read)). A Compact record shared by several sensors is returned as one sensor per instance, where `ipmitool` shows one line ([Shared records](sensors.html#shared-records)). |
@@ -232,6 +244,8 @@ the session is opened, with an `IllegalArgumentException`
 | --- | --- |
 | `IpmiClientException: Cannot open the SOL console of <host>: The SOL payload is in use by another session: instance 1 by session ...` | Another session that the BMC still has holds the payload; the message gives its user ID and privilege. Close that console first; for a console killed without being closed, try again once the BMC has expired its session (typically after 60 seconds). The client deactivates a payload held by a session the BMC no longer has, and activates it again without an error ([With `IpmiClient`](serial-over-lan.html#with-ipmiclient)). |
 | `IpmiCompletionCodeException` with `D4h`: `Activating the SOL payload failed: ...` | The session needs the privilege the BMC requires for SOL (*Privilege Level* in `ipmitool sol info 1`), Administrator on most BMCs: `privilege(PrivilegeLevel.Administrator)` on the builder, or `MaximumAvailable`, which raises the session as far as the account allows ([Prerequisites](serial-over-lan.html#prerequisites)). |
+| `IpmiCompletionCodeException` with `81h`: `Activating the SOL payload failed: ...` | The BMC does not allow the SOL payload to be activated: check that SOL is enabled (`ipmitool sol set enabled true 1`) and that the SOL payload is enabled for the account (`ipmitool sol payload enable 1 <user id>`) ([Prerequisites](serial-over-lan.html#prerequisites)). |
+| `IpmiCompletionCodeException` with `84h`: `Activating the SOL payload failed: ...` | The BMC requires encryption (`force-encryption`) and the session uses a cipher suite without it: restrict the client to `cipherSuites(17, 3, 8, 12)` ([Prerequisites](serial-over-lan.html#prerequisites)). |
 
 ## Closing a Serial over LAN console fails with `Message timed out`
 
@@ -249,9 +263,12 @@ session after that delay.
 
 With `ipmitool`, add `-I lanplus -H <bmc> -U <user> -P <password> -L USER -C <suite>`; with
 `ipmiutil`, add `-N <bmc> -U <user> -P <password> -F lan2 -J <suite> -V 2`. Use `-L OPERATOR`
-(`-V 3`) for `chassisControl()` and `chassisIdentify()`, and `-L ADMINISTRATOR` (`-V 4`) for
-`sol()`. The [Command-Line Client](cli.html#ipmitool-equivalents) lists the `ipmitool`
-equivalents of each `ipmicli` subcommand and option.
+(`-V 3`) for `chassisControl()`, `chassisIdentify()` and the sensors and FRUs of controllers other
+than the BMC ([Sensor owners](sensors.html#sensor-owners),
+[FRUs of other controllers](fru-inventory.html#frus-of-other-controllers); `-L ADMINISTRATOR`
+(`-V 4`) on an AMI-based GIGABYTE BMC), and `-L ADMINISTRATOR` (`-V 4`) for `sol()`. The
+[Command-Line Client](cli.html#ipmitool-equivalents) lists the `ipmitool` equivalents of each
+`ipmicli` subcommand and option.
 
 | Library | `ipmitool` | `ipmiutil` |
 | --- | --- | --- |

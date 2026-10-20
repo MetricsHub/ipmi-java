@@ -102,8 +102,9 @@ public final class SelRequest {
 	 * by then.
 	 *
 	 * @return the entries, in the order of the log
-	 * @throws IpmiClientException when the log cannot be read: the BMC does not answer, refuses an entry, returns a
-	 *         malformed one, or changed the log twice during the read
+	 * @throws IpmiClientException when the session cannot be opened, the deadline expires, or the log cannot be read:
+	 *         the BMC does not answer, refuses an entry, returns a malformed one, or changed the log twice during the
+	 *         read
 	 */
 	public SelEntryList execute() {
 		return client.readSel(since, sinceEntry, timeout);

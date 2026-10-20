@@ -8,7 +8,8 @@ description: A Java client and command-line tool for IPMI 2.0 over LAN (RMCP+): 
 ## Overview
 
 The **IPMI Java Client** talks to the **Baseboard Management Controller (BMC)** of a server
-(Dell iDRAC, HPE iLO, Lenovo IMM and XClarity Controller (XCC), Cisco IMC, Fujitsu iRMC,
+(Dell iDRAC, HPE iLO, Lenovo XClarity Controller (XCC) and ThinkServer System
+Manager (TSM), Cisco IMC, Fujitsu iRMC,
 Supermicro, and the BMC firmwares of most other boards; see
 [Tested BMCs](preparing-the-bmc.html#tested-bmcs)) over **IPMI 2.0** (Intelligent Platform
 Management Interface) **over LAN**, in the authenticated **RMCP+** (Remote Management Control
@@ -26,26 +27,26 @@ Protocol) sessions of IPMI 2.0, on UDP port 623. It lets a Java application:
   boards, power supplies and other Field Replaceable Units, the Serial Presence Detect (SPD) data
   of memory modules and the Processor Information ROM of Intel Xeon processors
   ([FRU Inventory](fru-inventory.html)),
-* read the **sensors** that the SDR records of the BMC describe (Full and Compact sensor
-  records), including those of the satellite controllers the BMC reaches with Send Message:
-  temperatures, voltages, fan speeds, currents, power and energy readings with their thresholds,
-  and the discrete states (presence, redundancy, failure, ...);
-  [Sensors](sensors.html#what-is-not-read) lists what is not read,
+* read the **sensors** that the Sensor Data Records (SDRs) of the BMC describe (Full and Compact
+  sensor records), including those of the other controllers of the server (power supplies, fans,
+  RAID adapters), which the BMC reaches with Send Message: temperatures, voltages, fan speeds,
+  currents, power and energy readings with their thresholds, and the discrete states (presence,
+  redundancy, failure, ...); [Sensors](sensors.html#what-is-not-read) lists what is not read,
 * read the **System Event Log**: the hardware events the BMC logged (thresholds crossed, power
   supply failures, memory errors, intrusion), whole or since the last entry read
   ([System Event Log](system-event-log.html)),
 * open a **Serial over LAN** console on the server's serial port ([Serial over LAN](serial-over-lan.html)),
   and
-* send **any IPMI command** in the same session, as a command class or as raw bytes (DCMI and
-  OEM network functions included), or through the low-level connector
-  ([Low-Level API](low-level-api.html)).
+* send **any IPMI command** in the same session, as a command class or as raw bytes, or through
+  the low-level connector ([Low-Level API](low-level-api.html)), including the commands of the
+  Data Center Manageability Interface (DCMI) and of the OEM network functions.
 
 `deviceId()`, `capabilities()`, `chassisStatus()`, `frus()`, `sensors()` and `sel()` only read:
-besides the session commands, they send Get commands, the Reserve commands that some BMCs require
-before the SDR repository or the SEL is read, and Send Message to reach the other controllers
-([Supported Commands](supported-commands.html#commands)); they change nothing on the server. The
-power control, the identify LED and the Serial over LAN console act on the server or the BMC,
-and so can the commands sent with `send()` or `raw()`.
+besides the session commands, they send Get commands, Read FRU Data, the Reserve commands that
+some BMCs require before the SDR repository or the SEL is read, and Send Message to reach the
+other controllers ([Supported Commands](supported-commands.html#commands)); they change nothing
+on the server. The power control, the identify LED and the Serial over LAN console act on the
+server or the BMC, and so can the commands sent with `send()` or `raw()`.
 
 The same operations are available from the command line with the **`ipmicli`** client
 ([Command-Line Client](cli.html)). Install it with one command
@@ -104,7 +105,7 @@ See [Installation](installation.html) for Gradle and the requirements.
 > [!NOTE]
 > **On the BMC**, IPMI over LAN must be enabled, UDP port 623 reachable, and the account must be
 > allowed to log in over LAN with the **User** privilege at least. User is enough for every read
-> operation, but for the sensors and FRUs of other controllers than the BMC, which most BMCs serve
+> operation except the sensors and FRUs of controllers other than the BMC, which most BMCs serve
 > at the **Operator** level (some at **Administrator** only); controlling the power and the
 > identify LED needs **Operator**, and Serial over LAN **Administrator** on most BMCs. A client
 > built with `privilege(PrivilegeLevel.MaximumAvailable)` raises the session only when a command
@@ -163,17 +164,33 @@ The client runs its operations one at a time on its session, walks the SDR repos
 both `frus()` and `sensors()` while the repository does not change
 ([SDR cache](configuration.html#sdr-cache)), and reopens the session when the BMC loses it.
 
-Every failure of an operation, but for a call the client refuses (below), is an unchecked
+Every failure of an operation, except a call the API does not allow (below), is an unchecked
 [`IpmiClientException`](apidocs/org/metricshub/ipmi/client/IpmiClientException.html), whose
-subclass says what to act on: the BMC refused the login (`IpmiAuthenticationException`), the
-session could not be established for a network reason (`IpmiConnectionException`), the BMC
-answered an error completion code (`IpmiCompletionCodeException`), or a message got no reply or
-the operation outlived its deadline (`IpmiTimeoutException`). The other failures, such as a BMC
-that offers none of the cipher suites, are an `IpmiClientException` itself. An invalid builder
-setting throws `IllegalArgumentException`, and a call the client refuses (any operation of a
-closed client, an operation that needs a session on a client built without credentials, a power
-cycle of a system that is off) throws `IllegalStateException`
-([Timeouts and Errors](timeouts-and-errors.html#exceptions)).
+subclass says what to act on ([Timeouts and Errors](timeouts-and-errors.html#exceptions)):
+
+```java
+try (IpmiClient bmc = IpmiClient.builder(host).credentials(user, password).build()) {
+	ChassisStatus chassis = bmc.chassisStatus();
+	// ...
+} catch (IpmiAuthenticationException e) {
+	// the BMC refused the login: user name, password, BMC key or privilege level
+} catch (IpmiConnectionException e) {
+	// no session: unknown host, UDP port 623 filtered, IPMI over LAN disabled
+} catch (IpmiTimeoutException e) {
+	// a message got no reply, or the operation outlived its deadline
+} catch (IpmiCompletionCodeException e) {
+	// the BMC refused a command: e.completionCode() says why (D4h: insufficient privilege)
+} catch (IpmiClientException e) {
+	// any other failure: no cipher suite in common, a BMC without IPMI 2.0, a malformed reply
+}
+```
+
+A call the API does not allow throws a standard Java exception instead: an invalid setting or
+argument, of the builder or of an operation (`chassisIdentify(300)`), throws
+`IllegalArgumentException` before anything is sent to the BMC, and any operation of a closed
+client, an operation that needs a session on a client built without credentials, or a power cycle
+of a system that is off throws `IllegalStateException`
+([Invalid settings and calls](timeouts-and-errors.html#invalid-settings-and-calls)).
 
 ## Where to go next
 

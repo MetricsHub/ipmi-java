@@ -1368,7 +1368,8 @@ public final class IpmiCli {
 
 	static String usage() {
 		String program = programName();
-		// Wrapped for an 80-column terminal: the descriptions start at column 33
+		// Wrapped for an 80-column terminal (the descriptions start at column 33), except the usage lines, which name
+		// the program and run longer with java -jar
 		return "Usage:\n" + "  " + program + " -h <host> [options] probe [--json]\n" + "  " + program
 				+ " -h <host> -u <user> [options] <subcommand> [arguments]\n" + "  " + program + " --help | --version\n"
 				+ "\n" + "<subcommand> [arguments]:\n" + "  info [--json]\n" + "  chassis [--json]\n"

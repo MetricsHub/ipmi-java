@@ -25,7 +25,7 @@ package org.metricshub.ipmi.core.coding.commands.fru.record;
 import org.metricshub.ipmi.core.common.TypeConverter;
 
 /**
- * DC output Information record from FRU Multi Record Area
+ * DC Output record (type 01h) from the FRU MultiRecord area
  */
 public class DcOutputInfo extends MultiRecordInfo {
 

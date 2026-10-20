@@ -145,7 +145,7 @@ and the name ends at its first NUL character.
 ### OEM and unknown records
 
 IPMI 2.0 reserves the record types `C0h` to `FFh` for OEM use, and vendors do use them: a
-GIGABYTE BMC tested with this library returns 19 records of type `D0h`, a Lenovo IMM one of type
+GIGABYTE BMC tested with this library returns 19 records of type `D0h`, a Lenovo ThinkServer System Manager (TSM) one of type
 `C0h`. They are all decoded as an
 [`OemRecord`](apidocs/org/metricshub/ipmi/core/coding/commands/sdr/record/OemRecord.html), which
 keeps the whole vendor-defined payload as raw bytes. Only type `C0h` has a standard layout, with
@@ -204,11 +204,11 @@ JEDEC DRAM device type and decoded into a single `SpdInfo`
 returns its Processor Information ROM, decoded into a single `PiromInfo`
 ([`Fru.pirom()`](apidocs/org/metricshub/ipmi/client/Fru.html)). The SPD data of a module of
 another memory type (DDR, DDR2, DDR2 FB-DIMM, DDR4E, LPDDR3 to LPDDR5X, DDR5 NVDIMM-P) and a
-processor information ROM of another revision are recognized but not decoded. SPD data that ends
-before the part number of the module is rejected, and so is a processor information ROM shorter
-than its 128 bytes, with a wrong static checksum or with a section pointer outside the ROM. A FRU
-that is recognized but not decoded, or rejected, is returned without areas, with the reason in
-`Fru.problems()`.
+Processor Information ROM of another revision are recognized but not decoded. SPD data that ends
+before the end of the part number of the module is rejected, and so is a Processor Information
+ROM shorter than its 128 bytes, with a wrong static checksum or with a section pointer outside the
+ROM. A FRU that is recognized but not decoded, or rejected, is returned without areas, with the
+reason in `Fru.problems()`.
 
 The decoder checks the checksums that frame the data and ignores the others, which real firmware
 gets wrong on genuine data:

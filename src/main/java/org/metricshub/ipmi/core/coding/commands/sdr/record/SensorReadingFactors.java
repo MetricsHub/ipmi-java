@@ -93,7 +93,7 @@ public final class SensorReadingFactors {
 	/**
 	 * Returns the accuracy.
 	 *
-	 * @return the accuracy, as a fraction (0.01 for 1 %)
+	 * @return the accuracy, as a fraction (0.01 for 1%)
 	 */
 	public double getAccuracy() {
 		return accuracy;

@@ -22,7 +22,7 @@ only, and works whether the server is powered on or off, as long as the BMC has 
 | Requirement | Detail |
 | --- | --- |
 | IPMI over LAN | Enabled on the LAN channel of the BMC (usually channel 1). Many recent BMCs ship with it **disabled**. |
-| IPMI 2.0 (RMCP+) | The client only opens RMCP+ sessions. IPMI 1.5-only BMCs (RMCP with MD2/MD5 or straight password authentication) are not supported: the client refuses them at once with `IpmiClientException: The BMC ... does not support IPMI 2.0 / RMCP+` ([Troubleshooting](troubleshooting.html#the-bmc-does-not-support-ipmi-2-0)), or, with [`cipherSuite(id)`](configuration.html#cipher-suites), which skips that check, fails with `IpmiConnectionException` when Open Session gets no reply ([Troubleshooting](troubleshooting.html#ipmiconnectionexception)). |
+| IPMI 2.0 (RMCP+) | The client only opens RMCP+ sessions. IPMI 1.5-only BMCs (RMCP with MD2/MD5 or straight password authentication) are not supported: by default the client refuses them at once with `IpmiClientException: The BMC ... does not support IPMI 2.0 / RMCP+` ([The BMC does not support IPMI 2.0](troubleshooting.html#the-bmc-does-not-support-ipmi-2-0)). |
 | UDP port 623 | Open from the machine running the client to the BMC. The port can be changed with [`port(int)`](configuration.html#host-and-port) on the builder (`-P` with `ipmicli`). |
 | An account | Enabled, with a password, allowed to log in over IPMI on the LAN channel. |
 | Privilege level | **User**: the device ID, the chassis status, the SEL, and the sensors and FRUs of the BMC itself. **Operator**: the power and identify commands, and on most BMCs the [sensors](sensors.html#sensor-owners) and [FRUs](fru-inventory.html#frus-of-other-controllers) of the other controllers, which the BMC reaches with Send Message (User is enough on an HPE iLO 5, Administrator is needed on an AMI-based GIGABYTE BMC). **Administrator**: [Serial over LAN](serial-over-lan.html) on most BMCs (the level the BMC configures for SOL, `Privilege Level` in `ipmitool sol info 1`). A client built with `privilege(PrivilegeLevel.MaximumAvailable)` runs the session at User and raises it only when a command needs more, as far as the account allows ([Raising the session on demand](configuration.html#raising-the-session-on-demand)). |
@@ -31,7 +31,7 @@ only, and works whether the server is powered on or off, as long as the BMC has 
 ## Tested BMCs
 
 The library is tested on these BMCs, whose answers and quirks the pages of this site cite: Dell
-iDRAC 6, 7 and 8, HPE iLO 5, Lenovo IMM, Lenovo XClarity Controller (XCC), Supermicro, Cisco IMC,
+iDRAC 6, 7 and 8, HPE iLO 5, the Lenovo ThinkServer System Manager (TSM) of a ThinkServer RD350, Lenovo XClarity Controller (XCC), Supermicro, Cisco IMC,
 Fujitsu iRMC S5, and an AMI-based GIGABYTE BMC. Other IPMI 2.0 BMCs are expected to work: report
 the ones that do not on the [issue tracker](https://github.com/MetricsHub/ipmi-java/issues).
 
@@ -206,14 +206,15 @@ key (all zeros, which the client treats as no key): leave `bmcKey()` unset then.
 
 A stateful firewall needs the outbound rule only. Each client binds one ephemeral local UDP port
 when it first contacts the BMC (`capabilities()` included), keeps it for all its sessions (a new
-session after a lost one, and the Serial over LAN one, included) and releases it in `close()`
-([Host and port](configuration.html#host-and-port)), so a stateless firewall must accept UDP
-replies from the BMC's port on the whole ephemeral range.
+session after a lost one, and the session of a Serial over LAN console on another port, included)
+and releases it in `close()` ([Host and port](configuration.html#host-and-port)), so a stateless
+firewall must accept UDP replies from the BMC's port on the whole ephemeral range.
 
 [Serial over LAN](serial-over-lan.html) may use another UDP port: the BMC returns the port of the
 SOL payload when it is activated, usually the same one (623 on every lab BMC the console was
-tested with), and the console then opens a second session on that port, with the same
-credentials and BMC key. Allow it too if your BMC announces a different one.
+tested with), and the console then runs in the session of the client. When the BMC announces
+another port, the console opens a second session there, with the same credentials and BMC key:
+allow that port too.
 
 ## Checking what the BMC offers
 

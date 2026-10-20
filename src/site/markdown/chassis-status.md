@@ -87,7 +87,7 @@ try (IpmiClient bmc = IpmiClient.builder(host).credentials(user, password)
 | [`PowerCommand`](apidocs/org/metricshub/ipmi/core/coding/commands/chassis/PowerCommand.html) | Effect |
 | --- | --- |
 | `PowerUp` | Power the system on |
-| `PowerDown` | Power it off at once (soft off, S4/S5), without shutting the operating system down |
+| `PowerDown` | Power it off at once, into the ACPI soft-off state (S4/S5), without shutting the operating system down (`SoftShutdown` asks for a clean shutdown) |
 | `PowerCycle` | Power it off for at least a second, then on. Optional: a BMC should refuse it with `D5h` when the system is off, but some power the system on instead, so `chassisControl()` reads the power state first and throws `IllegalStateException` when the system is off (use `PowerUp`) |
 | `HardReset` | Pulse the reset signal. A BMC that can tell it would do nothing (the system is off) should refuse it with `D5h` |
 | `SoftShutdown` | Ask the operating system to shut down through ACPI, by emulating a fatal overtemperature (optional) |
@@ -109,7 +109,8 @@ Unlike the read operations, a control command is **sent once**:
   nothing was done) fails with `IpmiCompletionCodeException` at once, for the same reason, and
   `chassisStatus()` then tells what the BMC did.
 * A command that failed because the session was lost is not replayed on a new session.
-* A busy BMC (`C0h`) did nothing: the command is sent again, as for any command.
+* A busy BMC (`C0h`, node busy, or `D2h`, initialization in progress) did nothing: the command is
+  sent again after a pause, as for any command.
 * A command refused with `D4h` was not carried out either: a session raised on demand sends it
   again at the higher level (above).
 
@@ -143,7 +144,7 @@ System.out.println(bmc.chassisStatus().identifyState()); // Optional[TemporaryOn
 bmc.chassisIdentify(0);
 ```
 
-## From the command line
+## With the command-line client
 
 `ipmicli ... chassis` prints the chassis status, and `power status` prints just `on` or `off`.
 `power on|off|cycle|reset|soft|diag` sends `PowerUp`, `PowerDown`, `PowerCycle`, `HardReset`,

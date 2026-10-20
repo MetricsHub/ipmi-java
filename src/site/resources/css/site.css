@@ -91,19 +91,40 @@ body.dark .callout.callout-important {
 }
 
 /* Tables: the skin breaks code in cells anywhere, which cuts identifiers like manufacturerId() in the middle.
-   Keep them whole, and let a table wider than the page scroll on its own */
-body.sentry-site main table.bodyTable {
-	display: block;
-	overflow-x: auto;
-}
-body.sentry-site main table.bodyTable code {
-	overflow-wrap: break-word;
+   On screen, keep them whole, and let a table wider than the page scroll on its own (a scroll container would
+   cut it on paper) */
+@media screen {
+	body.sentry-site main table.bodyTable {
+		display: block;
+		overflow-x: auto;
+	}
+	body.sentry-site main table.bodyTable code {
+		overflow-wrap: break-word;
+	}
 }
 
-/* Phones: inline code wraps instead of making the whole page scroll sideways */
+/* Inline code wraps instead of running past the column or making the page scroll sideways. The skin
+   shades code with an absolutely positioned ::after, which covers the wrong box when the code wraps:
+   shade the code itself, line by line */
+body.sentry-site main :not(pre) > code {
+	white-space: normal !important;
+	overflow-wrap: anywhere;
+	background-color: color-mix(in srgb, var(--main-fgcolor) 7%, transparent);
+	-webkit-box-decoration-break: clone;
+	box-decoration-break: clone;
+}
+body.sentry-site main :not(pre) > code::after {
+	content: none;
+}
+
+/* Neither the heading link icon nor a long uppercase title may widen the page. Clipping would cut the long
+   names of the generated reports (Checkstyle, Surefire, dependency tree): break them instead */
+body.sentry-site .main-content {
+	overflow-x: clip;
+	overflow-wrap: break-word;
+}
 @media (max-width: 767px) {
-	body.sentry-site main :not(pre) > code {
-		white-space: normal !important;
-		overflow-wrap: anywhere;
+	body.sentry-site .main-content h1 {
+		font-size: 28px;
 	}
 }

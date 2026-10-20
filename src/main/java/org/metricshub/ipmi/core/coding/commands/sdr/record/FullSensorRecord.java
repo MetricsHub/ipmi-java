@@ -176,7 +176,7 @@ public class FullSensorRecord extends AbstractSensorRecord {
 	 * Returns the accuracy of the readings of the sensor, from the factors of the record (bytes 28 and 29 of the
 	 * record).
 	 *
-	 * @return the accuracy, as a fraction (0.01 for 1 %)
+	 * @return the accuracy, as a fraction (0.01 for 1%)
 	 */
 	public double getAccuracy() {
 		return accuracy;
@@ -185,7 +185,7 @@ public class FullSensorRecord extends AbstractSensorRecord {
 	/**
 	 * Sets the accuracy of the readings.
 	 *
-	 * @param bAccuracy the accuracy, as a fraction (0.01 for 1 %)
+	 * @param bAccuracy the accuracy, as a fraction (0.01 for 1%)
 	 */
 	public void setAccuracy(double bAccuracy) {
 		this.accuracy = bAccuracy;

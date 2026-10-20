@@ -74,7 +74,7 @@ the build.
 | `power on`, `off`, `cycle`, `reset`, `soft`, `diag` | `chassisControl()` | Powers the system on; off at once; off then on; resets it; asks the operating system to shut down (ACPI); pulses a diagnostic interrupt (NMI). Prints nothing: the exit code says whether the BMC accepted the command, which it carries out afterwards. |
 | `identify`, `identify <seconds>`, `identify force`, `identify off` | `chassisIdentify()`, `chassisIdentifyForever()` | `identify` blinks the identify LED of the chassis for 15 seconds, `identify <seconds>` for 1 to 255 seconds, `identify force` until it is turned off (not every BMC supports `force`); `identify off` turns it off. Prints nothing. |
 | `sensors` | `sensors()` | One line per sensor with its reading, unit and status. `--type` and `--name` select the sensors **before** they are read (fewer round trips on a slow BMC); `--long` adds the sensor number, the entity, the six thresholds and the problem of a sensor without reading. |
-| `fru` | `frus()` | The FRU inventory, one block per FRU with the fields of its chassis, board and product areas, or the SPD data of a memory module, or the processor information ROM of a processor; `<id>...` reads only these FRU IDs. |
+| `fru` | `frus()` | The FRU inventory, one block per FRU with the fields of its chassis, board and product areas, or the SPD data of a memory module, or the Processor Information ROM of a processor; `<id>...` reads only these FRU IDs. |
 | `sel` | `sel()` | The System Event Log, one line per entry with its time, the sensor that reported it, the event and its direction; `--since <id>` reads only the entries after the given record ID. |
 | `sol` | `sol().open()` | An interactive [Serial over LAN console](#interactive-sol-console) on the serial port of the server. |
 | `raw` | `raw(netFn, command).data(...).execute()` | Sends any request, like `ipmitool raw`: the network function, the command and the data bytes in hexadecimal, `0x` optional (`06`, `0x06` and `6` are the same byte). Prints the response data in hexadecimal, 16 bytes per line. Extension and OEM network functions are accepted (`raw 0x2c 0x01 0xdc 0x01`, Get DCMI Capabilities Info). |
@@ -96,7 +96,7 @@ A sensor is selected when its type is one of the `--type` values and its name ma
 | `-u, --username <user>` | User name. Required, except for `probe`. An empty string (`-u ""`) is the null user name: with an empty password (`-p ""`) it is the anonymous login, with a password a login by null user name; `probe` says whether the BMC accepts each. |
 | `-p, --password <password>` | Password. Command-line arguments may be visible to other local processes: avoid in automation. |
 | `-pf, --password-file <file>` | Read the password from a UTF-8 file (preferred for automation, see [below](#passwords-and-bmc-key)). |
-| `-k, --bmc-key <hex>` | BMC key (Kg) of a two-key login: an even number of hexadecimal digits (`0x` optional), at most 20 bytes. |
+| `-k, --bmc-key <hex>` | The [BMC key (Kg)](preparing-the-bmc.html#bmc-key-kg) of a BMC configured for two-key logins (`probe` says whether it requires one): an even number of hexadecimal digits (`0x` optional), at most 20 bytes. |
 | `-kf, --bmc-key-file <file>` | Read the BMC key from a file, in the same hexadecimal form. |
 | `-P, --port <port>` | UDP port of the BMC. Default: 623. |
 | `-L, --privilege <level>` | `user`, `operator`, `administrator` or `auto` (case-insensitive). Default: the lowest level the subcommand needs (see [below](#default-privilege-per-subcommand)). |
@@ -107,6 +107,11 @@ A sensor is selected when its type is one of the `--type` values and its name ma
 | `-v, --verbose` | Print to stderr the address, the user and privilege, the cipher suite preference, the message timeout and retries, and the time of each operation, failed ones included; `sel` and `sol` add a summary (see [`sel`](#sel) and the [SOL console](#interactive-sol-console)). Never prints a secret. |
 | `--help` | Print the usage summary. |
 | `--version` | Print the version of the build. |
+
+`-P`, `-L`, `-C`, `-k`/`-kf`, `-t`, `--message-timeout` and `--retries` set `port()`,
+`privilege()` (`auto` is `MaximumAvailable`), `cipherSuites()` (`cipherSuite()` for a single ID),
+`bmcKey()`, `timeout()`, `messageTimeout()` and `retries()` of the client builder: see
+[Configuration](configuration.html#options) for what each one does.
 
 The two password options are mutually exclusive, and so are the two BMC key options. Every option
 that takes a value also takes the `option=value` form (`--port=6230`, `-P=6230`); a flag (`-v`,
@@ -148,7 +153,7 @@ A BMC that refuses a command at the session's level answers `D4h`: the CLI exits
 which higher `-L` to use (at the Administrator level, that the BMC restricts the command; with
 `-L auto`, that the account does not have the level or the BMC restricts the command). Serial over
 LAN is the usual case: most BMCs activate the SOL payload at the Administrator level only, some
-at the User level. A raw request can be anything, so `raw` asks for Administrator, like
+at the Operator or User level. A raw request can be anything, so `raw` asks for Administrator, like
 `ipmitool`: give `-L user` to send a read with a read-only account.
 
 ## Passwords and BMC key
@@ -174,8 +179,9 @@ European system, for instance) reaches the CLI as `?`, and the BMC refuses the l
 password in a UTF-8 file and pass it with `-pf`.
 
 Secrets are never printed: not in the usage errors, not with `--verbose`, not in the failure
-messages. The CLI blanks its in-memory copy of the `-p` and `-k` values and wipes its copies of
-the password and of the key when it ends. The command line that other processes see cannot be
+messages. The CLI wipes its copies of the password and of the key when it ends, but a `-p` or
+`-k` value stays in memory as text that the CLI cannot wipe (the JVM keeps its command line in the
+`sun.java.command` system property), and the command line that other processes see cannot be
 changed: use `-pf` and `-kf` when other users share the machine.
 
 ## Output
@@ -192,7 +198,8 @@ In the text output, a control character in a string from the BMC (a sensor or FR
 field, a SEL description) is printed as `?`, so that it cannot drive the terminal. `--json` keeps
 these characters, with JSON escapes for those below U+0020.
 
-The output below was captured on a Lenovo RD350 (serial numbers masked), with
+The output below was captured on a Lenovo RD350, whose BMC is a Lenovo ThinkServer System Manager (TSM) (serial
+numbers masked), with
 `ipmicli -h bmc.example.com -u monitor -pf pw.txt ...`, except the memory module and processor
 FRUs of the `fru` example, which come from a Lenovo XClarity Controller (XCC).
 
@@ -430,7 +437,7 @@ binary one in hexadecimal). The board manufacturing date is UTC, ISO-8601. A mem
 97 above, whose FRU device returns the SPD data of the DIMM) is printed with its type, capacity,
 manufacturers, part and serial numbers and manufacturing week
 ([Memory modules](fru-inventory.html#memory-modules)), and a processor (FRU 85, whose FRU device
-returns the processor information ROM of the CPU) with its S-spec, part number, PPIN, cores,
+returns the Processor Information ROM of the CPU) with its S-spec, part number, PPIN, cores,
 frequencies, caches and thermal design power ([Processors](fru-inventory.html#processors)). The
 MultiRecord area (power supply, DC output and load, management access records...) and the
 internal use area are not printed, in text or JSON: read them in code with `Fru.multiRecords()`
@@ -507,9 +514,9 @@ $ ipmicli -h bmc.example.com -u monitor -pf pw.txt sel --since 5 --json
 {"id":8,"type":"OemTimestamped","timestamp":"2024-05-15T08:29:39Z","description":"OEM data 02 01 05 05 00 00","manufacturerId":19046,"oemData":"020105050000"}
 ```
 
-The sensor names are not resolved: that takes a walk of the SDR repository, as long as `sensors`
-on a slow BMC. A sensor number is unique only within its owner (the BMC, a satellite controller,
-the BIOS), which `generatorId` identifies: in code,
+(An excerpt: the first three entries.) The sensor names are not resolved: that takes a walk of
+the SDR repository, as long as `sensors` on a slow BMC. A sensor number is unique only within its
+owner (the BMC, a satellite controller, the BIOS), which `generatorId` identifies: in code,
 [`SelEntry.isFrom(Sensor)`](system-event-log.html#the-selentry-object) matches the owner and LUN
 as well as the number, as `ipmitool sel elist` does.
 
@@ -664,7 +671,9 @@ ipmicli -h bmc.example.com -u monitor -pf pw.txt -kf kg.txt -v sensors --type Te
 ```
 
 The names of the sensors whose status is not `OK` (`UNAVAILABLE` ones included), from the JSON
-Lines output filtered with `jq`:
+Lines output filtered with `jq`. A discrete sensor that answers is `OK` whatever its `states`, a
+power supply at `Failure detected` included: check the `states` of the discrete sensors to monitor
+([The `Sensor` object](sensors.html#the-sensor-object)):
 
 ```bash
 ipmicli -h bmc.example.com -u monitor -pf pw.txt sensors --json | jq -r 'select(.status != "OK") | .name'

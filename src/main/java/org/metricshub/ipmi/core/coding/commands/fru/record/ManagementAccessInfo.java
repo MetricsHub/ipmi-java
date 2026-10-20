@@ -27,7 +27,7 @@ import org.metricshub.ipmi.core.common.TypeConverter;
 import java.nio.charset.StandardCharsets;
 
 /**
- * Management Access Information record from FRU Multi Record Area
+ * Management Access record (type 03h) from the FRU MultiRecord area
  */
 public class ManagementAccessInfo extends MultiRecordInfo {
 

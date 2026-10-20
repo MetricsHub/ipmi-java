@@ -100,8 +100,9 @@ public final class SensorsRequest {
 	 *
 	 * @return the sensors, in the order of the SDR repository
 	 * @throws IpmiClientException when the session cannot be opened, the SDR repository cannot be read, the BMC stops
-	 *         answering, or the deadline expires; a reading that the BMC or a controller behind it refuses or
-	 *         malforms, or that such a controller does not answer, costs that sensor only ({@link Sensor#problem()})
+	 *         answering, or the deadline expires; a reading that the BMC or a controller behind it refuses or answers
+	 *         with a malformed reply, or that such a controller does not answer, costs that sensor only
+	 *         ({@link Sensor#problem()})
 	 */
 	public SensorList execute() {
 		return client.readSensors(this::selects, timeout);

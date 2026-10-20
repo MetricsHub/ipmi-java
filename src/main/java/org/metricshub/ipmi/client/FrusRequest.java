@@ -76,7 +76,8 @@ public final class FrusRequest {
 	 *
 	 * @return the FRUs, in the order of their locator records; a FRU that could not be read entirely is returned
 	 *         with its problems
-	 * @throws IpmiClientException when the repository cannot be read, or the BMC stops answering
+	 * @throws IpmiClientException when the session cannot be opened, the SDR repository cannot be read, the BMC stops
+	 *         answering, or the deadline expires
 	 */
 	public FruList execute() {
 		return client.readFrus(ids, timeout);

@@ -25,7 +25,7 @@ package org.metricshub.ipmi.core.coding.commands.fru.record;
 import org.metricshub.ipmi.core.common.TypeConverter;
 
 /**
- * Power Supply Information record from FRU Multi Record Area
+ * Power Supply Information record (type 00h) from the FRU MultiRecord area
  */
 public class PowerSupplyInfo extends MultiRecordInfo {
 

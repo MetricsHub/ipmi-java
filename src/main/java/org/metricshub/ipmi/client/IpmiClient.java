@@ -457,8 +457,9 @@ public final class IpmiClient implements AutoCloseable {
 	}
 
 	/**
-	 * Closes the session (Close Session, within the message timeout), releases the UDP port and the threads. Closing
-	 * a closed client does nothing, and a BMC that does not answer the logout does not fail the caller.
+	 * Closes the session (Close Session, sent once and waited for at most the message timeout plus one second),
+	 * releases the UDP port and the threads. Closing a closed client does nothing, and a BMC that does not answer the
+	 * logout does not fail the caller.
 	 * <p>
 	 * Close the SOL consoles first. A console still open ends with the client: its reads return -1, no Deactivate
 	 * Payload is sent for it, and the session of a console that the BMC serves on another UDP port is left for the
@@ -1401,7 +1402,7 @@ public final class IpmiClient implements AutoCloseable {
 		 * raises it only when the BMC refuses a command for insufficient privilege ({@code D4h}): to Operator, then to
 		 * Administrator, and the refused command, which the BMC did not carry out, is sent again. A level the BMC refuses
 		 * ({@code 80h}, {@code 81h}) is the ceiling of the session, remembered for its lifetime, and the {@code D4h}
-		 * reaches the caller as it does at a fixed level. The sensors of other controllers than the BMC, which some BMCs
+		 * reaches the caller as it does at a fixed level. The sensors of controllers other than the BMC, which some BMCs
 		 * serve at the Operator or Administrator level only, are then read with any account that has the level, without
 		 * running the whole session at it.
 		 * </p>

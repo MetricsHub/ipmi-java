@@ -2,11 +2,11 @@
  * The client of a BMC. Build an {@link org.metricshub.ipmi.client.IpmiClient} with
  * {@link org.metricshub.ipmi.client.IpmiClient#builder(String)}, then call its operations: {@code capabilities()},
  * {@code deviceId()}, {@code chassisStatus()}, {@code chassisControl()}, {@code chassisIdentify()},
- * {@code sensors()}, {@code frus()}, {@code sel()} and {@code sol()}, or {@code send()} and {@code raw()} for any
- * other command. They return typed results ({@link org.metricshub.ipmi.client.Sensor},
- * {@link org.metricshub.ipmi.client.Fru}, {@link org.metricshub.ipmi.client.SelEntry}...) and report the failures of
- * the BMC and of the network as unchecked {@link org.metricshub.ipmi.client.IpmiClientException}s, whose subclasses
- * say what to act on.
+ * {@code chassisIdentifyForever()}, {@code sensors()}, {@code frus()}, {@code sel()} and {@code sol()}, or
+ * {@code send()} and {@code raw()} for any other command. They return typed results
+ * ({@link org.metricshub.ipmi.client.Sensor}, {@link org.metricshub.ipmi.client.Fru},
+ * {@link org.metricshub.ipmi.client.SelEntry}...) and report the failures of the BMC and of the network as unchecked
+ * {@link org.metricshub.ipmi.client.IpmiClientException}s, whose subclasses say what to act on.
  * <p>
  * User guide: <a href="https://metricshub.org/ipmi-java/">https://metricshub.org/ipmi-java/</a>
  * </p>

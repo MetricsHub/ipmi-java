@@ -26,7 +26,7 @@ import org.metricshub.ipmi.core.coding.commands.sdr.record.EntityId;
 import org.metricshub.ipmi.core.common.TypeConverter;
 
 /**
- * Base Compatibility Information record from FRU Multi Record Area
+ * Base Compatibility record (type 04h) from the FRU MultiRecord area
  */
 public class BaseCompatibilityInfo extends MultiRecordInfo {
 

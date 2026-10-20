@@ -1,5 +1,5 @@
 keywords: fru, field replaceable unit, inventory, serial number, part number, manufacturer, product, board, chassis, read fru data, asset tag, multirecord, power supply, dimm, memory module, spd, serial presence detect, ddr4, ddr5, jedec, processor, pirom, s-spec, ppin
-description: Read the FRU inventory of a server through its BMC — which FRUs are read, and the Fru object with the Board, Chassis, Product and MultiRecord areas, the SPD data of memory modules and the processor information ROM of processors.
+description: Read the FRU inventory of a server through its BMC — which FRUs are read, and the Fru object with the Board, Chassis, Product and MultiRecord areas, the SPD data of memory modules and the Processor Information ROM of processors.
 
 # FRU Inventory
 
@@ -18,6 +18,9 @@ try (IpmiClient bmc = IpmiClient.builder(host).credentials(user, password).build
 }
 ```
 
+The model and serial number of the server itself are those of its system FRU, FRU 0 on most
+BMCs: see [Identifying the server](#identifying-the-server).
+
 ## How the FRUs are read
 
 [`frus().execute()`](apidocs/org/metricshub/ipmi/client/FrusRequest.html):
@@ -27,16 +30,16 @@ try (IpmiClient bmc = IpmiClient.builder(host).credentials(user, password).build
 2. reads **FRU 0**, the built-in FRU of the BMC (usually the system board), with Get FRU
    Inventory Area Info and Read FRU Data, unless `ids()` leaves it out;
 3. reads the FRU of each **FRU Device Locator** record of a *logical* FRU device, one that a
-   management controller serves with these two commands, from the controller and at the LUN the
-   record names (IPMI 2.0 table 43-7). The BMC serves its own FRUs. The FRUs of another
-   controller are read through the BMC, which forwards the two commands with **Send Message**,
-   as it does for sensor readings ([Sensor owners](sensors.html#sensor-owners));
-4. returns FRU 0 at the place of the first **Compact Sensor** record of the System Board entity,
-   when no locator record pointed at it before. Its `entity()` is `SystemBoard`, its
-   `entityInstance()` the one of that sensor, and its `name()` the board product name of FRU 0
-   (else its product name, else its chassis part number, else `System Board`) followed by that
-   entity instance. A FRU 0 that could not be read is returned the same way, with its
-   `problems()`.
+   management controller serves with these two commands, from the controller and at the logical
+   unit number (LUN, 0 to 3) the record names (IPMI 2.0 table 43-7). The BMC serves its own FRUs.
+   The FRUs of another controller are read through the BMC, which forwards the two commands with
+   **Send Message**, as it does for sensor readings ([Sensor owners](sensors.html#sensor-owners));
+4. returns FRU 0 at the position of the first **Compact Sensor** record of the System Board
+   entity, when no locator record of FRU 0 of the BMC comes before that record in the repository.
+   Its `entity()` is `SystemBoard`, its `entityInstance()` the one of that sensor, and its
+   `name()` the board product name of FRU 0 (else its product name, else its chassis part number,
+   else `System Board`) followed by that entity instance. A FRU 0 that could not be read is
+   returned the same way, with its `problems()`.
 
 Physical FRU devices (EEPROMs on a private I²C bus, read with Master Write-Read) are not read.
 
@@ -53,7 +56,8 @@ FruList frus = bmc.frus().ids(0, 1).timeout(Duration.ofSeconds(30)).execute();
 An ID selects the FRUs of that ID on every controller and LUN: `ids(1)` returns every FRU 1 that a
 locator record declares, on the BMC and on any other controller. An ID the repository does not
 locate is left out of the result, without an exception. The SDR repository is walked, or its cache
-checked, all the same: the selection saves FRU reads only.
+checked, all the same: the selection saves FRU reads only. Calling `ids()` again replaces the
+IDs, and `ids()` without arguments reads no FRU.
 
 When the deadline expires, `execute()` throws
 [`IpmiTimeoutException`](apidocs/org/metricshub/ipmi/client/IpmiTimeoutException.html) and returns
@@ -87,8 +91,8 @@ reasons in `problems()`. A BMC that stops answering fails the whole operation.
 | `FRU <id> is truncated at offset <n>: ...` | The Read FRU Data at that offset was refused ([Read size](#read-size)), got no reply through the BMC, or returned no data (`No data returned`): the areas held in the first `<n>` bytes are decoded |
 | `... from the controller at <xx>h on channel <c>: No reply through the BMC` | The controller behind the BMC did not answer ([FRUs of other controllers](#frus-of-other-controllers)) |
 | `... from the controller at <xx>h on channel <c>: NAK on write: no controller acknowledged the address (completion code 83h)` | The BMC found no controller at that address. `Lost arbitration` (`81h`) and `Bus error` (`82h`) report a problem on the bus of the controller |
-| `... from the controller at <xx>h on channel <c>: ... (completion code D4h)` | The session lacks the privilege the BMC requires for Send Message ([FRUs of other controllers](#frus-of-other-controllers)) |
-| `Cannot decode FRU <id>: ...` | The data is not a FRU inventory (`Invalid format version`, `Invalid common header checksum`), is SPD data of a DRAM type the library does not decode or that is truncated, or is a processor information ROM of another revision, truncated or corrupt (invalid static checksum, section pointer outside the ROM): no record is returned |
+| `... from the controller at <xx>h on channel <c>: SendMessage failed: ... (completion code D4h). The command requires a higher privilege than the session has: ...` | The session lacks the privilege the BMC requires for Send Message ([FRUs of other controllers](#frus-of-other-controllers)) |
+| `Cannot decode FRU <id>: ...` | The data is not a FRU inventory (`Invalid format version`, `Invalid common header checksum`), is SPD data of a DRAM type the library does not decode or that is truncated, or is a Processor Information ROM of another revision, truncated or corrupt (invalid static checksum, section pointer outside the ROM): no record is returned |
 | `The <area> info area at offset <n> is truncated (<x> of <y> bytes read)`, `... is beyond the <m> byte(s) read`, `Cannot decode the <area> info area at offset <n>: ...`, `The internal use area ...` | That area is missing; the other areas are returned |
 | `The multirecord ...` | The MultiRecord area is cut short or has a corrupt record header: the records before it are returned |
 | `Cannot decode the multirecord at offset <n>: ...` | That record is missing; the records around it are returned |
@@ -284,3 +288,13 @@ PIROM 2: SR3GH, 8 cores at 2100 MHz, 85 W, PPIN 666DB709E2AB8496
 A ROM of another revision, a truncated ROM, an invalid static checksum or a section pointer
 outside the ROM leaves the FRU without records: `complete()` is false and `problems()` gives the
 reason.
+
+## With the command-line client
+
+`ipmicli fru` prints the same FRUs, one block per FRU with the fields of its chassis, board and
+product areas, or of its memory module or processor. `fru <id>...` reads only these FRUs, like
+`ids()`, but exits with 66 for an ID the repository does not locate, and `--json` gives the
+summary fields of `Fru` and one object per area. The MultiRecord and internal use areas are not
+printed. A FRU read incompletely is printed with what was read, its problem goes to stderr, and
+`fru` exits with 1 (66 when an ID is also missing). See [`fru`](cli.html#fru) in the manual of
+the command-line client.

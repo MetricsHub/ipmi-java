@@ -1,5 +1,6 @@
 /**
- * The application commands of IPMI 2.0 that describe the controller itself (section 20): Get Device ID.
+ * The application commands of IPMI 2.0: Get Device ID (section 20.1), which describes the controller, and Send
+ * Message (sections 6.13.3 and 22.7), which carries a command to a controller behind the BMC.
  */
 package org.metricshub.ipmi.core.coding.commands.app;
 

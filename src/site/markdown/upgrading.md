@@ -110,8 +110,8 @@ selection or the meaning of results existing code already gets are marked **Beha
 * A FRU of the BMC is read at the access LUN of its record.
 * A FRU of another controller is read through the BMC with Send Message. 2.0.00 asked the BMC for
   its own FRU of the same ID, which came back absent or with the inventory of an unrelated device.
-* **Behavior change.** Two FRUs with the same ID on different controllers, channels or LUNs are
-  both returned, where 2.0.00 returned the first one only
+* **Behavior change.** Two FRUs with the same ID on different controllers or LUNs are both
+  returned, where 2.0.00 returned the first one only
   ([FRUs of other controllers](fru-inventory.html#frus-of-other-controllers)).
 * The FRUs of other controllers need the privilege the BMC requires for Send Message, Operator on
   most BMCs: below it, they are returned without inventory, with the `D4h` in their `problems()`.
@@ -148,8 +148,8 @@ selection or the meaning of results existing code already gets are marked **Beha
 * A level the BMC refuses is the ceiling of the session: the `D4h` then reaches the caller, as at
   a fixed level.
 * Cipher suites 11 and 12 (MD5-128 integrity, IPMI 2.0 section 13.28.4: a plain MD5 of the
-  password around each message) open sessions, where 2.0.00 failed with an
-  `IllegalArgumentException` saying that MD5-128 `is not yet implemented.`
+  password around each message) open sessions, where 2.0.00 failed the login with
+  `Integrity algorithm MD5-128 is not yet implemented.`
   `CipherSuite.isSupported()` is `true` for them.
 * **Behavior change.** The default preference of the builder and of `ipmicli -C` becomes
   `17, 3, 8, 16, 2, 7, 12, 11`: a BMC that offers one of the first six gets the same suite as
@@ -199,7 +199,7 @@ selection or the meaning of results existing code already gets are marked **Beha
   the role, and sets the session to User right after the handshake; an account limited to User
   costs up to three logins. 2.0.00 requested the role `0h` of the specification ("highest level
   matching the proposed algorithms"), which HPE iLO 5, Dell iDRAC, Cisco IMC and GIGABYTE BMCs
-  refuse at login, and which leaves a session that Lenovo IMM, Supermicro and Fujitsu iRMC BMCs
+  refuse at login, and which leaves a session that Lenovo ThinkServer System Manager (TSM), Supermicro and Fujitsu iRMC BMCs
   will not set to any level. A `SetSessionPrivilegeLevel` sent after `openSession()` raises the
   session up to the role the login obtained.
 * `SerialOverLan` raises a `MaximumAvailable` session when the BMC refuses to activate the payload
@@ -453,7 +453,7 @@ since.
 The client is more tolerant of real-world BMCs:
 
 * the SDR repository walk no longer aborts on a record type the library does not model: OEM
-  records (`C0h` – `FFh`) are decoded as `OemRecord`, and any record that cannot be decoded is
+  records (`C0h`-`FFh`) are decoded as `OemRecord`, and any record that cannot be decoded is
   skipped and reported in `skippedRecords()` of the `SensorList` and the `FruList`, where 1.2.02
   returned no sensors and no FRUs at all
   ([OEM and unknown records](supported-commands.html#oem-and-unknown-records));
@@ -486,8 +486,8 @@ The client is more tolerant of real-world BMCs:
   (`AuthenticationException: Authentication check failed` or `IPMIException: Unauthorized name.`
   in the low-level API), where 1.2.02 sent the credentials four times and threw
   `ConnectionException: Illegal connection state: Rakp1Waiting`
-  ([Troubleshooting](troubleshooting.html#ipmiauthenticationexception)); only a handshake step that
-  got no reply is sent again;
+  ([Troubleshooting](troubleshooting.html#ipmiauthenticationexception)); only a login whose step
+  got no reply is started again (from Open Session);
 * the [keep-alive](configuration.html#keep-alive) is actually sent: with the default `pingPeriod`
   (`-1`) 1.2.02 sent no keep-alive at all, so a session could expire during a long collection; the
   keep-alive is now a Get Device ID every 30 s by default, as `ipmitool` sends, whose reply is

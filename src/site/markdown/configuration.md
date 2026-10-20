@@ -132,9 +132,9 @@ a command needs more:
 
 1. **Login**: the client requests Administrator at Open Session and RAKP Message 1, then Operator,
    then User when the BMC refuses the role to the account. It does not use the role `0h` of the
-   specification ("highest level matching the proposed algorithms"): HPE iLO 5, Dell iDRAC and
-   Cisco IMC BMCs refuse it, and Lenovo IMM, Supermicro and Fujitsu iRMC BMCs refuse to set a
-   session opened with it to any level.
+   specification ("highest level matching the proposed algorithms"): HPE iLO 5, Dell iDRAC, Cisco
+   IMC and GIGABYTE BMCs refuse it, and Lenovo ThinkServer System Manager (TSM), Supermicro and Fujitsu iRMC BMCs refuse to set
+   a session opened with it to any level.
 2. **Start at User**: right after the handshake, the client sets the session to User, as some
    BMCs start it at the requested maximum.
 3. **Raise on `D4h`**: when the BMC refuses a command for insufficient privilege (`D4h`), the
@@ -151,8 +151,8 @@ a command needs more:
 This is the mode for a monitoring account on a fleet of BMCs that differ: `sensors()` reads the
 sensors of controllers other than the BMC ([Sensor owners](sensors.html#sensor-owners)) at the
 User level on an HPE iLO 5, after one raise to Operator on most BMCs, and after a second raise to
-Administrator on an AMI-based BMC, each with the same client and without running the whole
-session at the highest level of the account.
+Administrator on an AMI-based GIGABYTE BMC, each with the same client and without running the
+whole session at the highest level of the account.
 
 A session that the BMC revoked (on HPE iLO 5, a session that another client deleted) answers
 `D4h` to every command, Set Session Privilege Level included: the client asks for the raise once,
@@ -192,22 +192,26 @@ the library implements.
 `timeout(Duration)` is the **overall deadline of each operation**, session setup included: 2
 minutes by default. When it expires, the operation is abandoned and throws
 [`IpmiTimeoutException`](apidocs/org/metricshub/ipmi/client/IpmiTimeoutException.html) with
-nothing collected, and the next operation opens a new session. Walking a large SDR repository or
-reading many FRUs can take tens of seconds on a slow BMC. Each operation builder (`sensors()`,
-`frus()`, `sel()`, `raw()`, `sol()`) has its own `timeout(Duration)` that overrides the client's
-deadline for that operation; for `sol()`, it covers the activation of the console. `deviceId()`,
-`chassisStatus()`, the control operations, `send()` and `capabilities()` run under the client's
-deadline.
+nothing collected. When the operation was running, the client drops the session and the next
+operation opens a new one; an operation still queued behind those of other threads is never
+sent, and the session is kept ([Deadline](timeouts-and-errors.html#deadline)). Walking a large
+SDR repository or reading many FRUs can take tens of seconds on a slow BMC. Each operation
+builder (`sensors()`, `frus()`, `sel()`, `raw()`, `sol()`) has its own `timeout(Duration)` that
+overrides the client's deadline for that operation; for `sol()`, it covers the activation of the
+console. `deviceId()`, `chassisStatus()`, the control operations, `send()` and `capabilities()`
+run under the client's deadline.
 
 ### Message timeout and retries
 
 Below the deadline, each message has its own timeout: `messageTimeout(Duration)`, 5 seconds by
 default. A message without reply when it expires is sent again at once, `retries(int)` times
-(3 by default); a message that got no reply after all the tries fails the operation with
-`IpmiTimeoutException`, and the session is considered lost. Two timeouts keep the session: that of
-a control operation (`chassisControl()`, `chassisIdentify()`, `chassisIdentifyForever()`), whose
-command is sent once and never again, and that of a request forwarded with Send Message that the
-BMC acknowledged but the controller behind it did not answer
+(3 by default); a message that got no reply after all the tries loses the session and fails the
+operation with `IpmiTimeoutException`, except a read operation, which is first run once more on a
+new session, and fails with `IpmiConnectionException` when the BMC does not answer the setup of
+that session either. Two timeouts keep the session: that of a control operation
+(`chassisControl()`, `chassisIdentify()`, `chassisIdentifyForever()`), whose command is sent once
+and never again, and that of a request forwarded with Send Message that the BMC acknowledged but
+the controller behind it did not answer
 ([Session recovery](timeouts-and-errors.html#session-recovery)). The timeout also applies to each
 step of the session handshake, where the failure is an `IpmiConnectionException`.
 
@@ -282,6 +286,29 @@ open between collections, or builds one client per collection:
 | SDR repository | Walked once; each later `sensors()` or `frus()` sends only Get SDR Repository Info unless the repository changed (a BMC that refuses the command is walked every time) | Walked at every collection |
 | BMC session slot | Held as long as the client is open | Free between collections |
 | Local resources | One UDP port and two daemon threads (the worker of the client and the UDP receiver) from the first operation until `close()`, plus three while a session is open (the keep-alive timer and two message-queue timers; two with `keepAlive(Duration.ZERO)`) | The same, during the collection only |
+
+Keep the client open between collections, unless other tools need its session slot: this saves
+the login and the SDR walk of each collection
+([Collecting is slow](troubleshooting.html#collecting-is-slow)). Catch the exceptions in the
+collection task, so that a failed collection does not cancel the next ones:
+
+```java
+IpmiClient bmc = IpmiClient.builder(host)
+		.credentials(user, password)
+		.privilege(PrivilegeLevel.MaximumAvailable) // raised on demand for the sensors of other controllers
+		.build();
+ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
+scheduler.scheduleWithFixedDelay(() -> {
+	try {
+		for (Sensor sensor : bmc.sensors().execute()) {
+			report(sensor);
+		}
+	} catch (IpmiClientException e) {
+		warn(e); // a lost session is reopened by the next collection
+	}
+}, 0, 1, TimeUnit.MINUTES);
+// At shutdown: scheduler.shutdown(), then bmc.close()
+```
 
 ## Testing code that uses the client
 

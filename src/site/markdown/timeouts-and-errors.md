@@ -37,13 +37,14 @@ Below the deadline, each message has its own timeout and is retried:
 1. The request is sent, and the client waits for the reply up to the **message timeout**.
 2. Without a reply, the request is sent again at once (the BMC already had the whole timeout), up
    to `retries` times.
-3. When every try failed, the operation fails: with
+3. When every try failed during the session handshake, the operation fails with
    [`IpmiConnectionException`](apidocs/org/metricshub/ipmi/client/IpmiConnectionException.html)
-   during the session handshake (the usual symptom of a wrong host, a filtered UDP port or IPMI
-   over LAN disabled), with `IpmiTimeoutException` in the session, where the session is then
-   considered [lost](#session-recovery).
+   (the usual symptom of a wrong host, a filtered UDP port or IPMI over LAN disabled). After the
+   handshake, the session is considered [lost](#session-recovery) and the operation fails with
+   `IpmiTimeoutException`, except a read operation, which is first run once more on a new
+   session.
 
-The control commands are the exception: `chassisControl()`, `chassisIdentify()` and
+The control commands are an exception too: `chassisControl()`, `chassisIdentify()` and
 `chassisIdentifyForever()` send their command **once**, since a BMC that carried out a reset and
 lost the reply would carry it out again; a lost reply fails them with `IpmiTimeoutException`
 without losing the session, a `C3h` reply (which says the response is unavailable, not that
@@ -91,10 +92,13 @@ BMC loses the session all the same (it rebooted, or expired it), the client find
 first message of the session that gets no reply after all its tries, about 20 seconds with the
 defaults: the session is then lost, and the next operation opens a new one. A **read** operation
 (`deviceId()`, `chassisStatus()`, `sensors()`, `frus()`, `sel()`) that fails because the session
-was lost while it ran is retried **once** on a new session, within its deadline; `send()`,
-`raw()`, `sol().open()` and the control operations are never replayed, as a chassis control sent
-twice is not the same as sent once: they fail with the `IpmiTimeoutException` of the message
-without reply. `capabilities()` opens no session.
+was lost while it ran is retried **once** on a new session, within its deadline: when the BMC
+does not answer the setup of that session either (it is still rebooting, or is off the network),
+the read fails with the `IpmiConnectionException` of the setup, and when the request again gets
+no reply, with `IpmiTimeoutException`. `send()`, `raw()`, `sol().open()` and the control
+operations are never replayed, as a chassis control sent twice is not the same as sent once: they
+fail with the `IpmiTimeoutException` of the message without reply. `capabilities()` opens no
+session.
 
 A session is considered lost when a message of the session got no reply after all its tries, when
 the connection was closed, or when the deadline of a running operation expired. Two timeouts keep
@@ -111,7 +115,7 @@ build a new one
 ## Exceptions
 
 Every failure of an operation is an unchecked
-[`IpmiClientException`](apidocs/org/metricshub/ipmi/client/IpmiClientException.html), but for a
+[`IpmiClientException`](apidocs/org/metricshub/ipmi/client/IpmiClientException.html), except a
 call the API does not allow, which throws a standard Java exception
 ([Invalid settings and calls](#invalid-settings-and-calls)). Act on the subclass, not on the
 message:
@@ -121,8 +125,29 @@ message:
 | [`IpmiAuthenticationException`](apidocs/org/metricshub/ipmi/client/IpmiAuthenticationException.html) | The BMC refused the login: unknown user, wrong password or [BMC key](configuration.html#bmc-key), refused role, or the requested privilege refused right after the login. `statusCode()` tells which (below). |
 | [`IpmiConnectionException`](apidocs/org/metricshub/ipmi/client/IpmiConnectionException.html) | The session could not be established for a network reason: unknown host, socket error, or no reply to the session setup after all the tries (wrong host, UDP port 623 filtered, IPMI over LAN disabled, an IPMI 1.5-only BMC with `cipherSuite(id)`). Also a connection closed while an operation ran, which loses the session, and the session of a [Serial over LAN](serial-over-lan.html#with-ipmiclient) console that the BMC serves on another UDP port, when it cannot be opened. |
 | [`IpmiTimeoutException`](apidocs/org/metricshub/ipmi/client/IpmiTimeoutException.html) | The [deadline](#deadline) of the operation expired, or a message of the session got no reply after all the tries. |
-| [`IpmiCompletionCodeException`](apidocs/org/metricshub/ipmi/client/IpmiCompletionCodeException.html) | The BMC answered a command with an error completion code: `completionCode()` (`CompletionCode`, `Unknown` for a code the library does not list), `rawCompletionCode()`, `networkFunction()` (`null` for a network function that `NetworkFunction` does not list: an [extension or OEM command](low-level-api.html#extension-and-oem-network-functions) sent with `send()`) and `command()`. `InsufficentPrivilege` (sic, `D4h`) means the command needs a higher [privilege level](configuration.html#privilege-level) than the session has; with `MaximumAvailable`, that the session could not be [raised](configuration.html#raising-the-session-on-demand) that far; when commands that worked earlier in the same session start failing with it, that the BMC [revoked the session](#session-recovery). |
-| `IpmiClientException` itself | The rest: a BMC without IPMI 2.0 / RMCP+ ([Troubleshooting](troubleshooting.html#the-bmc-does-not-support-ipmi-2-0)), no cipher suite in common ([how the suite is chosen](preparing-the-bmc.html#how-ipmiclient-chooses-the-suite)), a [session the BMC refuses](troubleshooting.html#the-bmc-refuses-the-session) for another reason than the login (insufficient resources to create a session), a handshake reply that does not match the request (for another session, or confirming other algorithms than the requested ones), a Set Session Privilege Level after the login that fails with another code than a refusal of the level (a busy BMC), a reply whose data the library cannot decode, a SOL payload that cannot be activated for another reason than a completion code (every instance held by another session), an interrupted operation (the interrupt status is restored). |
+| [`IpmiCompletionCodeException`](apidocs/org/metricshub/ipmi/client/IpmiCompletionCodeException.html) | The BMC answered a command with an error **completion code**, the first byte of every IPMI response (`00h` for success, IPMI 2.0 table 5-2), such as `C1h` (invalid command) or `CBh` (requested data not present): `completionCode()` (`CompletionCode`, `Unknown` for a code the library does not list), `rawCompletionCode()`, `networkFunction()` (`null` for a network function that `NetworkFunction` does not list: an [extension or OEM command](low-level-api.html#extension-and-oem-network-functions) sent with `send()`) and `command()`. `InsufficentPrivilege` (sic, `D4h`) means the command needs a higher [privilege level](configuration.html#privilege-level) than the session has; with `MaximumAvailable`, that the session could not be [raised](configuration.html#raising-the-session-on-demand) that far; when commands that worked earlier in the same session start failing with it, that the BMC [revoked the session](#session-recovery). |
+| `IpmiClientException` itself | Any other failure, listed below the table. |
+
+`IpmiClientException` itself reports:
+
+* a BMC without IPMI 2.0 / RMCP+
+  ([Troubleshooting](troubleshooting.html#the-bmc-does-not-support-ipmi-2-0)), or with no cipher
+  suite in common
+  ([how the suite is chosen](preparing-the-bmc.html#how-ipmiclient-chooses-the-suite));
+* a [session the BMC refuses](troubleshooting.html#the-bmc-refuses-the-session) for another
+  reason than the login (insufficient resources to create a session), or a handshake reply that
+  does not match the request (for another session, or confirming other algorithms than the
+  requested ones);
+* a Set Session Privilege Level after the login that fails with another code than a refusal of
+  the level (a busy BMC);
+* a reply whose data the library cannot decode;
+* a SOL payload that cannot be activated for another reason than a completion code (every
+  instance held by another session);
+* a System Event Log that cannot be read consistently (changed twice during the read, next record
+  IDs that loop, an entry other than the one asked for or with record ID `0000h` or `FFFFh`, a
+  Clear SEL still in progress after 10 s:
+  [When the read fails](system-event-log.html#when-the-read-fails));
+* an interrupted operation (the interrupt status is restored).
 
 `IpmiAuthenticationException.statusCode()` tells which refusal it was:
 
@@ -166,8 +191,8 @@ sent to the BMC:
 `IllegalStateException` comes from an operation that needs a session on a client built without
 credentials (every operation but `capabilities()`), from every operation of a closed client, and
 from `chassisControl(PowerCommand.PowerCycle)` when the system is off. A `null` argument throws
-`NullPointerException`, but for `builder(null)` (`IllegalArgumentException`) and `bmcKey(null)`,
-which means no BMC key.
+`NullPointerException`, except for `builder(null)` (`IllegalArgumentException`) and
+`bmcKey(null)`, which means no BMC key.
 
 ## Problems that do not fail the operation
 

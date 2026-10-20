@@ -149,7 +149,8 @@ public class IpmiAsyncConnector implements ConnectionListener {
 	}
 
 	/**
-	 * Sets how many times a message without a reply, or a handshake step without a reply, is sent again.
+	 * Sets how many times a message without a reply is sent again, or a login whose step got no reply is started
+	 * again from Open Session.
 	 *
 	 * @param retries the number of resends, 0 to send every message once
 	 * @throws IllegalArgumentException when negative
@@ -381,7 +382,8 @@ public class IpmiAsyncConnector implements ConnectionListener {
 		connectionHandle.setBmcKey(bmcKey);
 
 		// MaximumAvailable: the role 0 of the specification (highest level matching the proposed algorithms, section
-		// 13.17) is refused at Open Session by iLO 5, iDRAC and Cisco IMC BMCs, and leaves a session that IMM, Supermicro
+		// 13.17) is refused at Open Session by iLO 5, iDRAC and Cisco IMC BMCs, and leaves a session that Lenovo TSM,
+		// Supermicro
 		// and iRMC BMCs will not set to any level (D4h), so the levels are requested from the highest down, and a role
 		// the BMC refuses to the account is tried one level lower
 		PrivilegeLevel[] roles = connectionHandle.getPrivilegeLevel() == PrivilegeLevel.MaximumAvailable ?
@@ -448,7 +450,7 @@ public class IpmiAsyncConnector implements ConnectionListener {
 	/**
 	 * Sets the new session to the privilege requested for it: raised to Operator or Administrator, as the BMC starts
 	 * every session at User whatever the maximum requested in RAKP Message 1 (IPMI 2.0 section 22.18); set to User for
-	 * {@link PrivilegeLevel#MaximumAvailable}, as some BMCs (IMM, iDRAC 6, iRMC, GIGABYTE, Supermicro) start the
+	 * {@link PrivilegeLevel#MaximumAvailable}, as some BMCs (Lenovo TSM, iDRAC 6, iRMC, GIGABYTE, Supermicro) start the
 	 * session at the requested maximum instead, which for the highest level available is the limit of the account.
 	 * Sent again, like a handshake step, when no reply comes or the BMC is busy; any failure closes the session.
 	 *

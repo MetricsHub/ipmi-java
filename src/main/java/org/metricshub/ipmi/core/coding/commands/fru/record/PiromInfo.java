@@ -136,7 +136,7 @@ public class PiromInfo extends FruRecord {
 	}
 
 	/**
-	 * Tells whether FRU data is a processor information ROM rather than an IPMI FRU inventory: a data format
+	 * Tells whether FRU data is a Processor Information ROM rather than an IPMI FRU inventory: a data format
 	 * revision other than 01h (the FRU format version) in byte 0 and the 128-byte size in bytes 1 and 2.
 	 *
 	 * @param fruData the FRU data
