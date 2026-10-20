@@ -58,7 +58,9 @@ System 3.3V (Voltage, SystemBoard 1): 3.38 Volts, OK
 Event-Only records (sensors without a reading), the locator and association records, and the
 OEM records are part of the walk but are not returned. A record the BMC returns truncated, or
 that the library cannot decode, is skipped and listed in `skippedRecords()`; the walk goes on
-([Supported Commands](supported-commands.html#sdr-records)). A refusal of the walk itself fails
+([Supported Commands](supported-commands.html#sdr-records)). A next record ID that names a record
+already read ends the walk there, with the loop listed in `skippedRecords()`, so that a firmware
+whose next record IDs loop does not make the walk read the repository forever. A refusal of the walk itself fails
 the operation ([Errors](#errors)).
 
 Some BMCs have no SDR repository: they hold the records of their own sensors themselves, as

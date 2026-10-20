@@ -78,7 +78,7 @@ class SerialOverLanTest {
 			.stream()
 			.filter(suite -> suite.getId() == 17)
 			.findFirst()
-			.orElse(null);
+			.orElseThrow(() -> new IllegalArgumentException("The BMC does not offer cipher suite 17"));
 
 	@Test
 	@Timeout(30)
@@ -120,6 +120,28 @@ class SerialOverLanTest {
 			assertThrows(
 					SessionException.class,
 					() -> new SerialOverLan(connector, host(bmc), bmc.getPort(), USER, PASSWORD, SUITE_17));
+			assertTornDown(connector);
+		}
+	}
+
+	@Test
+	@Timeout(30)
+	void aSelectorThatChoosesNoSuiteFailsBeforeAnyOpenSessionRequest() throws Exception {
+		// Only suite 3 is offered: a selector that returns null must not open a suite 0 session (#215)
+		try (FakeRmcpPlusBmc bmc = new FakeRmcpPlusBmc(bytes("c0 03 01 41 81"), USER, utf8(PASSWORD), null)) {
+			IpmiConnector connector = new IpmiConnector(0, 0);
+			CipherSuiteSelectionHandler none = suites -> suites
+					.stream()
+					.filter(suite -> suite.getId() == 17)
+					.findFirst()
+					.orElse(null);
+			SessionException e = assertThrows(
+					SessionException.class,
+					() -> new SerialOverLan(connector, host(bmc), bmc.getPort(), USER, PASSWORD, none));
+			assertEquals(
+					"Cannot create new session: The cipher suite selector chose none of the suites the BMC offers (offered: 3)",
+					e.getMessage());
+			assertEquals(0, bmc.getCount(FakeRmcpPlusBmc.OPEN_SESSION_REQUEST));
 			assertTornDown(connector);
 		}
 	}

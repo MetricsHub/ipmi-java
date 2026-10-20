@@ -237,12 +237,13 @@ public class GetChassisStatusResponseData implements ResponseData {
 	 * Returns the state of the chassis identify (byte 4 bits 5:4), which the BMC reports when it supports the Chassis
 	 * Identify command and its state ({@link #isChassisIdentifyCommandSupported()}).
 	 *
-	 * @return the chassis identify state
+	 * @return the chassis identify state, {@link ChassisIdentifyState#Unknown} for the reserved value 11b
+	 * @throws IllegalStateException when the BMC does not report the state
+	 *         ({@link #isChassisIdentifyCommandSupported()} is false)
 	 */
 	public ChassisIdentifyState getChassisIdentifyState() {
 		if (!isChassisIdentifyCommandSupported()) {
-			throw new IllegalAccessError(
-					"Chassis Idetify command and state not supported");
+			throw new IllegalStateException("Chassis Identify command and state not supported");
 		}
 
 		return ChassisIdentifyState

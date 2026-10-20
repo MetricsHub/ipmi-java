@@ -336,7 +336,7 @@ public final class IpmiCli {
 	private static void probe(CliArguments arguments, BmcCapabilities capabilities, PrintStream out) {
 		int[] preference = arguments.cipherSuites() == null ? CliArguments.DEFAULT_CIPHER_SUITES : arguments.cipherSuites();
 		// The choice the client makes with the same -C: a single ID is used as is, without discovery; several are a
-		// preference among the suites the BMC offers, implemented by the library or not
+		// preference among the suites the BMC offers (the builder refuses the suites the library does not implement)
 		CipherSuite chosen = null;
 		boolean offered = false;
 		if (arguments.cipherSuites() != null && preference.length == 1) {
@@ -350,11 +350,7 @@ public final class IpmiCli {
 				}
 			}
 		}
-		String problem = chosen == null ?
-				null :
-				!offered ?
-						"not offered by the BMC: the login would fail" :
-						!chosen.isSupported() ? "not implemented by the library: the login would fail" : null;
+		String problem = chosen != null && !offered ? "not offered by the BMC: the login would fail" : null;
 		if (arguments.json()) {
 			Map<String, Object> fields = new LinkedHashMap<String, Object>();
 			fields.put("ipmi20", capabilities.ipmi20());

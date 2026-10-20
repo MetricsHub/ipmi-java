@@ -57,6 +57,7 @@ public final class FakeSdrRepository {
 	private final Map<Integer, byte[]> frus = new ConcurrentHashMap<>();
 	private final java.util.Set<Integer> chunkedOnly = ConcurrentHashMap.newKeySet();
 	private final Map<Integer, Integer> cancelOnce = new ConcurrentHashMap<>();
+	private final Map<Integer, Integer> nextIds = new ConcurrentHashMap<>();
 	private volatile int addTimestamp = 1;
 	private volatile int deleteTimestamp = 1;
 	private volatile boolean infoSupported = true;
@@ -226,6 +227,19 @@ public final class FakeSdrRepository {
 	}
 
 	/**
+	 * Makes the BMC give the given next record ID after the given record, instead of the ID of the record that follows
+	 * it, as a firmware whose next record IDs loop.
+	 *
+	 * @param recordId the record ID
+	 * @param next the next record ID to give
+	 * @return this repository
+	 */
+	public FakeSdrRepository nextRecordId(int recordId, int next) {
+		nextIds.put(recordId, next);
+		return this;
+	}
+
+	/**
 	 * Changes the repository: a new most-recent-addition timestamp, as after an SDR update.
 	 */
 	public void touch() {
@@ -291,7 +305,8 @@ public final class FakeSdrRepository {
 		if (count != 0xff && cancelOnce.remove(id(record), offset)) {
 			return new byte[] { (byte) 0xc5 }; // reservation canceled
 		}
-		int next = index + 1 < records.size() ? id(records.get(index + 1)) : LAST_RECORD_ID;
+		int next = nextIds
+				.getOrDefault(id(record), index + 1 < records.size() ? id(records.get(index + 1)) : LAST_RECORD_ID);
 		int end = count == 0xff ? record.length : Math.min(record.length, offset + count);
 		byte[] chunk = Arrays.copyOfRange(record, Math.min(offset, record.length), end);
 		return ByteBuffer

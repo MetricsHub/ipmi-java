@@ -177,7 +177,9 @@ The cipher suite is chosen by a
 [`CipherSuiteSelectionHandler`](apidocs/org/metricshub/ipmi/core/api/sol/CipherSuiteSelectionHandler.html),
 which receives the suites the BMC offers and returns the one to use: the selector above picks the
 first of 17, 3, 8 and 12 (the suites with encryption, in the order of the client's default
-preference) that the BMC offers, and fails if it offers none of them.
+preference) that the BMC offers, and fails if it offers none of them. A selector returns a suite
+or throws: a `null` suite fails the session setup with `SessionException`, before anything is
+sent, and is never taken for suite 0.
 [`SpecificCipherSuiteSelector`](apidocs/org/metricshub/ipmi/core/api/sol/SpecificCipherSuiteSelector.html)
 always returns the suite it was built with, whether the BMC offers it or not:
 `new SpecificCipherSuiteSelector(CipherSuite.forId(17))`.

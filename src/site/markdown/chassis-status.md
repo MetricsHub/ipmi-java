@@ -40,7 +40,7 @@ try (IpmiClient bmc = IpmiClient.builder(host).credentials(user, password).build
 | `driveFault()` | A drive fault was detected |
 | `intrusion()` | The chassis intrusion sensor is active (the case is or was open) |
 | `frontPanelLockout()` | The power off and reset buttons of the front panel are disabled |
-| `identifyState()` | The state of the identify LED, a [`ChassisIdentifyState`](apidocs/org/metricshub/ipmi/core/coding/commands/chassis/ChassisIdentifyState.html) (`Off`, `TemporaryOn`, `IndefiniteOn`), or empty when the BMC does not report it |
+| `identifyState()` | The state of the identify LED, a [`ChassisIdentifyState`](apidocs/org/metricshub/ipmi/core/coding/commands/chassis/ChassisIdentifyState.html) (`Off`, `TemporaryOn`, `IndefiniteOn`, or `Unknown` for the reserved value `11b`), or empty when the BMC does not report it |
 | `data()` | The raw [`GetChassisStatusResponseData`](apidocs/org/metricshub/ipmi/core/coding/commands/chassis/GetChassisStatusResponseData.html): the raw bytes (`getCurrentPowerState()`, `getLastPowerEvent()`, `getMiscChassisState()`) and the front panel button flags, such as `isPowerOffButtonDisabled()`. The button byte is optional: when the BMC did not send it, the button flags throw the checked `IllegalAccessException`, so check `isFrontPanelButtonCapabilitiesSet()` first |
 
 Not every BMC fills every flag: a BMC that does not monitor the chassis intrusion, the drives or

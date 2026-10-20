@@ -84,6 +84,16 @@ selection or the meaning of results existing code already gets are marked **Beha
 * A BMC that refuses Get SDR Repository Info and answers `CBh` (record not present) to the first
   Get SDR has no records, where 2.0.00 failed `sensors()` and `frus()` with
   `IpmiCompletionCodeException`.
+* A BMC whose next record IDs loop (the last record names `0000h` or a record already read
+  instead of `FFFFh`) returns its sensors and FRUs, each record once, with the loop reported in
+  `skippedRecords()`, where 2.0.00 read the repository again and again until the deadline of the
+  operation failed it with `IpmiTimeoutException`.
+
+### Chassis status
+
+* `ChassisStatus.identifyState()` returns the new `ChassisIdentifyState.Unknown` when the BMC
+  reports the reserved identify state `11b`, where 2.0.00 threw `IllegalArgumentException` from
+  `identifyState()` and `toString()`, and `ipmicli chassis` failed with a stack trace.
 
 ### FRU inventory
 
@@ -165,6 +175,15 @@ selection or the meaning of results existing code already gets are marked **Beha
   says `could not set the session to the <level> privilege`, and the `SessionException` of
   `openSession()` says `The BMC refused to set the session to the <level> privilege`. With
   `MaximumAvailable`, the level named is `User`.
+* **Behavior change.** `cipherSuites()` and `cipherSuite()` refuse the xRC4 suites (4, 5, 9, 10,
+  13, 14, 18, 19) with `IllegalArgumentException`, as they refuse the suites without integrity.
+  In 2.0.00, `cipherSuites(18, 17)` used suite 18 on a BMC that offers it, and failed the login
+  instead of moving on to suite 17.
+* After a control operation (`chassisControl()`, `chassisIdentify()`,
+  `chassisIdentifyForever()`) whose reply is lost, the next operation first checks the session
+  with a Get Device ID, and opens a new session when that gets no reply either. In 2.0.00, a
+  client that sent only control operations kept a session the BMC had dropped (after a reboot or
+  an expiry) and every call timed out.
 
 ### Command-line client
 
@@ -172,6 +191,9 @@ selection or the meaning of results existing code already gets are marked **Beha
   BMC refuses at the highest level of the account exits with code 77, with a diagnostic that says
   so.
 * `-C` defaults to `17,3,8,16,2,7,12,11`, and `probe` lists suites 11 and 12 as `supported`.
+* **Behavior change.** `-C` with an xRC4 suite (4, 5, 9, 10, 13, 14, 18, 19) is a usage error
+  (exit code 64), and `probe` no longer says `not implemented by the library` of the chosen suite.
+* `chassis` prints `Unknown` as the identify state of a BMC that reports the reserved value.
 * `fru` prints the SPD data of memory modules and the PIROM of processors; `fru --json` gives
   them as `spd` and `pirom` objects.
 * `sensors` lists the sensors of shared records and of other controllers as `sensors()` returns
@@ -188,6 +210,17 @@ selection or the meaning of results existing code already gets are marked **Beha
   sensors. `calcFormula(int)` still returns `NaN` for them: the new
   `calcFormula(int, SensorReadingFactors)` converts their reading byte with the factors of Get
   Sensor Reading Factors, and the new `isNonLinear()` tells them apart.
+* **Behavior change.** `SessionManager.establishSession()`, and the `SerialOverLan` constructors
+  that open their own session, fail with `SessionException` before sending Open Session when the
+  `CipherSuiteSelectionHandler` returns `null`, where 2.0.00 opened the session with cipher suite 0
+  (no authentication, integrity or confidentiality) without telling the caller. A selector
+  returns a suite or throws; `new SpecificCipherSuiteSelector(CipherSuite.getEmpty())` still asks
+  for suite 0 explicitly.
+* **Behavior change.** `GetChassisStatusResponseData.getChassisIdentifyState()` throws
+  `IllegalStateException` when the BMC does not report the identify state, instead of an
+  `IllegalAccessError`, which a `catch (Exception e)` did not catch, and returns
+  `ChassisIdentifyState.Unknown` for the reserved value `11b`.
+* `CipherSuite.listIds(List)` formats the IDs of suites for messages.
 * `getName()` of the Full, Compact and Event-Only sensor records is never `null`: `setName(null)`
   stores the empty string.
 * `ReadingType` has the eight offsets of Watchdog 1: `BiosWatchdogReset`, `OsWatchdogReset`,

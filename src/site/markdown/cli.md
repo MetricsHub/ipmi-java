@@ -100,7 +100,7 @@ A sensor is selected when its type is one of the `--type` values and its name ma
 | `-kf, --bmc-key-file <file>` | Read the BMC key from a file, in the same hexadecimal form. |
 | `-P, --port <port>` | UDP port of the BMC. Default: 623. |
 | `-L, --privilege <level>` | `user`, `operator`, `administrator` or `auto` (case-insensitive). Default: the lowest level the subcommand needs (see [below](#default-privilege-per-subcommand)). |
-| `-C, --cipher-suite <id>[,<id>...]` | One ID: use exactly this cipher suite, without discovery. Several: the preference order among the suites the BMC offers. Default: `17,3,8,16,2,7,12,11`. Suites without integrity (0, 1, 6, 15) are refused: their replies could be forged. |
+| `-C, --cipher-suite <id>[,<id>...]` | One ID: use exactly this cipher suite, without discovery. Several: the preference order among the suites the BMC offers. Default: `17,3,8,16,2,7,12,11`. Suites without integrity (0, 1, 6, 15) are refused: their replies could be forged. So are the xRC4 suites (4, 5, 9, 10, 13, 14, 18, 19), which the library does not implement. |
 | `-t, --timeout <ms>` | Deadline of the subcommand, in milliseconds. Default: 120000. For `sol`, it bounds the session setup and the payload activation only. |
 | `--message-timeout <ms>` | Per-message timeout. Default: 5000. |
 | `--retries <n>` | Resends of a message that got no reply. Default: 3. |
@@ -225,14 +225,13 @@ Every line but the last shows what `capabilities()` returns
 ([Checking what the BMC offers](preparing-the-bmc.html#checking-what-the-bmc-offers)). The last
 line is the suite a login with the same `-C` option would use: the first suite of the preference
 that the BMC offers, or the single suite of a one-ID `-C`, which is used without discovery. When
-that suite is one the library does not implement, or one the BMC does not offer, the line says so
+that suite is one the BMC does not offer, the line says so
 and that the login would fail; `none` means a login would fail with *offers none of the cipher
 suites* ([Troubleshooting](troubleshooting.html#no-cipher-suite-in-common-with-the-bmc)).
 `--json` prints one object with the same fields and the suites as an array (`supported` is false
 for a suite the library does not implement). `chosenCipherSuite` is omitted when no suite would be
 chosen (`none` in the text output); when a login with the chosen suite would fail,
-`chosenCipherSuiteProblem` says why: `not offered by the BMC: the login would fail` or
-`not implemented by the library: the login would fail`:
+`chosenCipherSuiteProblem` says why: `not offered by the BMC: the login would fail`:
 
 ```json
 {"ipmi20":true,"bmcKeyRequired":false,"anonymousLogin":false,"nullUserNames":false,"nonNullUserNames":true,"perMessageAuthentication":true,"userLevelAuthentication":true,"cipherSuites":[{"id":3,"authentication":"RAKP-HMAC-SHA1","integrity":"HMAC-SHA1-96","confidentiality":"AES-CBC-128","supported":true},{"id":17,"authentication":"RAKP-HMAC-SHA256","integrity":"HMAC-SHA256-128","confidentiality":"AES-CBC-128","supported":true}],"chosenCipherSuite":17}
@@ -285,7 +284,7 @@ Identify                    Off
 The values are those of [`ChassisStatus`](chassis-status.html): the power restore policy is
 `PoweredOff`, `PowerRestored`, `PoweredUp` or `Unknown`, the last power events are `AC_FAILED`,
 `POWER_OVERLOAD`, `INTERLOCK`, `POWER_FAULT` and `IPMI_COMMAND` (`none` when the BMC reports
-none), and the `Identify` line (`Off`, `TemporaryOn` or `IndefiniteOn`) is only printed by a BMC
+none), and the `Identify` line (`Off`, `TemporaryOn`, `IndefiniteOn`, or `Unknown` for the reserved value) is only printed by a BMC
 that reports the identify state.
 
 ```json

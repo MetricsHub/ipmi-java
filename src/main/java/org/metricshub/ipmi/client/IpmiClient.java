@@ -298,6 +298,8 @@ public final class IpmiClient implements AutoCloseable {
 	 * <li>A {@code C3h} reply (timeout on the BMC side, response unavailable) fails the call with
 	 * {@link IpmiCompletionCodeException}, without a resend.</li>
 	 * <li>The command is never replayed on a new session.</li>
+	 * <li>After a lost reply, the next operation first checks the session with a Get Device ID, and opens a new one
+	 * when the BMC does not answer it (it rebooted or expired the session).</li>
 	 * </ul>
 	 * <p>
 	 * After such a failure, read the power state with {@link #chassisStatus()}. A busy reply ({@code C0h} or
@@ -329,7 +331,8 @@ public final class IpmiClient implements AutoCloseable {
 	 * Makes the chassis identify itself (Chassis Identify, IPMI 2.0 section 28.5), typically with a blinking LED,
 	 * for the given number of seconds, or turns the identify off. Needs the Operator privilege. Sent once, never
 	 * again when its reply is lost nor on a new session: a lost reply fails with {@link IpmiTimeoutException}, and
-	 * {@link ChassisStatus#identifyState()} tells what the BMC did.
+	 * {@link ChassisStatus#identifyState()} tells what the BMC did. Like after {@link #chassisControl(PowerCommand)},
+	 * the next operation first checks the session.
 	 *
 	 * @param seconds how long the identify stays on, 1 to 255 (the BMC may stretch it by 20%); 0 turns it off
 	 * @throws IllegalArgumentException when {@code seconds} is not between 0 and 255
@@ -886,6 +889,18 @@ public final class IpmiClient implements AutoCloseable {
 	}
 
 	private void session() throws Exception {
+		if (link != null && link.suspect) {
+			// A command sent once got no reply: check the session with a harmless command, sent with the retries, before
+			// running anything on it. No reply marks it lost; any other reply, a completion code included, shows it alive
+			link.suspect = false;
+			try {
+				link.send(new GetDeviceId());
+			} catch (IpmiClientException e) {
+				if (Thread.currentThread().isInterrupted()) {
+					throw e;
+				}
+			}
+		}
 		if (link != null && link.lost) {
 			dropSession();
 		}
@@ -1071,15 +1086,9 @@ public final class IpmiClient implements AutoCloseable {
 				}
 			}
 		}
-		StringBuilder ids = new StringBuilder();
-		if (offered != null) {
-			for (CipherSuite suite : offered) {
-				ids.append(ids.length() == 0 ? "" : ", ").append(suite.getId());
-			}
-		}
 		throw new IpmiClientException(
 				"The BMC " + host + " offers none of the cipher suites " + Arrays.toString(preference) + " (offered: "
-						+ (ids.length() == 0 ? "none" : ids) + ")");
+						+ CipherSuite.listIds(offered) + ")");
 	}
 
 	/**
@@ -1100,6 +1109,8 @@ public final class IpmiClient implements AutoCloseable {
 		/** The highest level the BMC lets the session be raised to: Administrator until it refuses one. */
 		private PrivilegeLevel ceiling = PrivilegeLevel.Administrator;
 		private boolean lost;
+		/** A command sent once got no reply: the session may be dead, and the next operation checks it first. */
+		private boolean suspect;
 
 		private Link(IpmiConnector connector, ConnectionHandle handle, Session session, String host, int tries) {
 			this.connector = connector;
@@ -1162,7 +1173,8 @@ public final class IpmiClient implements AutoCloseable {
 
 		/**
 		 * Sends a command once, never again when its reply is lost or is a C3h: a control command the BMC may have
-		 * carried out (a reset) must not reach it twice. A lost reply says nothing about the session, which is kept.
+		 * carried out (a reset) must not reach it twice. A lost reply leaves the session in doubt: it is kept, and the next
+		 * operation checks it with Get Device ID first, and replaces it when that gets no reply either.
 		 */
 		<R extends ResponseData> R sendOnce(IpmiCommandCoder<R> command) {
 			return exchange(command, true);
@@ -1288,6 +1300,7 @@ public final class IpmiClient implements AutoCloseable {
 							e);
 				}
 				if (once) {
+					suspect = true;
 					throw new IpmiTimeoutException(
 							"No reply from " + host + " to " + name + ", which is sent once and not again: whether the BMC"
 									+ " carried it out is unknown",
@@ -1425,12 +1438,13 @@ public final class IpmiClient implements AutoCloseable {
 
 		/**
 		 * Sets the cipher suites the client may use, by order of preference: the first one the BMC offers is used.
-		 * Default: 17, 3, 8, 16, 2, 7, 12, 11. The suites without integrity (0, 1, 6, 15) are refused.
+		 * Default: 17, 3, 8, 16, 2, 7, 12, 11. The suites without integrity (0, 1, 6, 15) and the xRC4 suites, which
+		 * the library does not implement (4, 5, 9, 10, 13, 14, 18, 19), are refused.
 		 *
 		 * @param ids the suite IDs (IPMI 2.0 table 22-20)
 		 * @return this builder
-		 * @throws IllegalArgumentException when no suite is given, or a suite is not a standard suite (0 to 19) or has
-		 *         no integrity (0, 1, 6, 15)
+		 * @throws IllegalArgumentException when no suite is given, or a suite is not a standard suite (0 to 19), has
+		 *         no integrity (0, 1, 6, 15) or uses xRC4 (4, 5, 9, 10, 13, 14, 18, 19)
 		 */
 		public Builder cipherSuites(int... ids) {
 			this.cipherSuites = checkSuites(ids);
@@ -1444,10 +1458,10 @@ public final class IpmiClient implements AutoCloseable {
 		 * IPMI 1.5-only BMC then fails with {@link IpmiConnectionException} (no reply to Open Session) instead of
 		 * {@link IpmiClientException}.
 		 *
-		 * @param id the suite ID (IPMI 2.0 table 22-20), one with integrity
+		 * @param id the suite ID (IPMI 2.0 table 22-20), one with integrity and without xRC4
 		 * @return this builder
-		 * @throws IllegalArgumentException when the suite is not a standard suite (0 to 19) or has no integrity (0, 1,
-		 *         6, 15)
+		 * @throws IllegalArgumentException when the suite is not a standard suite (0 to 19), has no integrity (0, 1,
+		 *         6, 15) or uses xRC4 (4, 5, 9, 10, 13, 14, 18, 19), which the library does not implement
 		 */
 		public Builder cipherSuite(int id) {
 			this.cipherSuites = checkSuites(new int[] { id });
@@ -1467,6 +1481,10 @@ public final class IpmiClient implements AutoCloseable {
 				if (SUITES_WITHOUT_INTEGRITY.contains(id)) {
 					throw new IllegalArgumentException(
 							"Cipher suite " + id + " has no integrity algorithm: its replies could be forged");
+				}
+				if (!CipherSuite.forId(id).isSupported()) {
+					throw new IllegalArgumentException(
+							"Cipher suite " + id + " uses xRC4 confidentiality, which the library does not implement");
 				}
 			}
 			return ids.clone();

@@ -23,7 +23,9 @@ package org.metricshub.ipmi.client;
  */
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 import org.metricshub.ipmi.core.coding.commands.sdr.GetDeviceSdr;
 import org.metricshub.ipmi.core.coding.commands.sdr.GetDeviceSdrInfo;
@@ -74,6 +76,10 @@ final class SdrWalker {
 	private final boolean mayBeEmpty;
 	private final List<SensorRecord> records = new ArrayList<SensorRecord>();
 	private final List<SkippedRecord> skipped = new ArrayList<SkippedRecord>();
+	/** The record IDs read so far. */
+	private final Set<Integer> readIds = new HashSet<Integer>();
+	/** The record type of the last record read, -1 when its header could not be read. */
+	private int lastRecordType = -1;
 	private int nextRecordId;
 	private int reservationId;
 	private int lastReservationId = -1;
@@ -132,9 +138,24 @@ final class SdrWalker {
 		// Some BMCs allow reading the records without a reservation, so none is taken until the BMC asks for one.
 		while (nextRecordId < LAST_RECORD_ID) {
 			try {
+				int recordId = nextRecordId;
 				SensorRecord record = read();
 				if (record != null) {
 					records.add(record);
+				}
+				// Record IDs are unique (IPMI 2.0 section 33.8): a next record ID already read, 0000h included, would
+				// read the repository again and again, so the walk ends there
+				if (nextRecordId < LAST_RECORD_ID && readIds.contains(nextRecordId)) {
+					skipped
+							.add(
+									new SkippedRecord(
+											recordId,
+											lastRecordType,
+											String
+													.format(
+															"Names record %04Xh as the next one, which was read already: the walk ends there",
+															nextRecordId)));
+					return;
 				}
 			} catch (IpmiCompletionCodeException e) {
 				// In a walk that may find none, "record not present" to the first record means there is none
@@ -170,6 +191,7 @@ final class SdrWalker {
 			}
 			return readInChunks(recordId);
 		}
+		remember(recordId, reply.getSensorRecordData());
 		if (isTruncated(reply.getSensorRecordData())) {
 			return readInChunks(recordId);
 		}
@@ -185,6 +207,7 @@ final class SdrWalker {
 	private SensorRecord readInChunks(int recordId) {
 		GetSdrResponseData first = exchange.send(getSdr(recordId, 0, INITIAL_CHUNK_SIZE));
 		byte[] header = first.getSensorRecordData();
+		remember(recordId, header);
 		if (header == null || header.length < HEADER_SIZE) {
 			nextRecordId = first.getNextRecordId();
 			skipped
@@ -219,6 +242,18 @@ final class SdrWalker {
 		}
 		nextRecordId = first.getNextRecordId();
 		return decode(recordId, bytes);
+	}
+
+	/**
+	 * Notes the ID a record was requested by and the ID in its header (they differ for the first record, requested as
+	 * 0000h), so that a next record ID pointing back to either ends the walk.
+	 */
+	private void remember(int recordId, byte[] data) {
+		readIds.add(recordId);
+		if (data != null && data.length >= 2) {
+			readIds.add(TypeConverter.byteToInt(data[0]) | TypeConverter.byteToInt(data[1]) << 8);
+		}
+		lastRecordType = data != null && data.length > 3 ? TypeConverter.byteToInt(data[3]) : -1;
 	}
 
 	private GetSdr getSdr(int recordId, int offset, int size) {

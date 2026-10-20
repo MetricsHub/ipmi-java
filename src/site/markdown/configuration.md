@@ -44,7 +44,7 @@ message timeouts, retries or keep-alive periods. Nothing is configured globally.
 | `credentials(user, password)` | none: required by every operation but `capabilities()` | a user name of at most 16 bytes and a password of at most 20 bytes, in UTF-8 | [Credentials](#credentials) |
 | `bmcKey(byte[])` | none | at most 20 bytes, or `null` for no key | [BMC key](#bmc-key) |
 | `privilege(PrivilegeLevel)` | `User` | `User`, `Operator`, `Administrator`, `MaximumAvailable` | [Privilege level](#privilege-level) |
-| `cipherSuites(int...)`, `cipherSuite(int)` | `17, 3, 8, 16, 2, 7, 12, 11` | at least one suite, 0 to 19, but not 0, 1, 6 or 15 | [Cipher suites](#cipher-suites) |
+| `cipherSuites(int...)`, `cipherSuite(int)` | `17, 3, 8, 16, 2, 7, 12, 11` | at least one suite, 0 to 19, but not 0, 1, 6 or 15 (no integrity) nor 4, 5, 9, 10, 13, 14, 18 or 19 (xRC4) | [Cipher suites](#cipher-suites) |
 | `timeout(Duration)` | 2 minutes | 1 ms to `Integer.MAX_VALUE` ms (a little under 25 days) | [Timeout](#timeout) |
 | `messageTimeout(Duration)` | 5 seconds | 1 ms to `Integer.MAX_VALUE` ms | [Message timeout and retries](#message-timeout-and-retries) |
 | `retries(int)` | `3` | 0 or more | [Message timeout and retries](#message-timeout-and-retries) |
@@ -183,7 +183,8 @@ that suite refuses the Open Session request
 
 The suites without integrity (0, 1, 6 and 15) are refused by the builder: the list of suites the
 BMC sends is not authenticated, so falling back to them would let an attacker downgrade the
-session to one whose replies can be forged. See
+session to one whose replies can be forged. So are the xRC4 suites (4, 5, 9, 10, 13, 14, 18 and
+19), which the library does not implement: a login with them would always fail. See
 [Cipher suites](preparing-the-bmc.html#cipher-suites) for the full table and which algorithms
 the library implements.
 

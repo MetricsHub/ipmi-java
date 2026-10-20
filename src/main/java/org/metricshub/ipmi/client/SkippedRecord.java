@@ -24,6 +24,7 @@ package org.metricshub.ipmi.client;
 
 /**
  * An SDR record the repository walk could not use: the BMC returned it truncated, or the library cannot decode it.
+ * Also a record whose next record ID names a record already read: the walk keeps it and ends there.
  * OEM records (types {@code C0h} to {@code FFh}) are decoded as
  * {@link org.metricshub.ipmi.core.coding.commands.sdr.record.OemRecord} and never skipped.
  */
