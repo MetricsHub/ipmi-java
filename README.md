@@ -111,6 +111,7 @@ Code written for 2.0.00 compiles unchanged with 2.1.00, which reads more of the 
 * The FRUs of memory modules (`Fru.spd()`: DDR3, DDR4 and DDR5 SPD data) and of Intel processors (`Fru.pirom()`) are decoded. FRUs are read 255 bytes at a time instead of 16, with a smaller count when the controller refuses it.
 * `privilege(PrivilegeLevel.MaximumAvailable)` (`ipmicli -L auto`) is accepted: the session runs at User and is raised only when a command needs more.
 * Cipher suites 11 and 12 (MD5-128 integrity) open sessions, and the default preference becomes 17, 3, 8, 16, 2, 7, 12, 11.
+* The `states()` of a threshold sensor list the thresholds its reading is at or beyond (`Upper Critical Going High`), a discrete sensor described by a Full record has no `reading()`, the threshold and generic states of OEM sensor types are decoded, the reserved sensor type codes are `SensorType.Reserved` instead of `Oem`, and `Sensor.typeCode()`, `SelEntry.sensorTypeCode()` and `Sensor.percentage()` are new.
 * Non-linear sensors have a `reading()`, and `Sensor.name()` is never `null`. `FullSensorRecord.getSensorResolution()` returns `|M x 10^R|`, and `NaN` for a linearizable or non-linear sensor.
 
 ### From 1.x to 2.0.00

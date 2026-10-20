@@ -146,14 +146,16 @@ Each [`Sensor`](apidocs/org/metricshub/ipmi/client/Sensor.html) holds:
 | --- | --- |
 | `name()` | The sensor name of the SDR record (`CPU1 Temp`, `PSU2 Present`, ...), with its instance modifier for a sensor that shares its record (`Drive 3`, `Temp B`); never `null`: empty for a record without ID string |
 | `number()` | The sensor number |
-| `type()` | What it measures or monitors: [`SensorType`](apidocs/org/metricshub/ipmi/core/coding/commands/sdr/record/SensorType.html) (`Temperature`, `Voltage`, `Fan`, `PowerSupply`, ...); `Oem` for an OEM sensor type (`C0h`-`FFh`) and for a reserved code the library does not know, so `types(SensorType.Oem)` selects both |
+| `type()` | What it measures or monitors: [`SensorType`](apidocs/org/metricshub/ipmi/core/coding/commands/sdr/record/SensorType.html) (`Temperature`, `Voltage`, `Fan`, `PowerSupply`, ...); `Oem` for an OEM sensor type (`C0h`-`FFh`), `Reserved` for a code IPMI 2.0 table 42-3 reserves (`00h`, `2Dh`-`BFh`) |
+| `typeCode()` | The sensor type code of the record, 0 to 255, which `type()` does not keep for `Oem` and `Reserved` (`getCode()` of these constants is the first code of their range): the code to look up in the vendor documentation |
 | `entity()`, `entityInstance()` | The entity the sensor belongs to: its type (`EntityId.Processor`, `EntityId.PowerSupply`, ...) and instance number |
 | `unit()` | The [`SensorUnit`](apidocs/org/metricshub/ipmi/core/coding/commands/sdr/record/SensorUnit.html) of the reading and thresholds: the base unit of the record. A record with a rate unit (per second, per hour, ...) or a modifier unit (the base unit divided or multiplied by another one) gives them through `((AbstractSensorRecord) sensor.record())`: `getRateUnit()`, `getModifierUnitUsage()` and `getSensorModifierUnit()` |
-| `reading()` | The converted reading of a threshold sensor (`OptionalDouble`); empty when the record gives no conversion (a discrete sensor, a Compact record, a Full record without analog reading) or when the reading, or the factors of a non-linear sensor, are unavailable ([Readings](#readings)) |
+| `percentage()` | Whether the reading and the thresholds are a percentage (Sensor Units 1 bit 0, IPMI 2.0 table 43-1): of `unit()`, as a fan speed in % of `Rpm`, unless `unit()` is `Unspecified` |
+| `reading()` | The converted reading of a threshold sensor (`OptionalDouble`), in `unit()` or a percentage of it (`percentage()`); empty when the record gives no conversion (a discrete sensor, even described by a Full record, a Compact record, a Full record without analog reading) or when the reading, or the factors of a non-linear sensor, are unavailable ([Readings](#readings)) |
 | `rawReading()` | The reading byte as the BMC sent it, before conversion (`OptionalInt`, 0 to 255), also given for a discrete sensor, whose reading byte the specification says to ignore (IPMI 2.0 table 35-15); empty when the BMC gave no valid reading (`problem()` says why), present when only the factors of a non-linear sensor are missing |
-| `lowerNonCritical()` ... `upperNonRecoverable()` | The six thresholds of the SDR record, converted like the reading; empty when the record does not define them (so that a threshold of `0` is a threshold), for a Compact record, which has none, for a Full record without analog reading, and for a non-linear sensor. They are the values of the record: the client does not send Get Sensor Thresholds, so a threshold changed on the BMC at run time does not show here, while `status()` follows it |
+| `lowerNonCritical()` ... `upperNonRecoverable()` | The six thresholds of the SDR record, converted like the reading; empty when the record does not define them (so that a threshold of `0` is a threshold), for a Compact record, which has none, for a discrete sensor, for a Full record without analog reading, and for a non-linear sensor. They are the values of the record: the client does not send Get Sensor Thresholds, so a threshold changed on the BMC at run time does not show here, while `status()` follows it |
 | `status()` | [`SensorStatus`](apidocs/org/metricshub/ipmi/client/SensorStatus.html): for a threshold sensor, the most severe threshold the BMC reports the reading at or beyond in its Get Sensor Reading reply (`OK`, `NON_CRITICAL`, `CRITICAL` or `NON_RECOVERABLE`), even when the record does not give that threshold; `OK` for a discrete sensor that answers, whatever its states; `UNAVAILABLE` when the reading is unavailable (`problem()` says why) |
-| `states()` | The asserted states of a discrete sensor, in the wording of `ipmiutil` (of `ipmitool` for the few states `ipmiutil` does not name), each once ([States](#states)) |
+| `states()` | The asserted states of a discrete sensor, in the wording of `ipmiutil` (of `ipmitool` for the few states `ipmiutil` does not name), each once; for a threshold sensor, the thresholds its reading is at or beyond, in the wording of their SEL events (`Upper Critical Going High`) ([States](#states)) |
 | `rawStates()` | The asserted states as a list of [`ReadingType`](apidocs/org/metricshub/ipmi/core/coding/commands/sdr/record/ReadingType.html) values, one per asserted bit, including those `states()` has no wording for |
 | `problem()` | Why the sensor has no reading or, for a non-linear sensor, no converted reading ([Problems](#problems)); empty otherwise |
 | `record()`, `readingData()` | The decoded record, typed `SensorRecord`: cast it to [`FullSensorRecord`](apidocs/org/metricshub/ipmi/core/coding/commands/sdr/record/FullSensorRecord.html) or [`CompactSensorRecord`](apidocs/org/metricshub/ipmi/core/coding/commands/sdr/record/CompactSensorRecord.html) (both extend [`AbstractSensorRecord`](apidocs/org/metricshub/ipmi/core/coding/commands/sdr/record/AbstractSensorRecord.html)) to read its fields; and the [`GetSensorReadingResponseData`](apidocs/org/metricshub/ipmi/core/coding/commands/sdr/GetSensorReadingResponseData.html) reply, an `Optional` that is empty when the reading was refused, unanswered or malformed, or the sensor belongs to system software (a reply the BMC flags as not valid or not scanned is there). Both give access to what `Sensor` does not expose |
@@ -205,8 +207,12 @@ threshold the BMC finds the reading at or beyond.
 `reading()` is empty when the sensor has no reading at all (`status()` is `UNAVAILABLE` and
 `problem()` says why), and when the factors of a non-linear sensor are missing (`problem()` says
 why; `rawReading()`, `states()` and `status()` are still there). It is also empty, with an empty
-`problem()`, for a discrete sensor, for a Compact record, which has no conversion formula, and
-for a Full record without analog reading (data format `11b` or a reserved linearization).
+`problem()`, for a discrete sensor (an event/reading type other than `01h`), even when its Full
+record gives a data format and a formula, for a Compact record, which has no conversion formula,
+and for a Full record without analog reading (data format `11b` or a reserved linearization).
+IPMI 2.0 section 42.1 and table 35-15 give a reading to the threshold sensors only, and
+`ipmitool` does the same; a caller that knows a vendor stores a value in a discrete sensor can
+still convert its `rawReading()` with `record().calcFormula(...)` of the `FullSensorRecord`.
 
 ### Problems
 
@@ -285,7 +291,17 @@ PSU1 Present: [Presence detected]
 CPU0_Status: [Presence detected]
 ```
 
-The states of a threshold sensor are the thresholds its reading is at or beyond. For a sensor of
+The states of a threshold sensor are the thresholds its reading is at or beyond (the comparison
+bits of the Get Sensor Reading reply, IPMI 2.0 table 35-15), in the wording of the same events
+in the SEL ([System Event Log](system-event-log.html)): a temperature at 44 °C with an upper
+non-critical threshold of 38 and an upper critical one of 41 has the states
+`[Upper Non Critical Going High, Upper Critical Going High]` and the `status()` `CRITICAL`.
+
+The threshold and generic states (event/reading types `01h` to `0Ch`) are the same for every
+sensor type (IPMI 2.0 section 42.1), so a sensor of an OEM or reserved sensor type has them
+too: a presence sensor of type `C0h` reports `Device Present`. Only its sensor-specific states
+(`6Fh`) are left to the vendor: they are `UnknownOEMEvent` in `rawStates()` (`Unknown` for a
+reserved sensor type) and have no wording in `states()`. For a sensor of
 an OEM event/reading type (`70h` to `7Fh`), whose states the specification does not define, the
 single state is the state bytes in lowercase hexadecimal, the second byte first: `0x01c3`
 (`0xc3` when the BMC returns a single state byte), while `rawStates()` holds an `UnknownOEMEvent`
@@ -297,7 +313,9 @@ generic types) is reported as `Unknown` (`ReadingType.Unknown` in `rawStates()`)
 The static `getReadingType(state)` of
 [`ReadingTypeDescription`](apidocs/org/metricshub/ipmi/client/ReadingTypeDescription.html) gives
 the wording that `states()` uses for a `ReadingType` of `rawStates()` or of `SelEntry.event()`,
-and `null` for one the library does not describe.
+and `null` for one the library does not describe, such as the threshold states, which `states()`
+and `SelEntry.description()` name after their constant (`UpperCriticalGoingHigh` is
+`Upper Critical Going High`).
 
 ## Errors
 

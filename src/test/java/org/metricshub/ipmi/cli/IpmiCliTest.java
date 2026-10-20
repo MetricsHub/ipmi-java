@@ -15,6 +15,7 @@ import static org.metricshub.ipmi.core.transport.FakeSdrRepository.COMPACT_SENSO
 import static org.metricshub.ipmi.core.transport.FakeSdrRepository.compactSensorRecord;
 import static org.metricshub.ipmi.core.transport.FakeSdrRepository.fruDeviceLocatorRecord;
 import static org.metricshub.ipmi.core.transport.FakeSdrRepository.record;
+import static org.metricshub.ipmi.core.transport.FakeSdrRepository.withId;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
@@ -311,6 +312,42 @@ class IpmiCliTest {
 			Result selected = login(bmc, "sensors", "--type", "fan,TEMPERATURE", "--name", "fan*");
 			assertEquals("Name   Type  Reading  Unit  Status\nFan 1  Fan                  Device Present\n", selected.out);
 			assertEquals(readings + 1, bmc.getCount(NETFN_SENSOR, GET_SENSOR_READING), "selected before the readings");
+		}
+	}
+
+	@Test
+	@Timeout(30)
+	void sensorsShowThresholdsCrossedOemTypeCodesAndPercentages() throws Exception {
+		try (FakeRmcpPlusBmc bmc = Fixtures.bmc()) {
+			byte[] percent = withId(Fixtures.FRONT_PANEL_FULL_RECORD.clone(), 2);
+			percent[7] = 51; // sensor number
+			percent[20] = 0x01; // Sensor Units 1 bit 0: percentage
+			percent[21] = 18; // of RPM
+			new FakeSdrRepository()
+					.add(Fixtures.FRONT_PANEL_FULL_RECORD)
+					.add(percent)
+					.add(compactSensorRecord(3, 0x30, EntityId.SystemBoard.getCode(), 1, 0xc1, 0x08, "OEM Presence"))
+					// at or above UNC and UC
+					.reading(Fixtures.TEMPERATURE_SENSOR, 0xb0, 0x40, 0x18)
+					.reading(51, 0x9a, 0x40, 0x00)
+					.reading(0x30, 0x00, 0x40, 0x02)
+					.install(bmc);
+			Result sensors = login(bmc, "sensors");
+			assertEquals(0, sensors.code, sensors.err);
+			assertEquals(
+					"Name          Type         Reading  Unit      Status\n"
+							+ "Ambient Temp  Temperature  44       DegreesC  critical\n"
+							+ "Ambient Temp  Temperature  22       % Rpm     ok\n"
+							+ "OEM Presence  Oem C1h                         Device Present\n",
+					sensors.out);
+			String[] json = login(bmc, "sensors", "--json").out.split("\n");
+			assertTrue(
+					json[0]
+							.contains(
+									"\"status\":\"CRITICAL\",\"states\":[\"Upper Non Critical Going High\",\"Upper Critical Going High\"]"),
+					json[0]);
+			assertTrue(json[1].contains("\"unit\":\"Rpm\",\"percentage\":true,"), json[1]);
+			assertTrue(json[2].contains("\"type\":\"Oem\",\"typeCode\":193,"), json[2]);
 		}
 	}
 

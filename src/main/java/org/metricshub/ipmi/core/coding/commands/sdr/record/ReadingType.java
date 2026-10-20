@@ -1198,8 +1198,10 @@ public enum ReadingType {
 	}
 
 	/**
-	 * Determines type of discrete sensor reading. The states of an OEM event/reading type (70h to 7Fh), and of an OEM
-	 * sensor type (C0h to FFh) with the sensor-specific event/reading type (6Fh), are {@link #UnknownOEMEvent}.
+	 * Determines type of discrete sensor reading. The states of an OEM event/reading type (70h to 7Fh), and the
+	 * sensor-specific states (event/reading type 6Fh) of an OEM sensor type (C0h to FFh), are {@link #UnknownOEMEvent};
+	 * the sensor-specific states of a reserved sensor type are {@link #Unknown}, as table 42-3 defines none. The
+	 * threshold (01h) and generic (02h to 0Ch) states decode the same for every sensor type (IPMI 2.0 section 42.1).
 	 *
 	 * @param sensorType
 	 *        - {@link SensorType} of the sensor
@@ -1212,8 +1214,11 @@ public enum ReadingType {
 	 */
 	public static ReadingType parseInt(SensorType sensorType, int eventReadingType, int offset) {
 
-		if (sensorType == SensorType.Oem || isOem(eventReadingType)) {
+		if (isOem(eventReadingType) || eventReadingType == 0x6f && sensorType == SensorType.Oem) {
 			return UnknownOEMEvent;
+		}
+		if (eventReadingType == 0x6f && sensorType == SensorType.Reserved) {
+			return Unknown;
 		}
 
 		int actualOffset = (eventReadingType == 0x6f && sensorType.getCode() <= 0x4) ? 0 : offset;

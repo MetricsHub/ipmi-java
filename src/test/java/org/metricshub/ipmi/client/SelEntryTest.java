@@ -3,6 +3,7 @@ package org.metricshub.ipmi.client;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.metricshub.ipmi.core.transport.FakeSel.selRecord;
 import static org.metricshub.ipmi.core.transport.FakeSel.systemEvent;
 
 import java.time.Instant;
@@ -89,9 +90,31 @@ class SelEntryTest {
 		assertEquals(0x70, oem.eventType().getAsInt());
 		assertEquals("OEM event type 70h offset 2h", oem.description());
 
-		SelEntry oemSensor = entry(systemEvent(1, 0xffffffffL, 0xc0, 1, 0x6f, true, 0x02, 0xff, 0xff));
+		SelEntry oemSensor = entry(systemEvent(1, 0xffffffffL, 0xc1, 5, 0x6f, true, 0x02, 0xff, 0xff));
 		assertEquals(SensorType.Oem, oemSensor.sensorType().get());
-		assertEquals("OEM event type 6Fh offset 2h", oemSensor.description());
+		assertEquals(0xc1, oemSensor.sensorTypeCode().getAsInt());
+		assertEquals("OEM sensor type C1h, event type 6Fh offset 2h", oemSensor.description());
+		assertEquals(
+				"SEL entry 1: Oem C1h sensor 5, OEM sensor type C1h, event type 6Fh offset 2h (assertion)",
+				oemSensor.toString());
+
+		SelEntry reserved = entry(systemEvent(1, 0xffffffffL, 0x76, 5, 0x6f, true, 0x02, 0xff, 0xff));
+		assertEquals(SensorType.Reserved, reserved.sensorType().get());
+		assertEquals(0x76, reserved.sensorTypeCode().getAsInt());
+		assertEquals(ReadingType.Unknown, reserved.event().get());
+		assertEquals("Reserved sensor type 76h, event type 6Fh offset 2h", reserved.description());
+
+		assertFalse(entry(selRecord(2, 0xe0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13)).sensorTypeCode().isPresent());
+	}
+
+	@Test
+	void theGenericAndThresholdEventsOfAnOemSensorTypeAreNamed() {
+		SelEntry presence = entry(systemEvent(1, 0xffffffffL, 0xc0, 49, 0x08, true, 0x01, 0xff, 0xff));
+		assertEquals(ReadingType.DevicePresent, presence.event().get());
+		assertEquals("Device Present", presence.description());
+		SelEntry threshold = entry(systemEvent(2, 0xffffffffL, 0xc0, 54, 0x01, true, 0x09, 0xff, 0xff));
+		assertEquals(ReadingType.UpperCriticalGoingHigh, threshold.event().get());
+		assertEquals("Upper Critical Going High", threshold.description());
 	}
 
 	@Test

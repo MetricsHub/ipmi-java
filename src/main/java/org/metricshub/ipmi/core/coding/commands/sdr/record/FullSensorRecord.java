@@ -66,6 +66,9 @@ public class FullSensorRecord extends AbstractSensorRecord {
 
 	private static final int NO_ANALOG_READING = 3;
 
+	/** Event/reading type code of the threshold sensors, the only ones with an analog reading (IPMI 2.0 table 42-1). */
+	private static final int THRESHOLD_EVENT_READING_TYPE = 1;
+
 	/** Last linearization code (cube root, Table 43-1 byte 24) the library can apply. */
 	private static final int LAST_LINEARIZABLE = 0x0b;
 
@@ -195,7 +198,8 @@ public class FullSensorRecord extends AbstractSensorRecord {
 	 * Returns the nominal reading of the sensor (byte 32 of the record), converted to the unit of the sensor, whether
 	 * or not the analog characteristic flags of byte 31 (bit 0) say that the record specifies it.
 	 *
-	 * @return the value, {@link Double#NaN} when the sensor has no analog reading ({@link #hasAnalogReading()}) or is
+	 * @return the value, {@link Double#NaN} when the data format of Sensor Units 1 is 11b (no analog reading) or the
+	 *         sensor is
 	 *         non-linear ({@link #isNonLinear()})
 	 */
 	public double getNominalReading() {
@@ -215,7 +219,8 @@ public class FullSensorRecord extends AbstractSensorRecord {
 	 * Returns the normal maximum of the sensor (byte 33 of the record), converted to the unit of the sensor, whether
 	 * or not the analog characteristic flags of byte 31 (bit 1) say that the record specifies it.
 	 *
-	 * @return the value, {@link Double#NaN} when the sensor has no analog reading ({@link #hasAnalogReading()}) or is
+	 * @return the value, {@link Double#NaN} when the data format of Sensor Units 1 is 11b (no analog reading) or the
+	 *         sensor is
 	 *         non-linear ({@link #isNonLinear()})
 	 */
 	public double getNormalMaximum() {
@@ -235,7 +240,8 @@ public class FullSensorRecord extends AbstractSensorRecord {
 	 * Returns the normal minimum of the sensor (byte 34 of the record), converted to the unit of the sensor, whether
 	 * or not the analog characteristic flags of byte 31 (bit 2) say that the record specifies it.
 	 *
-	 * @return the value, {@link Double#NaN} when the sensor has no analog reading ({@link #hasAnalogReading()}) or is
+	 * @return the value, {@link Double#NaN} when the data format of Sensor Units 1 is 11b (no analog reading) or the
+	 *         sensor is
 	 *         non-linear ({@link #isNonLinear()})
 	 */
 	public double getNormalMinimum() {
@@ -254,7 +260,8 @@ public class FullSensorRecord extends AbstractSensorRecord {
 	/**
 	 * Returns the maximum reading of the sensor (byte 35 of the record), converted to the unit of the sensor.
 	 *
-	 * @return the value, {@link Double#NaN} when the sensor has no analog reading ({@link #hasAnalogReading()}) or is
+	 * @return the value, {@link Double#NaN} when the data format of Sensor Units 1 is 11b (no analog reading) or the
+	 *         sensor is
 	 *         non-linear ({@link #isNonLinear()})
 	 */
 	public double getSensorMaximumReading() {
@@ -273,7 +280,8 @@ public class FullSensorRecord extends AbstractSensorRecord {
 	/**
 	 * Returns the minimum reading of the sensor (byte 36 of the record), converted to the unit of the sensor.
 	 *
-	 * @return the value, {@link Double#NaN} when the sensor has no analog reading ({@link #hasAnalogReading()}) or is
+	 * @return the value, {@link Double#NaN} when the data format of Sensor Units 1 is 11b (no analog reading) or the
+	 *         sensor is
 	 *         non-linear ({@link #isNonLinear()})
 	 */
 	public double getSensorMinmumReading() {
@@ -294,7 +302,7 @@ public class FullSensorRecord extends AbstractSensorRecord {
 	 * sensor.
 	 *
 	 * @return the threshold, {@link Double#NaN} when the record does not define it (byte 12 bits 3:2 and the readable
-	 *         threshold mask of byte 19), when the sensor has no analog reading ({@link #hasAnalogReading()}) or when
+	 *         threshold mask of byte 19), when the data format of Sensor Units 1 is 11b (no analog reading) or when
 	 *         it is non-linear ({@link #isNonLinear()})
 	 */
 	public double getUpperNonRecoverableThreshold() {
@@ -317,7 +325,7 @@ public class FullSensorRecord extends AbstractSensorRecord {
 	 * sensor.
 	 *
 	 * @return the threshold, {@link Double#NaN} when the record does not define it (byte 12 bits 3:2 and the readable
-	 *         threshold mask of byte 19), when the sensor has no analog reading ({@link #hasAnalogReading()}) or when
+	 *         threshold mask of byte 19), when the data format of Sensor Units 1 is 11b (no analog reading) or when
 	 *         it is non-linear ({@link #isNonLinear()})
 	 */
 	public double getLowerNonRecoverableThreshold() {
@@ -339,7 +347,7 @@ public class FullSensorRecord extends AbstractSensorRecord {
 	 * Returns the upper critical threshold of the sensor (byte 38 of the record), converted to the unit of the sensor.
 	 *
 	 * @return the threshold, {@link Double#NaN} when the record does not define it (byte 12 bits 3:2 and the readable
-	 *         threshold mask of byte 19), when the sensor has no analog reading ({@link #hasAnalogReading()}) or when
+	 *         threshold mask of byte 19), when the data format of Sensor Units 1 is 11b (no analog reading) or when
 	 *         it is non-linear ({@link #isNonLinear()})
 	 */
 	public double getUpperCriticalThreshold() {
@@ -360,7 +368,7 @@ public class FullSensorRecord extends AbstractSensorRecord {
 	 * Returns the lower critical threshold of the sensor (byte 41 of the record), converted to the unit of the sensor.
 	 *
 	 * @return the threshold, {@link Double#NaN} when the record does not define it (byte 12 bits 3:2 and the readable
-	 *         threshold mask of byte 19), when the sensor has no analog reading ({@link #hasAnalogReading()}) or when
+	 *         threshold mask of byte 19), when the data format of Sensor Units 1 is 11b (no analog reading) or when
 	 *         it is non-linear ({@link #isNonLinear()})
 	 */
 	public double getLowerCriticalThreshold() {
@@ -382,7 +390,7 @@ public class FullSensorRecord extends AbstractSensorRecord {
 	 * sensor.
 	 *
 	 * @return the threshold, {@link Double#NaN} when the record does not define it (byte 12 bits 3:2 and the readable
-	 *         threshold mask of byte 19), when the sensor has no analog reading ({@link #hasAnalogReading()}) or when
+	 *         threshold mask of byte 19), when the data format of Sensor Units 1 is 11b (no analog reading) or when
 	 *         it is non-linear ({@link #isNonLinear()})
 	 */
 	public double getUpperNonCriticalThreshold() {
@@ -404,7 +412,7 @@ public class FullSensorRecord extends AbstractSensorRecord {
 	 * sensor.
 	 *
 	 * @return the threshold, {@link Double#NaN} when the record does not define it (byte 12 bits 3:2 and the readable
-	 *         threshold mask of byte 19), when the sensor has no analog reading ({@link #hasAnalogReading()}) or when
+	 *         threshold mask of byte 19), when the data format of Sensor Units 1 is 11b (no analog reading) or when
 	 *         it is non-linear ({@link #isNonLinear()})
 	 */
 	public double getLowerNonCriticalThreshold() {
@@ -422,14 +430,17 @@ public class FullSensorRecord extends AbstractSensorRecord {
 	}
 
 	/**
-	 * Tells whether the reading byte of this sensor converts to a value: false when the data format of Sensor Units 1
-	 * is 11b (no analog reading, Table 43-1), or when the linearization is reserved. The reading of a non-linear sensor
-	 * ({@link #isNonLinear()}) converts with the factors of {@link #calcFormula(int, SensorReadingFactors)} only.
+	 * Tells whether the reading byte of this sensor converts to a value: false for a discrete sensor (an event/reading
+	 * type other than 01h, whose Get Sensor Reading reply carries states, IPMI 2.0 section 42.1 and table 35-15), when
+	 * the data format of Sensor Units 1 is 11b (no analog reading, Table 43-1), or when the linearization is reserved.
+	 * The reading of a non-linear sensor ({@link #isNonLinear()}) converts with the factors of
+	 * {@link #calcFormula(int, SensorReadingFactors)} only. {@link #calcFormula(int)} does not depend on this test.
 	 *
 	 * @return whether the reading byte gives a meaningful value
 	 */
 	public boolean hasAnalogReading() {
-		return ((TypeConverter.byteToInt(sensorUnits1) & 0xc0) >> 6) != NO_ANALOG_READING
+		return getEventReadingType() == THRESHOLD_EVENT_READING_TYPE
+				&& ((TypeConverter.byteToInt(sensorUnits1) & 0xc0) >> 6) != NO_ANALOG_READING
 				&& (linearization <= LAST_LINEARIZABLE || isNonLinear());
 	}
 

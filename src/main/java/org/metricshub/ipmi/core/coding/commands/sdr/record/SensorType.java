@@ -71,8 +71,26 @@ public enum SensorType {
 	SystemBoot(SensorType.SYSTEMBOOT),
 	VersionChange(SensorType.VERSIONCHANGE),
 	FruState(SensorType.FRUSTATE),
+	/**
+	 * An OEM sensor type, C0h to FFh (IPMI 2.0 table 42-3): {@link #getCode()} is C0h whatever the code, which
+	 * {@link AbstractSensorRecord#getSensorTypeCode()} and
+	 * {@link org.metricshub.ipmi.core.coding.commands.sel.SelRecord#getSensorTypeCode()} keep.
+	 */
 	Oem(SensorType.OEM),
-	OemReserved(SensorType.OEMRESERVED);
+	/**
+	 * The reserved code 76h.
+	 *
+	 * @deprecated 76h is reserved like the other codes table 42-3 does not define: {@link #parseInt(int)} returns
+	 *             {@link #Reserved} for it.
+	 */
+	@Deprecated
+	OemReserved(SensorType.OEMRESERVED),
+	/**
+	 * A sensor type code IPMI 2.0 table 42-3 reserves: 00h and 2Dh to BFh. {@link #getCode()} is 00h whatever the
+	 * code, which {@link AbstractSensorRecord#getSensorTypeCode()} and
+	 * {@link org.metricshub.ipmi.core.coding.commands.sel.SelRecord#getSensorTypeCode()} keep.
+	 */
+	Reserved(SensorType.RESERVED);
 
 	private static final int COOLINGDEVICE = 10;
 	private static final int OTHERUNITSBASEDSENSOR = 11;
@@ -120,6 +138,7 @@ public enum SensorType {
 	private static final int FRUSTATE = 44;
 	private static final int OEM = 192;
 	private static final int OEMRESERVED = 118;
+	private static final int RESERVED = 0;
 
 	private int code;
 
@@ -127,10 +146,22 @@ public enum SensorType {
 		this.code = code;
 	}
 
+	/**
+	 * Returns the code of the sensor type (IPMI 2.0 table 42-3): the first code of the range for {@link #Oem} (C0h)
+	 * and {@link #Reserved} (00h).
+	 *
+	 * @return the code
+	 */
 	public int getCode() {
 		return code;
 	}
 
+	/**
+	 * Decodes a sensor type code.
+	 *
+	 * @param value the code, 0 to 255
+	 * @return the sensor type: {@link #Oem} for C0h to FFh, {@link #Reserved} for the codes table 42-3 reserves
+	 */
 	public static SensorType parseInt(int value) {
 		switch (value) {
 		case COOLINGDEVICE:
@@ -221,13 +252,8 @@ public enum SensorType {
 			return VersionChange;
 		case FRUSTATE:
 			return FruState;
-		case OEMRESERVED:
-			return OemReserved;
 		default:
-			if (value >= OEM) {
-				return Oem;
-			}
-			return Oem;
+			return value >= OEM ? Oem : Reserved;
 		}
 	}
 }

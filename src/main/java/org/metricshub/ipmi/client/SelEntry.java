@@ -148,6 +148,17 @@ public final class SelEntry {
 	}
 
 	/**
+	 * Returns the sensor type code of a system event (byte 11 of the record, IPMI 2.0 table 42-3), which
+	 * {@link #sensorType()} does not keep for an OEM sensor type ({@link SensorType#Oem}, C0h to FFh) or a reserved
+	 * one ({@link SensorType#Reserved}).
+	 *
+	 * @return the sensor type code, 0 to 255, empty for the other record types
+	 */
+	public OptionalInt sensorTypeCode() {
+		return isSystemEvent() ? OptionalInt.of(record.getSensorTypeCode()) : OptionalInt.empty();
+	}
+
+	/**
 	 * Returns the number of the sensor that reported a system event, unique for its {@link #generatorId() generator}:
 	 * the {@link Sensor#number()} of the sensor in the SDR repository.
 	 *
@@ -180,9 +191,10 @@ public final class SelEntry {
 	/**
 	 * Returns what happened, as the {@link ReadingType} of the event offset for the sensor type and event/reading
 	 * type: {@code UpperCriticalGoingHigh}, {@code PowerSupplyFailureDetected}, {@code LogAreaReset}...
-	 * {@link ReadingType#UnknownOEMEvent} for an OEM event/reading type (70h to 7Fh), or for an OEM sensor type (C0h
-	 * to FFh) with a sensor-specific event/reading type (6Fh), {@link ReadingType#Unknown} for an offset the
-	 * specification does not define.
+	 * {@link ReadingType#UnknownOEMEvent} for an OEM event/reading type (70h to 7Fh), or for a sensor-specific event
+	 * (event/reading type 6Fh) of an OEM sensor type (C0h to FFh), {@link ReadingType#Unknown} for an offset the
+	 * specification does not define. The threshold and generic events of an OEM or reserved sensor type decode as for
+	 * any sensor type (IPMI 2.0 section 42.1).
 	 *
 	 * @return the event, empty for the other record types
 	 */
@@ -206,8 +218,9 @@ public final class SelEntry {
 	 * events {@code ipmiutil} does not name ({@code Installation started}); the name of the {@link ReadingType} spaced
 	 * out when neither tool names it, as for the threshold events ({@code Upper Critical Going High}); the event/reading
 	 * type and the offset when the specification does not define the offset ({@code Unknown event type 08h offset 6h})
-	 * or the event is OEM ({@code OEM event type 71h offset 2h}). For an OEM entry, {@code OEM data} followed by its OEM
-	 * bytes in hexadecimal. For a reserved record type, {@code Reserved record type}.
+	 * or the event is OEM ({@code OEM event type 71h offset 2h}), preceded by the sensor type code for an OEM or
+	 * reserved sensor type ({@code OEM sensor type C1h, event type 6Fh offset 2h}). For an OEM entry, {@code OEM data}
+	 * followed by its OEM bytes in hexadecimal. For a reserved record type, {@code Reserved record type}.
 	 *
 	 * @return the description
 	 */
@@ -273,21 +286,22 @@ public final class SelEntry {
 
 	private String describeEvent() {
 		ReadingType event = record.getEvent();
-		String known = ReadingTypeDescription.getReadingType(event);
-		if (event == ReadingType.Unknown || event == ReadingType.UnknownOEMEvent) {
-			// Neither the table nor the specification names it: the codes let the vendor documentation do so
+		if (event != ReadingType.Unknown && event != ReadingType.UnknownOEMEvent) {
+			return ReadingTypeDescription.describe(event);
+		}
+		// Neither the table nor the specification names it: the codes let the vendor documentation do so
+		SensorType type = record.getSensorType();
+		String codes = String
+				.format("event type %02Xh offset %Xh", record.getEventType(), record.getEventData()[0] & OFFSET_MASK);
+		if (type == SensorType.Oem || type == SensorType.Reserved) {
 			return String
 					.format(
-							"%s event type %02Xh offset %Xh",
-							event == ReadingType.Unknown ? "Unknown" : "OEM",
-							record.getEventType(),
-							record.getEventData()[0] & OFFSET_MASK);
+							"%s sensor type %02Xh, %s",
+							type == SensorType.Oem ? "OEM" : "Reserved",
+							record.getSensorTypeCode(),
+							codes);
 		}
-		if (known != null) {
-			return known;
-		}
-		// The threshold events and the states that have no wording: the name of the ReadingType, spaced out
-		return event.name().replaceAll("(?<=[a-z])(?=[A-Z])", " ");
+		return (event == ReadingType.Unknown ? "Unknown " : "OEM ") + codes;
 	}
 
 	/**
@@ -370,7 +384,7 @@ public final class SelEntry {
 		if (isSystemEvent()) {
 			text
 					.append(": ")
-					.append(record.getSensorType())
+					.append(Sensor.typeName(record.getSensorType(), record.getSensorTypeCode()))
 					.append(" sensor ")
 					.append(record.getSensorNumber())
 					.append(", ")
