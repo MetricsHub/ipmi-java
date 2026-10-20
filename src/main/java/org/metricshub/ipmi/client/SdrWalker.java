@@ -245,12 +245,13 @@ final class SdrWalker {
 	}
 
 	/**
-	 * Notes the ID a record was requested by and the ID in its header (they differ for the first record, requested as
-	 * 0000h), so that a next record ID pointing back to either ends the walk.
+	 * Notes the ID a record was requested by, and for the first record, requested as 0000h, the ID in its header, so
+	 * that a next record ID pointing back to either ends the walk. The header ID of any other record is not trusted: a
+	 * malformed reply naming a record not read yet must not end the walk before it.
 	 */
 	private void remember(int recordId, byte[] data) {
 		readIds.add(recordId);
-		if (data != null && data.length >= 2) {
+		if (recordId == 0 && data != null && data.length >= 2) {
 			readIds.add(TypeConverter.byteToInt(data[0]) | TypeConverter.byteToInt(data[1]) << 8);
 		}
 		lastRecordType = data != null && data.length > 3 ? TypeConverter.byteToInt(data[3]) : -1;
