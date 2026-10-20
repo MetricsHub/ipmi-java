@@ -23,9 +23,8 @@ package org.metricshub.ipmi.core.coding.commands.fru.record;
  */
 
 /**
- * Extended Compatibility Information record from FRU Multi Record Area<br>
- * It seems to be the same as {@link BaseCompatibilityInfo} except of
- * {@link ManagementAccessRecordType} code.
+ * Extended Compatibility record (type 05h) from the FRU MultiRecord area: the same layout as the
+ * {@link BaseCompatibilityInfo} record (type 04h).
  */
 public class ExtendedCompatibilityInfo extends BaseCompatibilityInfo {
 

@@ -25,7 +25,9 @@ package org.metricshub.ipmi.core.coding.commands.sdr.record;
 import org.metricshub.ipmi.core.common.TypeConverter;
 
 /**
- * Wrapper class for Full Sensor Record format
+ * A Full Sensor Record (SDR type 01h, IPMI 2.0 table 43-1): one sensor, with the fields of
+ * {@link AbstractSensorRecord}, the factors that convert its reading bytes to values in its unit
+ * ({@link #calcFormula(int)}), its nominal and normal readings, its reading range and its thresholds.
  */
 public class FullSensorRecord extends AbstractSensorRecord {
 
@@ -151,108 +153,270 @@ public class FullSensorRecord extends AbstractSensorRecord {
 		populateName(recordData, 47);
 	}
 
+	/**
+	 * Returns the tolerance of the readings of the sensor, in its unit, from the factors of the record (IPMI 2.0
+	 * section 36.4.1).
+	 *
+	 * @return the tolerance, +/-
+	 */
 	public double getTolerance() {
 		return tolerance;
 	}
 
+	/**
+	 * Sets the tolerance of the readings.
+	 *
+	 * @param mTolerance the tolerance, +/-, in the unit of the sensor
+	 */
 	public void setTolerance(double mTolerance) {
 		this.tolerance = mTolerance;
 	}
 
+	/**
+	 * Returns the accuracy of the readings of the sensor, from the factors of the record (bytes 28 and 29 of the
+	 * record).
+	 *
+	 * @return the accuracy, as a fraction (0.01 for 1 %)
+	 */
 	public double getAccuracy() {
 		return accuracy;
 	}
 
+	/**
+	 * Sets the accuracy of the readings.
+	 *
+	 * @param bAccuracy the accuracy, as a fraction (0.01 for 1 %)
+	 */
 	public void setAccuracy(double bAccuracy) {
 		this.accuracy = bAccuracy;
 	}
 
+	/**
+	 * Returns the nominal reading of the sensor (byte 32 of the record), converted to the unit of the sensor, whether
+	 * or not the analog characteristic flags of byte 31 (bit 0) say that the record specifies it.
+	 *
+	 * @return the value, {@link Double#NaN} when the sensor has no analog reading ({@link #hasAnalogReading()}) or is
+	 *         non-linear ({@link #isNonLinear()})
+	 */
 	public double getNominalReading() {
 		return nominalReading;
 	}
 
+	/**
+	 * Sets the nominal reading of the sensor.
+	 *
+	 * @param nominalReading the nominal reading, in the unit of the sensor
+	 */
 	public void setNominalReading(double nominalReading) {
 		this.nominalReading = nominalReading;
 	}
 
+	/**
+	 * Returns the normal maximum of the sensor (byte 33 of the record), converted to the unit of the sensor, whether
+	 * or not the analog characteristic flags of byte 31 (bit 1) say that the record specifies it.
+	 *
+	 * @return the value, {@link Double#NaN} when the sensor has no analog reading ({@link #hasAnalogReading()}) or is
+	 *         non-linear ({@link #isNonLinear()})
+	 */
 	public double getNormalMaximum() {
 		return normalMaximum;
 	}
 
+	/**
+	 * Sets the normal maximum of the sensor.
+	 *
+	 * @param normalMaximum the normal maximum, in the unit of the sensor
+	 */
 	public void setNormalMaximum(double normalMaximum) {
 		this.normalMaximum = normalMaximum;
 	}
 
+	/**
+	 * Returns the normal minimum of the sensor (byte 34 of the record), converted to the unit of the sensor, whether
+	 * or not the analog characteristic flags of byte 31 (bit 2) say that the record specifies it.
+	 *
+	 * @return the value, {@link Double#NaN} when the sensor has no analog reading ({@link #hasAnalogReading()}) or is
+	 *         non-linear ({@link #isNonLinear()})
+	 */
 	public double getNormalMinimum() {
 		return normalMinimum;
 	}
 
+	/**
+	 * Sets the normal minimum of the sensor.
+	 *
+	 * @param normalMinimum the normal minimum, in the unit of the sensor
+	 */
 	public void setNormalMinimum(double normalMinimum) {
 		this.normalMinimum = normalMinimum;
 	}
 
+	/**
+	 * Returns the maximum reading of the sensor (byte 35 of the record), converted to the unit of the sensor.
+	 *
+	 * @return the value, {@link Double#NaN} when the sensor has no analog reading ({@link #hasAnalogReading()}) or is
+	 *         non-linear ({@link #isNonLinear()})
+	 */
 	public double getSensorMaximumReading() {
 		return sensorMaximumReading;
 	}
 
+	/**
+	 * Sets the maximum reading of the sensor.
+	 *
+	 * @param sensorMaximumReading the maximum reading, in the unit of the sensor
+	 */
 	public void setSensorMaximumReading(double sensorMaximumReading) {
 		this.sensorMaximumReading = sensorMaximumReading;
 	}
 
+	/**
+	 * Returns the minimum reading of the sensor (byte 36 of the record), converted to the unit of the sensor.
+	 *
+	 * @return the value, {@link Double#NaN} when the sensor has no analog reading ({@link #hasAnalogReading()}) or is
+	 *         non-linear ({@link #isNonLinear()})
+	 */
 	public double getSensorMinmumReading() {
 		return sensorMinmumReading;
 	}
 
+	/**
+	 * Sets the minimum reading of the sensor.
+	 *
+	 * @param sensorMinmumReading the minimum reading, in the unit of the sensor
+	 */
 	public void setSensorMinmumReading(double sensorMinmumReading) {
 		this.sensorMinmumReading = sensorMinmumReading;
 	}
 
+	/**
+	 * Returns the upper non-recoverable threshold of the sensor (byte 37 of the record), converted to the unit of the
+	 * sensor.
+	 *
+	 * @return the threshold, {@link Double#NaN} when the record does not define it (byte 12 bits 3:2 and the readable
+	 *         threshold mask of byte 19), when the sensor has no analog reading ({@link #hasAnalogReading()}) or when
+	 *         it is non-linear ({@link #isNonLinear()})
+	 */
 	public double getUpperNonRecoverableThreshold() {
 		return upperNonRecoverableThreshold;
 	}
 
+	/**
+	 * Sets the upper non-recoverable threshold of the sensor.
+	 *
+	 * @param upperNonRecoverableThreshold the threshold, in the unit of the sensor, {@link Double#NaN} when the record
+	 *        does not define it
+	 */
 	public void setUpperNonRecoverableThreshold(
 			double upperNonRecoverableThreshold) {
 		this.upperNonRecoverableThreshold = upperNonRecoverableThreshold;
 	}
 
+	/**
+	 * Returns the lower non-recoverable threshold of the sensor (byte 40 of the record), converted to the unit of the
+	 * sensor.
+	 *
+	 * @return the threshold, {@link Double#NaN} when the record does not define it (byte 12 bits 3:2 and the readable
+	 *         threshold mask of byte 19), when the sensor has no analog reading ({@link #hasAnalogReading()}) or when
+	 *         it is non-linear ({@link #isNonLinear()})
+	 */
 	public double getLowerNonRecoverableThreshold() {
 		return lowerNonRecoverableThreshold;
 	}
 
+	/**
+	 * Sets the lower non-recoverable threshold of the sensor.
+	 *
+	 * @param lowerNonRecoverableThreshold the threshold, in the unit of the sensor, {@link Double#NaN} when the record
+	 *        does not define it
+	 */
 	public void setLowerNonRecoverableThreshold(
 			double lowerNonRecoverableThreshold) {
 		this.lowerNonRecoverableThreshold = lowerNonRecoverableThreshold;
 	}
 
+	/**
+	 * Returns the upper critical threshold of the sensor (byte 38 of the record), converted to the unit of the sensor.
+	 *
+	 * @return the threshold, {@link Double#NaN} when the record does not define it (byte 12 bits 3:2 and the readable
+	 *         threshold mask of byte 19), when the sensor has no analog reading ({@link #hasAnalogReading()}) or when
+	 *         it is non-linear ({@link #isNonLinear()})
+	 */
 	public double getUpperCriticalThreshold() {
 		return upperCriticalThreshold;
 	}
 
+	/**
+	 * Sets the upper critical threshold of the sensor.
+	 *
+	 * @param upperCriticalThreshold the threshold, in the unit of the sensor, {@link Double#NaN} when the record does
+	 *        not define it
+	 */
 	public void setUpperCriticalThreshold(double upperCriticalThreshold) {
 		this.upperCriticalThreshold = upperCriticalThreshold;
 	}
 
+	/**
+	 * Returns the lower critical threshold of the sensor (byte 41 of the record), converted to the unit of the sensor.
+	 *
+	 * @return the threshold, {@link Double#NaN} when the record does not define it (byte 12 bits 3:2 and the readable
+	 *         threshold mask of byte 19), when the sensor has no analog reading ({@link #hasAnalogReading()}) or when
+	 *         it is non-linear ({@link #isNonLinear()})
+	 */
 	public double getLowerCriticalThreshold() {
 		return lowerCriticalThreshold;
 	}
 
+	/**
+	 * Sets the lower critical threshold of the sensor.
+	 *
+	 * @param lowerCriticalThreshold the threshold, in the unit of the sensor, {@link Double#NaN} when the record does
+	 *        not define it
+	 */
 	public void setLowerCriticalThreshold(double lowerCriticalThreshold) {
 		this.lowerCriticalThreshold = lowerCriticalThreshold;
 	}
 
+	/**
+	 * Returns the upper non-critical threshold of the sensor (byte 39 of the record), converted to the unit of the
+	 * sensor.
+	 *
+	 * @return the threshold, {@link Double#NaN} when the record does not define it (byte 12 bits 3:2 and the readable
+	 *         threshold mask of byte 19), when the sensor has no analog reading ({@link #hasAnalogReading()}) or when
+	 *         it is non-linear ({@link #isNonLinear()})
+	 */
 	public double getUpperNonCriticalThreshold() {
 		return upperNonCriticalThreshold;
 	}
 
+	/**
+	 * Sets the upper non-critical threshold of the sensor.
+	 *
+	 * @param upperNonCriticalThreshold the threshold, in the unit of the sensor, {@link Double#NaN} when the record
+	 *        does not define it
+	 */
 	public void setUpperNonCriticalThreshold(double upperNonCriticalThreshold) {
 		this.upperNonCriticalThreshold = upperNonCriticalThreshold;
 	}
 
+	/**
+	 * Returns the lower non-critical threshold of the sensor (byte 42 of the record), converted to the unit of the
+	 * sensor.
+	 *
+	 * @return the threshold, {@link Double#NaN} when the record does not define it (byte 12 bits 3:2 and the readable
+	 *         threshold mask of byte 19), when the sensor has no analog reading ({@link #hasAnalogReading()}) or when
+	 *         it is non-linear ({@link #isNonLinear()})
+	 */
 	public double getLowerNonCriticalThreshold() {
 		return lowerNonCriticalThreshold;
 	}
 
+	/**
+	 * Sets the lower non-critical threshold of the sensor.
+	 *
+	 * @param lowerNonCriticalThreshold the threshold, in the unit of the sensor, {@link Double#NaN} when the record
+	 *        does not define it
+	 */
 	public void setLowerNonCriticalThreshold(double lowerNonCriticalThreshold) {
 		this.lowerNonCriticalThreshold = lowerNonCriticalThreshold;
 	}

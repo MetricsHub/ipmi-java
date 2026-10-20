@@ -69,42 +69,92 @@ public class BaseCompatibilityInfo extends MultiRecordInfo {
 		System.arraycopy(fruData, offset + 6, codeRangeMasks, 0, length - 6);
 	}
 
+	/**
+	 * Returns the manufacturer ID of the record.
+	 *
+	 * @return the IANA manufacturer ID (3 bytes in the record, least significant byte first)
+	 */
 	public int getManufacturerId() {
 		return manufacturerId;
 	}
 
+	/**
+	 * Sets the manufacturer ID of the record.
+	 *
+	 * @param manufacturerId the IANA manufacturer ID
+	 */
 	public void setManufacturerId(int manufacturerId) {
 		this.manufacturerId = manufacturerId;
 	}
 
+	/**
+	 * Returns the entity ID of the record.
+	 *
+	 * @return the entity ID, {@link EntityId#Other} for a code that {@link EntityId} does not list
+	 */
 	public EntityId getEntityId() {
 		return entityId;
 	}
 
+	/**
+	 * Sets the entity ID of the record.
+	 *
+	 * @param entityId the entity ID
+	 */
 	public void setEntityId(EntityId entityId) {
 		this.entityId = entityId;
 	}
 
+	/**
+	 * Returns the compatibility base of the record.
+	 *
+	 * @return the compatibility base, 0 to 255
+	 */
 	public int getCompatibilityBase() {
 		return compatibilityBase;
 	}
 
+	/**
+	 * Sets the compatibility base of the record.
+	 *
+	 * @param compatibilityBase the compatibility base
+	 */
 	public void setCompatibilityBase(int compatibilityBase) {
 		this.compatibilityBase = compatibilityBase;
 	}
 
+	/**
+	 * Returns the compatibility code start value of the record.
+	 *
+	 * @return the code start value (bits 6:0 of its byte)
+	 */
 	public int getCodeStart() {
 		return codeStart;
 	}
 
+	/**
+	 * Sets the compatibility code start value of the record.
+	 *
+	 * @param codeStart the code start value
+	 */
 	public void setCodeStart(int codeStart) {
 		this.codeStart = codeStart;
 	}
 
+	/**
+	 * Returns the code range masks of the record.
+	 *
+	 * @return the code range mask bytes that follow the code start
+	 */
 	public byte[] getCodeRangeMasks() {
 		return codeRangeMasks;
 	}
 
+	/**
+	 * Sets the code range masks of the record.
+	 *
+	 * @param codeRangeMasks the code range mask bytes
+	 */
 	public void setCodeRangeMasks(byte[] codeRangeMasks) {
 		this.codeRangeMasks = codeRangeMasks;
 	}

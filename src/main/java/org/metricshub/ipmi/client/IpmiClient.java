@@ -126,14 +126,23 @@ import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
  * <p>
  * <b>Session recovery</b>: when the session is lost (the BMC rebooted or expired it), the next operation opens a new
  * one. A read operation that fails because the session was lost while it ran is retried once on a new session;
- * {@link #send(IpmiCommandCoder)}, {@link #raw(int, int)} and the control operations are never replayed.
+ * {@link #send(IpmiCommandCoder)}, {@link #raw(int, int)}, {@code sol().open()} and the control operations are never
+ * replayed.
  * </p>
  * <p>
- * <b>Threads</b>: a client can be shared between threads; its operations are serialized. A BMC drops replies under
- * concurrent sessions, so the client never opens two. Clients of different BMCs run in parallel.
+ * <b>Threads</b>: a client can be shared between threads; its operations are serialized. BMCs accept a limited
+ * number of sessions and drop replies under load, so the client uses a single session, plus one for a Serial over
+ * LAN console that the BMC serves on another UDP port. Clients of different BMCs run in parallel.
  * </p>
  * <p>
- * <b>Failures</b> are reported as {@link IpmiClientException}s, whose subclasses say what to act on.
+ * <b>Failures</b> of the BMC and of the network are reported as {@link IpmiClientException}s, whose subclasses say
+ * what to act on. A call the client does not allow throws an {@link IllegalStateException}: any operation of a closed
+ * client, an operation that needs a session on a client built without
+ * {@link Builder#credentials(String, char[]) credentials} (every operation but {@link #capabilities()}), and a
+ * {@link PowerCommand#PowerCycle} of a system that is off. An invalid setting or argument throws an
+ * {@link IllegalArgumentException} before anything is sent to the BMC, and a null argument a
+ * {@link NullPointerException}, except for {@link #builder(String)} ({@link IllegalArgumentException}) and
+ * {@link Builder#bmcKey(byte[])} (no key).
  * </p>
  */
 // EI_EXPOSE_REP also matches EI_EXPOSE_REP2
@@ -147,7 +156,7 @@ public final class IpmiClient implements AutoCloseable {
 	/** Timeout of each message when the builder sets none: 5 seconds. */
 	public static final Duration DEFAULT_MESSAGE_TIMEOUT = Duration.ofSeconds(5);
 
-	/** Resends of a message without reply when the builder sets none: 3. */
+	/** Resends of a message ({@link Builder#retries(int)}) when the builder sets none: 3. */
 	public static final int DEFAULT_RETRIES = 3;
 
 	/** Period of the keep-alive messages when the builder sets none: 30 seconds. */
@@ -227,6 +236,7 @@ public final class IpmiClient implements AutoCloseable {
 	 *
 	 * @param host the host name or IP address of the BMC
 	 * @return the builder
+	 * @throws IllegalArgumentException when the host is null or blank
 	 */
 	public static Builder builder(String host) {
 		return new Builder(host);
@@ -280,12 +290,20 @@ public final class IpmiClient implements AutoCloseable {
 	 * carry it out afterwards: {@link #chassisStatus()} tells when the power state changed. Needs the Operator
 	 * privilege ({@link Builder#privilege(PrivilegeLevel)}).
 	 * <p>
-	 * The command is <b>sent once</b>, never again when its reply is lost or is a {@code C3h} (timeout on the BMC
-	 * side, response unavailable), as the BMC may have carried it out and a reset sent again would reset the system
-	 * twice, and never on a new session: a lost reply fails with {@link IpmiTimeoutException}, a {@code C3h} with
-	 * {@link IpmiCompletionCodeException}, and the power state is then to be read with {@link #chassisStatus()}. A
-	 * {@link PowerCommand#PowerCycle} is refused when the system is off, as the specification recommends: some BMCs
-	 * would power the system up instead of doing nothing.
+	 * The command is <b>sent once</b>: the BMC may have carried it out even when its reply is lost, and a reset sent
+	 * twice resets the system twice.
+	 * </p>
+	 * <ul>
+	 * <li>A lost reply fails the call with {@link IpmiTimeoutException}, without a resend.</li>
+	 * <li>A {@code C3h} reply (timeout on the BMC side, response unavailable) fails the call with
+	 * {@link IpmiCompletionCodeException}, without a resend.</li>
+	 * <li>The command is never replayed on a new session.</li>
+	 * </ul>
+	 * <p>
+	 * After such a failure, read the power state with {@link #chassisStatus()}. A busy reply ({@code C0h} or
+	 * {@code D2h}) says that the BMC did not carry the command out: the command is sent again after a pause, like any
+	 * other. A {@link PowerCommand#PowerCycle} of a system that is off is refused, as the specification recommends:
+	 * some BMCs would power the system up instead of doing nothing.
 	 * </p>
 	 *
 	 * @param command the power command
@@ -341,8 +359,9 @@ public final class IpmiClient implements AutoCloseable {
 	}
 
 	/**
-	 * Reads the sensors of the BMC: {@code sensors().execute()} for all of them, with {@link SensorsRequest#types}
-	 * and {@link SensorsRequest#names} to select some before their readings are requested.
+	 * Reads the sensors of the BMC: {@code sensors().execute()} for all of them, with
+	 * {@link SensorsRequest#types(org.metricshub.ipmi.core.coding.commands.sdr.record.SensorType...) types()} and
+	 * {@link SensorsRequest#names(String...) names()} to select some before their readings are requested.
 	 *
 	 * @return the request to complete
 	 */
@@ -352,8 +371,10 @@ public final class IpmiClient implements AutoCloseable {
 
 	/**
 	 * Reads the FRU inventories of the system: {@code frus().execute()} for all of them, with
-	 * {@link FrusRequest#ids} to select some. The SDR repository is walked once per client: {@link #sensors()} and
-	 * {@link #frus()} share it until the BMC reports a change.
+	 * {@link FrusRequest#ids(int...) ids()} to select some. With the SDR cache ({@link Builder#sdrCache(boolean)},
+	 * enabled by default), {@link #sensors()} and {@link #frus()} share one walk of the SDR repository until Get SDR
+	 * Repository Info reports a change; the repository of a BMC that refuses Get SDR Repository Info is walked again
+	 * by every call.
 	 *
 	 * @return the request to complete
 	 */
@@ -393,13 +414,28 @@ public final class IpmiClient implements AutoCloseable {
 
 	/**
 	 * Sends any request in the session, like {@code ipmitool raw}, and returns its reply whatever its completion code:
-	 * {@code bmc.raw(0x2C, 0x01).data(0xDC, 0x01).execute()} is Get DCMI Capabilities Info. Any request network
-	 * function is accepted, the extension and OEM ones included (Group Extension 2Ch, whose first data byte is the
-	 * defining body, DCh for DCMI; OEM/Group 2Eh, whose first three are an IANA enterprise number; controller-specific
-	 * OEM 30h-3Eh). An error completion code is returned, not thrown, and not retried, a busy one ({@code C0h}) or
-	 * {@code C3h} included. Like {@link #send(IpmiCommandCoder)}, the request is sent again when its reply is lost
-	 * (the retries of the builder) and never replayed on a new session: a control request sent raw has none of the
-	 * safeguards of {@link #chassisControl(PowerCommand)}.
+	 * {@code bmc.raw(0x2C, 0x01).data(0xDC, 0x01).execute()} is Get DCMI Capabilities Info.
+	 * <p>
+	 * Every request network function is accepted, the extension and OEM ones included:
+	 * </p>
+	 * <ul>
+	 * <li>Group Extension (2Ch): the first data byte is the defining body, DCh for DCMI;</li>
+	 * <li>OEM/Group (2Eh): the first three data bytes are an IANA enterprise number;</li>
+	 * <li>controller-specific OEM (30h to 3Eh).</li>
+	 * </ul>
+	 * <p>
+	 * An error completion code is returned in the reply, not thrown, and the request is not sent again for it, even
+	 * for a busy BMC ({@code C0h}) or a {@code C3h}. The exception is a {@code D4h} on a client built with
+	 * {@link PrivilegeLevel#MaximumAvailable} ({@link Builder#privilege(PrivilegeLevel)}): the session is raised, to
+	 * Operator then Administrator, and the request sent again. The {@code D4h} is returned once the session cannot go
+	 * higher (Administrator, or the ceiling the BMC set), and a raise that fails for another reason (a busy BMC)
+	 * throws {@link IpmiCompletionCodeException}.
+	 * </p>
+	 * <p>
+	 * Like {@link #send(IpmiCommandCoder)}, a request whose reply is lost is sent again (the retries of the builder),
+	 * but never replayed on a new session. A control request sent raw has none of the safeguards of
+	 * {@link #chassisControl(PowerCommand)}.
+	 * </p>
 	 *
 	 * @param networkFunction the network function of the request: an even number from 00h to 3Eh (the odd ones are
 	 *        those of the responses, IPMI 2.0 section 5.1)
@@ -423,6 +459,11 @@ public final class IpmiClient implements AutoCloseable {
 	/**
 	 * Closes the session (Close Session, within the message timeout), releases the UDP port and the threads. Closing
 	 * a closed client does nothing, and a BMC that does not answer the logout does not fail the caller.
+	 * <p>
+	 * Close the SOL consoles first. A console still open ends with the client: its reads return -1, no Deactivate
+	 * Payload is sent for it, and the session of a console that the BMC serves on another UDP port is left for the
+	 * BMC to expire.
+	 * </p>
 	 */
 	@Override
 	public void close() {
@@ -652,10 +693,6 @@ public final class IpmiClient implements AutoCloseable {
 	}
 
 	/**
-	 * Returns the SDR repository: the cached one when the BMC reports it unchanged (same record count and timestamps
-	 * of the most recent addition and erase, IPMI 2.0 section 33.9), a new walk otherwise.
-	 */
-	/**
 	 * Activates the SOL payload; when the BMC has no free instance, one whose session the BMC no longer knows (a
 	 * console that was killed, which some BMCs keep active for good) is deactivated and the activation tried again.
 	 */
@@ -730,6 +767,10 @@ public final class IpmiClient implements AutoCloseable {
 		throw new SOLException("The SOL payload is in use by another session: " + holders, failure);
 	}
 
+	/**
+	 * Returns the SDR repository: the cached one when the BMC reports it unchanged (same record count and timestamps
+	 * of the most recent addition and erase, IPMI 2.0 section 33.9), a new walk otherwise.
+	 */
 	private SdrRepository repository() {
 		GetSdrRepositoryInfoResponseData info;
 		try {
@@ -1306,6 +1347,7 @@ public final class IpmiClient implements AutoCloseable {
 		 *
 		 * @param udpPort the port, 1 to 65535
 		 * @return this builder
+		 * @throws IllegalArgumentException when the port is not between 1 and 65535
 		 */
 		public Builder port(int udpPort) {
 			if (udpPort < 1 || udpPort > MAX_PORT) {
@@ -1330,7 +1372,9 @@ public final class IpmiClient implements AutoCloseable {
 		}
 
 		/**
-		 * Sets the BMC key (Kg) of the two-key login, as raw bytes, for a BMC whose key is set.
+		 * Sets the BMC key (Kg) of the two-key login, as raw bytes, for a BMC whose key is set. A key of zero bytes
+		 * only, the default value of a BMC, is treated as no key. The array is not copied: the caller can wipe it once
+		 * the client is closed.
 		 *
 		 * @param key the key, at most 20 bytes, or null for the usual single-key login
 		 * @return this builder
@@ -1341,10 +1385,17 @@ public final class IpmiClient implements AutoCloseable {
 		}
 
 		/**
-		 * Sets the maximum privilege of the session, requested at Open Session and RAKP 1 and set with Set Session
-		 * Privilege Level right after the handshake (every session starts at User, IPMI 2.0 section 22.18). User by
-		 * default, enough for every read operation; Operator for the power control; Administrator for Serial over
-		 * LAN on most BMCs.
+		 * Sets the maximum privilege of the session, requested at Open Session and RAKP 1. The specification starts every
+		 * session at User (IPMI 2.0 section 22.18): for Operator and Administrator, the client raises it with Set
+		 * Session Privilege Level right after the handshake. A BMC that refuses the level fails the operation that opens
+		 * the session with {@link IpmiAuthenticationException}; another failure of that command (a busy BMC) fails it
+		 * with {@link IpmiClientException}.
+		 * <p>
+		 * User, the default, is enough for every read operation of the BMC itself; most BMCs need Operator, some
+		 * Administrator, for the sensors and FRUs of the controllers behind the BMC, which it reaches with Send
+		 * Message. Operator is needed for the control operations (power, identify), Administrator for Serial over LAN
+		 * on most BMCs.
+		 * </p>
 		 * <p>
 		 * {@code MaximumAvailable} requests the highest level the account is allowed, then runs the session at User and
 		 * raises it only when the BMC refuses a command for insufficient privilege ({@code D4h}): to Operator, then to
@@ -1353,6 +1404,7 @@ public final class IpmiClient implements AutoCloseable {
 		 * reaches the caller as it does at a fixed level. The sensors of other controllers than the BMC, which some BMCs
 		 * serve at the Operator or Administrator level only, are then read with any account that has the level, without
 		 * running the whole session at it.
+		 * </p>
 		 *
 		 * @param level the privilege level: User, Operator, Administrator or MaximumAvailable ({@code Callback}, at
 		 *        which no operation works, is refused)
@@ -1376,6 +1428,8 @@ public final class IpmiClient implements AutoCloseable {
 		 *
 		 * @param ids the suite IDs (IPMI 2.0 table 22-20)
 		 * @return this builder
+		 * @throws IllegalArgumentException when no suite is given, or a suite is not a standard suite (0 to 19) or has
+		 *         no integrity (0, 1, 6, 15)
 		 */
 		public Builder cipherSuites(int... ids) {
 			this.cipherSuites = checkSuites(ids);
@@ -1391,6 +1445,8 @@ public final class IpmiClient implements AutoCloseable {
 		 *
 		 * @param id the suite ID (IPMI 2.0 table 22-20), one with integrity
 		 * @return this builder
+		 * @throws IllegalArgumentException when the suite is not a standard suite (0 to 19) or has no integrity (0, 1,
+		 *         6, 15)
 		 */
 		public Builder cipherSuite(int id) {
 			this.cipherSuites = checkSuites(new int[] { id });
@@ -1421,6 +1477,8 @@ public final class IpmiClient implements AutoCloseable {
 		 *
 		 * @param deadline the deadline
 		 * @return this builder
+		 * @throws IllegalArgumentException when the duration is shorter than one millisecond or longer than
+		 *         {@link Integer#MAX_VALUE} milliseconds
 		 */
 		public Builder timeout(Duration deadline) {
 			this.timeout = checkTimeout(deadline, "timeout");
@@ -1432,6 +1490,8 @@ public final class IpmiClient implements AutoCloseable {
 		 *
 		 * @param duration the timeout of a message
 		 * @return this builder
+		 * @throws IllegalArgumentException when the duration is shorter than one millisecond or longer than
+		 *         {@link Integer#MAX_VALUE} milliseconds
 		 */
 		public Builder messageTimeout(Duration duration) {
 			this.messageTimeout = checkTimeout(duration, "messageTimeout");
@@ -1439,10 +1499,17 @@ public final class IpmiClient implements AutoCloseable {
 		}
 
 		/**
-		 * Sets how many times a message without reply is sent again; 3 by default.
+		 * Sets how many times a message is sent again; 3 by default. A message is sent again at once when it gets no
+		 * reply within the message timeout or gets a {@code C3h} (timeout on the BMC side), and after a random pause of
+		 * up to 4 seconds when the BMC says it is busy ({@code C0h}, node busy, or {@code D2h}, initialization in
+		 * progress); in the session handshake, a busy reply or the RAKP status insufficient resources to create a
+		 * session is sent again at once. The control operations never send their command again for a lost reply or a
+		 * {@code C3h} ({@link IpmiClient#chassisControl(PowerCommand)}), and {@link IpmiClient#raw(int, int)} returns a
+		 * busy or {@code C3h} reply instead of sending its request again.
 		 *
 		 * @param count the number of resends, 0 to send every message once
 		 * @return this builder
+		 * @throws IllegalArgumentException when the count is negative
 		 */
 		public Builder retries(int count) {
 			if (count < 0) {
@@ -1455,10 +1522,13 @@ public final class IpmiClient implements AutoCloseable {
 		/**
 		 * Sets the period of the keep-alive messages that keep the session open between operations; 30 seconds by
 		 * default. {@link Duration#ZERO} disables them: the BMC then expires an idle session after its own timeout
-		 * (60 seconds by default), and the next operation opens a new one.
+		 * (60 seconds by default), and the client finds out only when a request of the next operation gets no reply
+		 * after all its tries: a read operation is then run again on a new session, any other one fails with
+		 * {@link IpmiTimeoutException}.
 		 *
 		 * @param period the period, or {@link Duration#ZERO}
 		 * @return this builder
+		 * @throws IllegalArgumentException when the period is negative, or shorter than one millisecond but not zero
 		 */
 		public Builder keepAlive(Duration period) {
 			Objects.requireNonNull(period, "period");

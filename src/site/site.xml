@@ -18,18 +18,11 @@
 				<icon>fa-brands fa-github</icon>
 			</custom>
 		</social>
+		<!-- Releases and Issue Tracker are in <links>: the phone navigation lists both sets -->
 		<additionalLinks>
-			<link>
-				<name>Issue Tracker</name>
-				<href>https://github.com/metricshub/ipmi-java/issues</href>
-			</link>
 			<link>
 				<name>Licenses</name>
 				<href>licenses.html</href>
-			</link>
-			<link>
-				<name>Releases</name>
-				<href>https://github.com/metricshub/ipmi-java/releases</href>
 			</link>
 		</additionalLinks>
 	</custom>
@@ -60,10 +53,10 @@
 			<item name="FRU Inventory" href="fru-inventory.html" />
 			<item name="Sensors" href="sensors.html" />
 			<item name="System Event Log" href="system-event-log.html" />
+			<item name="Serial over LAN" href="serial-over-lan.html" />
 			<item name="Configuration" href="configuration.html" />
 			<item name="Timeouts and Errors" href="timeouts-and-errors.html" />
 			<item name="Low-Level API" href="low-level-api.html" />
-			<item name="Serial over LAN" href="serial-over-lan.html" />
 		</menu>
 
 		<menu name="Reference">

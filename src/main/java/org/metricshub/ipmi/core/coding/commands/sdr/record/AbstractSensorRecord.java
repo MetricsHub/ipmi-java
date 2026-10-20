@@ -83,7 +83,7 @@ public abstract class AbstractSensorRecord extends SensorRecord {
 	private int idInstanceModifierOffset;
 
 	/**
-	 * Decodes the sensor owner, sensor number and entity (record bytes 5 to 9, at the same position in every sensor
+	 * Decodes the sensor owner, sensor number and entity (record bytes 6 to 10, at the same position in every sensor
 	 * record), then the sensor type and the event/reading type.
 	 *
 	 * @param recordData
@@ -105,7 +105,7 @@ public abstract class AbstractSensorRecord extends SensorRecord {
 	}
 
 	/**
-	 * Decodes the sensor capabilities (record byte 11) and the sensor units (record bytes 20 to 22) of Full and
+	 * Decodes the sensor capabilities (record byte 12) and the sensor units (record bytes 21 to 23) of Full and
 	 * Compact records.
 	 *
 	 * @param recordData
@@ -161,6 +161,11 @@ public abstract class AbstractSensorRecord extends SensorRecord {
 	}
 
 	/**
+	 * Returns the sensor owner ID (byte 6 bits 7:1 of the record): the 7-bit I2C slave address of the controller that
+	 * owns the sensor, or a system software ID ({@link #getAddressType()}).
+	 * {@link org.metricshub.ipmi.core.coding.commands.app.SendMessage} takes the slave address in its 8-bit form: this
+	 * value shifted left by one.
+	 *
 	 * @return the 7-bit I2C slave address or system software ID of the sensor owner
 	 */
 	public byte getSensorOwnerId() {
@@ -168,6 +173,8 @@ public abstract class AbstractSensorRecord extends SensorRecord {
 	}
 
 	/**
+	 * Sets the sensor owner ID.
+	 *
 	 * @param sensorOwnerId
 	 *        - the 7-bit I2C slave address or system software ID of the sensor owner
 	 */
@@ -176,6 +183,8 @@ public abstract class AbstractSensorRecord extends SensorRecord {
 	}
 
 	/**
+	 * Tells whether the sensor owner ID is an IPMB slave address or a system software ID (byte 6 bit 0 of the record).
+	 *
 	 * @return whether {@link #getSensorOwnerId()} is an IPMB slave address or a system software ID
 	 */
 	public AddressType getAddressType() {
@@ -183,6 +192,8 @@ public abstract class AbstractSensorRecord extends SensorRecord {
 	}
 
 	/**
+	 * Sets whether the sensor owner ID is an IPMB slave address or a system software ID.
+	 *
 	 * @param addressType
 	 *        - whether the sensor owner ID is an IPMB slave address or a system software ID
 	 */
@@ -191,6 +202,8 @@ public abstract class AbstractSensorRecord extends SensorRecord {
 	}
 
 	/**
+	 * Returns the channel number of the sensor owner (byte 7 bits 7:4 of the record), 0 for the primary IPMB.
+	 *
 	 * @return the channel number of the sensor owner
 	 */
 	public byte getChannelNumber() {
@@ -198,6 +211,8 @@ public abstract class AbstractSensorRecord extends SensorRecord {
 	}
 
 	/**
+	 * Sets the channel number of the sensor owner.
+	 *
 	 * @param channelNumber
 	 *        - the channel number of the sensor owner
 	 */
@@ -206,6 +221,9 @@ public abstract class AbstractSensorRecord extends SensorRecord {
 	}
 
 	/**
+	 * Returns the LUN of the sensor owner (byte 7 bits 1:0 of the record), the LUN of the commands that read the
+	 * sensor.
+	 *
 	 * @return the LUN of the sensor owner
 	 */
 	public byte getSensorOwnerLun() {
@@ -213,6 +231,8 @@ public abstract class AbstractSensorRecord extends SensorRecord {
 	}
 
 	/**
+	 * Sets the LUN of the sensor owner.
+	 *
 	 * @param sensorOwnerLun
 	 *        - the LUN of the sensor owner
 	 */
@@ -221,6 +241,8 @@ public abstract class AbstractSensorRecord extends SensorRecord {
 	}
 
 	/**
+	 * Returns the number of the sensor (byte 8 of the record), the one the commands that read the sensor take.
+	 *
 	 * @return the sensor number, unique for its owner and LUN
 	 */
 	public byte getSensorNumber() {
@@ -228,6 +250,8 @@ public abstract class AbstractSensorRecord extends SensorRecord {
 	}
 
 	/**
+	 * Sets the number of the sensor.
+	 *
 	 * @param sensorNumber
 	 *        - the sensor number, unique for its owner and LUN
 	 */
@@ -236,6 +260,8 @@ public abstract class AbstractSensorRecord extends SensorRecord {
 	}
 
 	/**
+	 * Returns the entity the sensor monitors (byte 9 of the record).
+	 *
 	 * @return the physical entity the sensor is monitoring
 	 */
 	public EntityId getEntityId() {
@@ -243,6 +269,8 @@ public abstract class AbstractSensorRecord extends SensorRecord {
 	}
 
 	/**
+	 * Sets the entity the sensor monitors.
+	 *
 	 * @param entityId
 	 *        - the physical entity the sensor is monitoring
 	 */
@@ -251,6 +279,8 @@ public abstract class AbstractSensorRecord extends SensorRecord {
 	}
 
 	/**
+	 * Tells whether the entity is a physical entity or a logical container entity (byte 10 bit 7 of the record).
+	 *
 	 * @return <code>true</code> if the entity is physical, <code>false</code> if it is logical
 	 */
 	public boolean isEntityPhysical() {
@@ -258,6 +288,8 @@ public abstract class AbstractSensorRecord extends SensorRecord {
 	}
 
 	/**
+	 * Sets whether the entity is a physical entity or a logical container entity.
+	 *
 	 * @param entityPhysical
 	 *        - <code>true</code> if the entity is physical, <code>false</code> if it is logical
 	 */
@@ -266,6 +298,8 @@ public abstract class AbstractSensorRecord extends SensorRecord {
 	}
 
 	/**
+	 * Returns the instance number of the entity (byte 10 bits 6:0 of the record).
+	 *
 	 * @return the instance number of the entity
 	 */
 	public byte getEntityInstanceNumber() {
@@ -273,6 +307,8 @@ public abstract class AbstractSensorRecord extends SensorRecord {
 	}
 
 	/**
+	 * Sets the instance number of the entity.
+	 *
 	 * @param entityInstanceNumber
 	 *        - the instance number of the entity
 	 */
@@ -281,6 +317,9 @@ public abstract class AbstractSensorRecord extends SensorRecord {
 	}
 
 	/**
+	 * Tells whether the hysteresis of the sensor can be read with Get Sensor Hysteresis (byte 12 bits 5:4 of a Full or
+	 * Compact record).
+	 *
 	 * @return whether the hysteresis of the sensor can be read (always <code>false</code> for Event-Only records)
 	 */
 	public boolean isHysteresisReadable() {
@@ -288,6 +327,8 @@ public abstract class AbstractSensorRecord extends SensorRecord {
 	}
 
 	/**
+	 * Sets whether the hysteresis of the sensor can be read.
+	 *
 	 * @param hysteresisReadable
 	 *        - whether the hysteresis of the sensor can be read
 	 */
@@ -296,6 +337,9 @@ public abstract class AbstractSensorRecord extends SensorRecord {
 	}
 
 	/**
+	 * Tells whether the thresholds of the sensor can be read with Get Sensor Thresholds (byte 12 bits 3:2 of a Full or
+	 * Compact record).
+	 *
 	 * @return whether the thresholds of the sensor can be read (always <code>false</code> for Event-Only records)
 	 */
 	public boolean isThresholdsReadable() {
@@ -303,6 +347,8 @@ public abstract class AbstractSensorRecord extends SensorRecord {
 	}
 
 	/**
+	 * Sets whether the thresholds of the sensor can be read.
+	 *
 	 * @param thresholdsReadable
 	 *        - whether the thresholds of the sensor can be read
 	 */
@@ -311,6 +357,8 @@ public abstract class AbstractSensorRecord extends SensorRecord {
 	}
 
 	/**
+	 * Returns the type of the sensor (IPMI 2.0 table 42-3).
+	 *
 	 * @return the sensor type
 	 */
 	public SensorType getSensorType() {
@@ -318,6 +366,8 @@ public abstract class AbstractSensorRecord extends SensorRecord {
 	}
 
 	/**
+	 * Sets the type of the sensor.
+	 *
 	 * @param sensorType
 	 *        - the sensor type
 	 */
@@ -326,6 +376,9 @@ public abstract class AbstractSensorRecord extends SensorRecord {
 	}
 
 	/**
+	 * Returns the event/reading type code of the sensor: 01h for a threshold sensor, 02h-0Ch for a generic discrete
+	 * one, 6Fh for a sensor-specific one, 70h-7Fh for an OEM one.
+	 *
 	 * @return the event/reading type code (IPMI 2.0 table 42-1)
 	 */
 	public int getEventReadingType() {
@@ -333,6 +386,8 @@ public abstract class AbstractSensorRecord extends SensorRecord {
 	}
 
 	/**
+	 * Sets the event/reading type code of the sensor.
+	 *
 	 * @param eventReadingType
 	 *        - the event/reading type code (IPMI 2.0 table 42-1)
 	 */
@@ -341,6 +396,8 @@ public abstract class AbstractSensorRecord extends SensorRecord {
 	}
 
 	/**
+	 * Returns the rate unit of the reading (Sensor Units 1 bits 5:3).
+	 *
 	 * @return the rate unit of the reading (<code>null</code> for Event-Only records)
 	 */
 	public RateUnit getRateUnit() {
@@ -348,6 +405,8 @@ public abstract class AbstractSensorRecord extends SensorRecord {
 	}
 
 	/**
+	 * Sets the rate unit of the reading.
+	 *
 	 * @param rateUnit
 	 *        - the rate unit of the reading
 	 */
@@ -356,6 +415,9 @@ public abstract class AbstractSensorRecord extends SensorRecord {
 	}
 
 	/**
+	 * Returns how the modifier unit combines with the base unit (Sensor Units 1 bits 2:1): none, divided by or
+	 * multiplied by.
+	 *
 	 * @return how the modifier unit combines with the base unit (<code>null</code> for Event-Only records)
 	 */
 	public ModifierUnitUsage getModifierUnitUsage() {
@@ -363,6 +425,8 @@ public abstract class AbstractSensorRecord extends SensorRecord {
 	}
 
 	/**
+	 * Sets how the modifier unit combines with the base unit.
+	 *
 	 * @param modifierUnitUsage
 	 *        - how the modifier unit combines with the base unit
 	 */
@@ -371,6 +435,8 @@ public abstract class AbstractSensorRecord extends SensorRecord {
 	}
 
 	/**
+	 * Returns the base unit of the reading (Sensor Units 2, IPMI 2.0 table 43-15).
+	 *
 	 * @return the base unit of the reading (<code>null</code> for Event-Only records)
 	 */
 	public SensorUnit getSensorBaseUnit() {
@@ -378,6 +444,8 @@ public abstract class AbstractSensorRecord extends SensorRecord {
 	}
 
 	/**
+	 * Sets the base unit of the reading.
+	 *
 	 * @param sensorBaseUnit
 	 *        - the base unit of the reading
 	 */
@@ -386,6 +454,8 @@ public abstract class AbstractSensorRecord extends SensorRecord {
 	}
 
 	/**
+	 * Returns the modifier unit of the reading (Sensor Units 3, IPMI 2.0 table 43-15).
+	 *
 	 * @return the modifier unit of the reading (<code>null</code> for Event-Only records)
 	 */
 	public SensorUnit getSensorModifierUnit() {
@@ -393,6 +463,8 @@ public abstract class AbstractSensorRecord extends SensorRecord {
 	}
 
 	/**
+	 * Sets the modifier unit of the reading.
+	 *
 	 * @param sensorModifierUnit
 	 *        - the modifier unit of the reading
 	 */
@@ -401,6 +473,8 @@ public abstract class AbstractSensorRecord extends SensorRecord {
 	}
 
 	/**
+	 * Returns the direction of the sensor: whether it monitors an input or an output of the entity.
+	 *
 	 * @return whether the sensor monitors an input or an output of the entity
 	 */
 	public SensorDirection getSensorDirection() {
@@ -408,6 +482,8 @@ public abstract class AbstractSensorRecord extends SensorRecord {
 	}
 
 	/**
+	 * Sets the direction of the sensor.
+	 *
 	 * @param sensorDirection
 	 *        - whether the sensor monitors an input or an output of the entity
 	 */
@@ -416,6 +492,9 @@ public abstract class AbstractSensorRecord extends SensorRecord {
 	}
 
 	/**
+	 * Returns the sensor ID string of the record. For a Compact or Event-Only record that several sensors share
+	 * ({@link #getShareCount()}), it is the string to which each sensor appends its instance modifier.
+	 *
 	 * @return the sensor ID string, empty when the record has none
 	 */
 	public String getName() {
@@ -423,6 +502,8 @@ public abstract class AbstractSensorRecord extends SensorRecord {
 	}
 
 	/**
+	 * Sets the sensor ID string.
+	 *
 	 * @param name
 	 *        - the sensor ID string, {@code null} for none (stored as the empty string)
 	 */
@@ -441,6 +522,8 @@ public abstract class AbstractSensorRecord extends SensorRecord {
 	}
 
 	/**
+	 * Sets the type of the ID string instance modifier.
+	 *
 	 * @param idInstanceModifierType
 	 *        - the type of the ID string instance modifier
 	 */
@@ -459,6 +542,8 @@ public abstract class AbstractSensorRecord extends SensorRecord {
 	}
 
 	/**
+	 * Sets the number of sensors sharing this record.
+	 *
 	 * @param shareCount
 	 *        - the number of sensors sharing this record
 	 */
@@ -467,6 +552,9 @@ public abstract class AbstractSensorRecord extends SensorRecord {
 	}
 
 	/**
+	 * Tells whether the entity instance number increments for each sensor sharing this record, rather than being the
+	 * same for all of them.
+	 *
 	 * @return whether the entity instance number increments for each sensor sharing this record
 	 */
 	public boolean isEntityInstanceIncrements() {
@@ -474,6 +562,8 @@ public abstract class AbstractSensorRecord extends SensorRecord {
 	}
 
 	/**
+	 * Sets whether the entity instance number increments for each sensor sharing this record.
+	 *
 	 * @param entityInstanceIncrements
 	 *        - whether the entity instance number increments for each sensor sharing this record
 	 */
@@ -494,6 +584,8 @@ public abstract class AbstractSensorRecord extends SensorRecord {
 	}
 
 	/**
+	 * Sets the offset of the ID string instance modifier.
+	 *
 	 * @param idInstanceModifierOffset
 	 *        - the offset of the ID string instance modifier
 	 */

@@ -1,6 +1,6 @@
 /**
  * The {@link org.metricshub.ipmi.core.sm.StateMachine} states.
- * To create custom action extend {@link org.metricshub.ipmi.core.sm.states.State} class.
+ * To create a custom state, extend {@link org.metricshub.ipmi.core.sm.states.State}.
  */
 package org.metricshub.ipmi.core.sm.states;
 /*-

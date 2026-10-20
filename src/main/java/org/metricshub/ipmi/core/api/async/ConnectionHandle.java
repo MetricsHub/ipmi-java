@@ -30,7 +30,15 @@ import java.net.InetAddress;
 import java.nio.charset.StandardCharsets;
 
 /**
- * Handle to the {@link Connection}
+ * Identifies one {@link Connection} (one BMC) of a connector: its index in the connector, the address and UDP port of
+ * the BMC, the cipher suite and privilege level of its session, and the user name, password and BMC key (Kg) the
+ * session was opened with, which the connector keeps to open another session on a payload port of the same BMC (Serial
+ * over LAN). Returned by {@code createConnection()} of {@link org.metricshub.ipmi.core.api.sync.IpmiConnector} and
+ * {@link IpmiAsyncConnector}, which fill it in as the connection is set up.
+ * <p>
+ * The responses delivered to an {@link IpmiResponseListener} carry a new {@code ConnectionHandle} with only the
+ * index, address and port of the connection: compare {@link #getHandle()} to match a response with its connection.
+ * </p>
  */
 public class ConnectionHandle {
 	private int handle;
@@ -48,49 +56,112 @@ public class ConnectionHandle {
 	 */
 	private byte[] bmcKey;
 
+	/**
+	 * Creates the handle of a connection. The connector creates it: see
+	 * {@link org.metricshub.ipmi.core.api.sync.IpmiConnector#createConnection(InetAddress)}.
+	 *
+	 * @param handle the index of the connection in its connector
+	 * @param remoteAddress the address of the BMC
+	 * @param remotePort the UDP port of the BMC
+	 */
 	public ConnectionHandle(int handle, InetAddress remoteAddress, int remotePort) {
 		this.handle = handle;
 		this.remoteAddress = remoteAddress;
 		this.remotePort = remotePort;
 	}
 
+	/**
+	 * Returns the cipher suite of the session, declared with {@code getChannelAuthenticationCapabilities()} or
+	 * {@code createConnection()}.
+	 *
+	 * @return the cipher suite, or null before it is declared
+	 */
 	public CipherSuite getCipherSuite() {
 		return cipherSuite;
 	}
 
+	/**
+	 * Sets the cipher suite of the session. The connector sets it; changing it once the session is open has no effect
+	 * on that session.
+	 *
+	 * @param cipherSuite the cipher suite of the session
+	 */
 	public void setCipherSuite(CipherSuite cipherSuite) {
 		this.cipherSuite = cipherSuite;
 	}
 
+	/**
+	 * Returns the maximum privilege level requested for the session, declared with
+	 * {@code getChannelAuthenticationCapabilities()} or {@code createConnection()}:
+	 * {@link PrivilegeLevel#MaximumAvailable} stays {@code MaximumAvailable}, whatever level the session runs at.
+	 *
+	 * @return the privilege level, or null before it is declared
+	 */
 	public PrivilegeLevel getPrivilegeLevel() {
 		return privilegeLevel;
 	}
 
+	/**
+	 * Sets the maximum privilege level requested for the session. The connector sets it; changing it once the session
+	 * is open has no effect on that session.
+	 *
+	 * @param privilegeLevel the privilege level of the session
+	 */
 	public void setPrivilegeLevel(PrivilegeLevel privilegeLevel) {
 		this.privilegeLevel = privilegeLevel;
 	}
 
+	/**
+	 * Returns the index of the connection in its connector, which is not reused once the connection is closed. The
+	 * response delivered to an {@link IpmiResponseListener} carries a new {@code ConnectionHandle} object, and this
+	 * class does not override {@code equals()}: match a response with its connection by comparing
+	 * {@code response.getHandle().getHandle()} with this index.
+	 *
+	 * @return the index of the connection
+	 */
 	public int getHandle() {
 		return handle;
 	}
 
+	/**
+	 * Returns the address of the BMC.
+	 *
+	 * @return the address of the BMC
+	 */
 	public InetAddress getRemoteAddress() {
 		return remoteAddress;
 	}
 
+	/**
+	 * Returns the UDP port of the BMC.
+	 *
+	 * @return the UDP port of the BMC
+	 */
 	public int getRemotePort() {
 		return remotePort;
 	}
 
+	/**
+	 * Returns the user name of the session, set by {@code openSession()}.
+	 *
+	 * @return the user name, or null before the session is opened
+	 */
 	public String getUser() {
 		return user;
 	}
 
+	/**
+	 * Sets the user name of the session. {@code openSession()} sets it.
+	 *
+	 * @param user the user name of the session
+	 */
 	public void setUser(String user) {
 		this.user = user;
 	}
 
 	/**
+	 * Returns the password of the session, decoded from UTF-8.
+	 *
 	 * @return the password of the session, decoded from UTF-8, or null
 	 */
 	public String getPassword() {
@@ -98,6 +169,8 @@ public class ConnectionHandle {
 	}
 
 	/**
+	 * Sets the password of the session, encoded in UTF-8.
+	 *
 	 * @param password the password of the session, sent to the BMC in UTF-8
 	 */
 	public void setPassword(String password) {
@@ -105,6 +178,8 @@ public class ConnectionHandle {
 	}
 
 	/**
+	 * Returns the password of the session as bytes: the array the handle holds, not a copy, so do not modify it.
+	 *
 	 * @return the password of the session, as sent to the BMC, or null
 	 */
 	public byte[] getPasswordBytes() {
@@ -112,6 +187,8 @@ public class ConnectionHandle {
 	}
 
 	/**
+	 * Sets the password of the session as bytes. {@code openSession()} sets it.
+	 *
 	 * @param passwordBytes the password of the session, as sent to the BMC: the handle keeps a copy, so the caller can
 	 *        clear the array
 	 */
@@ -120,6 +197,8 @@ public class ConnectionHandle {
 	}
 
 	/**
+	 * Returns the BMC key (Kg) of the session: the array the handle holds, not a copy, so do not modify it.
+	 *
 	 * @return the BMC key (Kg) of the session, or null for a one-key login
 	 */
 	public byte[] getBmcKey() {
@@ -127,12 +206,18 @@ public class ConnectionHandle {
 	}
 
 	/**
+	 * Sets the BMC key (Kg) of the session. {@code openSession()} sets it.
+	 *
 	 * @param bmcKey the BMC key (Kg) of the session, or null: the handle keeps a copy, so the caller can clear the array
 	 */
 	public void setBmcKey(byte[] bmcKey) {
 		this.bmcKey = bmcKey == null ? null : bmcKey.clone();
 	}
 
+	/**
+	 * Returns the index, address and port of the connection, and the cipher suite, privilege level and user name of
+	 * its session, without the password or the BMC key.
+	 */
 	@Override
 	public String toString() {
 		final StringBuilder sb = new StringBuilder("ConnectionHandle{");

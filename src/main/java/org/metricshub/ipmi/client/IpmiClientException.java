@@ -24,7 +24,7 @@ package org.metricshub.ipmi.client;
 
 /**
  * A failure of an {@link IpmiClient} operation. The subclasses tell what to act on: the BMC refused the login
- * ({@link IpmiAuthenticationException}), the session could not be established for a network reason
+ * ({@link IpmiAuthenticationException}), the connection to the BMC failed for a network reason
  * ({@link IpmiConnectionException}), the operation or a message of the session got no reply in time
  * ({@link IpmiTimeoutException}), or the BMC answered a command with an error completion code
  * ({@link IpmiCompletionCodeException}). The base class covers the rest: no cipher suite in common, a BMC without IPMI

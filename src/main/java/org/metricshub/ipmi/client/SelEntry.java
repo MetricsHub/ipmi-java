@@ -94,8 +94,9 @@ public final class SelEntry {
 	}
 
 	/**
-	 * Returns the record ID of the entry, unique in the log until it is cleared: the value to give
-	 * {@link SelRequest#since(int)} to read the entries added after this one.
+	 * Returns the record ID of the entry, unique in the log; after a Clear SEL or a Delete SEL Entry, the BMC may give it
+	 * to another entry (IPMI 2.0 sections 31.4.1 and 31.4.2). It is the value to give {@link SelRequest#since(int)} to
+	 * read the entries added after this one.
 	 *
 	 * @return the record ID, 1 to 65534
 	 */
@@ -179,8 +180,9 @@ public final class SelEntry {
 	/**
 	 * Returns what happened, as the {@link ReadingType} of the event offset for the sensor type and event/reading
 	 * type: {@code UpperCriticalGoingHigh}, {@code PowerSupplyFailureDetected}, {@code LogAreaReset}...
-	 * {@link ReadingType#UnknownOEMEvent} for an OEM sensor type or event/reading type, {@link ReadingType#Unknown}
-	 * for an offset the specification does not define.
+	 * {@link ReadingType#UnknownOEMEvent} for an OEM event/reading type (70h to 7Fh), or for an OEM sensor type (C0h
+	 * to FFh) with a sensor-specific event/reading type (6Fh), {@link ReadingType#Unknown} for an offset the
+	 * specification does not define.
 	 *
 	 * @return the event, empty for the other record types
 	 */
@@ -199,11 +201,13 @@ public final class SelEntry {
 	}
 
 	/**
-	 * Returns a description of the entry: the {@link #event() event} of a system event in the wording of
-	 * {@code ipmiutil} ({@code Upper Critical Going High}, {@code Failure detected}, {@code Log area reset/cleared}; of
-	 * {@code ipmitool} for the few events {@code ipmiutil} does not name, such as {@code Installation started}),
-	 * with its event/reading type and offset when the specification does not define it, the OEM bytes of an OEM
-	 * entry in hexadecimal, or the record type of a reserved entry.
+	 * Returns a description of the entry. For a system event: the {@link #event() event} in the wording of
+	 * {@code ipmiutil} ({@code Failure detected}, {@code Log area reset/cleared}), or of {@code ipmitool} for the few
+	 * events {@code ipmiutil} does not name ({@code Installation started}); the name of the {@link ReadingType} spaced
+	 * out when neither tool names it, as for the threshold events ({@code Upper Critical Going High}); the event/reading
+	 * type and the offset when the specification does not define the offset ({@code Unknown event type 08h offset 6h})
+	 * or the event is OEM ({@code OEM event type 71h offset 2h}). For an OEM entry, {@code OEM data} followed by its OEM
+	 * bytes in hexadecimal. For a reserved record type, {@code Reserved record type}.
 	 *
 	 * @return the description
 	 */

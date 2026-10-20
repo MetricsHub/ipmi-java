@@ -86,8 +86,8 @@ public final class DeviceId {
 	}
 
 	/**
-	 * Returns the version of IPMI the BMC implements: {@code 2.0}, or {@code 1.5} for a BMC that does not implement
-	 * RMCP+.
+	 * Returns the version of IPMI the BMC implements, {@code 2.0} in practice: a BMC without RMCP+ fails the login
+	 * before this command.
 	 *
 	 * @return the IPMI version
 	 */
@@ -114,7 +114,8 @@ public final class DeviceId {
 	}
 
 	/**
-	 * Tells whether the BMC is in normal operation, rather than updating its firmware or its SDR repository.
+	 * Tells whether the BMC is in normal operation, rather than updating its firmware or its SDR repository or
+	 * initializing itself.
 	 *
 	 * @return true when the device is available
 	 */

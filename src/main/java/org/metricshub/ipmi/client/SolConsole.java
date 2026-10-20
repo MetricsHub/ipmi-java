@@ -87,7 +87,9 @@ public final class SolConsole implements AutoCloseable {
 
 	/**
 	 * Returns the characters the system writes on its serial port. A read blocks until characters arrive, and
-	 * returns -1 once the console is closed or the BMC deactivated it.
+	 * returns -1 once the console has ended ({@link #close() closed}, or {@link #deactivated()}) and the characters
+	 * already received are read. On an interrupted thread, a read that has no characters to return throws an
+	 * {@link IOException}.
 	 *
 	 * @return the input stream of the console
 	 */
@@ -97,7 +99,7 @@ public final class SolConsole implements AutoCloseable {
 
 	/**
 	 * Returns the stream whose bytes reach the serial port of the system. A write returns once the BMC acknowledged
-	 * the characters, and fails with an {@link IOException} when it does not.
+	 * the characters, and fails with an {@link IOException} when it does not, or once the console is closed.
 	 *
 	 * @return the output stream of the console
 	 */
@@ -106,10 +108,12 @@ public final class SolConsole implements AutoCloseable {
 	}
 
 	/**
-	 * Tells whether the BMC deactivated the console: the session ended, another console took the payload, or the
-	 * system reset the serial port.
+	 * Tells whether the console has ended other than by a successful {@link #close()}: the BMC reported the SOL
+	 * payload deactivated (another session deactivated or took it, or the system was reset or powered on or off
+	 * locally), the client was closed or lost the session the console runs in, or {@link #close()} could not
+	 * deactivate the payload.
 	 *
-	 * @return true once the BMC reported the SOL payload deactivated
+	 * @return true once the console has ended for one of these reasons
 	 */
 	public boolean deactivated() {
 		return deactivated;
@@ -117,7 +121,7 @@ public final class SolConsole implements AutoCloseable {
 
 	/**
 	 * Sends the given operations to the serial port of the system: a break, a flush, the state of the control lines
-	 * (IPMI 2.0 table 15-3).
+	 * (IPMI 2.0 table 15-2).
 	 *
 	 * @param operations the operations
 	 * @return whether the packet was sent

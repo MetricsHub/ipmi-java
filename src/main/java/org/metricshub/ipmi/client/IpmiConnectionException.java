@@ -23,8 +23,11 @@ package org.metricshub.ipmi.client;
  */
 
 /**
- * The session could not be established for a network reason: unknown host, socket error, or no reply to the session
- * setup after all the tries (wrong host, UDP port 623 filtered, IPMI over LAN disabled).
+ * The connection to the BMC failed for a network reason: unknown host, socket error, no reply to the session setup
+ * after all the tries (wrong host, UDP port filtered, IPMI over LAN disabled, an IPMI 1.5-only BMC with
+ * {@link IpmiClient.Builder#cipherSuite(int)}), or the connection closed while an operation ran, which loses the
+ * session. Also thrown when the session of a Serial over LAN console that the BMC serves on another UDP port cannot be
+ * opened.
  */
 public class IpmiConnectionException extends IpmiClientException {
 

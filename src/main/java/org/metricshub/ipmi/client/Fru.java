@@ -252,9 +252,13 @@ public final class Fru {
 	}
 
 	/**
-	 * Returns every area and multirecord decoded from the FRU inventory.
+	 * Returns the records decoded from the FRU inventory: the internal use area
+	 * ({@link org.metricshub.ipmi.core.coding.commands.fru.record.InternalUseInfo}), the chassis, board and product
+	 * areas, then the multirecords, each when the inventory has it and it could be decoded. For a memory module or a
+	 * processor whose FRU device returns its SPD data or its processor information ROM, the list holds the single
+	 * {@link SpdInfo} or {@link PiromInfo} instead.
 	 *
-	 * @return the records, in the order of the FRU inventory
+	 * @return the records, in that order
 	 */
 	public List<FruRecord> records() {
 		return records;

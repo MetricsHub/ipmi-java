@@ -70,6 +70,11 @@ public enum SolOperation {
 		this.operationNumber = operationNumber;
 	}
 
+	/**
+	 * Returns the bit of the operation in the Operation/Status byte of a SOL packet to the BMC (IPMI 2.0 table 15-2).
+	 *
+	 * @return the bit number, 0 to 5
+	 */
 	public int getOperationNumber() {
 		return operationNumber;
 	}

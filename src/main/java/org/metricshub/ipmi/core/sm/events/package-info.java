@@ -1,6 +1,6 @@
 /**
  * The {@link org.metricshub.ipmi.core.sm.StateMachine} events.
- * To create custom action extend {@link org.metricshub.ipmi.core.sm.events.StateMachineEvent} class.
+ * To create a custom event, extend {@link org.metricshub.ipmi.core.sm.events.StateMachineEvent}.
  */
 package org.metricshub.ipmi.core.sm.events;
 /*-

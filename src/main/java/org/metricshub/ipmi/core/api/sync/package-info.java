@@ -1,9 +1,9 @@
 /**
- * The library's API.<br>
- * For synchronous API see {@link org.metricshub.ipmi.core.api.sync}, for asynchronous API see
- * {@link org.metricshub.ipmi.core.api.async}
+ * The synchronous API of the protocol core: {@link org.metricshub.ipmi.core.api.sync.IpmiConnector} opens RMCP+
+ * sessions and sends commands, waiting for their responses. Most applications use
+ * {@link org.metricshub.ipmi.client.IpmiClient} instead; see
+ * <a href="https://metricshub.org/ipmi-java/low-level-api.html">Low-Level API</a>.
  *
- * @see org.metricshub.ipmi.core.api.sync
  * @see org.metricshub.ipmi.core.api.async
  */
 package org.metricshub.ipmi.core.api.sync;

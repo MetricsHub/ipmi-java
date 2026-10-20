@@ -33,6 +33,11 @@ public class SpecificCipherSuiteSelector implements CipherSuiteSelectionHandler 
 
 	private final CipherSuite cipherSuite;
 
+	/**
+	 * Creates a selector that always returns the given suite, whether the BMC offers it or not.
+	 *
+	 * @param cipherSuite the suite to use, for example {@code CipherSuite.forId(17)}
+	 */
 	public SpecificCipherSuiteSelector(CipherSuite cipherSuite) {
 		this.cipherSuite = cipherSuite;
 	}

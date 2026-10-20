@@ -58,8 +58,8 @@ import java.util.concurrent.TimeUnit;
  * </p>
  * Creating connection consists of the following steps:
  * <ul>
- * <li>Create {@link Connection} and get associated with it
- * {@link ConnectionHandle} via {@link #createConnection(InetAddress, int)}</li>
+ * <li>Create a {@link Connection} and get its {@link ConnectionHandle} with
+ * {@link #createConnection(InetAddress, int)}</li>
  * <li>Get {@link CipherSuite}s that are available for the connection via
  * {@link #getAvailableCipherSuites(ConnectionHandle)}</li>
  * <li>Pick {@link CipherSuite} and {@link PrivilegeLevel} that will be used
@@ -74,9 +74,9 @@ import java.util.concurrent.TimeUnit;
  * </ul>
  * <br>
  * <p>
- * To send message register for receiving answers via
- * {@link #registerListener(IpmiResponseListener)} and send message via
- * {@link #sendMessage(ConnectionHandle, PayloadCoder, boolean)}
+ * Register a listener for the responses with {@link #registerListener(IpmiResponseListener)}, then send messages
+ * with {@link #sendMessage(ConnectionHandle, PayloadCoder, boolean)}: the response to a message that is not one-way,
+ * or its failure (an {@code IpmiError}), reaches the listeners with the tag that {@code sendMessage()} returned.
  * </p>
  * <br>
  * <p>
@@ -192,6 +192,8 @@ public class IpmiAsyncConnector implements ConnectionListener {
 	 *
 	 * @param address
 	 *        - {@link InetAddress} of the remote host
+	 * @param port
+	 *        - remote UDP port
 	 * @return handle to the connection to the remote host
 	 * @throws IOException
 	 *         when the connection cannot be created
@@ -209,6 +211,12 @@ public class IpmiAsyncConnector implements ConnectionListener {
 	 *
 	 * @param address
 	 *        - {@link InetAddress} of the remote host
+	 * @param port
+	 *        - remote UDP port
+	 * @param cipherSuite
+	 *        - the cipher suite of the session
+	 * @param privilegeLevel
+	 *        - the privilege level requested for the session
 	 * @return handle to the connection to the remote host
 	 * @throws IOException
 	 *         when the connection cannot be created
@@ -295,7 +303,10 @@ public class IpmiAsyncConnector implements ConnectionListener {
 
 	/**
 	 * Establishes the session with the remote host, and raises it to the requested privilege when that is Operator or
-	 * Administrator (Set Session Privilege Level, IPMI 2.0 section 22.18: every session starts at User).
+	 * Administrator (Set Session Privilege Level, IPMI 2.0 section 22.18: every session starts at User). For
+	 * {@link PrivilegeLevel#MaximumAvailable}, the session is requested at Administrator, then at Operator and at User
+	 * when the BMC refuses the role to the account, and set to User right after the handshake: the caller raises it
+	 * when a command needs more.
 	 *
 	 * @param connectionHandle
 	 *        - {@link ConnectionHandle} associated with the remote host.
@@ -551,13 +562,14 @@ public class IpmiAsyncConnector implements ConnectionListener {
 	 * @param request
 	 *        - {@link PayloadCoder} containing the request to be sent
 	 * @param isOneWay
-	 *        - tells whether this message is one way (needs response) or not.
-	 * @return ID of the message that will be also attached to the response to
-	 *         pair request with response if queue was not full and message was
-	 *         sent, -1 if sending of the message failed.
+	 *        - true for a message whose reply nobody waits for (the reply is discarded, and its timeout is not
+	 *        reported), false to receive the reply through the registered listeners
+	 * @return the tag of the message, which the response delivered to the listeners carries
+	 *         ({@link IpmiResponse#getTag()})
 	 * @throws ConnectionException
-	 *         when connection is in the state that does not allow to
-	 *         perform this operation.
+	 *         when the session is not open, or the message window stayed full, at every try
+	 * @throws IllegalStateException
+	 *         when the connection is closed
 	 * @throws Exception
 	 *         when sending message to the managed system or initializing
 	 *         one of the cipherSuite's algorithms fails
@@ -712,6 +724,8 @@ public class IpmiAsyncConnector implements ConnectionListener {
 	/**
 	 * Closes the connection with the given handle, and forgets its session. The requests still waiting for a reply
 	 * on the connection fail with a {@link ConnectionException}.
+	 *
+	 * @param handle the handle of the connection
 	 */
 	public void closeConnection(ConnectionHandle handle) {
 		Connection connection = connectionManager.getConnection(handle.getHandle());

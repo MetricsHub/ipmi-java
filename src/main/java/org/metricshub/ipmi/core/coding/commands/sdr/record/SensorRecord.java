@@ -27,7 +27,8 @@ import org.metricshub.ipmi.core.common.TypeConverter;
 import java.nio.charset.StandardCharsets;
 
 /**
- * Wrapper for SDR entry.
+ * A record of the Sensor Data Repository (IPMI 2.0 section 43): the record header that every type shares, and
+ * {@link #populateSensorRecord(byte[])}, which decodes a record into the class of its type.
  */
 public abstract class SensorRecord {
 
@@ -37,11 +38,15 @@ public abstract class SensorRecord {
 	private int recordLength;
 
 	/**
-	 * Parses sensor record raw data
+	 * Decodes an SDR record (IPMI 2.0 section 43): the types 01h-03h, 08h, 09h and 10h-13h into their classes, the OEM
+	 * types C0h-FFh into an {@link OemRecord}. A record whose body is shorter than its type requires fails with a
+	 * {@link RuntimeException}, an {@link ArrayIndexOutOfBoundsException} for instance.
 	 *
-	 * @param recordData
-	 * @return {@link SensorRecord} populated with data
-	 * @throws IllegalArgumentException
+	 * @param recordData the whole record, its 5-byte header included
+	 * @return the decoded record
+	 * @throws IllegalArgumentException when the record is shorter than its 5-byte header, of the deprecated type 14h,
+	 *         of a reserved type (below C0h and none of the types above), or a Compact or Event-Only record whose ID
+	 *         string instance modifier type is reserved (10b or 11b)
 	 */
 	public static SensorRecord populateSensorRecord(byte[] recordData) {
 
@@ -139,34 +144,76 @@ public abstract class SensorRecord {
 			byte[] recordData,
 			SensorRecord record);
 
+	/**
+	 * Sets the record ID.
+	 *
+	 * @param id the record ID, 0 to 65535
+	 */
 	public void setId(int id) {
 		this.id = id;
 	}
 
+	/**
+	 * Returns the record ID of the record header (bytes 1 and 2 of the record).
+	 *
+	 * @return the record ID, 0 to 65535
+	 */
 	public int getId() {
 		return id;
 	}
 
+	/**
+	 * Sets the SDR version of the record.
+	 *
+	 * @param sdrVersion the SDR version, BCD-decoded (15 for version 1.5)
+	 */
 	public void setSdrVersion(int sdrVersion) {
 		this.sdrVersion = sdrVersion;
 	}
 
+	/**
+	 * Returns the version of the sensor model specification the record complies with (byte 3 of the record),
+	 * BCD-decoded: 15 for 51h, version 1.5.
+	 *
+	 * @return the SDR version, 15 for version 1.5
+	 */
 	public int getSdrVersion() {
 		return sdrVersion;
 	}
 
+	/**
+	 * Sets the record type code.
+	 *
+	 * @param recordType the record type code
+	 */
 	public void setRecordType(byte recordType) {
 		this.recordType = recordType;
 	}
 
+	/**
+	 * Returns the record type code (byte 4 of the record), as a signed byte: the OEM types C0h-FFh are negative,
+	 * {@code getRecordType() & 0xFF} gives the unsigned code.
+	 *
+	 * @return the record type code
+	 */
 	public byte getRecordType() {
 		return recordType;
 	}
 
+	/**
+	 * Sets the record length.
+	 *
+	 * @param recordLength the number of bytes after the 5-byte header
+	 */
 	public void setRecordLength(int recordLength) {
 		this.recordLength = recordLength;
 	}
 
+	/**
+	 * Returns the record length (byte 5 of the record): the number of bytes after the 5-byte header.
+	 *
+	 * @return the number of bytes after the 5-byte header
+	 */
 	public int getRecordLength() {
 		return recordLength;
 	}

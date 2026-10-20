@@ -56,11 +56,11 @@ public final class SelEntryList extends AbstractList<SelEntry> {
 	}
 
 	/**
-	 * Returns the offset from UTC of the SEL time, which a BMC that keeps its SEL time as local time reports with
-	 * Get SEL Time UTC Offset (IPMI 2.0 revision 1.1): already applied to every timestamp of the list and its
-	 * entries. 0 for a BMC without the command, whose SEL time is UTC. It is the offset in force when the log was
-	 * read: the log records none per entry, so an entry logged under another offset (before a daylight saving
-	 * change) comes out shifted by the difference.
+	 * Returns the offset from UTC of the SEL time, which a BMC that keeps its SEL time as local time reports with Get SEL
+	 * Time UTC Offset (IPMI 2.0 revision 1.1): already applied to every timestamp of the list and its entries. 0 for a
+	 * BMC without the command, or that leaves the offset unspecified (07FFh), whose SEL time is then taken as UTC. It is
+	 * the offset in force when the log was read: the log records none per entry, so an entry logged under another offset
+	 * (before a daylight saving change) comes out shifted by the difference.
 	 *
 	 * @return the offset in minutes, local time = UTC + offset
 	 */
@@ -99,8 +99,8 @@ public final class SelEntryList extends AbstractList<SelEntry> {
 	}
 
 	/**
-	 * Returns when the log was last cleared: after a clear, the record IDs start over, and an entry read before is
-	 * no longer the one its {@link SelEntry#id() ID} names.
+	 * Returns when entries were last deleted or the log cleared (IPMI 2.0 table 31-2): the BMC may then give the
+	 * {@link SelEntry#id() record ID} of an entry read before to another entry.
 	 *
 	 * @return the time of the most recent erase, empty when the BMC refused Get SEL Info or reports none
 	 */

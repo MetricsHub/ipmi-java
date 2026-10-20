@@ -11,7 +11,7 @@
 	<version>2.1.00-SNAPSHOT</version>
 
 	<name>IPMI Java Client</name>
-	<description>IPMI Client Library for Java</description>
+	<description>A Java client library and command-line tool (ipmicli) for IPMI 2.0 over LAN (RMCP+): identify a server's BMC, read its chassis status, FRU inventory, sensors and System Event Log, control the power, open a Serial over LAN console, or send any IPMI command. Java 8 or later, no dependency.</description>
 
 	<organization>
 		<name>MetricsHub</name>
@@ -24,7 +24,8 @@
 	<licenses>
 		<license>
 			<name>LGPL-3.0</name>
-			<url>https://www.gnu.org/licenses/lgpl+gpl-3.0.txt</url>
+			<!-- the licenses report downloads this file; www.gnu.org refuses the site build (HTTP 403, timeouts) -->
+			<url>https://raw.githubusercontent.com/metricshub/ipmi-java/main/LICENSE</url>
 			<distribution>repo</distribution>
 		</license>
 	</licenses>
@@ -67,6 +68,8 @@
 	<properties>
 		<!-- Java 8 -->
 		<maven.compiler.release>8</maven.compiler.release>
+		<!-- read by the Project Summary report (Java Version), which ignores release; javac uses release -->
+		<maven.compiler.target>8</maven.compiler.target>
 
 		<!-- Encoding of the generated site reports. oss-parent only sets the source encoding;
 		     spotbugs-maven-plugin 4.10.4 fails with "charsetName" while rendering its report
@@ -278,6 +281,15 @@
 		<plugins>
 
 			<!-- project-info-reports, jxr, checkstyle and javadoc (published at apidocs/) are inherited from oss-parent -->
+
+			<!-- javadoc: maven-javadoc-plugin runs javadoc in Locale.ROOT (forceRootLocale), which writes <html lang> with
+				no value; an explicit locale gives lang="en" -->
+			<plugin>
+				<artifactId>maven-javadoc-plugin</artifactId>
+				<configuration>
+					<locale>en</locale>
+				</configuration>
+			</plugin>
 
 			<!-- surefire report: renders the unit-test results from target/surefire-reports -->
 			<plugin>

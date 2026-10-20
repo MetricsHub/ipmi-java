@@ -34,7 +34,8 @@ import org.metricshub.ipmi.core.coding.commands.sdr.record.SensorType;
 import org.metricshub.ipmi.core.common.TypeConverter;
 
 /**
- * Wrapper for Get Sensor Reading response.
+ * The reply to Get Sensor Reading (IPMI 2.0 table 35-15): the reading byte, the status bits and the threshold or
+ * discrete states of the sensor. The byte numbers below are those of the table, where byte 1 is the completion code.
  */
 public class GetSensorReadingResponseData implements ResponseData {
 
@@ -72,71 +73,126 @@ public class GetSensorReadingResponseData implements ResponseData {
 	 */
 	private byte[] raw;
 
+	/**
+	 * Returns the reading converted to the unit of the sensor with the factors of its Full Sensor Record
+	 * ({@link FullSensorRecord#calcFormula(int)}).
+	 *
+	 * @param sensorRecord the Full Sensor Record of the sensor
+	 * @return the reading, {@link Double#NaN} when the sensor has no analog reading or is non-linear
+	 *         ({@link FullSensorRecord#isNonLinear()}): the readings of a non-linear sensor convert with the factors
+	 *         of Get Sensor Reading Factors
+	 */
 	public double getSensorReading(FullSensorRecord sensorRecord) {
 		return sensorRecord.calcFormula(TypeConverter.byteToInt(sensorReading));
 	}
 
+	/**
+	 * Returns the reading byte as the BMC sent it (byte 2), unsigned and not converted.
+	 *
+	 * @return the reading byte, 0 to 255
+	 */
 	public double getPlainSensorReading() {
 		return TypeConverter.byteToInt(sensorReading);
 	}
 
+	/**
+	 * Sets the reading byte.
+	 *
+	 * @param sensorReading the reading byte (byte 2)
+	 */
 	public void setSensorReading(byte sensorReading) {
 		this.sensorReading = sensorReading;
 	}
 
+	/**
+	 * Tells whether the reading and the states are available: false when the BMC sets the reading/state unavailable bit
+	 * (byte 3 bit 5), for instance while the first update of the sensor after a re-arm is in progress, or when the
+	 * entity is not present.
+	 *
+	 * @return whether the reading and the states are available
+	 */
 	public boolean isSensorStateValid() {
 		return sensorStateValid;
 	}
 
+	/**
+	 * Sets whether the reading and the states are available.
+	 *
+	 * @param sensorStateValid whether the reading and the states are available (byte 3 bit 5 clear)
+	 */
 	public void setSensorStateValid(boolean sensorStateValid) {
 		this.sensorStateValid = sensorStateValid;
 	}
 
 	/**
-	 * @return false when the BMC reports sensor scanning as disabled (byte 2 bit 6): the reading and the states
-	 *         are then not to be used
+	 * Tells whether the BMC reports sensor scanning as enabled (byte 3 bit 6).
+	 *
+	 * @return false when the BMC reports sensor scanning as disabled: the reading and the states are then not to be
+	 *         used
 	 */
 	public boolean isScanningEnabled() {
 		return scanningEnabled;
 	}
 
 	/**
-	 * @param scanningEnabled whether the BMC reports sensor scanning as enabled (byte 2 bit 6)
+	 * Sets whether the BMC reports sensor scanning as enabled.
+	 *
+	 * @param scanningEnabled whether the BMC reports sensor scanning as enabled (byte 3 bit 6)
 	 */
 	public void setScanningEnabled(boolean scanningEnabled) {
 		this.scanningEnabled = scanningEnabled;
 	}
 
 	/**
-	 * Contains state of the sensor if it is threshold-based.
+	 * Returns the most severe threshold the reading is at or beyond (byte 4 bits 5:0), for a threshold sensor: the
+	 * value means nothing for a discrete sensor.
+	 *
+	 * @return the state, {@link SensorState#Ok} when the reading is within all the thresholds, null when the reply has
+	 *         no byte 4
 	 */
 	public SensorState getSensorState() {
 		return sensorState;
 	}
 
+	/**
+	 * Sets the most severe threshold the reading is at or beyond.
+	 *
+	 * @param sensorState the state
+	 */
 	public void setSensorState(SensorState sensorState) {
 		this.sensorState = sensorState;
 	}
 
 	/**
-	 * Contains raw IPMI command data.
+	 * Returns the response data as the BMC sent it, from byte 2 (the completion code is not included).
+	 *
+	 * @return the response data
 	 */
 	public byte[] getRaw() {
 		return raw;
 	}
 
+	/**
+	 * Sets the response data as the BMC sent it.
+	 *
+	 * @param raw the response data, from byte 2
+	 */
 	public void setRaw(byte[] raw) {
 		this.raw = raw;
 	}
 
 	/**
-	 * Contains state of the sensor if it is discrete.
+	 * Returns the states the sensor asserts (bytes 4 and 5): for a discrete sensor, one state per bit set; for a
+	 * threshold sensor, the going-low or going-high event of each threshold the reading is at or beyond.
 	 *
+	 * @param sensorType
+	 *        - the type of the sensor, from its record
 	 * @param sensorEventReadingType
 	 *        - value received via
 	 *        {@link FullSensorRecord#getEventReadingType()},
 	 *        {@link CompactSensorRecord#getEventReadingType()} or
 	 *        {@link EventOnlyRecord#getEventReadingType()}
+	 * @return the asserted states, empty when the reply has no state byte
 	 */
 	public List<ReadingType> getStatesAsserted(
 			SensorType sensorType,
@@ -146,7 +202,7 @@ public class GetSensorReadingResponseData implements ResponseData {
 			return list;
 		}
 		if (sensorEventReadingType == THRESHOLD_EVENT_READING_TYPE) {
-			// Byte 3 of a threshold sensor holds comparison bits (Table 35-15), not event offsets: bit n means
+			// Byte 4 of a threshold sensor holds comparison bits (Table 35-15), not event offsets: bit n means
 			// "at or beyond" the threshold whose going-low (lower) or going-high (upper) event offset is below
 			for (int i = 0; i < THRESHOLD_EVENT_OFFSETS.length && i < statesAsserted.length; ++i) {
 				if (statesAsserted[i]) {
@@ -169,6 +225,11 @@ public class GetSensorReadingResponseData implements ResponseData {
 		return list;
 	}
 
+	/**
+	 * Sets the state bits.
+	 *
+	 * @param statesAsserted the state bits of bytes 4 and 5, bit 0 of byte 4 first
+	 */
 	public void setStatesAsserted(boolean[] statesAsserted) {
 		this.statesAsserted = statesAsserted;
 	}

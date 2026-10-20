@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<title>IPMI Java Client</title>
+</head>
+<body>
+<p>
+The IPMI Java Client talks to the Baseboard Management Controller (BMC) of a server over IPMI 2.0 over LAN (RMCP+).
+</p>
+<ul>
+<li>{@link org.metricshub.ipmi.client} is the client API: start with {@link org.metricshub.ipmi.client.IpmiClient}.</li>
+<li>The {@code org.metricshub.ipmi.core} packages are the protocol layer that {@code IpmiClient} uses:
+{@link org.metricshub.ipmi.core.api.sync.IpmiConnector}, the command coders and the SDR, FRU and SEL decoders.</li>
+<li>{@link org.metricshub.ipmi.cli.IpmiCli} is {@code ipmicli}, the command-line client.</li>
+</ul>
+<p>
+User guide: <a href="https://metricshub.org/ipmi-java/">https://metricshub.org/ipmi-java/</a>
+</p>
+</body>
+</html>

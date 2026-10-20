@@ -28,11 +28,14 @@ package org.metricshub.ipmi.core.coding.commands.chassis;
  */
 public enum PowerCommand {
 	/**
-	 * Force system into soft off (S4/S45) state. This is for 'emergency'
+	 * Force system into soft off (S4/S5) state. This is for 'emergency'
 	 * management power down actions. The command does not initiate a clean
 	 * shut-down of the operating system prior to powering down the system.
 	 */
 	PowerDown(PowerCommand.POWERDOWN),
+	/**
+	 * Power up the system.
+	 */
 	PowerUp(PowerCommand.POWERUP),
 	/**
 	 * Power cycle (optional): a power off interval of at least 1 second, then power up. When the system is off,
@@ -72,10 +75,22 @@ public enum PowerCommand {
 		this.code = code;
 	}
 
+	/**
+	 * Returns the code of the command in the request data of Chassis Control (IPMI 2.0 table 28-4, byte 1 bits 3:0).
+	 *
+	 * @return the code, 0 to 5
+	 */
 	public int getCode() {
 		return code;
 	}
 
+	/**
+	 * Returns the command of a Chassis Control code.
+	 *
+	 * @param value the code, 0 to 5
+	 * @return the command
+	 * @throws IllegalArgumentException when the code is not 0 to 5
+	 */
 	public static PowerCommand parseInt(int value) {
 		switch (value) {
 		case POWERDOWN:

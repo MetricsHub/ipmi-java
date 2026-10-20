@@ -83,6 +83,8 @@ public final class RawRequest {
 	 *
 	 * @param deadline the time the request may take, session setup included
 	 * @return this request
+	 * @throws IllegalArgumentException when the duration is shorter than one millisecond or longer than
+	 *         {@link Integer#MAX_VALUE} milliseconds
 	 */
 	public RawRequest timeout(Duration deadline) {
 		this.timeout = IpmiClient.checkTimeout(deadline, "timeout");

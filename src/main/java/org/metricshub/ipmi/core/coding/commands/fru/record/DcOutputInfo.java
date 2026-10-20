@@ -31,19 +31,10 @@ public class DcOutputInfo extends MultiRecordInfo {
 
 	private int outputNumber;
 
-	/**
-	 * The unit is 10mV.
-	 */
 	private int nominalVoltage;
 
-	/**
-	 * The unit is 10mV.
-	 */
 	private int maximumNegativeDeviation;
 
-	/**
-	 * The unit is 10mV.
-	 */
 	private int maximumPositiveDeviation;
 
 	/**
@@ -72,34 +63,74 @@ public class DcOutputInfo extends MultiRecordInfo {
 		maximumPositiveDeviation = TypeConverter.decode2sComplement(maximumPositiveDeviation, 15);
 	}
 
+	/**
+	 * Returns the number of the DC output.
+	 *
+	 * @return the output number, 0 to 15
+	 */
 	public int getOutputNumber() {
 		return outputNumber;
 	}
 
+	/**
+	 * Sets the number of the DC output.
+	 *
+	 * @param outputNumber the output number, 0 to 15
+	 */
 	public void setOutputNumber(int outputNumber) {
 		this.outputNumber = outputNumber;
 	}
 
+	/**
+	 * Returns the nominal voltage of the output.
+	 *
+	 * @return the voltage in units of 10 mV, signed
+	 */
 	public int getNominalVoltage() {
 		return nominalVoltage;
 	}
 
+	/**
+	 * Sets the nominal voltage of the output.
+	 *
+	 * @param nominalVoltage the voltage in units of 10 mV, signed
+	 */
 	public void setNominalVoltage(int nominalVoltage) {
 		this.nominalVoltage = nominalVoltage;
 	}
 
+	/**
+	 * Returns the maximum negative deviation from the nominal voltage.
+	 *
+	 * @return the deviation in units of 10 mV, signed
+	 */
 	public int getMaximumNegativeDeviation() {
 		return maximumNegativeDeviation;
 	}
 
+	/**
+	 * Sets the maximum negative deviation from the nominal voltage.
+	 *
+	 * @param maximumNegativeDeviation the deviation in units of 10 mV, signed
+	 */
 	public void setMaximumNegativeDeviation(int maximumNegativeDeviation) {
 		this.maximumNegativeDeviation = maximumNegativeDeviation;
 	}
 
+	/**
+	 * Returns the maximum positive deviation from the nominal voltage.
+	 *
+	 * @return the deviation in units of 10 mV, signed
+	 */
 	public int getMaximumPositiveDeviation() {
 		return maximumPositiveDeviation;
 	}
 
+	/**
+	 * Sets the maximum positive deviation from the nominal voltage.
+	 *
+	 * @param maximumPositiveDeviation the deviation in units of 10 mV, signed
+	 */
 	public void setMaximumPositiveDeviation(int maximumPositiveDeviation) {
 		this.maximumPositiveDeviation = maximumPositiveDeviation;
 	}

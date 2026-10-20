@@ -44,7 +44,7 @@ import org.metricshub.ipmi.core.coding.payload.CompletionCode;
  */
 final class SelReader {
 
-	/** First entry (IPMI 2.0 section 31.6). */
+	/** First entry (IPMI 2.0 section 31.5). */
 	static final int FIRST_RECORD_ID = 0;
 
 	/** Given as the next record ID by the last entry. */
@@ -62,7 +62,10 @@ final class SelReader {
 	/** 0 until the BMC asks for a reservation: a whole entry is read without one (IPMI 2.0 section 31.5). */
 	private int reservationId;
 	private int utcOffsetMinutes;
-	/** The first entry the walk read, or the entry after which it read when it read none, to read again after it. */
+	/**
+	 * The entry given to since() when the log still holds it, else the first entry the walk read: read again after the
+	 * walk.
+	 */
 	private SelEntry anchor;
 
 	private SelReader(Exchange exchange) {
@@ -114,9 +117,9 @@ final class SelReader {
 	}
 
 	/**
-	 * Tells whether the anchor of the walk (the first entry it read, or the entry after which it read when it read
-	 * none) is still in the log, byte for byte: a log cleared and filled again while it was walked holds another
-	 * entry under its ID, even when two erases within a second left the erase timestamp unchanged.
+	 * Tells whether the anchor of the walk (the entry given to since() when the log still holds it, else the first
+	 * entry the walk read) is still in the log, byte for byte: a log cleared and filled again while it was walked holds
+	 * another entry under its ID, even when two erases within a second left the erase timestamp unchanged.
 	 */
 	private boolean changed() {
 		if (anchor == null) {
@@ -170,8 +173,8 @@ final class SelReader {
 			// 07FFh, unspecified: the SEL time is taken as UTC, the best there is
 			return offset.isUnspecified() ? 0 : offset.getOffsetMinutes();
 		} catch (IpmiCompletionCodeException e) {
-			// A BMC without the command (IPMI 2.0 revision 1.1) keeps its SEL time in UTC. Any other refusal (privilege,
-			// busy) is the caller's to act on: the timestamps would be off by an unknown offset
+			// The SEL time of a BMC without the command (IPMI 2.0 revision 1.1) is taken as UTC. Any other refusal
+			// (privilege, busy) is the caller's to act on: the timestamps would be off by an unknown offset
 			if (e.completionCode() == CompletionCode.InvalidCommand
 					|| e.completionCode() == CompletionCode.CommandNotSupported) {
 				return 0;
@@ -216,7 +219,7 @@ final class SelReader {
 			}
 			SelEntry entry = new SelEntry(reply.getSelRecord(), utcOffsetMinutes);
 			if (entry.id() <= FIRST_RECORD_ID || entry.id() >= LAST_RECORD_ID) {
-				// 0000h and FFFFh are selectors, not the IDs of entries (IPMI 2.0 section 31.6)
+				// 0000h and FFFFh are selectors, not the IDs of entries (IPMI 2.0 section 31.5 and table 32-1)
 				throw new IpmiClientException(
 						String.format("The System Event Log answered an entry whose record ID is %04Xh", entry.id()));
 			}

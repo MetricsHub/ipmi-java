@@ -54,8 +54,9 @@ public final class BmcCapabilities {
 	}
 
 	/**
-	 * Returns the cipher suites the BMC offers, with their algorithms. {@link CipherSuite#isSupported()} tells
-	 * whether the library implements the algorithms of a suite.
+	 * Returns the standard cipher suites (0 to 19) the BMC offers, with their algorithms; the OEM suites and reserved
+	 * suite IDs it lists are left out. {@link CipherSuite#isSupported()} tells whether the library implements the
+	 * algorithms of a suite.
 	 *
 	 * @return the suites, in the order the BMC lists them
 	 */

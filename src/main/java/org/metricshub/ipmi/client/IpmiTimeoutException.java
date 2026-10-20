@@ -24,7 +24,14 @@ package org.metricshub.ipmi.client;
 
 /**
  * The overall deadline of the operation expired, or a message of an established session got no reply after all the
- * tries. The session is considered lost: the next operation opens a new one.
+ * tries. The session is then considered lost, and the next operation opens a new one.
+ * <p>
+ * Two messages without reply keep the session: a command sent once
+ * ({@link IpmiClient#chassisControl(org.metricshub.ipmi.core.coding.commands.chassis.PowerCommand)},
+ * {@link IpmiClient#chassisIdentify(int)}, {@link IpmiClient#chassisIdentifyForever()}), where whether the BMC
+ * carried the command out is unknown, and a request the BMC acknowledged and forwarded with Send Message to another
+ * controller, which did not answer (it may be absent).
+ * </p>
  */
 public class IpmiTimeoutException extends IpmiClientException {
 

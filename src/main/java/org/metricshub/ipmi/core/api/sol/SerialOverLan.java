@@ -65,7 +65,9 @@ import java.util.Set;
 import java.util.concurrent.CopyOnWriteArrayList;
 
 /**
- * Entry point for the Serial Over LAN (SOL) communication. Use all SOL operations through this class.
+ * A Serial over LAN (SOL) console in a session of the protocol core: activates the SOL payload, reads and writes the
+ * serial port of the server, and invokes the serial port operations. Applications that use
+ * {@link org.metricshub.ipmi.client.IpmiClient} open a console with {@code sol().open()} instead.
  */
 public class SerialOverLan implements Closeable {
 
@@ -139,7 +141,7 @@ public class SerialOverLan implements Closeable {
 	 * @param connector
 	 *        {@link IpmiConnector} that will be used for communication
 	 * @param remoteHost
-	 *        IP address of the remote server
+	 *        the host name or IP address of the BMC
 	 * @param remotePort
 	 *        UDP port number of the remote server
 	 * @param user
@@ -165,7 +167,7 @@ public class SerialOverLan implements Closeable {
 	 * @param connector
 	 *        {@link IpmiConnector} that will be used for communication
 	 * @param remoteHost
-	 *        IP address of the remote server
+	 *        the host name or IP address of the BMC
 	 * @param remotePort
 	 *        UDP port number of the remote server
 	 * @param user
@@ -196,7 +198,7 @@ public class SerialOverLan implements Closeable {
 	 * @param connector
 	 *        {@link IpmiConnector} that will be used for communication
 	 * @param remoteHost
-	 *        IP address of the remote server
+	 *        the host name or IP address of the BMC
 	 * @param user
 	 *        IPMI user name
 	 * @param password
@@ -334,15 +336,15 @@ public class SerialOverLan implements Closeable {
 	}
 
 	/**
-	 * Tries to activate SOL payload in the given session. If the first try fails due to insufficient privileges in a
-	 * session opened with {@link PrivilegeLevel#MaximumAvailable}, the only one {@code openSession()} does not raise,
-	 * raises it to Administrator and tries once again.
+	 * Tries to activate SOL payload in the given session. When the BMC refuses it for insufficient privilege in a
+	 * session opened with {@link PrivilegeLevel#MaximumAvailable}, which {@code openSession()} sets to User, raises the
+	 * session to Operator, then to Administrator, and tries again after each raise.
 	 *
 	 * @param ipmiConnector
 	 *        {@link IpmiConnector} that will be used for communication
 	 * @param payloadSession
 	 *        the session where the payload is activated
-	 * @return UDP port number on which managed system listenes for SOL messages.
+	 * @return UDP port number on which managed system listens for SOL messages.
 	 * @throws SOLException
 	 *         when any unrecoverable error occurred.
 	 */
@@ -476,14 +478,6 @@ public class SerialOverLan implements Closeable {
 	}
 
 	/**
-	 * Writes single byte to the port.
-	 * This operation blocks until all data can be sent to remote server and is either accepted or rejected by the server.
-	 *
-	 * @param singleByte
-	 *        a byte to write
-	 * @return true if byte was successfully sent and acknowledged by remote server, false otherwise.
-	 */
-	/**
 	 * Returns the connection the console exchanges its packets on: the one of the session it was given, or the one
 	 * of the session it opened on the port of the payload when the BMC serves SOL on another port.
 	 *
@@ -493,6 +487,14 @@ public class SerialOverLan implements Closeable {
 		return session.getConnectionHandle();
 	}
 
+	/**
+	 * Writes single byte to the port.
+	 * This operation blocks until all data can be sent to remote server and is either accepted or rejected by the server.
+	 *
+	 * @param singleByte
+	 *        a byte to write
+	 * @return true if byte was successfully sent and acknowledged by remote server, false otherwise.
+	 */
 	public boolean writeByte(byte singleByte) {
 		return writeBytes(new byte[] { singleByte });
 	}

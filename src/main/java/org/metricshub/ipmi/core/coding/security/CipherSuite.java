@@ -265,7 +265,7 @@ public class CipherSuite {
 			}
 			return ca;
 		case SecurityConstants.CA_XRC4_40:
-			// xRC4 is deprecated by the IPMI 2.0 specification (section 13.29) and no current BMC requires it: not
+			// xRC4 is optional for BMCs in IPMI 2.0 (table 13-19, section 13.30) and no current BMC requires it: not
 			// implemented, the suites 4, 5, 9, 10, 13, 14, 18 and 19 are reported as unsupported
 			throw new IllegalArgumentException("Confidentiality algorithm XRC4-40 is not implemented.");
 		case SecurityConstants.CA_XRC4_128:
@@ -372,7 +372,7 @@ public class CipherSuite {
 	/**
 	 * Creates an instance of AuthenticationAlgorithm.
 	 *
-	 * @param supplier constructor of the algorithm
+	 * @param constructor constructor of the algorithm
 	 */
 	private AuthenticationAlgorithm instantiateAuthenticationAlgorithm(
 			final Supplier<AuthenticationAlgorithm> constructor) {
@@ -385,7 +385,7 @@ public class CipherSuite {
 	/**
 	 * Creates an instance of IntegrityAlgorithm.
 	 *
-	 * @param supplier constructor of the algorithm
+	 * @param constructor constructor of the algorithm
 	 */
 	private IntegrityAlgorithm instantiateIntegrityAlgorithm(final Supplier<IntegrityAlgorithm> constructor) {
 		if (ia == null) {

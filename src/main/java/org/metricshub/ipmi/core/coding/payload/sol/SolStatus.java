@@ -75,6 +75,11 @@ public enum SolStatus {
 		this.statusNumber = statusNumber;
 	}
 
+	/**
+	 * Returns the bit of the status in the Operation/Status byte of a SOL packet from the BMC (IPMI 2.0 table 15-2).
+	 *
+	 * @return the bit number, 0 to 5
+	 */
 	public int getStatusNumber() {
 		return statusNumber;
 	}

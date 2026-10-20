@@ -26,7 +26,9 @@ package org.metricshub.ipmi.core.coding.commands.fru;
  * Represents unit which is used to access FRU
  */
 public enum BaseUnit {
+	/** The device is accessed by bytes. */
 	Bytes(BaseUnit.BYTES),
+	/** The device is accessed by 16-bit words: Read FRU Data takes its offset in words. */
 	Words(BaseUnit.WORDS),;
 
 	private static final int BYTES = 0;
@@ -40,10 +42,22 @@ public enum BaseUnit {
 		this.code = code;
 	}
 
+	/**
+	 * Returns the code of the unit.
+	 *
+	 * @return the access type bit of Get FRU Inventory Area Info: 0 for bytes, 1 for words
+	 */
 	public int getCode() {
 		return code;
 	}
 
+	/**
+	 * Returns the unit of an access type bit.
+	 *
+	 * @param value the access type bit of Get FRU Inventory Area Info
+	 * @return the matching unit
+	 * @throws IllegalArgumentException when the value is neither 0 nor 1
+	 */
 	public static BaseUnit parseInt(int value) {
 		switch (value) {
 		case BYTES:
@@ -56,7 +70,9 @@ public enum BaseUnit {
 	}
 
 	/**
-	 * Returns size of the unit in bytes.
+	 * Returns the size of the unit in bytes.
+	 *
+	 * @return 1 for {@link #Bytes}, 2 for {@link #Words}
 	 */
 	public int getSize() {
 		switch (this) {

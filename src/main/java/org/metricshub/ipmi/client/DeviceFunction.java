@@ -38,9 +38,12 @@ public enum DeviceFunction {
 	IPMB_EVENT_RECEIVER(0x10),
 	/** The device generates events over the IPMB (bit 5). */
 	IPMB_EVENT_GENERATOR(0x20),
-	/** The device bridges messages to other channels (bit 6). */
+	/**
+	 * The device responds to the commands of the Bridge network function, used for ICMB bridging (bit 6). It does not
+	 * tell whether the BMC forwards Send Message requests to other controllers.
+	 */
 	BRIDGE(0x40),
-	/** The device implements the chassis commands (bit 7). */
+	/** The device implements the chassis commands, as the chassis device of the ICMB specification (bit 7). */
 	CHASSIS_DEVICE(0x80);
 
 	private final int bit;

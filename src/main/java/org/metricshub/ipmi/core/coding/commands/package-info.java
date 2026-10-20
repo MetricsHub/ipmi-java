@@ -1,7 +1,8 @@
 /**
- * The package containing command wrappers. These include command encoders and decoders.
- * To add custom IPMI command extend {@link org.metricshub.ipmi.core.coding.PayloadCoder} class and implement
- * {@link org.metricshub.ipmi.core.api.async.messages.IpmiResponseData} interface.
+ * The IPMI commands: one {@link org.metricshub.ipmi.core.coding.commands.IpmiCommandCoder} per command, which encodes
+ * the request and decodes the response into its {@link org.metricshub.ipmi.core.coding.commands.ResponseData}. To add a
+ * command, extend {@code IpmiCommandCoder<R>} and implement {@code ResponseData} for its response: see
+ * <a href="https://metricshub.org/ipmi-java/low-level-api.html#writing-your-own-command">Writing your own command</a>.
  */
 package org.metricshub.ipmi.core.coding.commands;
 /*-
