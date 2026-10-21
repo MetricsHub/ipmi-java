@@ -1101,6 +1101,92 @@ class IpmiClientTest {
 
 	@Test
 	@Timeout(30)
+	void aThresholdSensorBeyondItsThresholdsListsThemAsStates() throws Exception {
+		try (FakeRmcpPlusBmc bmc = new FakeRmcpPlusBmc(SUITES, USER, utf8(PASSWORD), null)) {
+			// B0h = 44 degrees C, byte 3 bits 3 and 4: at or above UNC (38) and UC (41), IPMI 2.0 table 35-15
+			new FakeSdrRepository()
+					.add(Fixtures.FRONT_PANEL_FULL_RECORD)
+					.reading(TEMPERATURE_SENSOR, 0xb0, 0x40, 0x18)
+					.install(bmc);
+			try (IpmiClient client = client(bmc).build()) {
+				Sensor temperature = client.sensors().execute().get(0);
+				assertEquals(44.0, temperature.reading().getAsDouble());
+				assertEquals(
+						Arrays.asList(ReadingType.UpperNonCriticalGoingHigh, ReadingType.UpperCriticalGoingHigh),
+						temperature.rawStates());
+				assertEquals(
+						Arrays.asList("Upper Non Critical Going High", "Upper Critical Going High"),
+						temperature.states(),
+						"the wording of the SEL events");
+				assertEquals(SensorStatus.CRITICAL, temperature.status());
+			}
+		}
+	}
+
+	@Test
+	@Timeout(30)
+	void theGenericStatesOfAnOemSensorTypeAreDecoded() throws Exception {
+		try (FakeRmcpPlusBmc bmc = new FakeRmcpPlusBmc(SUITES, USER, utf8(PASSWORD), null)) {
+			new FakeSdrRepository()
+					.add(compactSensorRecord(1, 0x30, EntityId.SystemBoard.getCode(), 1, 0xc0, 0x08, "OEM Presence"))
+					.reading(0x30, 0x00, 0x40, 0x02)
+					.install(bmc);
+			try (IpmiClient client = client(bmc).build()) {
+				Sensor presence = client.sensors().execute().get(0);
+				assertEquals(SensorType.Oem, presence.type());
+				assertEquals(0xc0, presence.typeCode());
+				assertEquals(Collections.singletonList(ReadingType.DevicePresent), presence.rawStates());
+				assertEquals(Collections.singletonList("Device Present"), presence.states());
+				assertEquals("OEM Presence (Oem C0h, SystemBoard 1): OK, states [Device Present]", presence.toString());
+			}
+		}
+	}
+
+	@Test
+	@Timeout(30)
+	void aDiscreteFullRecordHasNoReadingAndNoFactors() throws Exception {
+		byte[] discrete = Fixtures.FRONT_PANEL_FULL_RECORD.clone();
+		discrete[11] = 0x60; // capabilities: no thresholds
+		discrete[12] = (byte) SensorType.PowerSupply.getCode();
+		discrete[13] = 0x6f; // sensor-specific
+		discrete[20] = 0x00; // Sensor Units 1 "written as 00h" (IPMI 2.0 table 43-1, byte 21): unsigned
+		discrete[23] = 0x70; // non-linear: no Get Sensor Reading Factors for a sensor without a reading either
+		try (FakeRmcpPlusBmc bmc = new FakeRmcpPlusBmc(SUITES, USER, utf8(PASSWORD), null)) {
+			new FakeSdrRepository().add(discrete).reading(TEMPERATURE_SENSOR, 0x5a, 0x40, 0x01).install(bmc);
+			try (IpmiClient client = client(bmc).build()) {
+				Sensor psu = client.sensors().execute().get(0);
+				assertFalse(psu.reading().isPresent());
+				assertEquals(0x5a, psu.rawReading().getAsInt());
+				assertEquals(Collections.singletonList("Presence detected"), psu.states());
+				assertEquals(SensorStatus.OK, psu.status());
+				assertFalse(psu.problem().isPresent());
+				assertEquals(0, bmc.getCount(NETFN_SENSOR, FakeSdrRepository.GET_SENSOR_READING_FACTORS));
+			}
+		}
+	}
+
+	@Test
+	@Timeout(30)
+	void aPercentageSensorSaysSo() throws Exception {
+		byte[] percent = Fixtures.FRONT_PANEL_FULL_RECORD.clone();
+		percent[20] = 0x01; // Sensor Units 1 bit 0: percentage
+		percent[21] = 0x00; // base unit unspecified
+		try (FakeRmcpPlusBmc bmc = new FakeRmcpPlusBmc(SUITES, USER, utf8(PASSWORD), null)) {
+			new FakeSdrRepository().add(percent).reading(TEMPERATURE_SENSOR, 0x9a, 0x40, 0x00).install(bmc);
+			try (IpmiClient client = client(bmc).build()) {
+				Sensor sensor = client.sensors().execute().get(0);
+				assertTrue(sensor.percentage());
+				assertEquals(SensorUnit.Unspecified, sensor.unit());
+				assertEquals("Ambient Temp (Temperature, FrontPanelBoard 1): 22.0 percent, OK", sensor.toString());
+			}
+		}
+		try (FakeRmcpPlusBmc bmc = bmc(); IpmiClient client = client(bmc).build()) {
+			assertFalse(client.sensors().execute().get(0).percentage());
+		}
+	}
+
+	@Test
+	@Timeout(30)
 	void aMalformedReadingReplyCostsThatSensorAndKeepsTheSession() throws Exception {
 		try (FakeRmcpPlusBmc bmc = bmc()) {
 			// One data byte: Get Sensor Reading needs two

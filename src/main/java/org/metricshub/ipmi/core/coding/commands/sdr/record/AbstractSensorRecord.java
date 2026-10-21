@@ -60,7 +60,11 @@ public abstract class AbstractSensorRecord extends SensorRecord {
 
 	private SensorType sensorType;
 
+	private int sensorTypeCode;
+
 	private int eventReadingType;
+
+	private boolean percentage;
 
 	private RateUnit rateUnit;
 
@@ -100,7 +104,8 @@ public abstract class AbstractSensorRecord extends SensorRecord {
 		setEntityId(EntityId.parseInt(TypeConverter.byteToInt(recordData[8])));
 		setEntityPhysical((TypeConverter.byteToInt(recordData[9]) & 0x80) == 0);
 		setEntityInstanceNumber(TypeConverter.intToByte(TypeConverter.byteToInt(recordData[9]) & 0x7f));
-		setSensorType(SensorType.parseInt(TypeConverter.byteToInt(recordData[sensorTypeIndex])));
+		setSensorTypeCode(TypeConverter.byteToInt(recordData[sensorTypeIndex]));
+		setSensorType(SensorType.parseInt(getSensorTypeCode()));
 		setEventReadingType(TypeConverter.byteToInt(recordData[sensorTypeIndex + 1]));
 	}
 
@@ -116,6 +121,7 @@ public abstract class AbstractSensorRecord extends SensorRecord {
 		setThresholdsReadable(isFieldReadable((TypeConverter.byteToInt(recordData[11]) & 0xc) >> 2));
 		setRateUnit(RateUnit.parseInt((TypeConverter.byteToInt(recordData[20]) & 0x38) >> 3));
 		setModifierUnitUsage(ModifierUnitUsage.parseInt((TypeConverter.byteToInt(recordData[20]) & 0x6) >> 1));
+		setPercentage((TypeConverter.byteToInt(recordData[20]) & 0x1) != 0);
 		setSensorBaseUnit(SensorUnit.parseInt(TypeConverter.byteToInt(recordData[21])));
 		setSensorModifierUnit(SensorUnit.parseInt(TypeConverter.byteToInt(recordData[22])));
 	}
@@ -373,6 +379,46 @@ public abstract class AbstractSensorRecord extends SensorRecord {
 	 */
 	public void setSensorType(SensorType sensorType) {
 		this.sensorType = sensorType;
+	}
+
+	/**
+	 * Returns the sensor type code of the record (IPMI 2.0 table 42-3), which {@link #getSensorType()} does not keep
+	 * for an OEM (C0h to FFh) or reserved code.
+	 *
+	 * @return the sensor type code, 0 to 255
+	 */
+	public int getSensorTypeCode() {
+		return sensorTypeCode;
+	}
+
+	/**
+	 * Sets the sensor type code of the record.
+	 *
+	 * @param sensorTypeCode
+	 *        - the sensor type code, 0 to 255
+	 */
+	public void setSensorTypeCode(int sensorTypeCode) {
+		this.sensorTypeCode = sensorTypeCode;
+	}
+
+	/**
+	 * Tells whether the reading and the thresholds of the sensor are a percentage (Sensor Units 1 bit 0 of a Full or
+	 * Compact record, IPMI 2.0 tables 43-1 and 43-2), of the base unit when the record gives one.
+	 *
+	 * @return whether the reading is a percentage (always <code>false</code> for Event-Only records)
+	 */
+	public boolean isPercentage() {
+		return percentage;
+	}
+
+	/**
+	 * Sets whether the reading and the thresholds of the sensor are a percentage.
+	 *
+	 * @param percentage
+	 *        - whether the reading is a percentage
+	 */
+	public void setPercentage(boolean percentage) {
+		this.percentage = percentage;
 	}
 
 	/**

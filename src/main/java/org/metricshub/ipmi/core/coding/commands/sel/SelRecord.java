@@ -53,6 +53,12 @@ public class SelRecord {
 	private SensorType sensorType;
 
 	/**
+	 * Sensor type code of the sensor that generated the event, which {@link #sensorType} does not keep for an OEM or
+	 * reserved code
+	 */
+	private int sensorTypeCode;
+
+	/**
 	 * Number of sensor that generated the event
 	 */
 	private int sensorNumber;
@@ -184,7 +190,8 @@ public class SelRecord {
 
 		record.setGeneratorId(TypeConverter.littleEndianByteArrayToInt(buffer));
 
-		record.setSensorType(SensorType.parseInt(TypeConverter.byteToInt(data[10])));
+		record.setSensorTypeCode(TypeConverter.byteToInt(data[10]));
+		record.setSensorType(SensorType.parseInt(record.getSensorTypeCode()));
 
 		record.setSensorNumber(TypeConverter.byteToInt(data[11]));
 
@@ -374,6 +381,25 @@ public class SelRecord {
 	 */
 	public void setSensorType(SensorType sensorType) {
 		this.sensorType = sensorType;
+	}
+
+	/**
+	 * Returns the sensor type code of a system event (byte 11 of the record, IPMI 2.0 table 42-3), which
+	 * {@link #getSensorType()} does not keep for an OEM (C0h to FFh) or reserved code.
+	 *
+	 * @return the sensor type code, 0 to 255, 0 for the other record types
+	 */
+	public int getSensorTypeCode() {
+		return sensorTypeCode;
+	}
+
+	/**
+	 * Sets the sensor type code of a system event.
+	 *
+	 * @param sensorTypeCode the sensor type code, 0 to 255
+	 */
+	public void setSensorTypeCode(int sensorTypeCode) {
+		this.sensorTypeCode = sensorTypeCode;
 	}
 
 	/**

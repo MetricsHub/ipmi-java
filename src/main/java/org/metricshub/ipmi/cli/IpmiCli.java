@@ -74,6 +74,7 @@ import org.metricshub.ipmi.client.SensorsRequest;
 import org.metricshub.ipmi.client.SkippedRecord;
 import org.metricshub.ipmi.client.SolConsole;
 import org.metricshub.ipmi.core.coding.commands.PrivilegeLevel;
+import org.metricshub.ipmi.core.coding.commands.sdr.record.AbstractSensorRecord;
 import org.metricshub.ipmi.core.coding.commands.sdr.record.SensorType;
 import org.metricshub.ipmi.core.coding.commands.sdr.record.SensorUnit;
 import org.metricshub.ipmi.core.coding.commands.fru.record.BoardInfo;
@@ -113,6 +114,8 @@ public final class IpmiCli {
 	private static final long KEY_READER_START_MS = 500L;
 	private static final int DECIMALS = 3;
 	private static final int RAW_BYTES_PER_LINE = 16;
+	/** Event/reading type code of the threshold sensors (IPMI 2.0 table 42-1). */
+	private static final int THRESHOLD_EVENT_READING_TYPE = 1;
 
 	private IpmiCli() {}
 
@@ -557,9 +560,11 @@ public final class IpmiCli {
 								{ "Name", "Type", "Reading", "Unit", "Status" });
 		for (Sensor sensor : sensors) {
 			String reading = number(sensor.reading());
-			String unit = sensor.unit() == SensorUnit.Unspecified ? "" : sensor.unit().name();
-			String status = sensor.states().isEmpty() ?
+			String unit = unit(sensor);
+			// A threshold sensor keeps its status (critical...) in the column, its states being the thresholds crossed
+			String status = sensor.states().isEmpty() || isThreshold(sensor) ?
 					sensor.status().name().toLowerCase(Locale.ROOT).replace('_', '-') : String.join(", ", sensor.states());
+			String type = typeName(sensor.type(), sensor.typeCode());
 			rows
 					.add(
 							longFormat ?
@@ -567,7 +572,7 @@ public final class IpmiCli {
 									{
 											sensor.name(),
 											String.valueOf(sensor.number()),
-											sensor.type().name(),
+											type,
 											sensor.entity() + " " + sensor.entityInstance(),
 											reading,
 											unit,
@@ -580,10 +585,34 @@ public final class IpmiCli {
 											number(sensor.upperNonRecoverable()),
 											sensor.problem().orElse("") } :
 									new String[]
-									{ sensor.name(), sensor.type().name(), reading, unit, status });
+									{ sensor.name(), type, reading, unit, status });
 		}
 		out.print(table(rows));
 		return 0;
+	}
+
+	private static boolean isThreshold(Sensor sensor) {
+		return sensor.record() instanceof AbstractSensorRecord
+				&& ((AbstractSensorRecord) sensor.record()).getEventReadingType() == THRESHOLD_EVENT_READING_TYPE;
+	}
+
+	/**
+	 * Names the unit of a sensor as {@code ipmitool} does: {@code percent} for a percentage of no unit, {@code % }
+	 * followed by the unit for a percentage of it, nothing for no unit.
+	 */
+	private static String unit(Sensor sensor) {
+		if (sensor.percentage()) {
+			return sensor.unit() == SensorUnit.Unspecified ? "percent" : "% " + sensor.unit().name();
+		}
+		return sensor.unit() == SensorUnit.Unspecified ? "" : sensor.unit().name();
+	}
+
+	/**
+	 * Names a sensor type, with its code for an OEM or reserved one ({@code Oem C1h}), which the constant does not
+	 * keep.
+	 */
+	private static String typeName(SensorType type, int code) {
+		return type == SensorType.Oem || type == SensorType.Reserved ? String.format("%s %02Xh", type, code) : type.name();
 	}
 
 	private static Map<String, Object> sensorFields(Sensor sensor) {
@@ -591,10 +620,14 @@ public final class IpmiCli {
 		fields.put("name", sensor.name());
 		fields.put("number", sensor.number());
 		fields.put("type", sensor.type().name());
+		fields.put("typeCode", sensor.typeCode());
 		fields.put("entity", sensor.entity().name());
 		fields.put("entityInstance", sensor.entityInstance());
 		if (sensor.unit() != SensorUnit.Unspecified) {
 			fields.put("unit", sensor.unit().name());
+		}
+		if (sensor.percentage()) {
+			fields.put("percentage", true);
 		}
 		round(sensor.reading()).ifPresent(value -> fields.put("reading", value));
 		sensor.rawReading().ifPresent(value -> fields.put("rawReading", value));
@@ -848,7 +881,10 @@ public final class IpmiCli {
 							{
 									String.valueOf(entry.id()),
 									entry.timestamp().map(Instant::toString).orElse(preInit(entry)),
-									entry.sensorType().map(SensorType::name).orElse(entry.type().name()),
+									entry
+											.sensorType()
+											.map(type -> typeName(type, entry.sensorTypeCode().getAsInt()))
+											.orElse(entry.type().name()),
 									entry.sensorNumber().isPresent() ? String.valueOf(entry.sensorNumber().getAsInt()) : "",
 									entry.description(),
 									entry.direction().map(direction -> direction.name().toLowerCase(Locale.ROOT)).orElse("") });
@@ -868,6 +904,7 @@ public final class IpmiCli {
 		entry.timestamp().ifPresent(time -> fields.put("timestamp", time.toString()));
 		entry.preInitSeconds().ifPresent(seconds -> fields.put("preInitSeconds", seconds));
 		entry.sensorType().ifPresent(type -> fields.put("sensorType", type.name()));
+		entry.sensorTypeCode().ifPresent(code -> fields.put("sensorTypeCode", code));
 		entry.sensorNumber().ifPresent(number -> fields.put("sensorNumber", number));
 		entry.generatorId().ifPresent(id -> fields.put("generatorId", id));
 		entry.eventType().ifPresent(type -> fields.put("eventType", type));

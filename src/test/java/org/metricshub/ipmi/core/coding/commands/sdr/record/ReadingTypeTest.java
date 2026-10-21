@@ -55,6 +55,30 @@ class ReadingTypeTest {
 	}
 
 	@Test
+	void theThresholdAndGenericStatesOfAnOemOrReservedSensorTypeAreDecoded() {
+		// IPMI 2.0 section 42.1: only the sensor-specific states (6Fh) depend on the sensor type
+		for (SensorType type : new SensorType[] { SensorType.Oem, SensorType.Reserved }) {
+			assertEquals(ReadingType.DevicePresent, ReadingType.parseInt(type, 0x08, 1));
+			assertEquals(ReadingType.UpperCriticalGoingHigh, ReadingType.parseInt(type, 0x01, 9));
+			assertEquals(ReadingType.TransitionToCriticalFromLessSevere, ReadingType.parseInt(type, 0x07, 2));
+			assertEquals(ReadingType.UnknownOEMEvent, ReadingType.parseInt(type, 0x71, 2));
+		}
+		assertEquals(ReadingType.UnknownOEMEvent, ReadingType.parseInt(SensorType.Oem, 0x6f, 2));
+		assertEquals(ReadingType.Unknown, ReadingType.parseInt(SensorType.Reserved, 0x6f, 2), "table 42-3 defines none");
+	}
+
+	@Test
+	void theReservedSensorTypeCodesAreNotOem() {
+		assertEquals(SensorType.Reserved, SensorType.parseInt(0x00));
+		assertEquals(SensorType.Reserved, SensorType.parseInt(0x2d));
+		assertEquals(SensorType.Reserved, SensorType.parseInt(0x76));
+		assertEquals(SensorType.Reserved, SensorType.parseInt(0xbf));
+		assertEquals(SensorType.FruState, SensorType.parseInt(0x2c));
+		assertEquals(SensorType.Oem, SensorType.parseInt(0xc0));
+		assertEquals(SensorType.Oem, SensorType.parseInt(0xff));
+	}
+
+	@Test
 	void anUndefinedStateIsUnknown() {
 		// HP iLO asserts state 6 of the Device Present reading type (08h), which defines states 0 and 1
 		assertEquals(ReadingType.Unknown, ReadingType.parseInt(SensorType.Fan, 0x08, 6));

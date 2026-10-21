@@ -30,6 +30,7 @@ import java.util.Optional;
 import java.util.OptionalDouble;
 import java.util.OptionalInt;
 import java.util.Set;
+import java.util.function.ToDoubleFunction;
 
 import org.metricshub.ipmi.core.coding.commands.sdr.GetSensorReadingResponseData;
 import org.metricshub.ipmi.core.coding.commands.sdr.record.AbstractSensorRecord;
@@ -199,9 +200,12 @@ public final class Sensor {
 									String.format("0x%02x", raw[2]) :
 									String.format("0x%02x%02x", raw[3], raw[2]));
 		}
+		// The thresholds crossed get the wording of their SEL events; the discrete states without a wording are left out
+		boolean threshold = record.getEventReadingType() == THRESHOLD_EVENT_READING_TYPE;
 		Set<String> descriptions = new LinkedHashSet<String>();
 		for (ReadingType state : rawStates) {
-			String description = ReadingTypeDescription.getReadingType(state);
+			String description = threshold ?
+					ReadingTypeDescription.describe(state) : ReadingTypeDescription.getReadingType(state);
 			if (description != null) {
 				descriptions.add(description);
 			}
@@ -242,6 +246,28 @@ public final class Sensor {
 	}
 
 	/**
+	 * Returns the sensor type code of the record (IPMI 2.0 table 42-3), which {@link #type()} does not keep for an OEM
+	 * sensor type ({@link SensorType#Oem}, C0h to FFh) or a reserved one ({@link SensorType#Reserved}).
+	 *
+	 * @return the sensor type code, 0 to 255
+	 */
+	public int typeCode() {
+		return record.getSensorTypeCode();
+	}
+
+	/**
+	 * Names a sensor type: the name of the constant, followed by the code for {@link SensorType#Oem} and
+	 * {@link SensorType#Reserved} ({@code Oem C1h}).
+	 *
+	 * @param type the sensor type
+	 * @param code the sensor type code
+	 * @return the name
+	 */
+	static String typeName(SensorType type, int code) {
+		return type == SensorType.Oem || type == SensorType.Reserved ? String.format("%s %02Xh", type, code) : type.name();
+	}
+
+	/**
 	 * Returns the entity the sensor monitors.
 	 *
 	 * @return the entity
@@ -272,8 +298,19 @@ public final class Sensor {
 	}
 
 	/**
-	 * Returns the reading of a threshold sensor, in its {@link #unit()}, converted with the formula and the
-	 * linearization of its record, or for a non-linear sensor with the factors the BMC returned for the reading.
+	 * Tells whether the reading and the thresholds are a percentage (Sensor Units 1 bit 0, IPMI 2.0 table 43-1): of
+	 * the {@link #unit()} unless it is {@link SensorUnit#Unspecified}, as a fan speed in % of RPM.
+	 *
+	 * @return whether the reading is a percentage
+	 */
+	public boolean percentage() {
+		return record.isPercentage();
+	}
+
+	/**
+	 * Returns the reading of a threshold sensor (event/reading type 01h), in its {@link #unit()} (a percentage of it when
+	 * {@link #percentage()} says so), converted with the formula and the linearization of its record, or for a non-linear
+	 * sensor with the factors the BMC returned for the reading.
 	 *
 	 * @return the reading, or empty when the sensor has none: a discrete sensor, an unavailable reading
 	 *         ({@link #problem()}), a Compact record (which holds no conversion formula), a record without analog
@@ -337,8 +374,9 @@ public final class Sensor {
 	 * Returns the asserted states of a discrete sensor, in the wording of {@code ipmiutil} ("Device Present", "Device
 	 * Absent", "Fully Redundant", "Failure detected"...; of {@code ipmitool} for the few states {@code ipmiutil} does
 	 * not name), each once, and "Unknown" for a state its event/reading type does not define. The states of a
-	 * threshold sensor are the thresholds its reading is at or beyond. For an OEM event/reading type (70h-7Fh), the
-	 * single state is the hexadecimal state bytes.
+	 * threshold sensor are the thresholds its reading is at or beyond, in the wording of their SEL events
+	 * ({@code Upper Non Critical Going High}, {@code Upper Critical Going High}). For an OEM event/reading type
+	 * (70h-7Fh), the single state is the hexadecimal state bytes.
 	 *
 	 * @return the states, empty when none is asserted, when the reading is unavailable, or when the library does
 	 *         not describe the asserted states ({@link #rawStates()} still lists them)
@@ -360,77 +398,73 @@ public final class Sensor {
 	 * Returns the lower non-critical threshold, in the {@link #unit()} of the sensor.
 	 *
 	 * @return the threshold, or empty when the record does not define it, for a Compact record (which holds no
-	 *         thresholds), for a record without analog reading, and for a non-linear sensor (each threshold would need
-	 *         factors of its own); a threshold of 0 is a threshold
+	 *         thresholds), for a discrete sensor or a record without analog reading, and for a non-linear sensor (each
+	 *         threshold would need factors of its own); a threshold of 0 is a threshold
 	 */
 	public OptionalDouble lowerNonCritical() {
-		return threshold(
-				record instanceof FullSensorRecord ? ((FullSensorRecord) record).getLowerNonCriticalThreshold() : Double.NaN);
+		return threshold(FullSensorRecord::getLowerNonCriticalThreshold);
 	}
 
 	/**
 	 * Returns the lower critical threshold, in the {@link #unit()} of the sensor.
 	 *
 	 * @return the threshold, or empty when the record does not define it, for a Compact record (which holds no
-	 *         thresholds), for a record without analog reading, and for a non-linear sensor (each threshold would need
-	 *         factors of its own)
+	 *         thresholds), for a discrete sensor or a record without analog reading, and for a non-linear sensor (each
+	 *         threshold would need factors of its own)
 	 */
 	public OptionalDouble lowerCritical() {
-		return threshold(
-				record instanceof FullSensorRecord ? ((FullSensorRecord) record).getLowerCriticalThreshold() : Double.NaN);
+		return threshold(FullSensorRecord::getLowerCriticalThreshold);
 	}
 
 	/**
 	 * Returns the lower non-recoverable threshold, in the {@link #unit()} of the sensor.
 	 *
 	 * @return the threshold, or empty when the record does not define it, for a Compact record (which holds no
-	 *         thresholds), for a record without analog reading, and for a non-linear sensor (each threshold would need
-	 *         factors of its own)
+	 *         thresholds), for a discrete sensor or a record without analog reading, and for a non-linear sensor (each
+	 *         threshold would need factors of its own)
 	 */
 	public OptionalDouble lowerNonRecoverable() {
-		return threshold(
-				record instanceof FullSensorRecord ?
-						((FullSensorRecord) record).getLowerNonRecoverableThreshold() : Double.NaN);
+		return threshold(FullSensorRecord::getLowerNonRecoverableThreshold);
 	}
 
 	/**
 	 * Returns the upper non-critical threshold, in the {@link #unit()} of the sensor.
 	 *
 	 * @return the threshold, or empty when the record does not define it, for a Compact record (which holds no
-	 *         thresholds), for a record without analog reading, and for a non-linear sensor (each threshold would need
-	 *         factors of its own)
+	 *         thresholds), for a discrete sensor or a record without analog reading, and for a non-linear sensor (each
+	 *         threshold would need factors of its own)
 	 */
 	public OptionalDouble upperNonCritical() {
-		return threshold(
-				record instanceof FullSensorRecord ? ((FullSensorRecord) record).getUpperNonCriticalThreshold() : Double.NaN);
+		return threshold(FullSensorRecord::getUpperNonCriticalThreshold);
 	}
 
 	/**
 	 * Returns the upper critical threshold, in the {@link #unit()} of the sensor.
 	 *
 	 * @return the threshold, or empty when the record does not define it, for a Compact record (which holds no
-	 *         thresholds), for a record without analog reading, and for a non-linear sensor (each threshold would need
-	 *         factors of its own)
+	 *         thresholds), for a discrete sensor or a record without analog reading, and for a non-linear sensor (each
+	 *         threshold would need factors of its own)
 	 */
 	public OptionalDouble upperCritical() {
-		return threshold(
-				record instanceof FullSensorRecord ? ((FullSensorRecord) record).getUpperCriticalThreshold() : Double.NaN);
+		return threshold(FullSensorRecord::getUpperCriticalThreshold);
 	}
 
 	/**
 	 * Returns the upper non-recoverable threshold, in the {@link #unit()} of the sensor.
 	 *
 	 * @return the threshold, or empty when the record does not define it, for a Compact record (which holds no
-	 *         thresholds), for a record without analog reading, and for a non-linear sensor (each threshold would need
-	 *         factors of its own)
+	 *         thresholds), for a discrete sensor or a record without analog reading, and for a non-linear sensor (each
+	 *         threshold would need factors of its own)
 	 */
 	public OptionalDouble upperNonRecoverable() {
-		return threshold(
-				record instanceof FullSensorRecord ?
-						((FullSensorRecord) record).getUpperNonRecoverableThreshold() : Double.NaN);
+		return threshold(FullSensorRecord::getUpperNonRecoverableThreshold);
 	}
 
-	private static OptionalDouble threshold(double value) {
+	private OptionalDouble threshold(ToDoubleFunction<FullSensorRecord> threshold) {
+		if (!(record instanceof FullSensorRecord) || !((FullSensorRecord) record).hasAnalogReading()) {
+			return OptionalDouble.empty();
+		}
+		double value = threshold.applyAsDouble((FullSensorRecord) record);
 		return Double.isNaN(value) ? OptionalDouble.empty() : OptionalDouble.of(value);
 	}
 
@@ -473,11 +507,22 @@ public final class Sensor {
 		return Optional.ofNullable(reading);
 	}
 
+	/**
+	 * Names the unit of the reading as {@code ipmitool} does: {@code percent} for a percentage of no unit, {@code % }
+	 * followed by the unit for a percentage of it, the unit otherwise.
+	 */
+	private String unitText() {
+		if (!percentage()) {
+			return unit().name();
+		}
+		return unit() == SensorUnit.Unspecified ? "percent" : "% " + unit();
+	}
+
 	@Override
 	public String toString() {
 		StringBuilder text = new StringBuilder(name())
 				.append(" (")
-				.append(type())
+				.append(typeName(type(), typeCode()))
 				.append(", ")
 				.append(entity())
 				.append(' ')
@@ -488,7 +533,7 @@ public final class Sensor {
 		}
 		OptionalDouble value = reading();
 		if (value.isPresent()) {
-			text.append(value.getAsDouble()).append(' ').append(unit()).append(", ").append(status());
+			text.append(value.getAsDouble()).append(' ').append(unitText()).append(", ").append(status());
 		} else {
 			text.append(status());
 		}

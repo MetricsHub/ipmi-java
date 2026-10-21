@@ -315,4 +315,17 @@ public final class ReadingTypeDescription {
 	public static String getReadingType(ReadingType readingType) {
 		return READING_TYPE_TO_DESCRIPTION.get(readingType);
 	}
+
+	/**
+	 * Describes a state or event: its {@link #getReadingType(ReadingType) description}, or the name of the
+	 * {@link ReadingType} spaced out when it has none, as for the threshold states ({@code Upper Critical Going High}).
+	 * {@link Sensor#states()} and {@link SelEntry#description()} share this wording.
+	 *
+	 * @param readingType the state or event
+	 * @return the description
+	 */
+	static String describe(ReadingType readingType) {
+		String known = getReadingType(readingType);
+		return known != null ? known : readingType.name().replaceAll("(?<=[a-z])(?=[A-Z])", " ");
+	}
 }

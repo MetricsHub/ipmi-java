@@ -343,7 +343,9 @@ PSU1 Present    PowerSupply                               Presence detected
 
 (An excerpt: the BMC of this RD350 has 49 sensors.) The columns are aligned on their widest
 value, two spaces apart. The `Reading` is the converted reading of a threshold sensor, rounded to
-three decimals, in the `Unit` of its record; a discrete sensor has no reading. `Status` is the
+three decimals, in the `Unit` of its record; a discrete sensor has no reading. A percentage sensor
+shows its unit as `ipmitool` does: `percent`, or `% ` followed by the unit (`% Rpm`). The `Type`
+of an OEM or reserved sensor type gives its code (`Oem C1h`, `Reserved 2Dh`). `Status` is the
 [`status()`](sensors.html#the-sensor-object) of a threshold sensor, as the BMC compares its
 reading with its thresholds (`ok`, `non-critical`, `critical`, `non-recoverable`), the asserted
 states of a discrete sensor (`Presence detected`, `Fully Redundant`...), `ok` for a discrete
@@ -365,15 +367,18 @@ Exhaust Temp  9       Temperature  SystemChassis 1  22       DegreesC  ok
 
 With `--json`, one object per sensor, with the fields of [`Sensor`](sensors.html#the-sensor-object).
 `status` is the `SensorStatus` name (`OK`, `NON_CRITICAL`, `CRITICAL`, `NON_RECOVERABLE`,
-`UNAVAILABLE`), and `states` is always present, empty when there is none. `unit` is present only
-when the record names one (not `Unspecified`, which leaves the `Unit` column of the text output
-empty), `reading` only when the sensor has a valid converted reading, `rawReading` whenever its
+`UNAVAILABLE`), and `states` is always present, empty when there is none; for a threshold sensor,
+`states` lists the thresholds its reading is at or beyond (`Upper Critical Going High`), which the
+text output leaves to the `Status` column (`critical`). `typeCode` is the sensor type code of the
+record. `unit` is present only when the record names one (not `Unspecified`, which leaves the
+`Unit` column of the text output empty), `percentage` (`true`) only for a percentage sensor,
+`reading` only when the sensor has a valid converted reading, `rawReading` whenever its
 reading is valid, discrete sensors included, the thresholds only when the record sets them, and
 `problem` only when there is one:
 
 ```shell-session
 $ ipmicli -h bmc.example.com -u monitor -pf pw.txt sensors --type Fan --name 'Fan 1' --json
-{"name":"Fan 1","number":122,"type":"Fan","entity":"Fan","entityInstance":1,"unit":"Rpm","reading":6600.0,"rawReading":66,"status":"OK","states":[],"lowerCritical":1600.0}
+{"name":"Fan 1","number":122,"type":"Fan","typeCode":4,"entity":"Fan","entityInstance":1,"unit":"Rpm","reading":6600.0,"rawReading":66,"status":"OK","states":[],"lowerCritical":1600.0}
 ```
 
 An SDR record the library cannot decode is reported on stderr (`ipmicli: SDR record 0006h (type
@@ -487,7 +492,8 @@ ID   Time                  Type                  Sensor  Event                  
 of the [System Event Log](system-event-log.html), in the order of the log: the record ID, the
 time (UTC, ISO-8601; `pre-init <seconds>s` for an event logged before the BMC had the time, like
 the `Pre-Init` of `ipmitool`; empty for an OEM entry without timestamp), the sensor type of a
-system event or the record type of an OEM one, the sensor number, the event in the wording of
+system event (with its code for an OEM or reserved sensor type: `Oem C1h`) or the record type of
+an OEM one, the sensor number, the event in the wording of
 `ipmiutil` (of `ipmitool` for the few events `ipmiutil` does not name) or the OEM bytes, and
 `assertion` or `deassertion`. The times are UTC whatever the BMC keeps (it reports the offset of
 a local SEL time with Get SEL Time UTC Offset). `-v` adds to stderr what Get SEL Info says of the
@@ -502,14 +508,14 @@ again goes unnoticed: compare the `last erase` time that `-v` prints between run
 [`SelEntry`](system-event-log.html#the-selentry-object): `id`, `type` (`System`,
 `OemTimestamped`, `OemNonTimestamped` or `Reserved`) and `description` always, `timestamp` only
 when it is a date, `preInitSeconds` only for a pre-init one, the system event fields
-(`sensorType`, `sensorNumber`, `generatorId`, `eventType`, `event`, `direction`, `eventData` in
+(`sensorType`, `sensorTypeCode`, `sensorNumber`, `generatorId`, `eventType`, `event`, `direction`, `eventData` in
 hexadecimal) only for a system event, `oemData` only for an OEM entry, and `manufacturerId` only
 for a timestamped one:
 
 ```shell-session
 $ ipmicli -h bmc.example.com -u monitor -pf pw.txt sel --since 5 --json
-{"id":6,"type":"System","timestamp":"2024-05-15T08:23:34Z","sensorType":"PowerUnit","sensorNumber":100,"generatorId":32,"eventType":111,"event":"PowerOffOrDown","description":"Power off/down","direction":"Deassertion","eventData":"00ffff"}
-{"id":7,"type":"System","timestamp":"2024-05-15T08:24:15Z","sensorType":"VersionChange","sensorNumber":0,"generatorId":1,"eventType":111,"event":"FirmwareOrSoftwareIncompatibilityDetected","description":"Firmware or software incompatibility detected","direction":"Assertion","eventData":"830800"}
+{"id":6,"type":"System","timestamp":"2024-05-15T08:23:34Z","sensorType":"PowerUnit","sensorTypeCode":9,"sensorNumber":100,"generatorId":32,"eventType":111,"event":"PowerOffOrDown","description":"Power off/down","direction":"Deassertion","eventData":"00ffff"}
+{"id":7,"type":"System","timestamp":"2024-05-15T08:24:15Z","sensorType":"VersionChange","sensorTypeCode":43,"sensorNumber":0,"generatorId":1,"eventType":111,"event":"FirmwareOrSoftwareIncompatibilityDetected","description":"Firmware or software incompatibility detected","direction":"Assertion","eventData":"830800"}
 {"id":8,"type":"OemTimestamped","timestamp":"2024-05-15T08:29:39Z","description":"OEM data 02 01 05 05 00 00","manufacturerId":19046,"oemData":"020105050000"}
 ```
 

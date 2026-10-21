@@ -88,6 +88,46 @@ selection or the meaning of results existing code already gets are marked **Beha
   instead of `FFFFh`) returns its sensors and FRUs, each record once, with the loop reported in
   `skippedRecords()`, where 2.0.00 read the repository again and again until the deadline of the
   operation failed it with `IpmiTimeoutException`.
+* **Behavior change.** The `states()` of a threshold sensor list the thresholds its reading is at
+  or beyond, in the wording of their SEL events: `[Upper Non Critical Going High, Upper Critical
+  Going High]` for a temperature above its upper critical threshold. 2.0.00 always returned an
+  empty list for a threshold sensor, although its documentation said otherwise; `status()` and
+  `rawStates()` do not change. A caller that takes any state as a discrete state to report sees
+  the threshold sensors beyond a threshold too.
+* **Behavior change.** A discrete sensor (event/reading type other than `01h`) described by a
+  Full record has no `reading()` and no thresholds, and the client no longer sends Get Sensor
+  Reading Factors for it ([Readings](sensors.html#readings)). 2.0.00 converted its reading byte,
+  which IPMI 2.0 table 35-15 says to ignore, into a meaningless value (`0.0` when the record left
+  M and B at 0). `rawReading()` is unchanged. On the lab BMCs (HPE iLO 5, Dell iDRAC, Cisco IMC, Lenovo,
+  Supermicro, Fujitsu iRMC, GIGABYTE), every discrete Full record declares no analog reading
+  (data format `11b`), so none had a `reading()` in 2.0.00 either.
+* **Behavior change.** The threshold and generic states (event/reading types `01h` to `0Ch`) of a
+  sensor of an OEM sensor type (`C0h`-`FFh`) or of a reserved one are decoded as for any sensor
+  type (IPMI 2.0 section 42.1): a presence sensor of type `C0h` has the state `Device Present`,
+  where 2.0.00 returned `UnknownOEMEvent` in `rawStates()` and no state in `states()`. The
+  sensor-specific states (`6Fh`) of an OEM sensor type stay `UnknownOEMEvent`.
+* **Behavior change.** `Sensor.type()` is the new `SensorType.Reserved` for the codes IPMI 2.0
+  table 42-3 reserves (`00h`, `2Dh`-`BFh`, `76h` included), where 2.0.00 returned `Oem`
+  (`OemReserved` for `76h`): `types(SensorType.Oem)` no longer selects them, and
+  `types(SensorType.Reserved)` does. The new `Sensor.typeCode()` gives the code of the record,
+  which `Oem` and `Reserved` do not keep, and `toString()` shows it (`Oem C1h`).
+* The new `Sensor.percentage()` tells a sensor whose reading and thresholds are a percentage
+  (Sensor Units 1 bit 0), of `unit()` unless it is `Unspecified`; `toString()` shows its unit as
+  `ipmitool` does (`percent`, `% Rpm`).
+
+### System Event Log
+
+* **Behavior change.** The threshold and generic events of an OEM or reserved sensor type are
+  decoded: `event()` is `DevicePresent`, `UpperCriticalGoingHigh`... and `description()`
+  `Device Present`, where 2.0.00 gave `UnknownOEMEvent` and `OEM event type 08h offset 1h`.
+* **Behavior change.** `sensorType()` is `Reserved` for a reserved sensor type code, where 2.0.00
+  returned `Oem` (`OemReserved` for `76h`). The new `sensorTypeCode()` gives the code of the
+  record.
+* **Behavior change.** The `description()` of an event the specification does not define, of an
+  OEM or reserved sensor type, gives the sensor type code: `OEM sensor type C1h, event type 6Fh
+  offset 2h` and `Reserved sensor type 2Dh, event type 6Fh offset 2h`, where 2.0.00 said
+  `OEM event type 6Fh offset 2h` (`Unknown event type 6Fh offset 2h` for `76h`). `toString()`
+  gives the code with the sensor type: `Oem C1h sensor 5`.
 
 ### Chassis status
 
@@ -196,6 +236,15 @@ selection or the meaning of results existing code already gets are marked **Beha
 * `chassis` prints `Unknown` as the identify state of a BMC that reports the reserved value.
 * `fru` prints the SPD data of memory modules and the PIROM of processors; `fru --json` gives
   them as `spd` and `pirom` objects.
+* **Behavior change.** `sensors --json` and `sel --json` give the sensor type code
+  (`typeCode`, `sensorTypeCode`), the `Type` column of `sensors` and `sel` the code of an OEM or
+  reserved sensor type (`Oem C1h`, `Reserved 2Dh`, where 2.0.00 printed `Oem`), and the `Unit`
+  column of `sensors` a percentage as `ipmitool` does (`percent`, `% Rpm`), with
+  `"percentage":true` in `--json`.
+* **Behavior change.** `sensors --json` lists the thresholds a threshold sensor is at or beyond in
+  `states`, which 2.0.00 left empty; the `Status` column still shows the `status()` of a threshold
+  sensor (`critical`). A discrete sensor described by a Full record no longer has a `Reading` or
+  a `reading` field.
 * `sensors` lists the sensors of shared records and of other controllers as `sensors()` returns
   them, and no longer fails with a `NullPointerException` on a sensor without ID string, which
   2.0.00 printed as `"name":null` with `--json`.
@@ -206,6 +255,19 @@ selection or the meaning of results existing code already gets are marked **Beha
   between two successive raw readings of a linear sensor (IPMI 2.0 section 36.4.2), where 2.0.00
   returned half of it whatever the linearization. It returns `NaN` for a linearizable or
   non-linear sensor, whose resolution varies with the reading.
+* **Behavior change.** `FullSensorRecord.hasAnalogReading()` is `false` for a discrete sensor
+  (event/reading type other than `01h`). `calcFormula()` does not depend on it and still converts
+  any reading byte.
+* **Behavior change.** `SensorType.parseInt()` returns the new `SensorType.Reserved` for `00h` and
+  `2Dh`-`BFh`, where it returned `Oem`, and for `76h`, where it returned `OemReserved`, now
+  deprecated. The new `getSensorTypeCode()` of `AbstractSensorRecord` and `SelRecord` keeps the
+  code that `Oem` and `Reserved` do not.
+* **Behavior change.** `ReadingType.parseInt()` returns `UnknownOEMEvent` for an OEM sensor type
+  with the sensor-specific event/reading type (`6Fh`) only, and `Unknown` for a reserved sensor
+  type with `6Fh`; the threshold and generic states decode as for any sensor type. 2.0.00 returned
+  `UnknownOEMEvent` for every state of an OEM or reserved sensor type.
+* `AbstractSensorRecord.isPercentage()` decodes the Percentage bit of Sensor Units 1 of the Full
+  and Compact records.
 * **Behavior change.** `FullSensorRecord.hasAnalogReading()` is `true` for the non-linear
   sensors. `calcFormula(int)` still returns `NaN` for them: the new
   `calcFormula(int, SensorReadingFactors)` converts their reading byte with the factors of Get

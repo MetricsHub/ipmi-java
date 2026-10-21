@@ -70,6 +70,34 @@ class FullSensorRecordTest {
 	}
 
 	@Test
+	void thePercentageBitOfSensorUnits1IsDecoded() {
+		// IPMI 2.0 table 43-1, byte 21 bit 0
+		assertTrue(((FullSensorRecord) SensorRecord.populateSensorRecord(conversionRecord(0x01, 0x00))).isPercentage());
+		assertFalse(((FullSensorRecord) SensorRecord.populateSensorRecord(conversionRecord(0x00, 0x00))).isPercentage());
+	}
+
+	@Test
+	void aDiscreteSensorHasNoAnalogReading() {
+		// IPMI 2.0 section 42.1: only a threshold sensor (01h) reads a value; Sensor Units 1 = 00h is unsigned
+		byte[] data = conversionRecord(0x00, 0x00);
+		data[13] = 0x6f;
+		FullSensorRecord record = (FullSensorRecord) SensorRecord.populateSensorRecord(data);
+		assertFalse(record.hasAnalogReading());
+		assertEquals(90, record.calcFormula(90), DELTA, "the formula stays available");
+		data[13] = 0x01;
+		assertTrue(((FullSensorRecord) SensorRecord.populateSensorRecord(data)).hasAnalogReading());
+	}
+
+	@Test
+	void theSensorTypeCodeIsKept() {
+		byte[] data = conversionRecord(0x00, 0x00);
+		data[12] = (byte) 0xc1;
+		FullSensorRecord record = (FullSensorRecord) SensorRecord.populateSensorRecord(data);
+		assertEquals(SensorType.Oem, record.getSensorType());
+		assertEquals(0xc1, record.getSensorTypeCode());
+	}
+
+	@Test
 	void unsignedReadingsRetainTheirHighBit() {
 		FullSensorRecord record = (FullSensorRecord) SensorRecord.populateSensorRecord(conversionRecord(0x00, 0x00));
 

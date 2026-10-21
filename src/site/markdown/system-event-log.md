@@ -115,7 +115,8 @@ Each [`SelEntry`](apidocs/org/metricshub/ipmi/client/SelEntry.html) holds:
 | `type()` | [`SelRecordType`](apidocs/org/metricshub/ipmi/core/coding/commands/sel/SelRecordType.html): `System` for a system event, `OemTimestamped` (`C0h`-`DFh`), `OemNonTimestamped` (`E0h`-`FFh`) or `Reserved` (`00h`-`01h`, `03h`-`BFh`) |
 | `timestamp()` | When the event was logged (`Optional<Instant>`), for a system event or a timestamped OEM entry whose timestamp is a date ([below](#timestamps)) |
 | `preInitSeconds()` | For an event logged before the BMC had the time: the seconds since the initialization of the SEL device (`OptionalLong`) |
-| `sensorType()` | The [`SensorType`](apidocs/org/metricshub/ipmi/core/coding/commands/sdr/record/SensorType.html) of the sensor that reported a system event (`Optional<SensorType>`): `Temperature`, `PowerSupply`, `Memory`, `PhysicalSecurity`, ... |
+| `sensorType()` | The [`SensorType`](apidocs/org/metricshub/ipmi/core/coding/commands/sdr/record/SensorType.html) of the sensor that reported a system event (`Optional<SensorType>`): `Temperature`, `PowerSupply`, `Memory`, `PhysicalSecurity`, ...; `Oem` for an OEM sensor type (`C0h`-`FFh`), `Reserved` for a code IPMI 2.0 table 42-3 reserves (`00h`, `2Dh`-`BFh`) |
+| `sensorTypeCode()` | The sensor type code of a system event (`OptionalInt`, 0 to 255), which `sensorType()` does not keep for `Oem` and `Reserved` |
 | `sensorNumber()` | Its sensor number (`OptionalInt`): the [`Sensor.number()`](sensors.html#the-sensor-object) of the sensor in the SDR repository, unique for a given `generatorId()` |
 | `generatorId()` | What logged the event (`OptionalInt`). Low byte: the 7-bit slave address or system software ID in bits 7:1, bit 0 set for a software ID (`20h` for the BMC, `01h` for the BIOS). High byte: the channel in bits 7:4 and the LUN in bits 1:0 |
 | `isFrom(sensor)` | Whether a [`Sensor`](sensors.html#the-sensor-object) of the SDR repository is the one that reported the event: same owner (address or software ID, LUN) and same number |
@@ -134,7 +135,9 @@ as the OS Boot installation events of IPMI 2.0 revision 1.1 and the Watchdog 1 e
 (`Installation started`, `BIOS Reset`). An event neither tool names gives the name of its
 `ReadingType` spaced out (`Upper Critical Going High`). An offset the specification does not
 define, or an OEM event, gives the codes (`Unknown event type 08h offset 6h`,
-`OEM event type 71h offset 2h`).
+`OEM event type 71h offset 2h`), preceded by the sensor type code for an OEM or reserved sensor
+type (`OEM sensor type C1h, event type 6Fh offset 2h`), which `toString()` also gives
+(`Oem C1h sensor 5`).
 
 The accessors of a system event (`sensorType()`, `event()`, ...) are empty for the OEM and
 reserved entries (an empty `Optional`, or a zero-length array for `eventData()`), and so are
@@ -267,10 +270,12 @@ for a timestamped record (`C0h`-`DFh`), 13 bytes and neither for a non-timestamp
 (`E0h`-`FFh`). `type()` gives only the range: the record type byte itself is
 `record().getRawData()[2] & 0xFF`.
 
-A system event of an OEM event/reading type (`70h`-`7Fh`), or of an OEM sensor type
-(`C0h`-`FFh`) with a sensor-specific event/reading type (`6Fh`), is decoded like any other system
-event, with `event()` = `UnknownOEMEvent` and a `description()` that gives the codes:
-`OEM event type 71h offset 2h`.
+A system event of an OEM event/reading type (`70h`-`7Fh`), or a sensor-specific event (`6Fh`)
+of an OEM sensor type (`C0h`-`FFh`), is decoded like any other system event, with `event()` =
+`UnknownOEMEvent` and a `description()` that gives the codes: `OEM event type 71h offset 2h`,
+`OEM sensor type C1h, event type 6Fh offset 2h`. The threshold and generic events of an OEM
+sensor type (event/reading types `01h` to `0Ch`) use the offsets IPMI 2.0 table 42-2 defines for
+every sensor type (section 42.1): a presence sensor of type `C0h` logs `Device Present`.
 
 ## Polling for new entries
 
