@@ -380,6 +380,21 @@ public class IpmiAsyncConnector implements ConnectionListener {
 		connectionHandle.setUser(username);
 		connectionHandle.setPasswordBytes(password);
 		connectionHandle.setBmcKey(bmcKey);
+		try {
+			return startAndRegisterSession(connectionHandle, username, password, bmcKey);
+		} catch (Exception e) {
+			// No session keeps the credentials: a caller that does not close the connection leaves no copy behind
+			connectionHandle.wipeCredentials();
+			throw e;
+		}
+	}
+
+	private Session startAndRegisterSession(
+			ConnectionHandle connectionHandle,
+			String username,
+			byte[] password,
+			byte[] bmcKey)
+			throws Exception {
 
 		// MaximumAvailable: the role 0 of the specification (highest level matching the proposed algorithms, section
 		// 13.17) is refused at Open Session by iLO 5, iDRAC and Cisco IMC BMCs, and leaves a session that Lenovo TSM,

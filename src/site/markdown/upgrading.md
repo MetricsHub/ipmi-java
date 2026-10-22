@@ -244,11 +244,12 @@ The misspelled or wrong public names of 2.0.00 are fixed. Each old name stays, d
   up to 7 copies of the password and 3 of the key for each session, unwiped. The RAKP HMACs are
   computed with `MessageDigest` (RFC 2104) instead of a `Mac`, whose `SecretKeySpec` kept a copy
   of the key that cannot be wiped. **Behavior change** in the low-level API:
-  `IpmiConnector.closeSession()`, `closeConnection()` and `tearDown()` wipe the password and the
-  BMC key of the `ConnectionHandle` (the new `ConnectionHandle.wipeCredentials()`), whose
-  `getPasswordBytes()`, `getPassword()` and `getBmcKey()` then return zeros, and the key of its
-  MD5-128 integrity algorithm (the new `CipherSuite.wipeKeys()` and
-  `IntegrityAlgorithm.wipeKey()`).
+  `IpmiConnector.closeSession()`, `closeConnection()`, `tearDown()` and a failed `openSession()`
+  wipe the password and the BMC key of the `ConnectionHandle` (the new
+  `ConnectionHandle.wipeCredentials()`), whose `getPasswordBytes()`, `getPassword()` and
+  `getBmcKey()` then return zeros, and the key of its integrity algorithm (the new
+  `CipherSuite.wipeKeys()` and `IntegrityAlgorithm.wipeKey()`), which no longer generates the
+  codes of the session.
 * After a control operation (`chassisControl()`, `chassisIdentify()`,
   `chassisIdentifyForever()`) whose reply is lost, the next operation first checks the session
   with a Get Device ID, and opens a new session when that gets no reply either. In 2.0.00, a

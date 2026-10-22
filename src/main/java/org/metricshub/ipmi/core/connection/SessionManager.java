@@ -230,13 +230,17 @@ public class SessionManager {
 	}
 
 	/**
-	 * Unregisters session for given connection handle.
+	 * Unregisters session for given connection handle, and wipes the credentials of the handle it was registered with.
 	 *
 	 * @param connectionHandle
 	 *        handle of the connection, for which the session should be unregistered.
 	 */
 	public void unregisterSession(ConnectionHandle connectionHandle) {
-		sessionsPerConnectionHandle.remove(connectionHandle.getHandle());
+		Session session = sessionsPerConnectionHandle.remove(connectionHandle.getHandle());
+		// The handle registered with the session, which holds the credentials, may be another object than the argument
+		if (session != null) {
+			session.getConnectionHandle().wipeCredentials();
+		}
 	}
 
 	/**
