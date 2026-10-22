@@ -25,6 +25,7 @@ package org.metricshub.ipmi.core.coding.security;
 import java.security.InvalidKeyException;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.util.Arrays;
 
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
@@ -36,6 +37,11 @@ import org.metricshub.ipmi.core.coding.commands.session.Rakp1;
  * have a parameterless constructor.
  */
 public abstract class AuthenticationAlgorithm {
+
+	/**
+	 * Block length of MD5, SHA-1 and SHA-256, the hash functions of the RAKP HMACs (RFC 2104 and FIPS 180-4).
+	 */
+	private static final int HMAC_BLOCK_LENGTH = 64;
 
 	private final Mac mac;
 
@@ -101,11 +107,41 @@ public abstract class AuthenticationAlgorithm {
 	public byte[] getKeyExchangeAuthenticationCode(byte[] data, byte[] key)
 			throws NoSuchAlgorithmException,
 			InvalidKeyException {
+		// The HMAC of RFC 2104 computed here rather than with a Mac, whose SecretKeySpec would keep a copy of the
+		// password or of the BMC key that cannot be wiped: the padded key is wiped once used
+		MessageDigest digest = MessageDigest.getInstance(getDigestName());
+		byte[] pad = new byte[HMAC_BLOCK_LENGTH];
+		try {
+			System.arraycopy(key, 0, pad, 0, key.length);
+			for (int i = 0; i < pad.length; i++) {
+				pad[i] ^= 0x36;
+			}
+			digest.update(pad);
+			byte[] inner = digest.digest(data);
+			for (int i = 0; i < pad.length; i++) {
+				pad[i] ^= 0x36 ^ 0x5c;
+			}
+			digest.update(pad);
+			return digest.digest(inner);
+		} finally {
+			Arrays.fill(pad, (byte) 0);
+		}
+	}
 
-		SecretKeySpec sKey = new SecretKeySpec(key, getAlgorithmName());
-		mac.init(sKey);
-
-		return mac.doFinal(data);
+	/**
+	 * @return the name of the {@link MessageDigest} of the HMAC of {@link #getAlgorithmName()}
+	 */
+	private String getDigestName() throws NoSuchAlgorithmException {
+		switch (getAlgorithmName()) {
+		case "HmacMD5":
+			return "MD5";
+		case "HmacSHA1":
+			return "SHA-1";
+		case "HmacSHA256":
+			return "SHA-256";
+		default:
+			throw new NoSuchAlgorithmException("No digest for " + getAlgorithmName());
+		}
 	}
 
 	/**

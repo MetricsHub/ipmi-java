@@ -240,6 +240,16 @@ public class SessionManager {
 	}
 
 	/**
+	 * Wipes the credentials of the connections of all the registered sessions, when their connector tears down
+	 * without closing each connection.
+	 */
+	public void wipeCredentials() {
+		for (Session session : sessionsPerConnectionHandle.values()) {
+			session.getConnectionHandle().wipeCredentials();
+		}
+	}
+
+	/**
 	 * Returns session already bound to given connection handle fulfilling given criteria.
 	 *
 	 * @param remoteAddress

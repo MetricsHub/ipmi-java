@@ -2,6 +2,7 @@ package org.metricshub.ipmi.core.api.sync;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.metricshub.ipmi.core.transport.FakeRmcpPlusBmc.GET_CHANNEL_AUTHENTICATION_CAPABILITIES;
@@ -32,6 +33,8 @@ import org.metricshub.ipmi.core.coding.commands.session.SetSessionPrivilegeLevel
 import org.metricshub.ipmi.core.coding.payload.CompletionCode;
 import org.metricshub.ipmi.core.coding.payload.lan.IPMIException;
 import org.metricshub.ipmi.core.coding.security.CipherSuite;
+import org.metricshub.ipmi.core.coding.security.IntegrityAlgorithm;
+import org.metricshub.ipmi.core.coding.security.IntegrityMd5_128;
 import org.metricshub.ipmi.core.connection.Ipmi20UnsupportedException;
 import org.metricshub.ipmi.core.connection.SessionException;
 import org.metricshub.ipmi.core.transport.FakeRmcpPlusBmc;
@@ -149,6 +152,59 @@ class RmcpPlusSessionTest {
 				connector.tearDown();
 			}
 		}
+	}
+
+	@Test
+	@Timeout(30)
+	void closeSessionWipesTheCredentialsOfTheHandle() throws Exception {
+		assertCredentialsWiped(IpmiConnector::closeSession);
+	}
+
+	@Test
+	@Timeout(30)
+	void closeConnectionWipesTheCredentialsOfTheHandle() throws Exception {
+		assertCredentialsWiped(IpmiConnector::closeConnection);
+	}
+
+	@Test
+	@Timeout(30)
+	void tearDownWipesTheCredentialsOfTheSessions() throws Exception {
+		assertCredentialsWiped((connector, handle) -> connector.tearDown());
+	}
+
+	/**
+	 * A two-key session with MD5-128 integrity (suite 12), keyed with the password: once closed, the password and the
+	 * BMC key of the handle are zeros, and the integrity algorithm signs with a password of zeros.
+	 */
+	private static void assertCredentialsWiped(Closer closer) throws Exception {
+		try (FakeRmcpPlusBmc bmc = new FakeRmcpPlusBmc(XCC_SUITES, USER, utf8(PASSWORD), KG)) {
+			IpmiConnector connector = new IpmiConnector(0, 0);
+			try {
+				ConnectionHandle handle = openSession(connector, bmc, 12, PASSWORD, KG);
+				byte[] password = handle.getPasswordBytes();
+				byte[] kg = handle.getBmcKey();
+				IntegrityAlgorithm integrity = handle.getCipherSuite().getIntegrityAlgorithm();
+				byte[] base = bytes("06 c0 01 02 03 04 05 06 07 08 09 0a 0b");
+				IntegrityMd5_128 zeros = new IntegrityMd5_128();
+				zeros.initialize(null);
+				assertArrayEquals(utf8(PASSWORD), password);
+				assertArrayEquals(KG, kg);
+				assertFalse(Arrays.equals(zeros.generateAuthCode(base), integrity.generateAuthCode(base)));
+
+				closer.close(connector, handle);
+
+				assertArrayEquals(new byte[password.length], password);
+				assertArrayEquals(new byte[KG.length], kg);
+				assertArrayEquals(zeros.generateAuthCode(base), integrity.generateAuthCode(base));
+			} finally {
+				connector.tearDown();
+			}
+		}
+	}
+
+	/** Closes the session, the connection or the connector. */
+	private interface Closer {
+		void close(IpmiConnector connector, ConnectionHandle handle) throws Exception;
 	}
 
 	@Test

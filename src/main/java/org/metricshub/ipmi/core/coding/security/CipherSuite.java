@@ -407,6 +407,16 @@ public class CipherSuite {
 	 *
 	 * @param constructor constructor of the algorithm
 	 */
+	/**
+	 * Wipes the key of the integrity algorithm of the suite, if it was keyed (the password for MD5-128 integrity), once
+	 * the session is over.
+	 */
+	public void wipeKeys() {
+		if (ia != null) {
+			ia.wipeKey();
+		}
+	}
+
 	private IntegrityAlgorithm instantiateIntegrityAlgorithm(final Supplier<IntegrityAlgorithm> constructor) {
 		if (ia == null) {
 			ia = constructor.get();

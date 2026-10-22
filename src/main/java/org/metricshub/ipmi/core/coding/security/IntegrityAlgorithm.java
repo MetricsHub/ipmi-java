@@ -84,7 +84,7 @@ public abstract class IntegrityAlgorithm {
 	 *
 	 * @return the Session Integrity Key, or null if not initialized
 	 */
-	protected byte[] getSik() {
+	protected synchronized byte[] getSik() {
 		return sik;
 	}
 
@@ -93,8 +93,18 @@ public abstract class IntegrityAlgorithm {
 	 *
 	 * @param sik the Session Integrity Key
 	 */
-	protected void setSik(byte[] sik) {
+	protected synchronized void setSik(byte[] sik) {
 		this.sik = sik;
+	}
+
+	/**
+	 * Wipes the key passed to {@link #initialize(byte[])} (the password for MD5-128 integrity) once the session is
+	 * over: the algorithm cannot sign messages any more.
+	 */
+	public synchronized void wipeKey() {
+		if (sik != null) {
+			Arrays.fill(sik, (byte) 0);
+		}
 	}
 
 	/**

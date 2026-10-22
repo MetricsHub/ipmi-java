@@ -520,7 +520,8 @@ public class IpmiAsyncConnector implements ConnectionListener {
 	}
 
 	/**
-	 * Closes the session with the remote host if it is currently in open state.
+	 * Closes the session with the remote host if it is currently in open state, and wipes the password and the BMC
+	 * key (Kg) the handle keeps.
 	 *
 	 * @param connectionHandle
 	 *        - {@link ConnectionHandle} associated with the remote host.
@@ -547,6 +548,7 @@ public class IpmiAsyncConnector implements ConnectionListener {
 						.getConnection(connectionHandle.getHandle())
 						.closeSession();
 				sessionManager.unregisterSession(connectionHandle);
+				connectionHandle.wipeCredentials();
 				succeded = true;
 			} catch (Exception e) {
 				if (tries > retries) {
@@ -724,8 +726,8 @@ public class IpmiAsyncConnector implements ConnectionListener {
 	}
 
 	/**
-	 * Closes the connection with the given handle, and forgets its session. The requests still waiting for a reply
-	 * on the connection fail with a {@link ConnectionException}.
+	 * Closes the connection with the given handle, forgets its session, and wipes the credentials the handle keeps.
+	 * The requests still waiting for a reply on the connection fail with a {@link ConnectionException}.
 	 *
 	 * @param handle the handle of the connection
 	 */
@@ -735,13 +737,15 @@ public class IpmiAsyncConnector implements ConnectionListener {
 		connectionManager.closeConnection(handle.getHandle());
 		connection.unregisterListener(this);
 		sessionManager.unregisterSession(handle);
+		handle.wipeCredentials();
 	}
 
 	/**
-	 * Finalizes the connector and closes all connections.
+	 * Finalizes the connector, closes all connections, and wipes the credentials of their sessions.
 	 */
 	public void tearDown() {
 		connectionManager.close();
+		sessionManager.wipeCredentials();
 	}
 
 	/**
