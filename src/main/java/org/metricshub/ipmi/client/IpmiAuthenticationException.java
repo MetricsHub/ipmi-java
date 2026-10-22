@@ -63,7 +63,7 @@ public class IpmiAuthenticationException extends IpmiClientException {
 	 *
 	 * @return the status code: the Open Session or RAKP status code of a refused login, the completion code of a
 	 *         refused Set Session Privilege Level ({@link CompletionCode#Unknown} for its {@code 80h} and {@code 81h},
-	 *         {@code InsufficentPrivilege} for {@code D4h}), or null when the login failed on the console side, which
+	 *         {@code InsufficientPrivilege} for {@code D4h}), or null when the login failed on the console side, which
 	 *         checks the key exchange codes of the BMC against the password and the BMC key
 	 */
 	public CompletionCode statusCode() {

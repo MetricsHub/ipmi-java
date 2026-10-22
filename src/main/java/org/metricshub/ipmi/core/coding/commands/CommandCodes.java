@@ -65,14 +65,20 @@ public final class CommandCodes {
 	public static final byte READ_FRU_DATA = 0x11;
 
 	/**
-	 * An IPMI code for Get Device SDR Info command
+	 * An IPMI code for Get SDR Repository Info command (Storage network function, IPMI 2.0 section 33.9)
 	 */
 	public static final byte GET_SDR_REPOSITORY_INFO = 0x20;
 
 	/**
-	 * An IPMI code for Get Device SDR Info command
+	 * An IPMI code for Get Device SDR Info command (Sensor/Event network function, IPMI 2.0 section 35.2). Until 2.0.00,
+	 * this constant was wrongly 21h, the code of {@link #GET_DEVICE_SDR}.
 	 */
-	public static final byte GET_DEVICE_SDR_INFO = 0x21;
+	public static final byte GET_DEVICE_SDR_INFO = 0x20;
+
+	/**
+	 * An IPMI code for Get Device SDR command (Sensor/Event network function, IPMI 2.0 section 35.3)
+	 */
+	public static final byte GET_DEVICE_SDR = 0x21;
 
 	/**
 	 * An IPMI code for Reserve SDR Repository command

@@ -79,6 +79,18 @@ class SensorRecordTest {
 	}
 
 	@Test
+	@SuppressWarnings("deprecation")
+	void deviceRelativeEntityAssociationRecordKeepsTheMisspelledSuperclass() {
+		SensorRecord record = SensorRecord.populateSensorRecord(record(0x0041, 0x09, new byte[27]));
+
+		assertInstanceOf(DeviceRelativeEntityAssociationRecord.class, record);
+		assertInstanceOf(
+				DeviceRelativeEntityAssiciationRecord.class,
+				record,
+				"instanceof checks of 2.0 code keep matching");
+	}
+
+	@Test
 	void unknownStandardRecordTypeIsRejected() {
 		// 05h is reserved by IPMI 2.0 and not an OEM type: callers are expected to skip it
 		assertThrows(

@@ -1041,7 +1041,7 @@ public final class IpmiClient implements AutoCloseable {
 		case UnauthorizedGuid:
 		case InvalidIntegrityCheckValue:
 		case InvalidNameLength:
-		case InsufficentPrivilege:
+		case InsufficientPrivilege:
 			return true;
 		default:
 			return false;
@@ -1190,7 +1190,7 @@ public final class IpmiClient implements AutoCloseable {
 				try {
 					R response = attempt(command, once);
 					if (response instanceof RawResponse
-							&& ((RawResponse) response).completionCode() == CompletionCode.InsufficentPrivilege
+							&& ((RawResponse) response).completionCode() == CompletionCode.InsufficientPrivilege
 							&& raise()) {
 						continue;
 					}
@@ -1199,7 +1199,7 @@ public final class IpmiClient implements AutoCloseable {
 					}
 					return response;
 				} catch (IpmiCompletionCodeException e) {
-					if (e.completionCode() != CompletionCode.InsufficentPrivilege || !raise()) {
+					if (e.completionCode() != CompletionCode.InsufficientPrivilege || !raise()) {
 						throw e;
 					}
 				}
@@ -1229,7 +1229,7 @@ public final class IpmiClient implements AutoCloseable {
 				int code = e.rawCompletionCode();
 				if (code != SetSessionPrivilegeLevel.LEVEL_NOT_AVAILABLE
 						&& code != SetSessionPrivilegeLevel.LEVEL_ABOVE_LIMIT
-						&& e.completionCode() != CompletionCode.InsufficentPrivilege) {
+						&& e.completionCode() != CompletionCode.InsufficientPrivilege) {
 					throw e;
 				}
 				ceiling = level;

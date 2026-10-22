@@ -141,7 +141,19 @@
 				</configuration>
 			</plugin>
 
-			<!-- standalone executable jar: the library with the CLI as Main-Class, attached with the "standalone" classifier
+			<!-- stable JPMS name for the jar without module-info (Java 8 ignores the entry); the standalone jar inherits it -->
+			<plugin>
+				<artifactId>maven-jar-plugin</artifactId>
+				<configuration>
+					<archive>
+						<manifestEntries>
+							<Automatic-Module-Name>org.metricshub.ipmi</Automatic-Module-Name>
+						</manifestEntries>
+					</archive>
+				</configuration>
+			</plugin>
+
+			<!-- standalone executable jar:the library with the CLI as Main-Class, attached with the "standalone" classifier
 				next to the unchanged library jar. The library has no dependency, so nothing else is shaded in -->
 			<plugin>
 				<artifactId>maven-shade-plugin</artifactId>

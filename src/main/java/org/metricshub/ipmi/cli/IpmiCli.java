@@ -211,7 +211,7 @@ public final class IpmiCli {
 	 */
 	private static int completionCodeFailure(IpmiCompletionCodeException e, PrintStream err, PrivilegeLevel privilege) {
 		String message = e.getMessage();
-		if (e.completionCode() == CompletionCode.InsufficentPrivilege) {
+		if (e.completionCode() == CompletionCode.InsufficientPrivilege) {
 			// The message of the library ends with a hint for Java callers: replace it with the CLI's
 			int hint = message.indexOf(". The command requires");
 			String reason;

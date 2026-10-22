@@ -175,7 +175,7 @@ public enum CompletionCode {
 	 * Cannot execute command due to insufficient privilege level or other security - based restriction (e.g. disabled for
 	 * 'firmware firewall').
 	 */
-	InsufficentPrivilege(CompletionCode.INSUFFICENTPRIVILEGE),
+	InsufficientPrivilege(CompletionCode.INSUFFICIENTPRIVILEGE),
 	/**
 	 * Cannot execute command. Command, or request parameter(s), not supported in present state.
 	 */
@@ -224,6 +224,17 @@ public enum CompletionCode {
 	Unknown(CompletionCode.UNKNOWN),
 	;
 
+	/**
+	 * The misspelled name of {@link #InsufficientPrivilege}, kept so that code built against 2.0 keeps working: it is
+	 * the same constant, so {@link #values()}, {@link #name()} and {@link #valueOf(String)} only know the new spelling.
+	 *
+	 * @deprecated use {@link #InsufficientPrivilege}; this alias will be removed in 3.0.
+	 */
+	// CHECKSTYLE.OFF: ConstantName
+	@Deprecated
+	public static final CompletionCode InsufficentPrivilege = InsufficientPrivilege;
+	// CHECKSTYLE.ON: ConstantName
+
 	private static final int OK = 0;
 	private static final int INSUFFICIENTRESOURCES = 1;
 	private static final int UNAUTHORIZEDROLE = 10;
@@ -259,7 +270,7 @@ public enum CompletionCode {
 	private static final int FIRMWAREUPDATING = 209;
 	private static final int INITIALIZATIONINPROGRESS = 210;
 	private static final int DESTINATIONUNAVAILABLE = 211;
-	private static final int INSUFFICENTPRIVILEGE = 212;
+	private static final int INSUFFICIENTPRIVILEGE = 212;
 	private static final int COMMANDNOTSUPPORTED = 213;
 	private static final int ILLEGALPARAMETER = 214;
 	private static final int UNSPECIFIEDERROR = 255;
@@ -364,8 +375,8 @@ public enum CompletionCode {
 			return InitializationInProgress;
 		case DESTINATIONUNAVAILABLE:
 			return DestinationUnavailable;
-		case INSUFFICENTPRIVILEGE:
-			return InsufficentPrivilege;
+		case INSUFFICIENTPRIVILEGE:
+			return InsufficientPrivilege;
 		case COMMANDNOTSUPPORTED:
 			return CommandNotSupported;
 		case ILLEGALPARAMETER:
@@ -465,7 +476,7 @@ public enum CompletionCode {
 			return "Command response could not be provided. BMC initialization or initialization agent in progress.";
 		case DESTINATIONUNAVAILABLE:
 			return "Destination unavailable. Cannot deliver request to selected destination. E.g. this code can be returned if a request message is targeted to SMS, but receive message queue reception is disabled for the particular channel.";
-		case INSUFFICENTPRIVILEGE:
+		case INSUFFICIENTPRIVILEGE:
 			return "Cannot execute command due to insufficient privilege level or other security - based restriction (e.g. disabled for 'firmware firewall').";
 		case COMMANDNOTSUPPORTED:
 			return "Cannot execute command. Command, or request parameter(s), not supported in present state.";

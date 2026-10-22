@@ -359,7 +359,7 @@ class RmcpPlusSessionTest {
 						IPMIException refused = assertThrows(
 								IPMIException.class,
 								() -> connector.sendMessage(handle, new ChassisIdentify(0, false)));
-						assertEquals(CompletionCode.InsufficentPrivilege, refused.getCompletionCode());
+						assertEquals(CompletionCode.InsufficientPrivilege, refused.getCompletionCode());
 					} else {
 						connector.sendMessage(handle, new ChassisIdentify(0, false));
 						assertArrayEquals(new byte[] { 0 }, bmc.getChassisIdentify());

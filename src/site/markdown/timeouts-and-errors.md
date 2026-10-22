@@ -112,9 +112,9 @@ it did not answer
 ([Commands for another controller](low-level-api.html#commands-for-another-controller)).
 
 A session the BMC revoked is not lost, as it still answers: on HPE iLO 5, a session that another
-client deleted answers `D4h` (`InsufficentPrivilege`) to every command. Close the client and
+client deleted answers `D4h` (`InsufficientPrivilege`) to every command. Close the client and
 build a new one
-([Troubleshooting](troubleshooting.html#ipmicompletioncodeexception-with-insufficentprivilege-28d4h-29)).
+([Troubleshooting](troubleshooting.html#ipmicompletioncodeexception-with-insufficientprivilege-28d4h-29)).
 
 ## Exceptions
 
@@ -129,7 +129,7 @@ message:
 | [`IpmiAuthenticationException`](apidocs/org/metricshub/ipmi/client/IpmiAuthenticationException.html) | The BMC refused the login: unknown user, wrong password or [BMC key](configuration.html#bmc-key), refused role, or the requested privilege refused right after the login. `statusCode()` tells which (below). |
 | [`IpmiConnectionException`](apidocs/org/metricshub/ipmi/client/IpmiConnectionException.html) | The session could not be established for a network reason: unknown host, socket error, or no reply to the session setup after all the tries (wrong host, UDP port 623 filtered, IPMI over LAN disabled, an IPMI 1.5-only BMC with `cipherSuite(id)`). Also a connection closed while an operation ran, which loses the session, and the session of a [Serial over LAN](serial-over-lan.html#with-ipmiclient) console that the BMC serves on another UDP port, when it cannot be opened. |
 | [`IpmiTimeoutException`](apidocs/org/metricshub/ipmi/client/IpmiTimeoutException.html) | The [deadline](#deadline) of the operation expired, or a message of the session got no reply after all the tries. |
-| [`IpmiCompletionCodeException`](apidocs/org/metricshub/ipmi/client/IpmiCompletionCodeException.html) | The BMC answered a command with an error **completion code**, the first byte of every IPMI response (`00h` for success, IPMI 2.0 table 5-2), such as `C1h` (invalid command) or `CBh` (requested data not present): `completionCode()` (`CompletionCode`, `Unknown` for a code the library does not list), `rawCompletionCode()`, `networkFunction()` (`null` for a network function that `NetworkFunction` does not list: an [extension or OEM command](low-level-api.html#extension-and-oem-network-functions) sent with `send()`) and `command()`. `InsufficentPrivilege` (sic, `D4h`) means the command needs a higher [privilege level](configuration.html#privilege-level) than the session has; with `MaximumAvailable`, that the session could not be [raised](configuration.html#raising-the-session-on-demand) that far; when commands that worked earlier in the same session start failing with it, that the BMC [revoked the session](#session-recovery). |
+| [`IpmiCompletionCodeException`](apidocs/org/metricshub/ipmi/client/IpmiCompletionCodeException.html) | The BMC answered a command with an error **completion code**, the first byte of every IPMI response (`00h` for success, IPMI 2.0 table 5-2), such as `C1h` (invalid command) or `CBh` (requested data not present): `completionCode()` (`CompletionCode`, `Unknown` for a code the library does not list), `rawCompletionCode()`, `networkFunction()` (`null` for a network function that `NetworkFunction` does not list: an [extension or OEM command](low-level-api.html#extension-and-oem-network-functions) sent with `send()`) and `command()`. `InsufficientPrivilege` (`D4h`) means the command needs a higher [privilege level](configuration.html#privilege-level) than the session has; with `MaximumAvailable`, that the session could not be [raised](configuration.html#raising-the-session-on-demand) that far; when commands that worked earlier in the same session start failing with it, that the BMC [revoked the session](#session-recovery). |
 | `IpmiClientException` itself | Any other failure, listed below the table. |
 
 `IpmiClientException` itself reports:
@@ -215,7 +215,7 @@ The library never logs: a problem that does not fail an operation is reported in
   [`problems()`](apidocs/org/metricshub/ipmi/client/Fru.html)
   ([Incomplete FRUs](fru-inventory.html#incomplete-frus)).
 * A **sensor** without a usable reading — refused with a completion code (`DataNotPresent`,
-  `InsufficentPrivilege`, ...), not valid yet or not scanned, owned by system software, owned by
+  `InsufficientPrivilege`, ...), not valid yet or not scanned, owned by system software, owned by
   a controller behind the BMC that does not answer, or whose reply cannot be decoded — is
   returned without reading and without states, with the reason in
   [`problem()`](apidocs/org/metricshub/ipmi/client/Sensor.html) and the status `UNAVAILABLE`

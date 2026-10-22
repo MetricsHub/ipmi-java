@@ -91,7 +91,7 @@ console stays open until it is closed or ends.
 
 | Exception | When |
 | --- | --- |
-| `IpmiCompletionCodeException` | The BMC refused a command of the activation, with the code in `rawCompletionCode()`: `D4h` (`InsufficentPrivilege`) when the session runs below the privilege the BMC requires for SOL, or a code of Activate Payload (IPMI 2.0 table 24-2), such as `81h` (the payload type is disabled) or `84h` (the BMC requires encryption). |
+| `IpmiCompletionCodeException` | The BMC refused a command of the activation, with the code in `rawCompletionCode()`: `D4h` (`InsufficientPrivilege`) when the session runs below the privilege the BMC requires for SOL, or a code of Activate Payload (IPMI 2.0 table 24-2), such as `81h` (the payload type is disabled) or `84h` (the BMC requires encryption). |
 | `IpmiAuthenticationException` | The BMC refused the login or the privilege of the client when the client opened its session, or, for a BMC that serves SOL on another UDP port, the privilege of the client in the session there ([Exceptions](timeouts-and-errors.html#exceptions)). |
 | `IpmiConnectionException` | The session of the client, or the one on the SOL port, could not be established. |
 | `IpmiTimeoutException` | The activation did not complete within the deadline, or a message of the session got no reply after all the tries. |

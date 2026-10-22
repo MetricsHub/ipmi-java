@@ -81,7 +81,7 @@ then User. `statusCode()` says why:
 | `null`, message ending `(Authentication check failed)` | The BMC's proof in RAKP Message 2 does not match the password: **wrong password**. |
 | `null`, message ending `(Integrity check failed)` | The password matched, but the integrity check value of RAKP Message 4 does not: **wrong [BMC key](configuration.html#bmc-key)**, a BMC key missing for a BMC that requires one (`ipmicli probe` says whether it does), or one given to a BMC that has none. |
 | `UnauthorizedName` | **Unknown user**, or a user not allowed to log in over the LAN channel. |
-| `UnauthorizedRole`, `InvalidRole`, `InsufficentPrivilege` (sic) | The account is not allowed the requested [privilege level](configuration.html#privilege-level) on the LAN channel. |
+| `UnauthorizedRole`, `InvalidRole`, `InsufficientPrivilege` | The account is not allowed the requested [privilege level](configuration.html#privilege-level) on the LAN channel. |
 | `InsufficientResourcesForRole` | The BMC has no free session for the requested privilege level: close the sessions that other tools or unclosed clients hold, or request a lower [privilege](configuration.html#privilege-level). |
 | `InvalidNameLength` | The BMC does not accept a user name of that length: check the user name. |
 | `UnauthorizedGuid` | A status the specification gives to the remote console, not to the BMC: the BMC does not follow the handshake. Compare with `ipmitool`. |
@@ -128,9 +128,9 @@ When the BMC refuses the cipher suite:
   suites the BMC accepts
   ([How `IpmiClient` chooses the suite](preparing-the-bmc.html#how-ipmiclient-chooses-the-suite)).
 
-## `IpmiCompletionCodeException` with `InsufficentPrivilege` (`D4h`)
+## `IpmiCompletionCodeException` with `InsufficientPrivilege` (`D4h`)
 
-`InsufficentPrivilege` (sic) is the `CompletionCode` constant of `D4h`. The BMC refused a command
+`InsufficientPrivilege` is the `CompletionCode` constant of `D4h`. The BMC refused a command
 at the session's privilege level, which the client requests at login and sets right after it: the
 command needs a higher level. The levels the operations need
 ([Privilege level](configuration.html#privilege-level)):

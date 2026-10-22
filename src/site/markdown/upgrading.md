@@ -1,4 +1,4 @@
-keywords: upgrade, migration, release notes, breaking changes, behavior change, 2.1, 2.0, sensor owner, send message, get device sdr, lun, shared records, share count, non-linear, get sensor reading factors, sensor resolution, watchdog, read fru data, fru device locator, spd, dimm, pirom, processor, md5-128, maximumavailable, fluent client, builder, device id, raw, dcmi, network function, ipmiclientexception, slf4j, ipmicli, standalone jar, sel, system event log, chassis control, chassis identify, protected fields, accessors, abstractsensorrecord, validateresponse, utf-8, bmc key, cipher suite, integrity, org.sentrysoftware
+keywords: upgrade, migration, automatic-module-name, jpms, module name, deprecated aliases, release notes, breaking changes, behavior change, 2.1, 2.0, sensor owner, send message, get device sdr, lun, shared records, share count, non-linear, get sensor reading factors, sensor resolution, watchdog, read fru data, fru device locator, spd, dimm, pirom, processor, md5-128, maximumavailable, fluent client, builder, device id, raw, dcmi, network function, ipmiclientexception, slf4j, ipmicli, standalone jar, sel, system event log, chassis control, chassis identify, protected fields, accessors, abstractsensorrecord, validateresponse, utf-8, bmc key, cipher suite, integrity, org.sentrysoftware
 description: What changes when upgrading the IPMI Java Client — from 2.0.00 to 2.1.00, from 1.x to 2.0.00 (the fluent client, the System Event Log, the fixes made since 1.2.02), from 1.2.01, and from the org.sentrysoftware:ipmi artifact of 1.2.00 and earlier.
 
 # Upgrading
@@ -14,13 +14,33 @@ fixes 2.0.00 brings to the protocol core, the decoders and Serial over LAN),
 ## Upgrading from 2.0.00 to 2.1.00
 
 Version 2.1.00 only adds to the API of 2.0.00: no public or protected class, constructor, method,
-field or enum constant is removed or changed, so code built against 2.0.00 compiles and links
-unchanged. What changes is what the same calls return: the client reads each sensor and FRU from
+field or enum constant is removed, so code built against 2.0.00 links unchanged, and compiles
+unchanged except for the `case` labels of the two [renamed enum constants](#renamed-names). What changes is what the same calls return: the client reads each sensor and FRU from
 the controller that holds it, returns every sensor of a shared record, converts the readings of
 non-linear sensors, decodes the FRUs of memory modules and processors, reads the FRUs with fewer
 requests, and opens sessions with the MD5-128 cipher suites and the `MaximumAvailable` privilege.
 Most changes add results that 2.0.00 did not return; the ones that change the number, the
 selection or the meaning of results existing code already gets are marked **Behavior change**.
+
+### Java modules
+
+The jar declares the automatic module name `org.metricshub.ipmi` in its manifest (it has no
+`module-info`, and Java 8 ignores the entry). A modular application writes
+`requires org.metricshub.ipmi;`. **Behavior change.** The `requires ipmi.java;` that 2.0.00
+needed, a name the JDK derived from the jar's file name, no longer resolves.
+
+### Renamed names
+
+The misspelled or wrong public names of 2.0.00 are fixed. Each old name stays, deprecated, until
+3.0:
+
+| 2.0.00 | 2.1.00 | Compatibility |
+| --- | --- | --- |
+| `SensorType.SystemFirmwareProgess` | `SensorType.SystemFirmwareProgress` | The old name is a deprecated `static final` alias of the new constant: `==` comparisons and the `switch` statements of compiled code keep working. **Behavior change.** `name()`, `toString()` and `values()` only know the new spelling, `valueOf("SystemFirmwareProgess")` throws, and source code that uses the old name as a `case` label no longer compiles. |
+| `CompletionCode.InsufficentPrivilege` | `CompletionCode.InsufficientPrivilege` | The same as above, for `D4h`. |
+| `DeviceRelativeEntityAssiciationRecord` | `DeviceRelativeEntityAssociationRecord` | The SDR walk returns the new class for type `09h`. It extends the deprecated old one, so `instanceof` checks still match. |
+| `CommandCodes.GET_DEVICE_SDR_INFO` = `21h` | `CommandCodes.GET_DEVICE_SDR_INFO` = `20h`, new `GET_DEVICE_SDR` = `21h` | **Behavior change.** `21h` is Get Device SDR; Get Device SDR Info is `20h` (IPMI 2.0 table G-1). The compiler copies the value of a constant into the code that uses it: recompile code that sends a request with `GET_DEVICE_SDR_INFO`, which sent Get Device SDR until then. |
+| `CipherSuite.NOT_YET_IMPLEMENTED_MESSAGE` | none | Deprecated: no exception carries this message. |
 
 ### Sensors
 
@@ -231,6 +251,9 @@ selection or the meaning of results existing code already gets are marked **Beha
   BMC refuses at the highest level of the account exits with code 77, with a diagnostic that says
   so.
 * `-C` defaults to `17,3,8,16,2,7,12,11`, and `probe` lists suites 11 and 12 as `supported`.
+* **Behavior change.** The `Type` column of `sensors` and `sel`, and the `type` and `sensorType`
+  fields of their `--json` output, spell sensor type `0Fh` `SystemFirmwareProgress`, where 2.0.00
+  printed `SystemFirmwareProgess`. `sensors --type` accepts both spellings.
 * **Behavior change.** `-C` with an xRC4 suite (4, 5, 9, 10, 13, 14, 18, 19) is a usage error
   (exit code 64), and `probe` no longer says `not implemented by the library` of the chosen suite.
 * `chassis` prints `Unknown` as the identify state of a BMC that reports the reserved value.

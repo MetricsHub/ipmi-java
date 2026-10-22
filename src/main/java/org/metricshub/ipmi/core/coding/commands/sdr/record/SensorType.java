@@ -32,7 +32,7 @@ public enum SensorType {
 	Memory(SensorType.MEMORY),
 	DriveBay(SensorType.DRIVEBAY),
 	PostMemoryResize(SensorType.POSTMEMORYRESIZE),
-	SystemFirmwareProgess(SensorType.SYSTEMFIRMWAREPROGESS),
+	SystemFirmwareProgress(SensorType.SYSTEMFIRMWAREPROGRESS),
 	EventLoggingDisabled(SensorType.EVENTLOGGINGDISABLED),
 	BootError(SensorType.BOOTERROR),
 	Watchdog1(SensorType.WATCHDOG1),
@@ -92,12 +92,23 @@ public enum SensorType {
 	 */
 	Reserved(SensorType.RESERVED);
 
+	/**
+	 * The misspelled name of {@link #SystemFirmwareProgress}, kept so that code built against 2.0 keeps working: it is
+	 * the same constant, so {@link #values()}, {@link #name()} and {@link #valueOf(String)} only know the new spelling.
+	 *
+	 * @deprecated use {@link #SystemFirmwareProgress}; this alias will be removed in 3.0.
+	 */
+	// CHECKSTYLE.OFF: ConstantName
+	@Deprecated
+	public static final SensorType SystemFirmwareProgess = SystemFirmwareProgress;
+	// CHECKSTYLE.ON: ConstantName
+
 	private static final int COOLINGDEVICE = 10;
 	private static final int OTHERUNITSBASEDSENSOR = 11;
 	private static final int MEMORY = 12;
 	private static final int DRIVEBAY = 13;
 	private static final int POSTMEMORYRESIZE = 14;
-	private static final int SYSTEMFIRMWAREPROGESS = 15;
+	private static final int SYSTEMFIRMWAREPROGRESS = 15;
 	private static final int EVENTLOGGINGDISABLED = 16;
 	private static final int BOOTERROR = 30;
 	private static final int WATCHDOG1 = 17;
@@ -174,8 +185,8 @@ public enum SensorType {
 			return DriveBay;
 		case POSTMEMORYRESIZE:
 			return PostMemoryResize;
-		case SYSTEMFIRMWAREPROGESS:
-			return SystemFirmwareProgess;
+		case SYSTEMFIRMWAREPROGRESS:
+			return SystemFirmwareProgress;
 		case EVENTLOGGINGDISABLED:
 			return EventLoggingDisabled;
 		case BOOTERROR:

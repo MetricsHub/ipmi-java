@@ -41,8 +41,12 @@ import java.util.function.Supplier;
 public class CipherSuite {
 
 	/**
-	 * Message of the exceptions about algorithms this library does not implement.
+	 * A message no exception carries: the exceptions about the algorithms this library does not implement name the
+	 * algorithm, such as {@code Confidentiality algorithm XRC4-40 is not implemented.}
+	 *
+	 * @deprecated unused since 2.0.00; this constant will be removed in 3.0.
 	 */
+	@Deprecated
 	public static final String NOT_YET_IMPLEMENTED_MESSAGE = "Not yet implemented.";
 
 	/**

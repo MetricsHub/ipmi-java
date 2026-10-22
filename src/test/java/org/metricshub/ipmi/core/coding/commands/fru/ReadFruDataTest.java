@@ -43,7 +43,7 @@ class ReadFruDataTest {
 
 	private static final int POWER_SUPPLY_RECORD = 0x00;
 
-	private static final int EXTENDED_DC_OUTPUT_RECORD = 0x06;
+	private static final int EXTENDED_DC_OUTPUT_RECORD = 0x09;
 
 	private static byte[] bytes(int... values) {
 		byte[] result = new byte[values.length];

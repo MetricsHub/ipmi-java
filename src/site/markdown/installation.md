@@ -40,6 +40,7 @@ published as `org.sentrysoftware:ipmi`, with the `org.sentrysoftware.ipmi` packa
 | Java | **Java 8** or later. The library is compiled for Java 8 and built and tested on JDK 17; [building it](#building-from-source) needs JDK 17 or later. |
 | Cryptography | The standard JCA and JCE algorithms only: `HmacSHA1`, `HmacSHA256`, `HmacMD5`, `MD5` (the MD5-128 integrity of cipher suites 11 and 12), `AES/CBC/NoPadding` and the default `SecureRandom`. No extra security provider is needed. |
 | Network | UDP from the machine running the client to port **623** of the BMC (or the port set with [`port()`](configuration.html#host-and-port)). Each client also binds an ephemeral local UDP port while it is open. |
+| Java modules | The jar is an automatic module named `org.metricshub.ipmi` (it has no `module-info`): a modular application writes `requires org.metricshub.ipmi;`. |
 | A BMC | With IPMI 2.0 over LAN enabled and an account allowed to log in: see [Preparing the BMC](preparing-the-bmc.html). IPMI 1.5-only BMCs are not supported. |
 
 ## Dependencies
