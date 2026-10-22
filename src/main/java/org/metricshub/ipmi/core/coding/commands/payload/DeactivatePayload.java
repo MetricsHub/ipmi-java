@@ -113,7 +113,10 @@ public class DeactivatePayload extends IpmiCommandCoder<DeactivatePayloadRespons
 
 			// A payload already deactivated is the outcome the caller wants
 			if (specificCompletionCode != DeactivatePayloadCompletionCode.PAYLOAD_ALREADY_DEACTIVATED) {
-				throw new IPMIException(response.getCompletionCode(), response.getRawCompletionCode());
+				throw new IPMIException(
+						response.getCompletionCode(),
+						response.getRawCompletionCode(),
+						specificCompletionCode == null ? null : specificCompletionCode.getMessage() + ".");
 			}
 		}
 

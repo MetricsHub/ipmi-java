@@ -245,6 +245,35 @@ The misspelled or wrong public names of 2.0.00 are fixed. Each old name stays, d
   client that sent only control operations kept a session the BMC had dropped (after a reboot or
   an expiry) and every call timed out.
 
+### Serial over LAN
+
+* `SolConsole.input()` follows the `InputStream` contract: `available()` returns the number of
+  characters a read returns without blocking, where 2.0.00 always returned 0 (so a
+  `BufferedReader` over it is `ready()`), and a read returns what is buffered at once, where
+  2.0.00 waited 200 ms for more characters unless as many as asked were there. `ipmicli sol`
+  shows the output of the console without that delay.
+* **Behavior change.** An error reply to a command of `sol().open()` is an
+  `IpmiCompletionCodeException` that names that command (`networkFunction()`, `command()`, and
+  the message `GetPayloadActivationStatus failed: ...`, `ActivateSolPayload failed: ...`,
+  `SetSessionPrivilegeLevel failed: ...`), where 2.0.00 said `Activating the SOL payload failed`
+  whatever the command, with a `null` network function and a command of -1. The message describes
+  the codes of Activate Payload (`80h`-`84h`, IPMI 2.0 table 24-2), such as `Payload type is
+  disabled` for `81h` and `Cannot activate the payload without encryption` for `84h`.
+* **Behavior change.** A command of `sol().open()` that gets no reply after all the tries throws
+  `IpmiTimeoutException` (`No reply from <host> to <command> after <n> tries`), where 2.0.00 threw
+  a plain `IpmiClientException` (`Cannot activate SOL payload due to exception during activation
+  process`). When the command went through the session of the client, the session is lost, and
+  the next operation, `sol().open()` included, opens a new one: in 2.0.00, a client that only
+  opened consoles kept a session the BMC had forgotten, and every `open()` failed.
+* A second `sol().open()` while a console of the same client holds the only payload instance
+  fails with `The SOL payload is held by a console this client already opened: close it first`,
+  where 2.0.00 blamed `another session`.
+* With `MaximumAvailable`, `sol().open()` raises the session of the client as every other
+  operation does: a level the BMC refuses (`80h`, `81h` or `D4h` to Set Session Privilege Level)
+  is the ceiling of the session, and `open()` fails with the `D4h` of Activate Payload, as at a
+  fixed level. The level reached is recorded on failure too, so a later `open()` asks for no level
+  the session already has or the BMC refused.
+
 ### Command-line client
 
 * `-L auto` runs the session as `privilege(PrivilegeLevel.MaximumAvailable)` does; a command the
@@ -324,6 +353,21 @@ The misspelled or wrong public names of 2.0.00 are fixed. Each old name stays, d
   at its level (`D4h`): to Operator, then to Administrator, as far as the account allows, where
   2.0.00 raised it to Administrator at once. The new `getRaisedPrivilegeLevel()` returns the level
   it reached, `null` when it raised none.
+* **Behavior change.** A refusal of that raise (`80h`, `81h` or `D4h` to Set Session Privilege
+  Level) ends the raises: `SerialOverLan` fails with the `SOLException` of the `D4h` of Activate
+  Payload, with the refusal as a suppressed exception, where the refusal was the cause. The new
+  `SerialOverLan(connector, session, level, ceiling)` raises a given session from `level` as far
+  as `ceiling` only.
+* `SOLException` gives the command that failed (`getCommand()`) and the connection it was sent on
+  (`getConnectionHandle()`), and its message starts with the name of the command and ends with the
+  message of its cause. 2.0.00 said `Cannot activate SOL payload due to exception during
+  activation process`, without the cause.
+* `SerialOverLan.available()` returns the number of bytes buffered, and `getSession()` the session
+  of the payload.
+* `IPMIException` takes the description of a command-specific completion code
+  (`IPMIException(CompletionCode, int, String)`), which its `getMessage()` returns. A command
+  describes its codes by overriding `IpmiCommandCoder.describeCommandSpecificCompletionCode(int)`:
+  `ActivatePayload` describes `80h`-`84h`, and `DeactivatePayload` its `81h`.
 * `CipherSuite.initializeAlgorithms(sik, password)` keys the MD5-128 integrity (the new
   `IntegrityMd5_128`) with the password. The one-argument `initializeAlgorithms(sik)` still works
   for every other suite, and throws `IllegalArgumentException` for the MD5-128 suites rather than

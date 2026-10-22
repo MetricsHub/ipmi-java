@@ -110,6 +110,26 @@ public abstract class ActivatePayload<R extends ActivatePayloadResponseData> ext
 		return new IpmiLanRequest(getNetworkFunction(), getCommandCode(), message, TypeConverter.intToByte(sequenceNumber));
 	}
 
+	@Override
+	protected String describeCommandSpecificCompletionCode(int rawCode) {
+		// IPMI 2.0 section 24.1, table 24-2
+		switch (rawCode) {
+		case 0x80:
+			return "Payload already active on another session.";
+		case 0x81:
+			return "Payload type is disabled: enable it on the BMC (for SOL, the SOL configuration parameters).";
+		case 0x82:
+			return "Payload activation limit reached.";
+		case 0x83:
+			return "Cannot activate the payload with encryption.";
+		case 0x84:
+			return "Cannot activate the payload without encryption: use a cipher suite with AES-CBC-128 confidentiality"
+					+ " (3, 8, 12 or 17).";
+		default:
+			return null;
+		}
+	}
+
 	/**
 	 * Prepares Auxilary Data field for the request payload.
 	 *

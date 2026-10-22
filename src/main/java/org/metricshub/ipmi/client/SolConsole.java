@@ -86,10 +86,11 @@ public final class SolConsole implements AutoCloseable {
 	}
 
 	/**
-	 * Returns the characters the system writes on its serial port. A read blocks until characters arrive, and
-	 * returns -1 once the console has ended ({@link #close() closed}, or {@link #deactivated()}) and the characters
+	 * Returns the characters the system writes on its serial port. A read blocks until characters arrive, returns at
+	 * once what is buffered, and returns -1 once the console has ended ({@link #close() closed}, or
+	 * {@link #deactivated()}) and the characters
 	 * already received are read. On an interrupted thread, a read that has no characters to return throws an
-	 * {@link IOException}.
+	 * {@link IOException}. {@code available()} returns the number of characters a read returns without blocking.
 	 *
 	 * @return the input stream of the console
 	 */
@@ -160,6 +161,14 @@ public final class SolConsole implements AutoCloseable {
 	}
 
 	/**
+	 * @return the managed system session ID of the session the console runs in, which Get Payload Instance Info
+	 *         reports as the holder of its payload instance
+	 */
+	int sessionId() {
+		return sol.getSession().getManagedSystemSessionId();
+	}
+
+	/**
 	 * Marks the console deactivated: the session it ran in is gone, so no character can arrive any more.
 	 */
 	void invalidate() {
@@ -194,15 +203,23 @@ public final class SolConsole implements AutoCloseable {
 		}
 
 		@Override
+		public int available() {
+			return sol.available();
+		}
+
+		@Override
 		public int read(byte[] buffer, int offset, int length) throws IOException {
 			if (length == 0) {
 				return 0;
 			}
 			while (true) {
-				byte[] bytes = sol.readBytes(length, READ_POLL_MS);
-				if (bytes != null && bytes.length > 0) {
-					System.arraycopy(bytes, 0, buffer, offset, bytes.length);
-					return bytes.length;
+				// Waits for the first character only, then returns it with what else is buffered, without waiting
+				byte[] first = sol.readBytes(1, READ_POLL_MS);
+				if (first != null && first.length > 0) {
+					buffer[offset] = first[0];
+					byte[] rest = sol.readBytes(Math.min(length - 1, sol.available()));
+					System.arraycopy(rest, 0, buffer, offset + 1, rest.length);
+					return 1 + rest.length;
 				}
 				if (closed || deactivated) {
 					return -1;

@@ -680,10 +680,7 @@ public final class IpmiClient implements AutoCloseable {
 				consoles.add(console);
 				return console;
 			} catch (SOLException e) {
-				if (e.getCause() instanceof IPMIException) {
-					throw new IpmiCompletionCodeException("Activating the SOL payload", (IPMIException) e.getCause());
-				}
-				throw new IpmiClientException("Cannot open the SOL console of " + host + ": " + e.getMessage(), e);
+				throw translateSol(e);
 			} catch (SessionException e) {
 				if (e.getCause() instanceof SessionException) {
 					// The BMC refused to raise the session of the SOL payload port to the privilege of the client
@@ -697,31 +694,68 @@ public final class IpmiClient implements AutoCloseable {
 	}
 
 	/**
-	 * Activates the SOL payload; when the BMC has no free instance, one whose session the BMC no longer knows (a
-	 * console that was killed, which some BMCs keep active for good) is deactivated and the activation tried again.
+	 * Translates the failure of a command of the SOL console as the link does for the commands of the client: an error
+	 * reply names the command, and a command that got no reply after all its tries is a timeout, which marks the
+	 * session of the client lost when the command went through it (not through the session the console opened on the
+	 * port of the payload).
+	 */
+	private IpmiClientException translateSol(SOLException e) {
+		IpmiCommandCoder<?> command = e.getCommand();
+		IpmiClientException translated;
+		if (command != null && e.getCause() instanceof IPMIException) {
+			translated = new IpmiCompletionCodeException(command, (IPMIException) e.getCause());
+		} else if (command != null && e.getCause() instanceof ConnectionException) {
+			String name = command.getClass().getSimpleName();
+			if (e.getConnectionHandle() == link.handle) {
+				link.lost = true;
+				translated = new IpmiTimeoutException(
+						"No reply from " + host + " to " + name + " after " + link.tries + " tries: the session is lost",
+						e);
+			} else {
+				translated = new IpmiTimeoutException(
+						"No reply from " + host + " to " + name + " on the SOL payload port after " + link.tries + " tries",
+						e);
+			}
+		} else {
+			translated = new IpmiClientException("Cannot open the SOL console of " + host + ": " + e.getMessage(), e);
+		}
+		// The refusal of a raise, behind the D4h of Activate Payload
+		for (Throwable suppressed : e.getSuppressed()) {
+			translated.addSuppressed(suppressed);
+		}
+		return translated;
+	}
+
+	/**
+	 * Activates the SOL payload. The console never raises the session of the client: on a D4h, the link raises it as
+	 * for any command, within the ceiling it keeps, and the activation is tried again. When the BMC has no free
+	 * instance, one whose session the BMC no longer knows (a console that was killed, which some BMCs keep active for
+	 * good) is deactivated and the activation tried again.
 	 */
 	private SerialOverLan activateSol() throws SOLException, SessionException {
-		SerialOverLan sol;
-		try {
-			sol = new SerialOverLan(link.connector, link.session);
-		} catch (SOLException e) {
-			if (e.getCause() != null || !reclaimStaleSol(e)) {
-				throw e;
+		boolean reclaimed = false;
+		while (true) {
+			try {
+				return new SerialOverLan(link.connector, link.session, link.level, link.level);
+			} catch (SOLException e) {
+				if (e.getConnectionHandle() == link.handle
+						&& e.getCause() instanceof IPMIException
+						&& ((IPMIException) e.getCause()).getCompletionCode() == CompletionCode.InsufficientPrivilege
+						&& link.raise()) {
+					continue;
+				}
+				if (reclaimed || e.getCause() != null || !reclaimStaleSol(e)) {
+					throw e;
+				}
+				reclaimed = true;
 			}
-			sol = new SerialOverLan(link.connector, link.session);
 		}
-		if (sol.getRaisedPrivilegeLevel() != null && sol.getConnectionHandle() == link.handle) {
-			// The console raised the session of the client (not one of its own on the port of the payload): the
-			// session runs at that level, and the next D4h is raised from there
-			link.note(sol.getRaisedPrivilegeLevel());
-		}
-		return sol;
 	}
 
 	/**
 	 * @return whether the activation is worth trying again: an instance held by a session the BMC does not have any
 	 *         more was deactivated, or one was freed since the failed activation
-	 * @throws SOLException when every instance is held by a session the BMC still has
+	 * @throws SOLException when every instance is held by a session the BMC still has, or by this client
 	 */
 	private boolean reclaimStaleSol(SOLException failure) throws SOLException {
 		GetPayloadActivationStatusResponseData status = link.send(new GetPayloadActivationStatus(PayloadType.Sol));
@@ -729,12 +763,23 @@ public final class IpmiClient implements AutoCloseable {
 		for (Byte instance : status.getAvailableInstances()) {
 			free.add(TypeConverter.byteToInt(instance));
 		}
+		// The sessions of this client: its own, and those of its consoles on the port of the payload
+		Set<Integer> own = new HashSet<Integer>();
+		own.add(link.session.getManagedSystemSessionId());
+		for (SolConsole console : consoles) {
+			own.add(console.sessionId());
+		}
+		boolean heldByThisClient = false;
 		StringBuilder holders = new StringBuilder();
 		for (int instance = 1; instance <= status.getInstanceCapacity(); instance++) {
 			if (free.contains(instance)) {
 				continue;
 			}
 			int holder = link.send(new GetPayloadInstanceInfo(PayloadType.Sol, instance)).getSessionId();
+			if (holder != 0 && own.contains(holder)) {
+				heldByThisClient = true;
+				continue;
+			}
 			GetSessionInfoResponseData session;
 			try {
 				session = link.send(new GetSessionInfo(holder));
@@ -765,6 +810,11 @@ public final class IpmiClient implements AutoCloseable {
 					.append(')');
 		}
 		if (holders.length() == 0) {
+			if (free.isEmpty() && heldByThisClient) {
+				throw new SOLException(
+						"The SOL payload is held by a console this client already opened: close it first",
+						failure);
+			}
 			// Every instance is free now: a console released its instance since the failed activation
 			return !free.isEmpty();
 		}

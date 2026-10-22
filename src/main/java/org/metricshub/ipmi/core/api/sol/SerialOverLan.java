@@ -26,7 +26,9 @@ import org.metricshub.ipmi.core.api.async.ConnectionHandle;
 import org.metricshub.ipmi.core.api.async.InboundSolMessageListener;
 import org.metricshub.ipmi.core.api.sync.IpmiConnector;
 import org.metricshub.ipmi.core.coding.PayloadCoder;
+import org.metricshub.ipmi.core.coding.commands.IpmiCommandCoder;
 import org.metricshub.ipmi.core.coding.commands.PrivilegeLevel;
+import org.metricshub.ipmi.core.coding.commands.ResponseData;
 import org.metricshub.ipmi.core.coding.commands.payload.ActivateSolPayload;
 import org.metricshub.ipmi.core.coding.commands.payload.ActivateSolPayloadResponseData;
 import org.metricshub.ipmi.core.coding.commands.payload.DeactivatePayload;
@@ -187,7 +189,9 @@ public class SerialOverLan implements Closeable {
 		this(
 				connector,
 				openSession(connector, remoteHost, remotePort, user, password, bmcKey, cipherSuiteSelectionHandler),
-				true);
+				true,
+				PrivilegeLevel.User,
+				PrivilegeLevel.Administrator);
 	}
 
 	/**
@@ -228,7 +232,30 @@ public class SerialOverLan implements Closeable {
 	 * @throws SessionException when the session on the SOL payload port cannot be opened
 	 */
 	public SerialOverLan(IpmiConnector connector, Session session) throws SOLException, SessionException {
-		this(connector, session, false);
+		this(connector, session, PrivilegeLevel.User, PrivilegeLevel.Administrator);
+	}
+
+	/**
+	 * Tries to open SOL communication on given existing session, like {@link #SerialOverLan(IpmiConnector, Session)},
+	 * for a session opened with {@link PrivilegeLevel#MaximumAvailable} whose level its owner keeps: the console raises
+	 * it from the given level, when the BMC refuses to activate the payload at that level, as far as the given ceiling
+	 * only. The levels do not matter for a session opened at a fixed level, and do not apply to the session the console
+	 * opens on the port of the payload, which it raises from User as far as the account allows.
+	 *
+	 * @param connector
+	 *        {@link IpmiConnector} that will be used for communication
+	 * @param session
+	 *        Existing session that should be reused (if possible) for SOL communication.
+	 * @param level
+	 *        the level the session runs at: User, Operator or Administrator
+	 * @param ceiling
+	 *        the highest level the console may raise the session to; the given level to never raise it
+	 * @throws SOLException when the SOL payload cannot be activated
+	 * @throws SessionException when the session on the SOL payload port cannot be opened
+	 */
+	public SerialOverLan(IpmiConnector connector, Session session, PrivilegeLevel level, PrivilegeLevel ceiling)
+			throws SOLException, SessionException {
+		this(connector, session, false, level, ceiling);
 	}
 
 	/**
@@ -236,9 +263,11 @@ public class SerialOverLan implements Closeable {
 	 * what it opened when it fails.
 	 *
 	 * @param ownsSession whether the console opened the given session, and then owns the connector too
+	 * @param level the level the given session runs at, when opened with MaximumAvailable
+	 * @param ceiling the highest level the console may raise the given session to
 	 */
-	private SerialOverLan(IpmiConnector connector, Session session, boolean ownsSession)
-			throws SOLException, SessionException {
+	private SerialOverLan(IpmiConnector connector, Session session, boolean ownsSession, PrivilegeLevel level,
+			PrivilegeLevel ceiling) throws SOLException, SessionException {
 		this.connector = connector;
 		this.ownsConnector = ownsSession;
 		if (ownsSession) {
@@ -246,7 +275,7 @@ public class SerialOverLan implements Closeable {
 		}
 
 		try {
-			int solPayloadPort = activatePayload(connector, session);
+			int solPayloadPort = activatePayload(connector, session, level, ceiling);
 
 			this.session = resolveSession(connector, session, solPayloadPort);
 
@@ -330,93 +359,141 @@ public class SerialOverLan implements Closeable {
 			ownedConnections.add(alternativeSession.getConnectionHandle());
 		}
 
-		activatePayload(ipmiConnector, alternativeSession);
+		activatePayload(ipmiConnector, alternativeSession, PrivilegeLevel.User, PrivilegeLevel.Administrator);
 
 		return alternativeSession;
 	}
 
 	/**
 	 * Tries to activate SOL payload in the given session. When the BMC refuses it for insufficient privilege in a
-	 * session opened with {@link PrivilegeLevel#MaximumAvailable}, which {@code openSession()} sets to User, raises the
-	 * session to Operator, then to Administrator, and tries again after each raise.
+	 * session opened with {@link PrivilegeLevel#MaximumAvailable}, raises the session from the given level, to Operator
+	 * then to Administrator as far as the given ceiling, and tries again after each raise.
 	 *
 	 * @param ipmiConnector
 	 *        {@link IpmiConnector} that will be used for communication
 	 * @param payloadSession
 	 *        the session where the payload is activated
+	 * @param level
+	 *        the level the session runs at
+	 * @param ceiling
+	 *        the highest level the session may be raised to
 	 * @return UDP port number on which managed system listens for SOL messages.
 	 * @throws SOLException
-	 *         when any unrecoverable error occurred.
+	 *         when any unrecoverable error occurred, with the command that failed
 	 */
-	private int activatePayload(IpmiConnector ipmiConnector, Session payloadSession) throws SOLException {
+	private int activatePayload(
+			IpmiConnector ipmiConnector,
+			Session payloadSession,
+			PrivilegeLevel level,
+			PrivilegeLevel ceiling)
+			throws SOLException {
 		ConnectionHandle connectionHandle = payloadSession.getConnectionHandle();
-		try {
-			this.payloadInstance = getFirstAvailablePayloadInstance(ipmiConnector, connectionHandle);
-			this.activationSession = payloadSession;
+		this.payloadInstance = getFirstAvailablePayloadInstance(ipmiConnector, connectionHandle);
+		this.activationSession = payloadSession;
 
-			ActivateSolPayload activatePayload = new ActivateSolPayload(payloadInstance);
-			ActivateSolPayloadResponseData activatePayloadResponseData = getActivatePayloadResponse(
-					ipmiConnector,
-					payloadSession,
-					activatePayload);
-			this.activatedConnection = connectionHandle;
-			this.activatedInstance = payloadInstance;
+		ActivateSolPayload activatePayload = new ActivateSolPayload(payloadInstance);
+		ActivateSolPayloadResponseData activatePayloadResponseData = getActivatePayloadResponse(
+				ipmiConnector,
+				payloadSession,
+				activatePayload,
+				level,
+				ceiling);
+		this.activatedConnection = connectionHandle;
+		this.activatedInstance = payloadInstance;
 
-			this.maxPayloadSize = activatePayloadResponseData.getInboundPayloadSize();
-			if (maxPayloadSize <= SolMessage.PAYLOAD_HEADER_LENGTH) {
-				throw new SOLException(
-						"The BMC announced an inbound SOL payload size of " + maxPayloadSize
-								+ " bytes, which leaves no room for character data");
-			}
-
-			return activatePayloadResponseData.getPayloadUdpPortNumber();
-
-		} catch (SOLException e) {
-			throw e;
-		} catch (Exception e) {
-			if (e instanceof InterruptedException) {
-				Thread.currentThread().interrupt();
-			}
-			throw new SOLException("Cannot activate SOL payload due to exception during activation process", e);
+		this.maxPayloadSize = activatePayloadResponseData.getInboundPayloadSize();
+		if (maxPayloadSize <= SolMessage.PAYLOAD_HEADER_LENGTH) {
+			throw new SOLException(
+					"The BMC announced an inbound SOL payload size of " + maxPayloadSize
+							+ " bytes, which leaves no room for character data");
 		}
+
+		return activatePayloadResponseData.getPayloadUdpPortNumber();
+	}
+
+	/**
+	 * Sends a command of the activation or deactivation of the payload.
+	 *
+	 * @throws SOLException when the command fails, with the command, the connection and the cause: an
+	 *         {@link IPMIException} for an error reply, a {@link ConnectionException} when the BMC does not answer
+	 */
+	private static <R extends ResponseData> R send(
+			IpmiConnector ipmiConnector,
+			ConnectionHandle connectionHandle,
+			IpmiCommandCoder<R> command)
+			throws SOLException {
+		try {
+			return ipmiConnector.sendMessage(connectionHandle, command);
+		} catch (Exception e) {
+			restoreInterruptStatus(e);
+			throw new SOLException(
+					command.getClass().getSimpleName() + " failed: " + e.getMessage(),
+					e,
+					command,
+					connectionHandle);
+		}
+	}
+
+	/**
+	 * @return the completion code of the error reply that made the command fail, or -1 when it did not get one
+	 */
+	private static int rawCompletionCode(SOLException failure) {
+		return failure.getCause() instanceof IPMIException ? ((IPMIException) failure.getCause()).getRawCode() : -1;
 	}
 
 	/**
 	 * Sends Activate Payload, and again after raising the privilege of a session opened with
 	 * {@link PrivilegeLevel#MaximumAvailable} when it is too low (to Operator, then to Administrator, as far as the
-	 * account allows), or after deactivating the payload when a lost reply left it active in this session.
-	 * {@code openSession()} raised a session opened at Operator or Administrator, and a User session cannot go higher;
-	 * the session the console opens on the port of the payload has the level of the given session, so a
-	 * MaximumAvailable one is raised here too.
+	 * ceiling and the account allow), or after deactivating the payload when a lost reply left it active in this
+	 * session. {@code openSession()} raised a session opened at Operator or Administrator, and a User session cannot go
+	 * higher; the session the console opens on the port of the payload has the level of the given session, so a
+	 * MaximumAvailable one is raised here too. A refusal of the raise (80h or 81h, IPMI 2.0 table 22-24, or D4h) ends
+	 * the raises: the D4h of Activate Payload is thrown, with the refusal suppressed.
 	 */
 	private ActivateSolPayloadResponseData getActivatePayloadResponse(
 			IpmiConnector ipmiConnector,
 			Session payloadSession,
-			ActivateSolPayload activatePayload)
-			throws Exception {
+			ActivateSolPayload activatePayload,
+			PrivilegeLevel level,
+			PrivilegeLevel ceiling)
+			throws SOLException {
 		ConnectionHandle connectionHandle = payloadSession.getConnectionHandle();
 		boolean onDemand = connectionHandle.getPrivilegeLevel() == PrivilegeLevel.MaximumAvailable;
-		PrivilegeLevel level = PrivilegeLevel.User;
+		PrivilegeLevel current = level;
 		boolean deactivated = false;
 		while (true) {
 			try {
-				return ipmiConnector.sendMessage(connectionHandle, activatePayload);
-			} catch (IPMIException e) {
-				boolean alreadyActive = !deactivated && e.getRawCode() == PAYLOAD_ALREADY_ACTIVE;
-				if (onDemand
-						&& level != PrivilegeLevel.Administrator
-						&& e.getCompletionCode() == CompletionCode.InsufficientPrivilege) {
-					level = level == PrivilegeLevel.User ? PrivilegeLevel.Operator : PrivilegeLevel.Administrator;
-					ipmiConnector.sendMessage(connectionHandle, new SetSessionPrivilegeLevel(level));
-					raisedTo = level;
-				} else if (alreadyActive && isActiveInSession(ipmiConnector, payloadSession)) {
-					// The reply to Activate Payload was lost, and the request sent again found the payload active in this
-					// session: the port and the sizes of the payload are only in that reply, which a new activation gives
-					deactivatePayload(connectionHandle, payloadInstance);
-					deactivated = true;
-				} else {
-					throw e;
-				}
+				return send(ipmiConnector, connectionHandle, activatePayload);
+			} catch (SOLException e) {
+				int code = rawCompletionCode(e);
+				if (onDemand && code == CompletionCode.InsufficientPrivilege.getCode() && current.compareTo(ceiling) < 0) {
+					PrivilegeLevel next = current == PrivilegeLevel.User ? PrivilegeLevel.Operator : PrivilegeLevel.Administrator;
+					try {
+						send(ipmiConnector, connectionHandle, new SetSessionPrivilegeLevel(next));
+					} catch (SOLException refusal) {
+						int refusalCode = rawCompletionCode(refusal);
+						if (refusalCode != SetSessionPrivilegeLevel.LEVEL_NOT_AVAILABLE
+								&& refusalCode != SetSessionPrivilegeLevel.LEVEL_ABOVE_LIMIT
+								&& refusalCode != CompletionCode.InsufficientPrivilege.getCode()) {
+							throw refusal;
+						}
+						// The session stops at its level: the activation fails as it does at a fixed level
+						e.addSuppressed(refusal);
+						throw e;
+					}
+					current = next;
+					raisedTo = next;
+				} else
+					if (!deactivated
+							&& code == PAYLOAD_ALREADY_ACTIVE
+							&& isActiveInSession(ipmiConnector, payloadSession)) {
+								// The reply to Activate Payload was lost, and the request sent again found the payload active in this
+								// session: the port and the sizes of the payload are only in that reply, which a new activation gives
+								send(ipmiConnector, connectionHandle, new DeactivatePayload(PayloadType.Sol, payloadInstance));
+								deactivated = true;
+							} else {
+								throw e;
+							}
 			}
 		}
 	}
@@ -425,17 +502,19 @@ public class SerialOverLan implements Closeable {
 	 * Tells whether the payload instance is active in the given session (Get Payload Instance Info, IPMI 2.0 section
 	 * 24.5), rather than in the session of another console, which must keep it.
 	 */
-	private boolean isActiveInSession(IpmiConnector ipmiConnector, Session payloadSession) throws Exception {
-		ConnectionHandle connectionHandle = payloadSession.getConnectionHandle();
+	private boolean isActiveInSession(IpmiConnector ipmiConnector, Session payloadSession) throws SOLException {
 		try {
-			GetPayloadInstanceInfoResponseData info = ipmiConnector
-					.sendMessage(
-							connectionHandle,
-							new GetPayloadInstanceInfo(PayloadType.Sol, payloadInstance));
+			GetPayloadInstanceInfoResponseData info = send(
+					ipmiConnector,
+					payloadSession.getConnectionHandle(),
+					new GetPayloadInstanceInfo(PayloadType.Sol, payloadInstance));
 			return info.getSessionId() != 0 && info.getSessionId() == payloadSession.getManagedSystemSessionId();
-		} catch (IPMIException e) {
-			// The command is optional
-			return false;
+		} catch (SOLException e) {
+			if (e.getCause() instanceof IPMIException) {
+				// The command is optional
+				return false;
+			}
+			throw e;
 		}
 	}
 
@@ -447,16 +526,15 @@ public class SerialOverLan implements Closeable {
 	 * @param connectionHandle
 	 *        {@link ConnectionHandle} representing single connection to managed system.
 	 * @return number of first available SOL payload instance.
-	 * @throws Exception
-	 *         If any exception occurred during communication or if no available instances were found.
+	 * @throws SOLException
+	 *         If the command failed, or if no available instances were found (an exception without a cause).
 	 */
 	private int getFirstAvailablePayloadInstance(IpmiConnector ipmiConnector, ConnectionHandle connectionHandle)
-			throws Exception {
-		GetPayloadActivationStatus getPayloadActivationStatus = new GetPayloadActivationStatus(PayloadType.Sol);
-		GetPayloadActivationStatusResponseData getActivationResponseData = ipmiConnector
-				.sendMessage(
-						connectionHandle,
-						getPayloadActivationStatus);
+			throws SOLException {
+		GetPayloadActivationStatusResponseData getActivationResponseData = send(
+				ipmiConnector,
+				connectionHandle,
+				new GetPayloadActivationStatus(PayloadType.Sol));
 
 		if (getActivationResponseData.getInstanceCapacity() <= 0
 				|| getActivationResponseData.getAvailableInstances().isEmpty()) {
@@ -575,6 +653,25 @@ public class SerialOverLan implements Closeable {
 	 */
 	public boolean writeString(String string, Charset charset) {
 		return writeBytes(string.getBytes(charset));
+	}
+
+	/**
+	 * Returns the number of characters received from the BMC that a read returns without waiting.
+	 *
+	 * @return the number of bytes buffered, 0 when none
+	 */
+	public int available() {
+		return inboundMessageListener.getAvailableBytesCount();
+	}
+
+	/**
+	 * Returns the session the console exchanges its packets in: the session it was given, or the one it opened on the
+	 * port of the payload when the BMC serves SOL on another port.
+	 *
+	 * @return the session of the payload
+	 */
+	public Session getSession() {
+		return session;
 	}
 
 	/**

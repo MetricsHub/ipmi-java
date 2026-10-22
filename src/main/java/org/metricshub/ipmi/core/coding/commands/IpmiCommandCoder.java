@@ -149,9 +149,25 @@ public abstract class IpmiCommandCoder<R extends ResponseData> extends PayloadCo
 			completionCode = decodeCommandSpecificCompletionCode(response.getRawCompletionCode());
 		}
 		if (completionCode != CompletionCode.Ok) {
-			throw new IPMIException(completionCode, response.getRawCompletionCode());
+			throw new IPMIException(
+					completionCode,
+					response.getRawCompletionCode(),
+					completionCode == CompletionCode.Unknown ?
+							describeCommandSpecificCompletionCode(response.getRawCompletionCode()) : null);
 		}
 		return response.getIpmiCommandData();
+	}
+
+	/**
+	 * Gives the meaning, for this command, of an OEM or command-specific completion code (01h-7Eh and 80h-BEh, IPMI
+	 * 2.0 Table 5-2) that {@link CompletionCode} does not list: the message of the {@link IPMIException} the response
+	 * fails with. The default knows none of them.
+	 *
+	 * @param rawCode the completion code byte of the response
+	 * @return the meaning of the code, or null for the generic text of {@link IPMIException}
+	 */
+	protected String describeCommandSpecificCompletionCode(int rawCode) {
+		return null;
 	}
 
 	/**
