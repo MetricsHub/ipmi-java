@@ -81,7 +81,8 @@ the build.
 
 `--type` takes the sensor types as the `Type` column of `sensors` prints them, the names of
 [`SensorType`](apidocs/org/metricshub/ipmi/core/coding/commands/sdr/record/SensorType.html)
-(`Temperature`, `Voltage`, `Fan`, `PowerSupply`, `Processor`, `Memory`...), case-insensitively.
+(`Temperature`, `Voltage`, `Fan`, `PowerSupply`, `Processor`, `Memory`...), case-insensitively,
+and `SystemFirmwareProgess`, the spelling of 2.0.00, for `SystemFirmwareProgress`.
 `--name` takes globs, case-insensitively: `*` matches any characters and `?` one. Each option can
 be repeated or given a comma-separated list. A glob matches the whole name: `--name 'Fan*'`
 selects `Fan 1`, `--name Fan` does not (quote the globs so that the shell does not expand them).

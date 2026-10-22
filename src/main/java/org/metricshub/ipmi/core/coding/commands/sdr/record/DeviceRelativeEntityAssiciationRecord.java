@@ -28,7 +28,11 @@ import org.metricshub.ipmi.core.common.TypeConverter;
  * This record is the same as the {@link EntityAssociationRecord}, except that
  * it supports describing associations between entities that have
  * device-relative Entity Instance values as well as system-relative values.
+ *
+ * @deprecated misspelled: use {@link DeviceRelativeEntityAssociationRecord}, the class the SDR walk returns for type
+ *             09h. This class remains its superclass until 3.0, when it will be removed.
  */
+@Deprecated
 public class DeviceRelativeEntityAssiciationRecord extends SensorRecord {
 
 	private int containerEntityId;

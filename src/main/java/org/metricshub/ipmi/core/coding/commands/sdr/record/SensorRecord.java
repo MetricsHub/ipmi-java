@@ -70,7 +70,7 @@ public abstract class SensorRecord {
 			break;
 		case RecordTypes.DEVICE_RELATIVE_ENTITY_ASSOCIATION_RECORD:
 			// TODO: Test if server with such records will be available
-			sensorRecord = new DeviceRelativeEntityAssiciationRecord();
+			sensorRecord = new DeviceRelativeEntityAssociationRecord();
 			break;
 		case RecordTypes.ENTITY_ASSOCIATION_RECORD://
 			sensorRecord = new EntityAssociationRecord();

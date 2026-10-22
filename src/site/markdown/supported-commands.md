@@ -116,7 +116,7 @@ decodes the records of the SDR repository (IPMI 2.0 section 43) into these class
 | `02h` | Compact Sensor | `CompactSensorRecord` | yes, with its reading (none for a sensor of system software), one sensor per instance of a [shared record](sensors.html#shared-records) |
 | `03h` | Event-Only | `EventOnlyRecord` | no |
 | `08h` | Entity Association | `EntityAssociationRecord` | no |
-| `09h` | Device-relative Entity Association | `DeviceRelativeEntityAssiciationRecord` | no |
+| `09h` | Device-relative Entity Association | `DeviceRelativeEntityAssociationRecord` | no |
 | `10h` | Generic Device Locator | `GenericDeviceLocatorRecord` | no |
 | `11h` | FRU Device Locator | `FruDeviceLocatorRecord` | no (`frus()` reads the logical FRUs it locates) |
 | `12h` | Management Controller Device Locator | `ManagementControllerDeviceLocatorRecord` | no |

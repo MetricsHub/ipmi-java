@@ -499,7 +499,7 @@ class IpmiClientTest {
 				IpmiCompletionCodeException refused = assertThrows(
 						IpmiCompletionCodeException.class,
 						() -> client.sel().execute());
-				assertEquals(CompletionCode.InsufficentPrivilege, refused.completionCode());
+				assertEquals(CompletionCode.InsufficientPrivilege, refused.completionCode());
 
 				sel.refuseInfo(0xd5);
 				assertFalse(client.sel().execute().info().isPresent(), "not supported in the present state: no info");
@@ -645,7 +645,7 @@ class IpmiClientTest {
 				IpmiCompletionCodeException refused = assertThrows(
 						IpmiCompletionCodeException.class,
 						() -> client.sel().execute());
-				assertEquals(CompletionCode.InsufficentPrivilege, refused.completionCode(), "a refusal the caller can act on");
+				assertEquals(CompletionCode.InsufficientPrivilege, refused.completionCode(), "a refusal the caller can act on");
 			}
 		}
 	}
@@ -1967,7 +1967,7 @@ class IpmiClientTest {
 				IpmiCompletionCodeException refused = assertThrows(
 						IpmiCompletionCodeException.class,
 						() -> client.send(new GetChassisStatus()));
-				assertEquals(CompletionCode.InsufficentPrivilege, refused.completionCode());
+				assertEquals(CompletionCode.InsufficientPrivilege, refused.completionCode());
 				assertEquals(0xd4, refused.rawCompletionCode());
 				assertEquals(NetworkFunction.ChassisRequest, refused.networkFunction());
 				assertEquals(0x01, refused.command());
@@ -2178,7 +2178,7 @@ class IpmiClientTest {
 				IpmiCompletionCodeException refused = assertThrows(
 						IpmiCompletionCodeException.class,
 						() -> client.chassisIdentify(5));
-				assertEquals(CompletionCode.InsufficentPrivilege, refused.completionCode());
+				assertEquals(CompletionCode.InsufficientPrivilege, refused.completionCode());
 				assertEquals(6, bmc.getCount(NETFN_APP, SET_SESSION_PRIVILEGE_LEVEL));
 				assertEquals(1, bmc.getCount(NETFN_CHASSIS, CHASSIS_IDENTIFY), "not sent again");
 				assertEquals(1, bmc.getCount(OPEN_SESSION_REQUEST), "one session throughout");
@@ -2198,7 +2198,7 @@ class IpmiClientTest {
 						IpmiCompletionCodeException.class,
 						() -> client.chassisControl(PowerCommand.PowerDown));
 				assertEquals(
-						CompletionCode.InsufficentPrivilege,
+						CompletionCode.InsufficientPrivilege,
 						refused.completionCode(),
 						"the D4h, not the 81h of the raise");
 				assertEquals(3, bmc.getCount(FakeRmcpPlusBmc.RAKP_1), "logged in at User after two refused roles");
@@ -2221,7 +2221,7 @@ class IpmiClientTest {
 				bmc.handle(NETFN_CHASSIS, GET_CHASSIS_STATUS, data -> new byte[] { (byte) 0xd4 });
 				for (int i = 0; i < 2; i++) {
 					IpmiCompletionCodeException refused = assertThrows(IpmiCompletionCodeException.class, client::chassisStatus);
-					assertEquals(CompletionCode.InsufficentPrivilege, refused.completionCode());
+					assertEquals(CompletionCode.InsufficientPrivilege, refused.completionCode());
 				}
 				assertEquals(2, bmc.getCount(NETFN_APP, SET_SESSION_PRIVILEGE_LEVEL), "User, then one refused raise");
 				assertEquals(3, bmc.getCount(NETFN_CHASSIS, GET_CHASSIS_STATUS));
@@ -2262,10 +2262,10 @@ class IpmiClientTest {
 				IpmiCompletionCodeException refused = assertThrows(
 						IpmiCompletionCodeException.class,
 						() -> client.chassisControl(PowerCommand.PowerDown));
-				assertEquals(CompletionCode.InsufficentPrivilege, refused.completionCode(), "a User session");
+				assertEquals(CompletionCode.InsufficientPrivilege, refused.completionCode(), "a User session");
 				assertTrue(refused.getMessage().contains("privilege(PrivilegeLevel.Operator)"), refused.getMessage());
 				assertEquals(
-						CompletionCode.InsufficentPrivilege,
+						CompletionCode.InsufficientPrivilege,
 						assertThrows(IpmiCompletionCodeException.class, () -> client.chassisIdentify(5)).completionCode());
 				assertTrue(bmc.isPowerOn(), "the refused command did nothing");
 				assertEquals(-1, bmc.getChassisControl());
@@ -2511,7 +2511,7 @@ class IpmiClientTest {
 				IpmiCompletionCodeException refused = assertThrows(
 						IpmiCompletionCodeException.class,
 						() -> third.sol().open());
-				assertEquals(CompletionCode.InsufficentPrivilege, refused.completionCode());
+				assertEquals(CompletionCode.InsufficientPrivilege, refused.completionCode());
 				assertEquals(0, bmc.getCount(NETFN_APP, FakeRmcpPlusBmc.DEACTIVATE_PAYLOAD), "still never deactivated");
 			}
 			// A malformed reply (five bytes) is neither a found nor an absent session

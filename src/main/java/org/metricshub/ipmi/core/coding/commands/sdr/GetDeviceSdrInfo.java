@@ -25,6 +25,7 @@ package org.metricshub.ipmi.core.coding.commands.sdr;
 import java.security.InvalidKeyException;
 import java.security.NoSuchAlgorithmException;
 
+import org.metricshub.ipmi.core.coding.commands.CommandCodes;
 import org.metricshub.ipmi.core.coding.commands.IpmiCommandCoder;
 import org.metricshub.ipmi.core.coding.payload.IpmiPayload;
 import org.metricshub.ipmi.core.coding.payload.lan.IPMIException;
@@ -72,7 +73,7 @@ public class GetDeviceSdrInfo extends IpmiCommandCoder<GetDeviceSdrInfoResponseD
 
 	@Override
 	public byte getCommandCode() {
-		return 0x20;
+		return CommandCodes.GET_DEVICE_SDR_INFO;
 	}
 
 	@Override

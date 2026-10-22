@@ -405,7 +405,7 @@ public class SerialOverLan implements Closeable {
 				boolean alreadyActive = !deactivated && e.getRawCode() == PAYLOAD_ALREADY_ACTIVE;
 				if (onDemand
 						&& level != PrivilegeLevel.Administrator
-						&& e.getCompletionCode() == CompletionCode.InsufficentPrivilege) {
+						&& e.getCompletionCode() == CompletionCode.InsufficientPrivilege) {
 					level = level == PrivilegeLevel.User ? PrivilegeLevel.Operator : PrivilegeLevel.Administrator;
 					ipmiConnector.sendMessage(connectionHandle, new SetSessionPrivilegeLevel(level));
 					raisedTo = level;

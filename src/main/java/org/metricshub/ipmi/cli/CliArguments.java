@@ -565,6 +565,10 @@ final class CliArguments implements AutoCloseable {
 	}
 
 	private static SensorType parseSensorType(String name) throws CliUsageException {
+		// the misspelling of 2.0.00, accepted until 3.0
+		if ("SystemFirmwareProgess".equalsIgnoreCase(name)) {
+			return SensorType.SystemFirmwareProgress;
+		}
 		for (SensorType type : SensorType.values()) {
 			if (type.name().equalsIgnoreCase(name)) {
 				return type;

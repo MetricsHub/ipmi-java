@@ -104,7 +104,7 @@ See [Upgrading](https://metricshub.org/ipmi-java/upgrading.html) for the changes
 
 ### From 2.0.00
 
-Code written for 2.0.00 compiles unchanged with 2.1.00, which reads more of the server and fixes several decodings, so some results change; see [Upgrading from 2.0.00 to 2.1.00](https://metricshub.org/ipmi-java/upgrading.html#upgrading-from-2-0-00-to-2-1-00) for the details.
+Code written for 2.0.00 links unchanged with 2.1.00 and compiles unchanged unless it uses a renamed enum constant as a `case` label; which reads more of the server and fixes several decodings, so some results change; see [Upgrading from 2.0.00 to 2.1.00](https://metricshub.org/ipmi-java/upgrading.html#upgrading-from-2-0-00-to-2-1-00) for the details.
 
 * Each sensor and each FRU is read from the controller its SDR record names, at the LUN of the record. The sensors and FRUs of the other controllers (power supplies, fans, RAID and network adapters) are read through the BMC with Send Message: the power supply, fan, network and drive sensors of an HPE iLO 5 now have their readings. Send Message needs the Operator privilege on most BMCs; below it, these sensors and FRUs are returned without reading or inventory, with the `D4h` completion code in their `problem()` or `problems()`. The sensors owned by system software (the BIOS sensors of Dell iDRACs) are `UNAVAILABLE`, where 2.0.00 returned the states of an unrelated BMC sensor. A BMC without SDR repository that holds the SDRs of its own sensors is walked with Get Device SDR.
 * A Compact record shared by several sensors gives one `Sensor` per sensor: every drive slot and DIMM slot of a Dell iDRAC, where 2.0.00 listed the first one only.
@@ -112,6 +112,8 @@ Code written for 2.0.00 compiles unchanged with 2.1.00, which reads more of the 
 * `privilege(PrivilegeLevel.MaximumAvailable)` (`ipmicli -L auto`) is accepted: the session runs at User and is raised only when a command needs more.
 * Cipher suites 11 and 12 (MD5-128 integrity) open sessions, and the default preference becomes 17, 3, 8, 16, 2, 7, 12, 11.
 * The `states()` of a threshold sensor list the thresholds its reading is at or beyond (`Upper Critical Going High`), a discrete sensor described by a Full record has no `reading()`, the threshold and generic states of OEM sensor types are decoded, the reserved sensor type codes are `SensorType.Reserved` instead of `Oem`, and `Sensor.typeCode()`, `SelEntry.sensorTypeCode()` and `Sensor.percentage()` are new.
+* The jar declares the automatic module name `org.metricshub.ipmi`: a modular application writes `requires org.metricshub.ipmi;` instead of `requires ipmi.java;`.
+* Misspelled names are fixed, and the old ones stay as deprecated aliases until 3.0: `SensorType.SystemFirmwareProgress` (printed so by `ipmicli`), `CompletionCode.InsufficientPrivilege` and `DeviceRelativeEntityAssociationRecord`. `CommandCodes.GET_DEVICE_SDR_INFO` is `20h` (it was `21h`, now `GET_DEVICE_SDR`): recompile code that uses it.
 * Non-linear sensors have a `reading()`, and `Sensor.name()` is never `null`. `FullSensorRecord.getSensorResolution()` returns `|M x 10^R|`, and `NaN` for a linearizable or non-linear sensor.
 
 ### From 1.x to 2.0.00

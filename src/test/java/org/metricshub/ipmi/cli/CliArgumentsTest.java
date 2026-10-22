@@ -152,6 +152,17 @@ class CliArgumentsTest {
 	}
 
 	@Test
+	void systemFirmwareProgressInBothSpellings() throws Exception {
+		assertEquals(
+				EnumSet.of(SensorType.SystemFirmwareProgress),
+				parse("sensors", "--type", "SystemFirmwareProgress").types());
+		assertEquals(
+				EnumSet.of(SensorType.SystemFirmwareProgress),
+				parse("sensors", "--type", "systemfirmwareprogess").types(),
+				"the 2.0.00 misspelling");
+	}
+
+	@Test
 	void rawBytesInHexadecimal() throws Exception {
 		CliArguments dcmi = parse("raw", "0x2c", "01", "--json", "DC", "0X1");
 		assertEquals(CliArguments.Subcommand.RAW, dcmi.subcommand());

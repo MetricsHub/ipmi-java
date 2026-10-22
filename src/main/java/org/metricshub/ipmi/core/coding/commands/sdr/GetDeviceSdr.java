@@ -22,6 +22,7 @@ package org.metricshub.ipmi.core.coding.commands.sdr;
  * ╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱
  */
 
+import org.metricshub.ipmi.core.coding.commands.CommandCodes;
 import org.metricshub.ipmi.core.coding.payload.CompletionCode;
 import org.metricshub.ipmi.core.coding.payload.lan.NetworkFunction;
 
@@ -58,7 +59,7 @@ public class GetDeviceSdr extends GetSdr {
 
 	@Override
 	public byte getCommandCode() {
-		return 0x21;
+		return CommandCodes.GET_DEVICE_SDR;
 	}
 
 	@Override

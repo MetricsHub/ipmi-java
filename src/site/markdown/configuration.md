@@ -158,7 +158,7 @@ A session that the BMC revoked (on HPE iLO 5, a session that another client dele
 `D4h` to every command, Set Session Privilege Level included: the client asks for the raise once,
 takes the refusal as the ceiling, and the `D4h` reaches the caller. Such a session is not reopened
 by itself: close the client and build a new one
-([Troubleshooting](troubleshooting.html#ipmicompletioncodeexception-with-insufficentprivilege-28d4h-29)).
+([Troubleshooting](troubleshooting.html#ipmicompletioncodeexception-with-insufficientprivilege-28d4h-29)).
 
 ### Cipher suites
 
