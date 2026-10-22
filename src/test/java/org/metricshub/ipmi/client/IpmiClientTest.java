@@ -59,6 +59,7 @@ import static org.metricshub.ipmi.core.transport.FakeSel.systemEvent;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.Instant;
@@ -2522,6 +2523,177 @@ class IpmiClientTest {
 				assertEquals(0, bmc.getCount(NETFN_APP, FakeRmcpPlusBmc.DEACTIVATE_PAYLOAD), "and never deactivated");
 			}
 		}
+	}
+
+	@Test
+	@Timeout(30)
+	void aSolConsoleInputReportsWhatIsBufferedAndReturnsItAtOnce() throws Exception {
+		try (FakeRmcpPlusBmc bmc = bmc()) {
+			bmc.enableSol(bmc.getPort(), 255, ADMINISTRATOR);
+			try (
+					IpmiClient client = client(bmc).privilege(PrivilegeLevel.Administrator).build();
+					SolConsole console = client.sol().open()) {
+				InputStream input = console.input();
+				assertEquals(0, input.available());
+				bmc.sendSol(1, 0, "hello".getBytes(StandardCharsets.US_ASCII));
+				await(() -> {
+					try {
+						return input.available() == 5;
+					} catch (IOException e) {
+						throw new IllegalStateException(e);
+					}
+				}, "the characters are buffered");
+				assertTrue(new InputStreamReader(input, StandardCharsets.US_ASCII).ready());
+				// The reader above did not read: a 16-byte read returns the 5 characters without waiting for more
+				byte[] buffer = new byte[16];
+				long start = System.nanoTime();
+				int read = input.read(buffer, 0, buffer.length);
+				long elapsed = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - start);
+				assertEquals("hello", new String(buffer, 0, read, StandardCharsets.US_ASCII));
+				assertTrue(elapsed < 150, "read in " + elapsed + " ms");
+				assertEquals(0, input.available());
+			}
+		}
+	}
+
+	@Test
+	@Timeout(30)
+	void aSolFailureNamesTheCommandTheBmcRefused() throws Exception {
+		try (FakeRmcpPlusBmc bmc = bmc()) {
+			bmc.enableSol(bmc.getPort(), 255, ADMINISTRATOR);
+			try (IpmiClient client = client(bmc).privilege(PrivilegeLevel.Administrator).build()) {
+				// Get Payload Activation Status
+				bmc.handle(NETFN_APP, FakeRmcpPlusBmc.GET_PAYLOAD_ACTIVATION_STATUS, data -> new byte[] { (byte) 0xc1 });
+				IpmiCompletionCodeException status = assertThrows(
+						IpmiCompletionCodeException.class,
+						() -> client.sol().open());
+				assertCommand(status, FakeRmcpPlusBmc.GET_PAYLOAD_ACTIVATION_STATUS, 0xc1);
+				assertTrue(status.getMessage().startsWith("GetPayloadActivationStatus failed: "), status.getMessage());
+				bmc.enableSol(bmc.getPort(), 255, ADMINISTRATOR);
+
+				// Activate Payload: the command-specific codes of IPMI 2.0 table 24-2 are described
+				bmc.handle(NETFN_APP, FakeRmcpPlusBmc.ACTIVATE_PAYLOAD, data -> new byte[] { (byte) 0x81 });
+				IpmiCompletionCodeException disabled = assertThrows(
+						IpmiCompletionCodeException.class,
+						() -> client.sol().open());
+				assertCommand(disabled, FakeRmcpPlusBmc.ACTIVATE_PAYLOAD, 0x81);
+				assertTrue(disabled.getMessage().contains("Payload type is disabled"), disabled.getMessage());
+				bmc.handle(NETFN_APP, FakeRmcpPlusBmc.ACTIVATE_PAYLOAD, data -> new byte[] { (byte) 0x84 });
+				IpmiCompletionCodeException encryption = assertThrows(
+						IpmiCompletionCodeException.class,
+						() -> client.sol().open());
+				assertCommand(encryption, FakeRmcpPlusBmc.ACTIVATE_PAYLOAD, 0x84);
+				assertTrue(
+						encryption.getMessage().contains("Cannot activate the payload without encryption"),
+						encryption.getMessage());
+				assertEquals(1, bmc.getCount(OPEN_SESSION_REQUEST), "an error reply keeps the session");
+			}
+		}
+	}
+
+	@Test
+	@Timeout(30)
+	void aSolFailureNamesTheRefusedRaiseAndTheRefusedDeactivation() throws Exception {
+		try (FakeRmcpPlusBmc bmc = bmc()) {
+			bmc.enableSol(bmc.getPort(), 255, ADMINISTRATOR);
+			// Set Session Privilege Level: a busy BMC is the failure of the raise, not a ceiling
+			try (IpmiClient client = client(bmc).privilege(PrivilegeLevel.MaximumAvailable).build()) {
+				client.chassisStatus();
+				bmc.handle(NETFN_APP, SET_SESSION_PRIVILEGE_LEVEL, data -> new byte[] { (byte) 0xc0 });
+				IpmiCompletionCodeException busy = assertThrows(
+						IpmiCompletionCodeException.class,
+						() -> client.sol().open());
+				assertCommand(busy, SET_SESSION_PRIVILEGE_LEVEL, 0xc0);
+			}
+
+			// Deactivate Payload of the instance a dead session holds
+			bmc.handle(NETFN_APP, SET_SESSION_PRIVILEGE_LEVEL, bmc::setSessionPrivilegeLevel);
+			try (IpmiClient first = client(bmc).privilege(PrivilegeLevel.Administrator).build()) {
+				first.sol().open();
+				bmc.expireSession();
+			}
+			bmc.handle(NETFN_APP, FakeRmcpPlusBmc.DEACTIVATE_PAYLOAD, data -> new byte[] { (byte) 0xd4 });
+			try (IpmiClient second = client(bmc).privilege(PrivilegeLevel.Administrator).build()) {
+				IpmiCompletionCodeException refused = assertThrows(
+						IpmiCompletionCodeException.class,
+						() -> second.sol().open());
+				assertCommand(refused, FakeRmcpPlusBmc.DEACTIVATE_PAYLOAD, 0xd4);
+			}
+		}
+	}
+
+	@Test
+	@Timeout(30)
+	void aSolCommandWithoutReplyIsATimeoutThatLosesTheSession() throws Exception {
+		try (FakeRmcpPlusBmc bmc = bmc()) {
+			bmc.enableSol(bmc.getPort(), 255, ADMINISTRATOR);
+			try (IpmiClient client = client(bmc).privilege(PrivilegeLevel.Administrator).build()) {
+				client.chassisStatus();
+				bmc.handle(NETFN_APP, FakeRmcpPlusBmc.GET_PAYLOAD_ACTIVATION_STATUS, data -> null);
+				IpmiTimeoutException timeout = assertThrows(IpmiTimeoutException.class, () -> client.sol().open());
+				assertTrue(
+						timeout.getMessage().contains("to GetPayloadActivationStatus after 2 tries: the session is lost"),
+						timeout.getMessage());
+				assertEquals(1, bmc.getCount(OPEN_SESSION_REQUEST));
+
+				// The BMC forgot the session meanwhile: the next sol().open() opens a new one
+				bmc.expireSession();
+				bmc.enableSol(bmc.getPort(), 255, ADMINISTRATOR);
+				try (SolConsole console = client.sol().open()) {
+					assertEquals(2, bmc.getCount(OPEN_SESSION_REQUEST), "a new session");
+					assertTrue(bmc.isSolActive());
+				}
+			}
+		}
+	}
+
+	@Test
+	@Timeout(30)
+	void aSecondSolConsoleOfTheClientIsNotBlamedOnAnotherSession() throws Exception {
+		try (FakeRmcpPlusBmc bmc = bmc()) {
+			bmc.enableSol(bmc.getPort(), 255, ADMINISTRATOR);
+			try (
+					IpmiClient client = client(bmc).privilege(PrivilegeLevel.Administrator).build();
+					SolConsole console = client.sol().open()) {
+				IpmiClientException second = assertThrows(IpmiClientException.class, () -> client.sol().open());
+				assertTrue(
+						second.getMessage().contains("held by a console this client already opened: close it first"),
+						second.getMessage());
+				assertEquals(0, bmc.getCount(FakeRmcpPlusBmc.DEACTIVATE_PAYLOAD), "the first console keeps its payload");
+				assertFalse(console.deactivated());
+			}
+		}
+	}
+
+	@Test
+	@Timeout(30)
+	void aSolConsoleRaisesAMaximumAvailableClientWithinItsCeiling() throws Exception {
+		try (FakeRmcpPlusBmc bmc = bmc()) {
+			bmc.enableSol(bmc.getPort(), 255, ADMINISTRATOR);
+			bmc.privilegeLimit(FakeRmcpPlusBmc.OPERATOR);
+			try (IpmiClient client = client(bmc).privilege(PrivilegeLevel.MaximumAvailable).build()) {
+				for (int open = 1; open <= 2; open++) {
+					IpmiCompletionCodeException refused = assertThrows(
+							IpmiCompletionCodeException.class,
+							() -> client.sol().open());
+					assertCommand(refused, FakeRmcpPlusBmc.ACTIVATE_PAYLOAD, 0xd4);
+					assertEquals(
+							3,
+							bmc.getCount(NETFN_APP, SET_SESSION_PRIVILEGE_LEVEL),
+							"User, then Operator and the refused Administrator by the first open only");
+					assertEquals(FakeRmcpPlusBmc.OPERATOR, bmc.getPrivilege());
+				}
+				// The client knows its session runs at Operator: an Operator command needs no raise
+				client.chassisControl(PowerCommand.PowerDown);
+				assertEquals(3, bmc.getCount(NETFN_APP, SET_SESSION_PRIVILEGE_LEVEL));
+			}
+		}
+	}
+
+	private static void assertCommand(IpmiCompletionCodeException e, int command, int completionCode) {
+		assertEquals(NetworkFunction.ApplicationRequest, e.networkFunction(), e.getMessage());
+		assertEquals(command, e.command(), e.getMessage());
+		assertEquals(completionCode, e.rawCompletionCode(), e.getMessage());
 	}
 
 	@Test

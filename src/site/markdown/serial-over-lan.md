@@ -77,7 +77,7 @@ opens there with the same credentials and privilege) and returns a
 | Method | Behavior |
 | --- | --- |
 | `output()` | An `OutputStream` whose bytes reach the serial port of the server. A write returns once the BMC acknowledged the characters, and throws `IOException` when it does not, or once the console is closed. |
-| `input()` | An `InputStream` of what the server writes on its serial port. A read blocks until characters arrive, and returns -1 once the console has ended (closed, or `deactivated()`) and the characters already received are read. On an interrupted thread, a read that has no characters to return throws `IOException`. |
+| `input()` | An `InputStream` of what the server writes on its serial port. A read blocks until characters arrive, returns at once what is buffered (up to the length asked), and returns -1 once the console has ended (closed, or `deactivated()`) and the characters already received are read. On an interrupted thread, a read that has no characters to return throws `IOException`. `available()` returns the number of characters a read returns without blocking, so a `BufferedReader` over the stream is `ready()` as soon as characters are buffered. |
 | `deactivated()` | Whether the console ended other than by a successful `close()`: the BMC reported the payload deactivated (another session deactivated or took it, or the server was reset or powered on or off locally), the client was closed or lost the session the console runs in, or `close()` could not deactivate the payload. |
 | `invokeOperations(SolOperation...)` | The [serial port operations](#serial-port-operations-and-events). |
 | `registerEventListener(SolEventListener)`, `unregisterEventListener(SolEventListener)` | Add or remove a listener of the [status events](#serial-port-operations-and-events) of the console. |
@@ -91,19 +91,22 @@ console stays open until it is closed or ends.
 
 | Exception | When |
 | --- | --- |
-| `IpmiCompletionCodeException` | The BMC refused a command of the activation, with the code in `rawCompletionCode()`: `D4h` (`InsufficientPrivilege`) when the session runs below the privilege the BMC requires for SOL, or a code of Activate Payload (IPMI 2.0 table 24-2), such as `81h` (the payload type is disabled) or `84h` (the BMC requires encryption). |
+| `IpmiCompletionCodeException` | The BMC refused a command of the activation, named by `networkFunction()` and `command()` and in the message: Get Payload Activation Status (`4Ah`), Activate Payload (`48h`), Set Session Privilege Level (`3Bh`), or a command that looks for a [payload in use](#with-ipmiclient) (Get Payload Instance Info, Get Session Info, Deactivate Payload). The code is in `rawCompletionCode()`: `D4h` (`InsufficientPrivilege`) when the session runs below the privilege the BMC requires for SOL, or a code of Activate Payload (IPMI 2.0 table 24-2), which the message describes: `80h` (already active on another session), `81h` (the payload type is disabled), `82h` (activation limit reached), `83h` (cannot activate with encryption), `84h` (cannot activate without encryption: use a cipher suite with AES-CBC-128, 3, 8, 12 or 17). |
 | `IpmiAuthenticationException` | The BMC refused the login or the privilege of the client when the client opened its session, or, for a BMC that serves SOL on another UDP port, the privilege of the client in the session there ([Exceptions](timeouts-and-errors.html#exceptions)). |
 | `IpmiConnectionException` | The session of the client, or the one on the SOL port, could not be established. |
-| `IpmiTimeoutException` | The activation did not complete within the deadline, or a message of the session got no reply after all the tries. |
-| `IpmiClientException` | Every SOL payload instance is held by another live session (below), or the activation failed otherwise (the BMC reports no free payload instance, or a payload size that leaves no room for characters): `getCause()` is the `SOLException`. |
+| `IpmiTimeoutException` | The activation did not complete within the deadline, or a command of the activation got no reply after all the tries: `No reply from <host> to <command> after <n> tries`. When that command went through the session of the client, the session is lost, and the next operation, `sol().open()` included, opens a new one ([Session recovery](timeouts-and-errors.html#session-recovery)); a command sent in the session the console opened on another UDP port says `on the SOL payload port` instead. |
+| `IpmiClientException` | Every SOL payload instance is held by another live session, or by a console of this client (below), or the activation failed otherwise (the BMC reports no free payload instance, or a payload size that leaves no room for characters): `getCause()` is the `SOLException`. |
 | `IllegalStateException` | The client is closed, or was built without credentials. |
 
 A client built with `privilege(PrivilegeLevel.MaximumAvailable)` needs no fixed level: when the
 BMC refuses the activation for insufficient privilege (`D4h`), the session is raised to Operator,
 then to Administrator, as far as the account allows, and the activation is sent again after each
-raise ([Raising the session on demand](configuration.html#raising-the-session-on-demand)). A level
-the BMC refuses is the ceiling of the session, and `open()` then fails with
-`IpmiCompletionCodeException`, as at a fixed level.
+raise ([Raising the session on demand](configuration.html#raising-the-session-on-demand)). The
+client raises its session as for any other command: it records the level reached, and a level the
+BMC refuses (`80h`, `81h` or `D4h` to Set Session Privilege Level) is the ceiling of the session
+for its lifetime. `open()` then fails with the `IpmiCompletionCodeException` of Activate Payload
+(`D4h`), as at a fixed level, and a later `open()` asks for no level the session already has or
+the BMC refused.
 
 When every SOL payload instance is taken, `open()` asks the BMC which session holds each one (Get
 Payload Instance Info, then Get Session Info):
@@ -111,6 +114,9 @@ Payload Instance Info, then Get Session Info):
 * A session the BMC still has keeps its console: `open()` fails with an `IpmiClientException`
   that names the holder, `Cannot open the SOL console of <host>:` followed by
   `The SOL payload is in use by another session: instance 1 by session ... (user ID 2, privilege 4)`.
+* A console this client already opened keeps its payload: on a BMC with a single instance, a
+  second `open()` fails with `The SOL payload is held by a console this client already opened:
+  close it first`. A BMC with several instances serves the second console.
 * A session the BMC no longer has (a console killed without being closed) loses it: `open()`
   deactivates the payload and activates it again. Some BMCs (Supermicro) keep such a payload
   active for good; once they forget the dead session, within a minute, the next `open()` reclaims
@@ -240,14 +246,20 @@ A session runs at the privilege it was opened with:
 right after the login. A session opened with `MaximumAvailable` runs at User instead: when the BMC
 refuses to activate the payload at that level (`D4h`), the console raises the session with Set
 Session Privilege Level, to Operator first and then to Administrator, and tries again after each
-step. `getRaisedPrivilegeLevel()` returns the level the console reached, or `null` when it raised
-nothing; the session keeps that level after the console is closed.
+step. When the BMC refuses a level (`80h`, `81h` or `D4h`), the console stops there and fails with
+the `D4h` of Activate Payload, the refusal being a suppressed exception of the `SOLException`.
+`getRaisedPrivilegeLevel()` returns the level the console reached, or `null` when it raised
+nothing; the session keeps that level after the console is closed. The owner of a session that
+keeps track of its level gives it with
+`new SerialOverLan(connector, session, level, ceiling)`: the console raises the session from
+`level`, as far as `ceiling` only, and never raises it when both are the same (as `IpmiClient`
+does, which raises its session itself). `getSession()` returns the session the console runs in.
 
 The constructors close what they opened, then throw:
 
 | Exception | When |
 | --- | --- |
-| `SOLException` | The payload cannot be activated: SOL disabled, no free payload instance, a privilege the BMC refuses, a payload size that leaves no room for characters. `getCause()` is the `IPMIException` when the BMC answered with an error completion code. |
+| `SOLException` | The payload cannot be activated: SOL disabled, no free payload instance, a privilege the BMC refuses, a payload size that leaves no room for characters. When a command failed, `getCommand()` is that command (`GetPayloadActivationStatus`, `ActivateSolPayload`, `SetSessionPrivilegeLevel`, `GetPayloadInstanceInfo` or `DeactivatePayload`), `getConnectionHandle()` the connection it was sent on, and the message `<command> failed: ` followed by the message of `getCause()`: the `IPMIException` when the BMC answered with an error completion code (whose message describes the codes `80h`-`84h` of Activate Payload), the `ConnectionException` when it did not answer. |
 | `SessionException` | A session cannot be opened, or the account is not allowed the privilege requested for it. |
 
 ## Reading and writing
@@ -287,6 +299,7 @@ Reads take from this buffer:
 
 | Method | Behavior |
 | --- | --- |
+| `available()` | The number of bytes buffered, which a read returns without waiting |
 | `readBytes()`, `readString(Charset)` | Everything available now, possibly nothing |
 | `readBytes(int count)`, `readString(Charset, int count)` | At most `count` bytes available now |
 | `readBytes(int count, int timeoutMs)`, `readString(Charset, int count, int timeoutMs)` | Wait until `count` bytes are available, the buffer is full, or the timeout expires, then return what is available |

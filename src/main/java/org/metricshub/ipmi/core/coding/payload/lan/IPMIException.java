@@ -37,6 +37,9 @@ public class IPMIException extends Exception {
 
 	private final int rawCode;
 
+	/** The meaning of the code for the command that got it, or null. */
+	private final String description;
+
 	public IPMIException(CompletionCode completionCode) {
 		this(completionCode, completionCode.getCode());
 	}
@@ -47,8 +50,23 @@ public class IPMIException extends Exception {
 	 * @param rawCode the completion code byte as the BMC sent it
 	 */
 	public IPMIException(CompletionCode completionCode, int rawCode) {
+		this(completionCode, rawCode, null);
+	}
+
+	/**
+	 * Creates the exception for a code whose meaning depends on the command: an OEM or command-specific code that
+	 * {@link CompletionCode} does not list.
+	 *
+	 * @param completionCode the decoded completion code, {@link CompletionCode#Unknown} for a code the library
+	 *        does not list
+	 * @param rawCode the completion code byte as the BMC sent it
+	 * @param description the meaning of the code for the command that got it, returned by {@link #getMessage()}, or
+	 *        null for the generic text
+	 */
+	public IPMIException(CompletionCode completionCode, int rawCode, String description) {
 		this.completionCode = completionCode;
 		this.rawCode = rawCode;
+		this.description = description;
 	}
 
 	/**
@@ -72,6 +90,9 @@ public class IPMIException extends Exception {
 
 	@Override
 	public String getMessage() {
+		if (description != null) {
+			return description;
+		}
 		if (completionCode == CompletionCode.Unknown && rawCode >= 0) {
 			String kind = isReserved(rawCode) ?
 					"Reserved" : rawCode < COMMAND_SPECIFIC_CODES_START ?

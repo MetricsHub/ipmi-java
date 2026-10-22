@@ -98,7 +98,10 @@ does not answer the setup of that session either (it is still rebooting, or is o
 the read fails with the `IpmiConnectionException` of the setup, and when the request again gets
 no reply, with `IpmiTimeoutException`. `send()`, `raw()`, `sol().open()` and the control
 operations are never replayed, as a chassis control sent twice is not the same as sent once: they
-fail with the `IpmiTimeoutException` of the message without reply. `capabilities()` opens no
+fail with the `IpmiTimeoutException` of the message without reply. A command of `sol().open()`
+without reply loses the session like any other when it went through the session of the client
+(not through the session a console opens on another UDP port), so the next operation, another
+`sol().open()` included, opens a new session. `capabilities()` opens no
 session.
 
 A session is considered lost when a message of the session got no reply after all its tries, when
@@ -145,8 +148,9 @@ message:
 * a Set Session Privilege Level after the login that fails with another code than a refusal of
   the level (a busy BMC);
 * a reply whose data the library cannot decode;
-* a SOL payload that cannot be activated for another reason than a completion code (every
-  instance held by another session);
+* a SOL payload that cannot be activated for another reason than a completion code or a missing
+  reply (every instance held by another session, or by a console of the client:
+  [Serial over LAN](serial-over-lan.html#with-ipmiclient));
 * a System Event Log that cannot be read consistently (changed twice during the read, next record
   IDs that loop, an entry other than the one asked for or with record ID `0000h` or `FFFFh`, a
   Clear SEL still in progress after 10 s:

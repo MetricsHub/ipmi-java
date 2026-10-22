@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.metricshub.ipmi.core.transport.FakeRmcpPlusBmc.ADMINISTRATOR;
@@ -38,11 +39,14 @@ import org.metricshub.ipmi.core.api.sync.IpmiConnector;
 import org.metricshub.ipmi.core.coding.commands.PrivilegeLevel;
 import org.metricshub.ipmi.core.coding.commands.chassis.GetChassisStatus;
 import org.metricshub.ipmi.core.coding.commands.chassis.GetChassisStatusResponseData;
+import org.metricshub.ipmi.core.coding.commands.payload.ActivateSolPayload;
+import org.metricshub.ipmi.core.coding.commands.payload.GetPayloadActivationStatus;
 import org.metricshub.ipmi.core.coding.commands.session.SetSessionPrivilegeLevel;
 import org.metricshub.ipmi.core.coding.payload.lan.IPMIException;
 import org.metricshub.ipmi.core.coding.payload.sol.SolOperation;
 import org.metricshub.ipmi.core.coding.payload.sol.SolStatus;
 import org.metricshub.ipmi.core.coding.security.CipherSuite;
+import org.metricshub.ipmi.core.connection.ConnectionException;
 import org.metricshub.ipmi.core.connection.Session;
 import org.metricshub.ipmi.core.connection.SessionException;
 import org.metricshub.ipmi.core.transport.FakeRmcpPlusBmc;
@@ -803,15 +807,76 @@ class SerialOverLanTest {
 				connector.closeSession(session.getConnectionHandle());
 				awaitClose(bmc);
 
-				// An account limited to Operator: the raise to Administrator is refused, and the console fails on it
+				// An account limited to Operator: the raise to Administrator is refused, and the console fails on the D4h
+				// of Activate Payload, as at a fixed level, with the refusal suppressed
 				bmc.privilegeLimit(FakeRmcpPlusBmc.OPERATOR);
 				Session limited = openSession(connector, bmc, null, PrivilegeLevel.MaximumAvailable);
 				SOLException refused = assertThrows(SOLException.class, () -> new SerialOverLan(connector, limited));
-				assertEquals(
-						SetSessionPrivilegeLevel.LEVEL_ABOVE_LIMIT,
-						((IPMIException) refused.getCause()).getRawCode(),
-						refused.getMessage());
+				assertEquals(0xd4, ((IPMIException) refused.getCause()).getRawCode(), refused.getMessage());
+				assertTrue(refused.getCommand() instanceof ActivateSolPayload, refused.getMessage());
+				assertSame(limited.getConnectionHandle(), refused.getConnectionHandle());
+				assertEquals(1, refused.getSuppressed().length);
+				SOLException raise = (SOLException) refused.getSuppressed()[0];
+				assertTrue(raise.getCommand() instanceof SetSessionPrivilegeLevel, raise.getMessage());
+				assertEquals(SetSessionPrivilegeLevel.LEVEL_ABOVE_LIMIT, ((IPMIException) raise.getCause()).getRawCode());
 				assertEquals(Collections.emptyList(), bmc.getErrors());
+			} finally {
+				connector.tearDown();
+			}
+		}
+	}
+
+	@Test
+	@Timeout(30)
+	void theConsoleRaisesAGivenSessionOnlyWithinTheGivenCeiling() throws Exception {
+		try (FakeRmcpPlusBmc bmc = solBmc(null)) {
+			IpmiConnector connector = new IpmiConnector(0, 0);
+			try {
+				// The owner of the session keeps its level: the console does not raise it, and fails on the D4h
+				Session session = openSession(connector, bmc, null, PrivilegeLevel.MaximumAvailable);
+				SOLException refused = assertThrows(
+						SOLException.class,
+						() -> new SerialOverLan(connector, session, PrivilegeLevel.User, PrivilegeLevel.User));
+				assertTrue(refused.getCommand() instanceof ActivateSolPayload, refused.getMessage());
+				assertEquals(0xd4, ((IPMIException) refused.getCause()).getRawCode());
+				assertEquals(1, bmc.getCount(NETFN_APP, SET_SESSION_PRIVILEGE_LEVEL), "only the one of openSession()");
+
+				// From Operator, as far as Administrator: one raise
+				bmc.handle(NETFN_APP, SET_SESSION_PRIVILEGE_LEVEL, bmc::setSessionPrivilegeLevel);
+				connector.sendMessage(session.getConnectionHandle(), new SetSessionPrivilegeLevel(PrivilegeLevel.Operator));
+				SerialOverLan console = new SerialOverLan(
+						connector,
+						session,
+						PrivilegeLevel.Operator,
+						PrivilegeLevel.Administrator);
+				assertEquals(PrivilegeLevel.Administrator, console.getRaisedPrivilegeLevel());
+				assertEquals(3, bmc.getCount(NETFN_APP, SET_SESSION_PRIVILEGE_LEVEL));
+				assertSame(session, console.getSession());
+				console.close();
+				assertEquals(Collections.emptyList(), bmc.getErrors());
+			} finally {
+				connector.tearDown();
+			}
+		}
+	}
+
+	@Test
+	@Timeout(30)
+	void aCommandWithoutReplyFailsWithTheCommandAndItsConnection() throws Exception {
+		try (FakeRmcpPlusBmc bmc = solBmc(null)) {
+			IpmiConnector connector = new IpmiConnector(0, 0);
+			try {
+				Session session = openSession(connector, bmc, null);
+				connector.setTimeout(session.getConnectionHandle(), 200);
+				bmc.handle(NETFN_APP, FakeRmcpPlusBmc.GET_PAYLOAD_ACTIVATION_STATUS, data -> null);
+				SOLException failure = assertThrows(SOLException.class, () -> new SerialOverLan(connector, session));
+				assertTrue(failure.getCommand() instanceof GetPayloadActivationStatus, failure.getMessage());
+				assertSame(session.getConnectionHandle(), failure.getConnectionHandle());
+				assertTrue(failure.getCause() instanceof ConnectionException, failure.getMessage());
+				assertTrue(
+						failure.getMessage().startsWith("GetPayloadActivationStatus failed: ")
+								&& failure.getMessage().endsWith(failure.getCause().getMessage()),
+						failure.getMessage());
 			} finally {
 				connector.tearDown();
 			}
