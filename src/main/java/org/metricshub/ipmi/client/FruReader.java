@@ -43,17 +43,19 @@ import org.metricshub.ipmi.core.coding.commands.fru.record.BoardInfo;
 import org.metricshub.ipmi.core.coding.commands.fru.record.ChassisInfo;
 import org.metricshub.ipmi.core.coding.commands.fru.record.FruRecord;
 import org.metricshub.ipmi.core.coding.commands.fru.record.ProductInfo;
-import org.metricshub.ipmi.core.coding.commands.sdr.record.CompactSensorRecord;
+import org.metricshub.ipmi.core.coding.commands.sdr.record.AbstractSensorRecord;
 import org.metricshub.ipmi.core.coding.commands.sdr.record.EntityId;
 import org.metricshub.ipmi.core.coding.commands.sdr.record.FruDeviceLocatorRecord;
+import org.metricshub.ipmi.core.coding.commands.sdr.record.ManagementControllerDeviceLocatorRecord;
 import org.metricshub.ipmi.core.coding.commands.sdr.record.SensorRecord;
 import org.metricshub.ipmi.core.coding.payload.CompletionCode;
 import org.metricshub.ipmi.core.coding.payload.lan.IpmiLanConstants;
 
 /**
  * Reads the FRUs that the SDR repository locates: the inventory of each logical FRU Device Locator record, from the
- * controller and at the LUN the record names (IPMI 2.0 table 43-7), and the FRU of the system board (device 0 of
- * the BMC) when a System Board sensor record is met before any locator points at it.
+ * controller and at the LUN the record names (IPMI 2.0 table 43-7), the FRU of the system board (device 0 of the
+ * BMC), and device 0 of each other controller whose Management Controller Device Locator record says it holds one
+ * (table 43-8).
  */
 final class FruReader {
 
@@ -136,11 +138,11 @@ final class FruReader {
 			} else
 				if ((!systemBoard.isEmpty() || !systemBoardProblems.isEmpty())
 						&& !returned.contains(SYSTEM_BOARD_KEY)
-						&& record instanceof CompactSensorRecord
-						&& EntityId.SystemBoard.equals(((CompactSensorRecord) record).getEntityId())) {
+						&& record instanceof AbstractSensorRecord
+						&& EntityId.SystemBoard.equals(((AbstractSensorRecord) record).getEntityId())) {
 							// No locator pointed at FRU 0 so far: build one for the system board, named after whichever area
 							// describes it
-							CompactSensorRecord sensor = (CompactSensorRecord) record;
+							AbstractSensorRecord sensor = (AbstractSensorRecord) record;
 							FruDeviceLocatorRecord locator = bmcLocator();
 							locator.setFruEntityId(EntityId.SystemBoard.getCode());
 							locator.setFruEntityInstance(sensor.getEntityInstanceNumber());
@@ -148,6 +150,36 @@ final class FruReader {
 							frus.add(new Fru(locator, systemBoard, systemBoardProblems));
 							returned.add(SYSTEM_BOARD_KEY);
 						}
+		}
+		// FRU 0 of a controller is never located by a FRU Device Locator (IPMI 2.0 table 43-7, byte 7): one the BMC
+		// serves is returned whatever the records, not gated on its MC Device Locator, which Supermicro and Fujitsu
+		// iRMC clear while serving FRU 0
+		if (!systemBoard.isEmpty() && returned.add(SYSTEM_BOARD_KEY)) {
+			FruDeviceLocatorRecord locator = bmcLocator();
+			locator.setFruEntityId(EntityId.SystemBoard.getCode());
+			locator.setName(systemBoardName(systemBoard));
+			frus.add(new Fru(locator, systemBoard, systemBoardProblems));
+		}
+		if (!isSelected(SYSTEM_BOARD_FRU_ID)) {
+			return;
+		}
+		// FRU 0 of the other controllers whose MC Device Locator sets FRU Inventory Device (table 43-8, byte 9 bit 3),
+		// read through the BMC, as ipmitool fru print does
+		for (SensorRecord record : records) {
+			if (record instanceof ManagementControllerDeviceLocatorRecord
+					&& ((ManagementControllerDeviceLocatorRecord) record).isSupportsFruInventoryDevice()) {
+				ManagementControllerDeviceLocatorRecord controller = (ManagementControllerDeviceLocatorRecord) record;
+				FruDeviceLocatorRecord locator = bmcLocator();
+				locator.setDeviceAccessAddress(controller.getDeviceAddress());
+				locator.setManagementChannelNumber(controller.getChannelNumber());
+				locator.setFruEntityId(controller.getEntityId());
+				locator.setFruEntityInstance(controller.getEntityInstance());
+				locator.setName(controller.getName());
+				if (isBridged(locator) && returned.add(key(locator))) {
+					List<String> problems = new ArrayList<String>();
+					frus.add(new Fru(locator, inventory(locator, problems), problems));
+				}
+			}
 		}
 	}
 

@@ -34,12 +34,21 @@ BMCs: see [Identifying the server](#identifying-the-server).
    unit number (LUN, 0 to 3) the record names (IPMI 2.0 table 43-7). The BMC serves its own FRUs.
    The FRUs of another controller are read through the BMC, which forwards the two commands with
    **Send Message**, as it does for sensor readings ([Sensor owners](sensors.html#sensor-owners));
-4. returns FRU 0 at the position of the first **Compact Sensor** record of the System Board
-   entity, when no locator record of FRU 0 of the BMC comes before that record in the repository.
-   Its `entity()` is `SystemBoard`, its `entityInstance()` the one of that sensor, and its
-   `name()` the board product name of FRU 0 (else its product name, else its chassis part number,
-   else `System Board`) followed by that entity instance. A FRU 0 that could not be read is
-   returned the same way, with its `problems()`.
+4. returns FRU 0 at the position of the first **Full**, **Compact** or **Event-Only Sensor**
+   record of the System Board entity, when no locator record of FRU 0 of the BMC comes before that
+   record in the repository. Its `entity()` is `SystemBoard`, its `entityInstance()` the one of
+   that sensor, and its `name()` the board product name of FRU 0 (else its product name, else its
+   chassis part number, else `System Board`) followed by that entity instance. A FRU 0 that could
+   not be read is returned the same way, with its `problems()`;
+5. otherwise returns FRU 0 after the other FRUs of the repository, when the BMC returned at least
+   one of its areas, with the `SystemBoard` entity, instance 0, and the same name without an
+   instance. The FRU Inventory Device bit of the BMC's own Management Controller Device Locator
+   record does not matter: Supermicro BMCs and the Fujitsu iRMC S5 clear it, yet serve FRU 0;
+6. reads **FRU 0** at LUN 0 of each other controller whose **Management Controller Device
+   Locator** record sets FRU Inventory Device (IPMI 2.0 table 43-8), through the BMC, unless a FRU
+   Device Locator record already located it, and returns it with the entity, instance and ID
+   string of that record. The primary FRU of a controller is never declared by a FRU Device
+   Locator record (table 43-7, byte 7): `ipmitool fru print` reads it the same way.
 
 Physical FRU devices (EEPROMs on a private I²C bus, read with Master Write-Read) are not read.
 
