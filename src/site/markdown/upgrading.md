@@ -183,6 +183,16 @@ The misspelled or wrong public names of 2.0.00 are fixed. Each old name stays, d
 * **Behavior change.** Two FRUs with the same ID on different controllers or LUNs are both
   returned, where 2.0.00 returned the first one only
   ([FRUs of other controllers](fru-inventory.html#frus-of-other-controllers)).
+* **Behavior change.** FRU 0 of the BMC is returned whenever the BMC serves it
+  ([How the FRUs are read](fru-inventory.html#how-the-frus-are-read)). 2.0.00 read it on every
+  `frus()` but returned it only when a FRU Device Locator record or a Compact Sensor record of the
+  System Board entity anchored it, and dropped it otherwise: a BMC whose System Board sensors are
+  all Full or Event-Only records, or that has none, now returns its system board FRU. A Full or
+  Event-Only Sensor record of the System Board entity now anchors it like a Compact one.
+* **Behavior change.** FRU 0 of each other controller whose Management Controller Device Locator
+  record sets FRU Inventory Device is read through the BMC and returned, which 2.0.00 never did.
+  None of the [tested BMCs](preparing-the-bmc.html#tested-bmcs) sets this bit for another
+  controller: this change follows the specification.
 * The FRUs of other controllers need the privilege the BMC requires for Send Message, Operator on
   most BMCs: below it, they are returned without inventory, with the `D4h` in their `problems()`.
 * A controller behind the BMC that does not answer costs its own FRUs only, after its first

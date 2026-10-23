@@ -9,6 +9,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
+import org.metricshub.ipmi.core.coding.commands.sdr.record.EntityId;
+
 /**
  * An SDR repository, sensor readings and FRU inventories served by a {@link FakeRmcpPlusBmc}: Get SDR Repository
  * Info, Reserve SDR Repository, Get SDR (whole or in chunks), Get Sensor Reading, Get FRU Inventory Area Info and
@@ -47,6 +49,8 @@ public final class FakeSdrRepository {
 	public static final int COMPACT_SENSOR_RECORD = 0x02;
 	/** SDR record type of a FRU Device Locator Record. */
 	public static final int FRU_DEVICE_LOCATOR_RECORD = 0x11;
+	/** SDR record type of a Management Controller Device Locator Record. */
+	public static final int MC_DEVICE_LOCATOR_RECORD = 0x12;
 
 	private static final int LAST_RECORD_ID = 0xffff;
 	private static final int SDR_VERSION = 0x51;
@@ -511,6 +515,29 @@ public final class FakeSdrRepository {
 		body[10] = (byte) (0xc0 | name.length());
 		System.arraycopy(name.getBytes(StandardCharsets.US_ASCII), 0, body, 11, name.length());
 		return record(recordId, FRU_DEVICE_LOCATOR_RECORD, body);
+	}
+
+	/**
+	 * Builds a Management Controller Device Locator Record (IPMI 2.0 table 43-8) of a controller of the System Board
+	 * entity, instance 1.
+	 *
+	 * @param recordId the record ID
+	 * @param address the 8-bit slave address of the controller
+	 * @param channel the channel of the controller
+	 * @param capabilities the Device Capabilities byte (bit 3: FRU Inventory Device)
+	 * @param name the ID string
+	 * @return the record bytes
+	 */
+	public static byte[] mcDeviceLocatorRecord(int recordId, int address, int channel, int capabilities, String name) {
+		byte[] body = new byte[11 + name.length()];
+		body[0] = (byte) address;
+		body[1] = (byte) channel;
+		body[3] = (byte) capabilities;
+		body[7] = (byte) EntityId.SystemBoard.getCode();
+		body[8] = 1; // entity instance
+		body[10] = (byte) (0xc0 | name.length());
+		System.arraycopy(name.getBytes(StandardCharsets.US_ASCII), 0, body, 11, name.length());
+		return record(recordId, MC_DEVICE_LOCATOR_RECORD, body);
 	}
 
 	/**
