@@ -380,6 +380,21 @@ public class IpmiAsyncConnector implements ConnectionListener {
 		connectionHandle.setUser(username);
 		connectionHandle.setPasswordBytes(password);
 		connectionHandle.setBmcKey(bmcKey);
+		try {
+			return startAndRegisterSession(connectionHandle, username, password, bmcKey);
+		} catch (Exception e) {
+			// No session keeps the credentials: a caller that does not close the connection leaves no copy behind
+			connectionHandle.wipeCredentials();
+			throw e;
+		}
+	}
+
+	private Session startAndRegisterSession(
+			ConnectionHandle connectionHandle,
+			String username,
+			byte[] password,
+			byte[] bmcKey)
+			throws Exception {
 
 		// MaximumAvailable: the role 0 of the specification (highest level matching the proposed algorithms, section
 		// 13.17) is refused at Open Session by iLO 5, iDRAC and Cisco IMC BMCs, and leaves a session that Lenovo TSM,
@@ -520,7 +535,8 @@ public class IpmiAsyncConnector implements ConnectionListener {
 	}
 
 	/**
-	 * Closes the session with the remote host if it is currently in open state.
+	 * Closes the session with the remote host if it is currently in open state, and wipes the password and the BMC
+	 * key (Kg) the handle keeps.
 	 *
 	 * @param connectionHandle
 	 *        - {@link ConnectionHandle} associated with the remote host.
@@ -547,6 +563,7 @@ public class IpmiAsyncConnector implements ConnectionListener {
 						.getConnection(connectionHandle.getHandle())
 						.closeSession();
 				sessionManager.unregisterSession(connectionHandle);
+				connectionHandle.wipeCredentials();
 				succeded = true;
 			} catch (Exception e) {
 				if (tries > retries) {
@@ -724,8 +741,8 @@ public class IpmiAsyncConnector implements ConnectionListener {
 	}
 
 	/**
-	 * Closes the connection with the given handle, and forgets its session. The requests still waiting for a reply
-	 * on the connection fail with a {@link ConnectionException}.
+	 * Closes the connection with the given handle, forgets its session, and wipes the credentials the handle keeps.
+	 * The requests still waiting for a reply on the connection fail with a {@link ConnectionException}.
 	 *
 	 * @param handle the handle of the connection
 	 */
@@ -735,13 +752,15 @@ public class IpmiAsyncConnector implements ConnectionListener {
 		connectionManager.closeConnection(handle.getHandle());
 		connection.unregisterListener(this);
 		sessionManager.unregisterSession(handle);
+		handle.wipeCredentials();
 	}
 
 	/**
-	 * Finalizes the connector and closes all connections.
+	 * Finalizes the connector, closes all connections, and wipes the credentials of their sessions.
 	 */
 	public void tearDown() {
 		connectionManager.close();
+		sessionManager.wipeCredentials();
 	}
 
 	/**

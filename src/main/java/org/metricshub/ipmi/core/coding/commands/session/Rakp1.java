@@ -161,11 +161,11 @@ public class Rakp1 extends IpmiCommandCoder<Rakp1ResponseData> {
 	}
 
 	/**
-	 * @return the password as the key of the authentication algorithm (Kuid), zero-padded to 20 bytes as the BMC
-	 *         stores it: the same HMAC as the password itself, and a valid key for an empty password
+	 * @return the password as the key of the authentication algorithm (Kuid): the array of the caller, not a copy,
+	 *         since the HMAC zero-pads its key as the BMC stores it (20 bytes); an empty array for no password
 	 */
 	byte[] getPasswordBytes() {
-		return Arrays.copyOf(password == null ? new byte[0] : password, MAX_KEY_LENGTH);
+		return password == null ? new byte[0] : password;
 	}
 
 	private void setConsoleRandomNumber(byte[] randomNumber) {

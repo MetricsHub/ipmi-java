@@ -28,6 +28,7 @@ import org.metricshub.ipmi.core.connection.Connection;
 
 import java.net.InetAddress;
 import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
 
 /**
  * Identifies one {@link Connection} (one BMC) of a connector: its index in the connector, the address and UDP port of
@@ -212,6 +213,22 @@ public class ConnectionHandle {
 	 */
 	public void setBmcKey(byte[] bmcKey) {
 		this.bmcKey = bmcKey == null ? null : bmcKey.clone();
+	}
+
+	/**
+	 * Wipes the password and the BMC key (Kg) of the session, and the password that MD5-128 integrity keeps, once the
+	 * connection is closed. {@code closeConnection()} calls it.
+	 */
+	public void wipeCredentials() {
+		if (password != null) {
+			Arrays.fill(password, (byte) 0);
+		}
+		if (bmcKey != null) {
+			Arrays.fill(bmcKey, (byte) 0);
+		}
+		if (cipherSuite != null) {
+			cipherSuite.wipeKeys();
+		}
 	}
 
 	/**

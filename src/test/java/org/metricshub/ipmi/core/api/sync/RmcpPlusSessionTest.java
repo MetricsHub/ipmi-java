@@ -2,6 +2,7 @@ package org.metricshub.ipmi.core.api.sync;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.metricshub.ipmi.core.transport.FakeRmcpPlusBmc.GET_CHANNEL_AUTHENTICATION_CAPABILITIES;
@@ -32,6 +33,7 @@ import org.metricshub.ipmi.core.coding.commands.session.SetSessionPrivilegeLevel
 import org.metricshub.ipmi.core.coding.payload.CompletionCode;
 import org.metricshub.ipmi.core.coding.payload.lan.IPMIException;
 import org.metricshub.ipmi.core.coding.security.CipherSuite;
+import org.metricshub.ipmi.core.coding.security.IntegrityAlgorithm;
 import org.metricshub.ipmi.core.connection.Ipmi20UnsupportedException;
 import org.metricshub.ipmi.core.connection.SessionException;
 import org.metricshub.ipmi.core.transport.FakeRmcpPlusBmc;
@@ -149,6 +151,92 @@ class RmcpPlusSessionTest {
 				connector.tearDown();
 			}
 		}
+	}
+
+	@Test
+	@Timeout(30)
+	void closeSessionWipesTheCredentialsOfTheHandle() throws Exception {
+		assertCredentialsWiped(12, IpmiConnector::closeSession);
+		assertCredentialsWiped(17, IpmiConnector::closeSession);
+	}
+
+	@Test
+	@Timeout(30)
+	void closeConnectionWipesTheCredentialsOfTheHandle() throws Exception {
+		assertCredentialsWiped(12, IpmiConnector::closeConnection);
+		assertCredentialsWiped(17, IpmiConnector::closeConnection);
+	}
+
+	@Test
+	@Timeout(30)
+	void closeConnectionWithAnotherHandleOfTheConnectionWipesTheCredentialsOfTheSession() throws Exception {
+		// As the handle of a response, which the connector creates for each one
+		assertCredentialsWiped(
+				17,
+				(connector, handle) -> connector
+						.closeConnection(
+								new ConnectionHandle(handle.getHandle(), handle.getRemoteAddress(), handle.getRemotePort())));
+	}
+
+	@Test
+	@Timeout(30)
+	void tearDownWipesTheCredentialsOfTheSessions() throws Exception {
+		assertCredentialsWiped(12, (connector, handle) -> connector.tearDown());
+		assertCredentialsWiped(17, (connector, handle) -> connector.tearDown());
+	}
+
+	@Test
+	@Timeout(30)
+	void aFailedLoginWipesTheCredentialsOfTheHandle() throws Exception {
+		try (FakeRmcpPlusBmc bmc = new FakeRmcpPlusBmc(XCC_SUITES, USER, utf8("other"), KG)) {
+			IpmiConnector connector = new IpmiConnector(0, 0);
+			try {
+				ConnectionHandle handle = connector.createConnection(bmc.getAddress(), bmc.getPort());
+				connector.setTimeout(handle, TIMEOUT_MS);
+				connector.getAvailableCipherSuites(handle);
+				connector.getChannelAuthenticationCapabilities(handle, CipherSuite.forId(17), PrivilegeLevel.User);
+				byte[] kg = KG.clone();
+				assertThrows(Exception.class, () -> connector.openSession(handle, USER, utf8(PASSWORD), kg));
+				assertArrayEquals(new byte[PASSWORD.length()], handle.getPasswordBytes());
+				assertArrayEquals(new byte[KG.length], handle.getBmcKey());
+			} finally {
+				connector.tearDown();
+			}
+		}
+	}
+
+	/**
+	 * A two-key session with the given suite: once closed, the password and the BMC key of the handle are zeros, and
+	 * the integrity algorithm (MD5-128 keyed with the password for suite 12, HMAC-SHA256-128 for suite 17) no longer
+	 * generates the codes of the session.
+	 */
+	private static void assertCredentialsWiped(int suite, Closer closer) throws Exception {
+		try (FakeRmcpPlusBmc bmc = new FakeRmcpPlusBmc(XCC_SUITES, USER, utf8(PASSWORD), KG)) {
+			IpmiConnector connector = new IpmiConnector(0, 0);
+			try {
+				ConnectionHandle handle = openSession(connector, bmc, suite, PASSWORD, KG);
+				byte[] password = handle.getPasswordBytes();
+				byte[] kg = handle.getBmcKey();
+				IntegrityAlgorithm integrity = handle.getCipherSuite().getIntegrityAlgorithm();
+				byte[] base = bytes("06 c0 01 02 03 04 05 06 07 08 09 0a 0b");
+				byte[] code = integrity.generateAuthCode(base);
+				assertArrayEquals(utf8(PASSWORD), password);
+				assertArrayEquals(KG, kg);
+
+				closer.close(connector, handle);
+
+				assertArrayEquals(new byte[password.length], password);
+				assertArrayEquals(new byte[KG.length], kg);
+				assertFalse(Arrays.equals(code, integrity.generateAuthCode(base)));
+			} finally {
+				connector.tearDown();
+			}
+		}
+	}
+
+	/** Closes the session, the connection or the connector. */
+	private interface Closer {
+		void close(IpmiConnector connector, ConnectionHandle handle) throws Exception;
 	}
 
 	@Test

@@ -333,7 +333,8 @@ public class IpmiConnector {
 	}
 
 	/**
-	 * Closes the session with the remote host if it is currently in open state.
+	 * Closes the session with the remote host if it is currently in open state, and wipes the password and the BMC
+	 * key (Kg) the handle keeps.
 	 *
 	 * @param connectionHandle
 	 *        - {@link ConnectionHandle} associated with the remote host.
@@ -575,7 +576,8 @@ public class IpmiConnector {
 
 	/**
 	 * Closes the connection with the given handle, without closing its session: the requests still waiting for a
-	 * reply on the connection fail, with a {@link ConnectionException} or an {@link IllegalStateException}.
+	 * reply on the connection fail, with a {@link ConnectionException} or an {@link IllegalStateException}. The
+	 * password and the BMC key (Kg) the handle keeps are wiped.
 	 *
 	 * @param handle the handle of the connection
 	 */
@@ -585,7 +587,8 @@ public class IpmiConnector {
 
 	/**
 	 * Finalizes the connector and closes all connections, without closing their sessions: the requests still waiting
-	 * for a reply fail, with a {@link ConnectionException} or an {@link IllegalStateException}.
+	 * for a reply fail, with a {@link ConnectionException} or an {@link IllegalStateException}. The password and the
+	 * BMC key (Kg) of the sessions are wiped.
 	 */
 	public void tearDown() {
 		asyncConnector.tearDown();

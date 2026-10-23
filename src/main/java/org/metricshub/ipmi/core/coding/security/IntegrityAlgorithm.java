@@ -84,7 +84,7 @@ public abstract class IntegrityAlgorithm {
 	 *
 	 * @return the Session Integrity Key, or null if not initialized
 	 */
-	protected byte[] getSik() {
+	protected synchronized byte[] getSik() {
 		return sik;
 	}
 
@@ -93,8 +93,26 @@ public abstract class IntegrityAlgorithm {
 	 *
 	 * @param sik the Session Integrity Key
 	 */
-	protected void setSik(byte[] sik) {
+	protected synchronized void setSik(byte[] sik) {
 		this.sik = sik;
+	}
+
+	/**
+	 * Wipes the key passed to {@link #initialize(byte[])} (the password for MD5-128 integrity) once the session is
+	 * over, and keys the MAC with the wiped key: the codes the algorithm generates no longer match the session.
+	 */
+	public synchronized void wipeKey() {
+		if (sik == null) {
+			return;
+		}
+		Arrays.fill(sik, (byte) 0);
+		if (mac != null && sik.length > 0) {
+			try {
+				mac.init(new SecretKeySpec(sik, getAlgorithmName()));
+			} catch (InvalidKeyException e) {
+				// Cannot happen: HMAC takes a key of any non-zero length, and the session is over anyway
+			}
+		}
 	}
 
 	/**

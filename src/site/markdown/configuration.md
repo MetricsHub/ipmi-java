@@ -81,7 +81,10 @@ password is valid). An empty user name is the null user: use it on a BMC that ac
 anonymous login (empty user name and password) or null user names, as `capabilities()` reports
 (`anonymousLogin()`, `nullUserNames()`). The password is a `char[]` that the builder does **not**
 copy: the library encodes it to bytes each time it opens a session, so keep the array intact until
-`close()` and wipe it afterwards if you want no copy of the password left in memory.
+`close()` and wipe it afterwards if you want no copy of the password left in memory. The same goes
+for the `byte[]` of `bmcKey()`. The library wipes its own copies of both: the ones of the handshake
+as soon as the session is open, and the ones the session keeps (for Serial over LAN and MD5-128
+integrity) when it closes.
 
 Every operation needs the credentials, except
 [`capabilities()`](apidocs/org/metricshub/ipmi/client/IpmiClient.html), which reads what the BMC

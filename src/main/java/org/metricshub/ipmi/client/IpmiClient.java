@@ -1192,7 +1192,14 @@ public final class IpmiClient implements AutoCloseable {
 					handle = connector
 							.createConnection(address, client.port, CipherSuite.forId(client.cipherSuites[0]), client.privilege);
 				}
-				Session session = connector.openSession(handle, client.user, encode(client.password), client.bmcKey);
+				byte[] password = encode(client.password);
+				Session session;
+				try {
+					session = connector.openSession(handle, client.user, password, client.bmcKey);
+				} finally {
+					// The handle keeps its own copy, and the handshake is over
+					Arrays.fill(password, (byte) 0);
+				}
 				return new Link(connector, handle, session, client.host, client.retries + 1);
 			} catch (Exception e) {
 				if (handle != null) {
@@ -1633,7 +1640,12 @@ public final class IpmiClient implements AutoCloseable {
 		 */
 		public IpmiClient build() {
 			if (user != null) {
-				Rakp1.checkCredentials(user, encode(password), bmcKey);
+				byte[] encoded = encode(password);
+				try {
+					Rakp1.checkCredentials(user, encoded, bmcKey);
+				} finally {
+					Arrays.fill(encoded, (byte) 0);
+				}
 			} else if (bmcKey != null) {
 				Rakp1.checkCredentials("", null, bmcKey);
 			}
