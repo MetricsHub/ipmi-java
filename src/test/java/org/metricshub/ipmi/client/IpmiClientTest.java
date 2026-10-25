@@ -48,6 +48,7 @@ import static org.metricshub.ipmi.core.transport.FakeSdrRepository.NETFN_SENSOR;
 import static org.metricshub.ipmi.core.transport.FakeSdrRepository.NETFN_STORAGE;
 import static org.metricshub.ipmi.core.transport.FakeSdrRepository.compactSensorRecord;
 import static org.metricshub.ipmi.core.transport.FakeSdrRepository.fruDeviceLocatorRecord;
+import static org.metricshub.ipmi.core.transport.FakeSdrRepository.mcDeviceLocatorRecord;
 import static org.metricshub.ipmi.core.transport.FakeSdrRepository.record;
 import static org.metricshub.ipmi.core.transport.FakeSdrRepository.withAccess;
 import static org.metricshub.ipmi.core.transport.FakeSdrRepository.withOwner;
@@ -1437,6 +1438,91 @@ class IpmiClientTest {
 				assertEquals(5, bridged[6]);
 				assertEquals(1, bmc.getCount(OPEN_SESSION_REQUEST), "the session is kept");
 				assertEquals(Collections.emptyList(), bmc.getErrors());
+			}
+		}
+	}
+
+	@Test
+	@Timeout(30)
+	void fru0IsReadFromTheBmcAndFromEachControllerThatHoldsOne() throws Exception {
+		try (FakeRmcpPlusBmc bmc = new FakeRmcpPlusBmc(SUITES, USER, utf8(PASSWORD), null)) {
+			// No locator points at FRU 0 and no sensor of the system board anchors it. The BMC clears FRU Inventory
+			// Device in its own MC Device Locator, as Supermicro BMCs do, yet serves FRU 0; of the two controllers
+			// behind it, one sets the bit and the other clears it
+			new FakeSdrRepository()
+					.add(mcDeviceLocatorRecord(1, 0x20, 0, 0x07, "BMC"))
+					.add(fruDeviceLocatorRecord(2, PSU_FRU, EntityId.PowerSupply.getCode(), 1, "PSU 1"))
+					.add(mcDeviceLocatorRecord(3, 0x2c, 6, 0x08, "Satellite"))
+					.add(mcDeviceLocatorRecord(4, 0x44, 0, 0x01, "No FRU"))
+					.fru(0, BASE_BOARD_PRODUCT_INFO)
+					.fru(PSU_FRU, BASE_BOARD_PRODUCT_INFO)
+					.install(bmc);
+			FakeSdrRepository controller = new FakeSdrRepository().fru(0, BASE_BOARD_PRODUCT_INFO);
+			bmc
+					.satellite(
+							6,
+							0x2c,
+							NETFN_STORAGE,
+							GET_FRU_INVENTORY_AREA_INFO,
+							data -> controller.fruInventoryAreaInfo(bmc.getRequestLun(), data));
+			bmc
+					.satellite(
+							6,
+							0x2c,
+							NETFN_STORAGE,
+							READ_FRU_DATA,
+							data -> controller.readFruData(bmc.getRequestLun(), data));
+			try (IpmiClient client = client(bmc).build()) {
+				FruList frus = client.frus().execute();
+				assertEquals(3, frus.size(), frus.toString());
+				assertEquals("PSU 1", frus.get(0).name());
+				Fru systemBoard = frus.get(1);
+				assertEquals(0, systemBoard.id());
+				assertEquals(EntityId.SystemBoard, systemBoard.entity());
+				assertEquals(FruReader.systemBoardName(systemBoard.records()), systemBoard.name());
+				assertEquals("IBM", systemBoard.manufacturer());
+				Fru satellite = frus.get(2);
+				assertEquals(0, satellite.id());
+				assertEquals("Satellite", satellite.name());
+				assertEquals("IBM", satellite.manufacturer(), "read through the BMC");
+				assertTrue(satellite.complete(), satellite.problems().toString());
+				assertEquals(2, bmc.getCount(NETFN_STORAGE, GET_FRU_INVENTORY_AREA_INFO), "FRU 0 and FRU 1 of the BMC");
+				for (byte[] bridged : bmc.getBridgedRequests()) {
+					assertEquals(0x2c, bridged[0] & 0xff, "only the controller that holds a FRU 0 is asked");
+				}
+
+				FruList fru0 = client.frus().ids(0).execute();
+				assertEquals(
+						Arrays.asList(systemBoard.name(), "Satellite"),
+						fru0.stream().map(Fru::name).collect(Collectors.toList()));
+				assertEquals(Collections.emptyList(), bmc.getErrors());
+			}
+		}
+	}
+
+	@Test
+	@Timeout(30)
+	void fru0OfABmcWhoseSystemBoardSensorsAreFullRecordsIsReturnedLast() throws Exception {
+		try (FakeRmcpPlusBmc bmc = new FakeRmcpPlusBmc(SUITES, USER, utf8(PASSWORD), null)) {
+			// The HPE iLO 5: no locator of FRU 0, and Full records only for the System Board sensors. Only a Compact
+			// record anchors FRU 0, so that a Full one before the locator of FRU 0 does not rename it (Supermicro
+			// "BMC FRU", Cisco IMC "FRU_RAM")
+			byte[] board = FakeSdrRepository.withId(Fixtures.FRONT_PANEL_FULL_RECORD, 1);
+			board[8] = (byte) EntityId.SystemBoard.getCode(); // entity ID (table 43-1, byte 9)
+			new FakeSdrRepository()
+					.add(board)
+					.add(fruDeviceLocatorRecord(2, PSU_FRU, EntityId.PowerSupply.getCode(), 1, "PSU 1"))
+					.fru(0, BASE_BOARD_PRODUCT_INFO)
+					.fru(PSU_FRU, BASE_BOARD_PRODUCT_INFO)
+					.install(bmc);
+			try (IpmiClient client = client(bmc).build()) {
+				FruList frus = client.frus().execute();
+				assertEquals(2, frus.size(), frus.toString());
+				assertEquals("PSU 1", frus.get(0).name());
+				Fru systemBoard = frus.get(1);
+				assertEquals(EntityId.SystemBoard, systemBoard.entity());
+				assertEquals(0, systemBoard.entityInstance());
+				assertEquals(FruReader.systemBoardName(systemBoard.records()), systemBoard.name());
 			}
 		}
 	}

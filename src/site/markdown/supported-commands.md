@@ -56,7 +56,7 @@ configuration, PEF and the watchdog, and the DCMI power management commands.
 | Get Sensor Reading | `GetSensorReading` | Sensor/Event / `2Dh` | `sensors()` |
 | Get Sensor Reading Factors | `GetSensorReadingFactors` | Sensor/Event / `23h` | `sensors()`: the reading of a non-linear sensor (linearization `70h`-`7Fh`) |
 | **FRU** | `commands.fru` | | |
-| Get FRU Inventory Area Info | `GetFruInventoryAreaInfo` | Storage / `10h` | `frus()`: FRU 0 of the BMC, then the FRU of each logical FRU Device Locator record, at the access LUN of the record, through Send Message for a FRU of another controller ([How the FRUs are read](fru-inventory.html#how-the-frus-are-read)) |
+| Get FRU Inventory Area Info | `GetFruInventoryAreaInfo` | Storage / `10h` | `frus()`: FRU 0 of the BMC, then the FRU of each logical FRU Device Locator record, at the access LUN of the record, through Send Message for a FRU of another controller, and FRU 0 of each other controller whose Management Controller Device Locator record sets FRU Inventory Device ([How the FRUs are read](fru-inventory.html#how-the-frus-are-read)) |
 | Read FRU Data | `ReadFruData` | Storage / `11h` | `frus()`, like Get FRU Inventory Area Info |
 | **System Event Log** | `commands.sel` | | |
 | Get SEL Info | `GetSelInfo` | Storage / `40h` | `sel()` |
