@@ -303,7 +303,7 @@ class IpmiCliTest {
 			assertEquals(0, sensors.code, sensors.err);
 			assertEquals(golden("sensors.txt"), sensors.out);
 			assertEquals(
-					"ipmicli: SDR record 0006h (type 0Bh): Cannot decode the record: Invalid record type: 11\n",
+					"ipmicli: SDR record 0006h (type 0Bh): Cannot decode the record: Reserved record type 0Bh\n",
 					sensors.err);
 			assertEquals(golden("sensors-long.txt"), login(bmc, "sensors", "--long").out);
 			assertEquals(golden("sensors-json.txt"), login(bmc, "sensors", "--json").out);

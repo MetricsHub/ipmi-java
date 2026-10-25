@@ -51,23 +51,34 @@ class IpmiCommandCoderTest {
 				() -> COMMAND.getResponseData(response(CommandCodes.RESERVE_SDR_REPOSITORY, 0x8a)));
 		assertEquals(CompletionCode.Unknown, oem.getCompletionCode());
 		assertEquals(0x8a, oem.getRawCode());
-		assertEquals("Command-specific completion code 0x8A.", oem.getMessage());
+		assertEquals("Command-specific completion code 8Ah.", oem.getMessage());
+		assertEquals("Command-specific completion code 8Ah", oem.describe(), "the code named once");
 
 		// 0Dh is "Unauthorized name" for RAKP only: for an IPMI command it is an OEM (device-specific) code
 		IPMIException specific = assertThrows(
 				IPMIException.class,
 				() -> COMMAND.getResponseData(response(CommandCodes.RESERVE_SDR_REPOSITORY, 0x0d)));
 		assertEquals(CompletionCode.Unknown, specific.getCompletionCode());
-		assertEquals("OEM completion code 0x0D.", specific.getMessage());
+		assertEquals("OEM completion code 0Dh.", specific.getMessage());
 
 		IPMIException reserved = assertThrows(
 				IPMIException.class,
 				() -> COMMAND.getResponseData(response(CommandCodes.RESERVE_SDR_REPOSITORY, 0xd9)));
-		assertEquals("Reserved completion code 0xD9.", reserved.getMessage());
+		assertEquals("Reserved completion code D9h.", reserved.getMessage());
 		IPMIException boundary = assertThrows(
 				IPMIException.class,
 				() -> COMMAND.getResponseData(response(CommandCodes.RESERVE_SDR_REPOSITORY, 0xbf)));
-		assertEquals("Reserved completion code 0xBF.", boundary.getMessage());
+		assertEquals("Reserved completion code BFh.", boundary.getMessage());
+	}
+
+	@Test
+	void describeDropsTheFinalPeriodBeforeTheCode() {
+		assertEquals(
+				"Requested Sensor, data, or record not present (completion code CBh)",
+				new IPMIException(CompletionCode.parseInt(0xcb)).describe());
+		assertEquals(
+				"Invalid session handle (completion code 80h)",
+				IPMIException.describe("Invalid session handle", 0x80));
 	}
 
 	@Test

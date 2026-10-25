@@ -324,6 +324,26 @@ The misspelled or wrong public names of 2.0.00 are fixed. Each old name stays, d
   them, and no longer fails with a `NullPointerException` on a sensor without ID string, which
   2.0.00 printed as `"name":null` with `--json`.
 
+### Messages
+
+The messages built from a byte print it in hexadecimal, and a completion code is named once,
+after a sentence without its final period. **Behavior change** for code that matches these
+messages:
+
+| 2.0.00 | 2.1.00 |
+| --- | --- |
+| `ReadFruData failed: Requested Sensor, data, or record not present. (completion code CBh)` | `ReadFruData failed: Requested Sensor, data, or record not present (completion code CBh)` |
+| `ReadFruData failed: Command-specific completion code 0x81. (completion code 81h)` | `ReadFruData failed: Command-specific completion code 81h` |
+| `Get Sensor Reading failed: Unknown completion code. (completion code 81h)` | `Get Sensor Reading failed: Command-specific completion code 81h` |
+| `Invalid format version: -1` | `Invalid format version FFh` |
+| `Invalid record type: 11` | `Reserved record type 0Bh` |
+| `This format is deprecated` | `The BMC Message Channel Info record (type 14h) is deprecated since IPMI 1.5` |
+
+The same goes for the messages of `IpmiCompletionCodeException`, `Sensor.problem()`,
+`Fru.problems()`, `SkippedRecord.reason()` and of a refused privilege raise.
+`IPMIException.getMessage()` says `Command-specific completion code 81h.` instead of
+`... 0x81.`, and the new `IPMIException.describe()` gives the message with the code.
+
 ### Protocol core
 
 * **Behavior change.** `FullSensorRecord.getSensorResolution()` returns `|M x 10^R|`, the step

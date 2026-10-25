@@ -602,8 +602,9 @@ public final class IpmiClient implements AutoCloseable {
 							null,
 							(reading == null ? "Get Sensor Reading" : "Get Sensor Reading Factors")
 									+ (bridged ? " through the BMC to " + describeOwner(record) : "") + " failed: "
-									+ (meaning == null ? e.completionCode().getMessage() : meaning)
-									+ String.format(" (completion code %02Xh)", e.rawCompletionCode()));
+									+ (meaning == null ?
+											((IPMIException) e.getCause()).describe() :
+											IPMIException.describe(meaning, e.rawCompletionCode())));
 		} catch (IpmiTimeoutException e) {
 			if (!bridged || link.lost) {
 				// The BMC stopped answering: the walk cannot go on

@@ -289,6 +289,16 @@ class ReadFruDataTest {
 	}
 
 	@Test
+	void formatVersionIsPrintedInHex() {
+		// An unprogrammed EEPROM: all FFh
+		byte[] blank = new byte[16];
+		Arrays.fill(blank, (byte) 0xff);
+
+		IllegalArgumentException refused = assertThrows(IllegalArgumentException.class, () -> decode(blank));
+		assertEquals("Invalid format version FFh", refused.getMessage());
+	}
+
+	@Test
 	void aWordIsTwoBytes() {
 		assertEquals(1, BaseUnit.Bytes.getSize());
 		assertEquals(2, BaseUnit.Words.getSize());

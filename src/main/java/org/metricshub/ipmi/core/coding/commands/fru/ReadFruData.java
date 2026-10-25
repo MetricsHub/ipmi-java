@@ -251,7 +251,7 @@ public class ReadFruData extends IpmiCommandCoder<ReadFruDataResponseData> {
 			throw new IllegalArgumentException("FRU data shorter than its common header: " + data.length + " byte(s)");
 		}
 		if (data[0] != 0x1) {
-			throw new IllegalArgumentException("Invalid format version: " + data[0]);
+			throw new IllegalArgumentException(String.format("Invalid format version %02Xh", data[0] & 0xff));
 		}
 		if (!isChecksumValid(data, 0, COMMON_HEADER_SIZE)) {
 			throw new IllegalArgumentException("Invalid common header checksum");
