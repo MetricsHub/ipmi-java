@@ -1502,8 +1502,11 @@ class IpmiClientTest {
 
 	@Test
 	@Timeout(30)
-	void aFullSensorRecordOfTheSystemBoardAnchorsFru0() throws Exception {
+	void fru0OfABmcWhoseSystemBoardSensorsAreFullRecordsIsReturnedLast() throws Exception {
 		try (FakeRmcpPlusBmc bmc = new FakeRmcpPlusBmc(SUITES, USER, utf8(PASSWORD), null)) {
+			// The HPE iLO 5: no locator of FRU 0, and Full records only for the System Board sensors. Only a Compact
+			// record anchors FRU 0, so that a Full one before the locator of FRU 0 does not rename it (Supermicro
+			// "BMC FRU", Cisco IMC "FRU_RAM")
 			byte[] board = FakeSdrRepository.withId(Fixtures.FRONT_PANEL_FULL_RECORD, 1);
 			board[8] = (byte) EntityId.SystemBoard.getCode(); // entity ID (table 43-1, byte 9)
 			new FakeSdrRepository()
@@ -1515,10 +1518,11 @@ class IpmiClientTest {
 			try (IpmiClient client = client(bmc).build()) {
 				FruList frus = client.frus().execute();
 				assertEquals(2, frus.size(), frus.toString());
-				assertEquals(EntityId.SystemBoard, frus.get(0).entity(), "at the place of its sensor");
-				assertEquals(1, frus.get(0).entityInstance());
-				assertEquals(FruReader.systemBoardName(frus.get(0).records()) + " 1", frus.get(0).name());
-				assertEquals("PSU 1", frus.get(1).name());
+				assertEquals("PSU 1", frus.get(0).name());
+				Fru systemBoard = frus.get(1);
+				assertEquals(EntityId.SystemBoard, systemBoard.entity());
+				assertEquals(0, systemBoard.entityInstance());
+				assertEquals(FruReader.systemBoardName(systemBoard.records()), systemBoard.name());
 			}
 		}
 	}

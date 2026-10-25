@@ -187,8 +187,10 @@ The misspelled or wrong public names of 2.0.00 are fixed. Each old name stays, d
   ([How the FRUs are read](fru-inventory.html#how-the-frus-are-read)). 2.0.00 read it on every
   `frus()` but returned it only when a FRU Device Locator record or a Compact Sensor record of the
   System Board entity anchored it, and dropped it otherwise: a BMC whose System Board sensors are
-  all Full or Event-Only records, or that has none, now returns its system board FRU. A Full or
-  Event-Only Sensor record of the System Board entity now anchors it like a Compact one.
+  all Full or Event-Only records, or that has none, now returns its system board FRU, after the
+  other FRUs. Among the [tested BMCs](preparing-the-bmc.html#tested-bmcs), this is the HPE iLO 5:
+  `frus().ids(0)` returned nothing with 2.0.00, and now returns the model and serial number of
+  the server. The other tested BMCs return the same FRUs as before.
 * **Behavior change.** FRU 0 of each other controller whose Management Controller Device Locator
   record sets FRU Inventory Device is read through the BMC and returned, which 2.0.00 never did.
   None of the [tested BMCs](preparing-the-bmc.html#tested-bmcs) sets this bit for another

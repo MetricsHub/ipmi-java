@@ -43,7 +43,7 @@ import org.metricshub.ipmi.core.coding.commands.fru.record.BoardInfo;
 import org.metricshub.ipmi.core.coding.commands.fru.record.ChassisInfo;
 import org.metricshub.ipmi.core.coding.commands.fru.record.FruRecord;
 import org.metricshub.ipmi.core.coding.commands.fru.record.ProductInfo;
-import org.metricshub.ipmi.core.coding.commands.sdr.record.AbstractSensorRecord;
+import org.metricshub.ipmi.core.coding.commands.sdr.record.CompactSensorRecord;
 import org.metricshub.ipmi.core.coding.commands.sdr.record.EntityId;
 import org.metricshub.ipmi.core.coding.commands.sdr.record.FruDeviceLocatorRecord;
 import org.metricshub.ipmi.core.coding.commands.sdr.record.ManagementControllerDeviceLocatorRecord;
@@ -138,11 +138,11 @@ final class FruReader {
 			} else
 				if ((!systemBoard.isEmpty() || !systemBoardProblems.isEmpty())
 						&& !returned.contains(SYSTEM_BOARD_KEY)
-						&& record instanceof AbstractSensorRecord
-						&& EntityId.SystemBoard.equals(((AbstractSensorRecord) record).getEntityId())) {
+						&& record instanceof CompactSensorRecord
+						&& EntityId.SystemBoard.equals(((CompactSensorRecord) record).getEntityId())) {
 							// No locator pointed at FRU 0 so far: build one for the system board, named after whichever area
 							// describes it
-							AbstractSensorRecord sensor = (AbstractSensorRecord) record;
+							CompactSensorRecord sensor = (CompactSensorRecord) record;
 							FruDeviceLocatorRecord locator = bmcLocator();
 							locator.setFruEntityId(EntityId.SystemBoard.getCode());
 							locator.setFruEntityInstance(sensor.getEntityInstanceNumber());
