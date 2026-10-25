@@ -56,19 +56,15 @@ public class SetSessionPrivilegeLevel extends IpmiCommandCoder<SetSessionPrivile
 	 * @return the reason, ending with the completion code in hexadecimal
 	 */
 	public static String describeRefusal(IPMIException refusal) {
-		String reason;
 		switch (refusal.getRawCode()) {
 		case LEVEL_NOT_AVAILABLE:
-			reason = "the level is not available for this user";
-			break;
+			return IPMIException.describe("the level is not available for this user", LEVEL_NOT_AVAILABLE);
 		case LEVEL_ABOVE_LIMIT:
-			reason = "the level exceeds the privilege limit of the channel or of the user";
-			break;
+			return IPMIException
+					.describe("the level exceeds the privilege limit of the channel or of the user", LEVEL_ABOVE_LIMIT);
 		default:
-			reason = refusal.getMessage();
-			break;
+			return refusal.describe();
 		}
-		return reason + String.format(" (completion code %02Xh)", refusal.getRawCode());
 	}
 
 	/**

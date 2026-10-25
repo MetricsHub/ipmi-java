@@ -63,8 +63,8 @@ public abstract class SensorRecord {
 			sensorRecord = new FullSensorRecord();
 			break;
 		case RecordTypes.BMC_MESSAGE_CHANNEL_INFO_RECORD:
-			// Deprecated
-			throw new IllegalArgumentException("This format is deprecated");
+			throw new IllegalArgumentException(
+					"The BMC Message Channel Info record (type 14h) is deprecated since IPMI 1.5");
 		case RecordTypes.COMPACT_SENSOR_RECORD://
 			sensorRecord = new CompactSensorRecord();
 			break;
@@ -104,9 +104,9 @@ public abstract class SensorRecord {
 				sensorRecord = new OemRecord();
 				break;
 			}
+			// Every type left is below C0h and unmodeled: reserved (IPMI 2.0 section 43.6)
 			throw new IllegalArgumentException(
-					"Invalid record type: "
-							+ recType);
+					String.format("Reserved record type %02Xh", TypeConverter.byteToInt(recType)));
 		}
 
 		byte[] buffer = new byte[4];

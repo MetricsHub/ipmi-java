@@ -67,7 +67,7 @@ public class ProductInfo extends FruRecord {
 		super();
 
 		if (fruData[offset] != 0x1) {
-			throw new IllegalArgumentException("Invalid format version");
+			throw new IllegalArgumentException(String.format("Invalid format version %02Xh", fruData[offset] & 0xff));
 		}
 
 		int languageCode = TypeConverter.byteToInt(fruData[offset + 2]);

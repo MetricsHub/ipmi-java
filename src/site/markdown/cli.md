@@ -405,7 +405,7 @@ FRU 0: MotherBoard FRU (SystemBoard 1)
   Product serial number      S4M00000
 
 FRU 3: MidPlane FRU (OtherSystemBoard 1)
-ipmicli: FRU 3: Cannot read FRU 3: ReadFruData failed: Requested Sensor, data, or record not present. (completion code CBh)
+ipmicli: FRU 3: Cannot read FRU 3: ReadFruData failed: Requested Sensor, data, or record not present (completion code CBh)
 
 FRU 17: PSU1 FRU (SystemInternalExpansionBoard 2)
   Product manufacturer       LITEON

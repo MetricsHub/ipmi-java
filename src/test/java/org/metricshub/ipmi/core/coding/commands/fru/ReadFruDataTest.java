@@ -17,6 +17,7 @@ import org.junit.jupiter.api.Test;
 import org.metricshub.ipmi.client.Fixtures;
 import org.metricshub.ipmi.core.coding.commands.fru.record.BaseCompatibilityInfo;
 import org.metricshub.ipmi.core.coding.commands.fru.record.BoardInfo;
+import org.metricshub.ipmi.core.coding.commands.fru.record.ChassisInfo;
 import org.metricshub.ipmi.core.coding.commands.fru.record.DcLoadInfo;
 import org.metricshub.ipmi.core.coding.commands.fru.record.DcOutputInfo;
 import org.metricshub.ipmi.core.coding.commands.fru.record.ExtendedCompatibilityInfo;
@@ -286,6 +287,27 @@ class ReadFruDataTest {
 		image[7] ^= 0x01;
 
 		assertThrows(IllegalArgumentException.class, () -> decode(image));
+	}
+
+	@Test
+	void formatVersionIsPrintedInHex() {
+		// An unprogrammed EEPROM: all FFh
+		byte[] blank = new byte[16];
+		Arrays.fill(blank, (byte) 0xff);
+
+		IllegalArgumentException refused = assertThrows(IllegalArgumentException.class, () -> decode(blank));
+		assertEquals("Invalid format version FFh", refused.getMessage());
+
+		byte[] area = bytes(0x80, 0, 0, 0, 0, 0, 0, 0);
+		assertEquals(
+				"Invalid format version 80h",
+				assertThrows(IllegalArgumentException.class, () -> new BoardInfo(area, 0)).getMessage());
+		assertEquals(
+				"Invalid format version 80h",
+				assertThrows(IllegalArgumentException.class, () -> new ChassisInfo(area, 0)).getMessage());
+		assertEquals(
+				"Invalid format version 80h",
+				assertThrows(IllegalArgumentException.class, () -> new ProductInfo(area, 0)).getMessage());
 	}
 
 	@Test

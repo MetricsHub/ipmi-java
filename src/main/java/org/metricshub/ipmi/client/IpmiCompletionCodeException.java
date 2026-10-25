@@ -76,8 +76,7 @@ public class IpmiCompletionCodeException extends IpmiClientException {
 	}
 
 	private static String describe(String what, IPMIException cause) {
-		String description = what + " failed: " + cause.getMessage()
-				+ String.format(" (completion code %02Xh)", cause.getRawCode());
+		String description = what + " failed: " + cause.describe();
 		if (cause.getCompletionCode() == CompletionCode.InsufficientPrivilege) {
 			description += ". The command requires a higher privilege than the session has: open the client with "
 					+ "privilege(PrivilegeLevel.Operator) or privilege(PrivilegeLevel.Administrator)";

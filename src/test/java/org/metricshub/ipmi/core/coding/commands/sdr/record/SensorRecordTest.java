@@ -93,10 +93,16 @@ class SensorRecordTest {
 	@Test
 	void unknownStandardRecordTypeIsRejected() {
 		// 05h is reserved by IPMI 2.0 and not an OEM type: callers are expected to skip it
-		assertThrows(
+		IllegalArgumentException reserved = assertThrows(
 				IllegalArgumentException.class,
 				() -> SensorRecord.populateSensorRecord(record(0x0040, 0x05, new byte[]
 				{ 0x00 })));
+		assertEquals("Reserved record type 05h", reserved.getMessage());
+		IllegalArgumentException high = assertThrows(
+				IllegalArgumentException.class,
+				() -> SensorRecord.populateSensorRecord(record(0x0040, 0x90, new byte[]
+				{ 0x00 })));
+		assertEquals("Reserved record type 90h", high.getMessage(), "printed unsigned");
 	}
 
 	/**

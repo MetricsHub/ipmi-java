@@ -97,8 +97,38 @@ public class IPMIException extends Exception {
 			String kind = isReserved(rawCode) ?
 					"Reserved" : rawCode < COMMAND_SPECIFIC_CODES_START ?
 							"OEM" : rawCode < GENERIC_CODES_START ? "Command-specific" : "Generic";
-			return String.format("%s completion code 0x%02X.", kind, rawCode);
+			return String.format("%s completion code %02Xh.", kind, rawCode);
 		}
 		return completionCode.getMessage();
+	}
+
+	/**
+	 * Describes the error reply as a sentence without its final period: the message, then the completion code in
+	 * hexadecimal, named once.
+	 *
+	 * @return the description, {@code Requested Sensor, data, or record not present (completion code CBh)} or
+	 *         {@code Command-specific completion code 81h} for instance
+	 */
+	public String describe() {
+		if (rawCode < 0 || (description == null && completionCode == CompletionCode.Unknown)) {
+			// No code to name, or the message already names it
+			return withoutPeriod(getMessage());
+		}
+		return describe(getMessage(), rawCode);
+	}
+
+	/**
+	 * Describes a completion code as a sentence without its final period: its meaning, then the code in hexadecimal.
+	 *
+	 * @param meaning the meaning of the code, with or without a final period
+	 * @param rawCode the completion code byte
+	 * @return the description, {@code Invalid session handle (completion code 80h)} for instance
+	 */
+	public static String describe(String meaning, int rawCode) {
+		return withoutPeriod(meaning) + String.format(" (completion code %02Xh)", rawCode);
+	}
+
+	private static String withoutPeriod(String sentence) {
+		return sentence.endsWith(".") ? sentence.substring(0, sentence.length() - 1) : sentence;
 	}
 }

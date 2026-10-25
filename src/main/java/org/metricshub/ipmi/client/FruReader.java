@@ -49,6 +49,7 @@ import org.metricshub.ipmi.core.coding.commands.sdr.record.FruDeviceLocatorRecor
 import org.metricshub.ipmi.core.coding.commands.sdr.record.ManagementControllerDeviceLocatorRecord;
 import org.metricshub.ipmi.core.coding.commands.sdr.record.SensorRecord;
 import org.metricshub.ipmi.core.coding.payload.CompletionCode;
+import org.metricshub.ipmi.core.coding.payload.lan.IPMIException;
 import org.metricshub.ipmi.core.coding.payload.lan.IpmiLanConstants;
 
 /**
@@ -347,7 +348,7 @@ final class FruReader {
 				int code = ((IpmiCompletionCodeException) e).rawCompletionCode();
 				String meaning = SendMessage.describeCompletionCode(code);
 				if (meaning != null) {
-					reason = String.format("%s (completion code %02Xh)", meaning, code);
+					reason = IPMIException.describe(meaning, code);
 				}
 			}
 			problems.add(prefix(fruId, offset) + where + ": " + reason);
