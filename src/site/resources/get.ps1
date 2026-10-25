@@ -146,6 +146,8 @@ $shim | Set-Content -Path $shimPath -Encoding ASCII
 
 Write-Host "Installed the IPMI Java Client jar to $jarPath"
 Write-Host "Installed the ipmicli launcher to $shimPath"
+Write-Host 'The launcher is a batch file: a value with % ^ & | < or > does not reach ipmicli as typed.'
+Write-Host 'Give such a password at the prompt or in a file (-pf).'
 
 # --- PATH registration -----------------------------------------------------------
 
