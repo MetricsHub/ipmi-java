@@ -323,6 +323,21 @@ The misspelled or wrong public names of 2.0.00 are fixed. Each old name stays, d
 * `sensors` lists the sensors of shared records and of other controllers as `sensors()` returns
   them, and no longer fails with a `NullPointerException` on a sensor without ID string, which
   2.0.00 printed as `"name":null` with `--json`.
+* `sensors --json` gives the owner of each sensor (`ownerId`, encoded like the low byte of the
+  `generatorId` of `sel --json`, `ownerLun`, `ownerChannel`), and `fru --json` the controller of
+  each FRU (`address`, `lun`, `channel`); `fru` heads a FRU that is not held by the BMC at LUN 0
+  with them (`FRU 5 at 2Ch LUN 1: ...`), in its problem lines too.
+* A password or BMC key option given twice is refused as `--password is given twice`, where
+  2.0.00 said `--password and --password-file are mutually exclusive` without a file option on
+  the command line.
+* On Java 22 to 24, a run whose standard input or output is redirected no longer takes the
+  console for a terminal: it fails with `no interactive console to ask the password` instead of
+  reading the password from its input, and `sol` forwards a redirected input byte for byte
+  instead of line by line.
+* `sol --no-escape` is refused on a terminal (exit code 64), where nothing typed would close the
+  console; it stays for a redirected input, whose end closes it.
+* `power cycle` of a system that is off says `use 'power on'` where 2.0.00 printed the message of
+  `chassisControl()`, which names the Java constant `PowerUp`.
 
 ### Messages
 

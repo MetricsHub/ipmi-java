@@ -89,6 +89,8 @@ final class CliArguments implements AutoCloseable {
 	/** The last request network function: the odd codes are those of the responses (IPMI 2.0 section 5.1). */
 	private static final int LAST_NETWORK_FUNCTION = 0x3e;
 	private static final char DELETE = 0x7f;
+	private static final String PASSWORD_OPTIONS = "--password and --password-file";
+	private static final String KEY_OPTIONS = "--bmc-key and --bmc-key-file";
 
 	private Subcommand subcommand;
 	private String hostname;
@@ -117,7 +119,9 @@ final class CliArguments implements AutoCloseable {
 	private int escape = DEFAULT_ESCAPE;
 	private boolean escapeGiven;
 	private boolean noEscape;
+	/** The long name of the password option given so far, null for none. */
 	private String passwordOption;
+	/** The long name of the BMC key option given so far, null for none. */
 	private String keyOption;
 
 	private CliArguments() {}
@@ -186,29 +190,29 @@ final class CliArguments implements AutoCloseable {
 				// Rejected: this copy is wiped too
 				Arrays.fill(value, '\0');
 			}
-			exclusive(passwordOption, "--password and --password-file");
-			passwordOption = option;
+			once(passwordOption, "--password", PASSWORD_OPTIONS);
+			passwordOption = "--password";
 			replacePassword(value);
 			return nextIndex(argument, index);
 		}
 		case "-pf":
 		case "--password-file":
-			exclusive(passwordOption, "--password and --password-file");
-			passwordOption = option;
+			once(passwordOption, "--password-file", PASSWORD_OPTIONS);
+			passwordOption = "--password-file";
 			replacePassword(decodeUtf8(readSecretFile(optionValue(args, index, option), option), option));
 			return nextIndex(argument, index);
 		case "-k":
 		case "--bmc-key": {
 			String value = consumeSecret(args, index, option);
-			exclusive(keyOption, "--bmc-key and --bmc-key-file");
-			keyOption = option;
+			once(keyOption, "--bmc-key", KEY_OPTIONS);
+			keyOption = "--bmc-key";
 			bmcKey = parseHex(value.getBytes(StandardCharsets.US_ASCII), option);
 			return nextIndex(argument, index);
 		}
 		case "-kf":
 		case "--bmc-key-file":
-			exclusive(keyOption, "--bmc-key and --bmc-key-file");
-			keyOption = option;
+			once(keyOption, "--bmc-key-file", KEY_OPTIONS);
+			keyOption = "--bmc-key-file";
 			bmcKey = parseHex(readSecretFile(optionValue(args, index, option), option), option);
 			return nextIndex(argument, index);
 		case "-P":
@@ -478,7 +482,14 @@ final class CliArguments implements AutoCloseable {
 		}
 	}
 
-	private static void exclusive(String given, String pair) throws CliUsageException {
+	/**
+	 * Refuses a secret option given twice, in either of its forms, or together with the option it excludes: a secret
+	 * given twice is likely a mistake (the other options take their last value).
+	 */
+	private static void once(String given, String option, String pair) throws CliUsageException {
+		if (option.equals(given)) {
+			throw new CliUsageException(option + " is given twice");
+		}
 		if (given != null) {
 			throw new CliUsageException(pair + " are mutually exclusive");
 		}

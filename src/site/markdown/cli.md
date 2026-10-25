@@ -114,7 +114,10 @@ A sensor is selected when its type is one of the `--type` values and its name ma
 `bmcKey()`, `timeout()`, `messageTimeout()` and `retries()` of the client builder: see
 [Configuration](configuration.html#options) for what each one does.
 
-The two password options are mutually exclusive, and so are the two BMC key options. Every option
+The two password options are mutually exclusive, and so are the two BMC key options; a password
+or key option given twice, in either of its forms (`--password=a -p b`), is refused as
+*`--password` is given twice*, since a secret given twice is likely a mistake. Every other option
+given twice takes its last value. Every option
 that takes a value also takes the `option=value` form (`--port=6230`, `-P=6230`); a flag (`-v`,
 `--json`, `--long`, `--no-escape`, `--help`, `--version`) takes no value: `--json=true` is
 refused. `-p` is the password and `-P` the port, as in the other MetricsHub command-line clients;
@@ -375,11 +378,16 @@ record. `unit` is present only when the record names one (not `Unspecified`, whi
 `Unit` column of the text output empty), `percentage` (`true`) only for a percentage sensor,
 `reading` only when the sensor has a valid converted reading, `rawReading` whenever its
 reading is valid, discrete sensors included, the thresholds only when the record sets them, and
-`problem` only when there is one:
+`problem` only when there is one. `ownerId`, `ownerLun` and `ownerChannel` identify the owner of
+the sensor ([Sensor owners](sensors.html#sensor-owners)): `ownerId` is the 8-bit slave address of
+the controller (`32`, that is `20h`, for the BMC) or, with bit 0 set, the system software ID
+(`177` for the BIOS sensors of a Dell iDRAC, `B1h`), encoded like the low byte of the
+`generatorId` of a [`sel --json`](#sel) entry; a sensor number is unique only within its owner
+and LUN:
 
 ```shell-session
 $ ipmicli -h bmc.example.com -u monitor -pf pw.txt sensors --type Fan --name 'Fan 1' --json
-{"name":"Fan 1","number":122,"type":"Fan","typeCode":4,"entity":"Fan","entityInstance":1,"unit":"Rpm","reading":6600.0,"rawReading":66,"status":"OK","states":[],"lowerCritical":1600.0}
+{"name":"Fan 1","number":122,"type":"Fan","typeCode":4,"entity":"Fan","entityInstance":1,"ownerId":32,"ownerLun":0,"ownerChannel":0,"unit":"Rpm","reading":6600.0,"rawReading":66,"status":"OK","states":[],"lowerCritical":1600.0}
 ```
 
 An SDR record the library cannot decode is reported on stderr (`ipmicli: SDR record 0006h (type
@@ -453,9 +461,16 @@ stderr (`ipmicli: FRU <id>: ...`), and `fru` exits with 1 once every FRU is prin
 is declared but absent (FRU 3 above, or an empty power supply bay) is the usual case
 ([Troubleshooting](troubleshooting.html#sensors-or-frus-are-missing)).
 
+A FRU held by another controller than the BMC, or at another LUN than 0, is headed by the 8-bit
+slave address, the LUN and the channel of its locator record (`FRU 5 at 2Ch: ...`,
+`FRU 5 at 20h LUN 1: ...`, `FRU 5 at 2Ch channel 6: ...`), in the problem lines too: a FRU ID
+is unique only per controller and LUN, and two FRUs with the same ID are both printed
+([FRUs of other controllers](fru-inventory.html#frus-of-other-controllers)).
+
 `fru 0 17` reads only these FRUs; an ID that no locator record declares exits with 66
 (`ipmicli: no such FRU 9`), also when another FRU is incomplete. `--json` prints one object per
-FRU, with the summary fields of [`Fru`](fru-inventory.html) (`manufacturer`, `model`,
+FRU, with its `id`, the `address` (8-bit, `32` for the BMC), `lun` and `channel` of its
+controller, the summary fields of [`Fru`](fru-inventory.html) (`manufacturer`, `model`,
 `serialNumber`, `partNumber`) and one nested object per area, its empty fields omitted:
 
 | Object | Keys |
@@ -469,7 +484,7 @@ FRU, with the summary fields of [`Fru`](fru-inventory.html) (`manufacturer`, `mo
 FRU 17 of the example above:
 
 ```json
-{"id":17,"name":"PSU1 FRU","entity":"SystemInternalExpansionBoard","entityInstance":2,"manufacturer":"LITEON","model":"PS-2451-6L-LF","serialNumber":"0000","product":{"manufacturerName":"LITEON","productName":"PS-2451-6L-LF","serialNumber":"0000"},"complete":true}
+{"id":17,"address":32,"lun":0,"channel":0,"name":"PSU1 FRU","entity":"SystemInternalExpansionBoard","entityInstance":2,"manufacturer":"LITEON","model":"PS-2451-6L-LF","serialNumber":"0000","product":{"manufacturerName":"LITEON","productName":"PS-2451-6L-LF","serialNumber":"0000"},"complete":true}
 ```
 
 An incomplete FRU has `"complete":false` and a `problems` array.
@@ -522,9 +537,12 @@ $ ipmicli -h bmc.example.com -u monitor -pf pw.txt sel --since 5 --json
 
 (An excerpt: the first three entries.) The sensor names are not resolved: that takes a walk of
 the SDR repository, as long as `sensors` on a slow BMC. A sensor number is unique only within its
-owner (the BMC, a satellite controller, the BIOS), which `generatorId` identifies: in code,
-[`SelEntry.isFrom(Sensor)`](system-event-log.html#the-selentry-object) matches the owner and LUN
-as well as the number, as `ipmitool sel elist` does.
+owner (the BMC, a satellite controller, the BIOS), which `generatorId` identifies: a script joins
+the entries with the output of [`sensors --json`](#sensors) on `sensorNumber` and `number`, the
+low byte of `generatorId` and `ownerId`, and bits 1:0 of its high byte and `ownerLun`
+(`generatorId` 32 and 1 above are the BMC and the BIOS, `ownerId` 32 and 1), as
+[`SelEntry.isFrom(Sensor)`](system-event-log.html#the-selentry-object) does in code, like
+`ipmitool sel elist`.
 
 ### `raw`
 
@@ -570,7 +588,9 @@ sequences of the remote console; the typed bytes go to the BMC.
   `ipmitool sol activate`: `~.` closes the console, `~B` sends a serial break, `~?` lists the
   sequences, `~~` sends a `~`. `--escape <char>` changes the escape character (one printable
   ASCII character other than space); `--no-escape` disables the sequences, for binary transfers
-  through a pipe, whose end closes the console.
+  through a pipe, whose end closes the console. It is refused on a terminal (exit code 64):
+  there, every keystroke goes to the BMC, Ctrl+C and Ctrl+D included, and the escape sequence
+  is the only way out.
 * **Every keystroke goes to the BMC**, Ctrl+C included, without local echo (the remote console
   echoes, or hides a password), so arrow keys, function keys and BIOS setup screens work; `~.` at
   the start of a line is the way out.
@@ -617,7 +637,7 @@ CLI:
 | ---: | --- |
 | `0` | Success (including `sol` closed with `~.` or by the end of the input). |
 | `1` | Partial result: `fru` could not read some FRUs completely (reported on stderr); the rest was printed. |
-| `64` | Invalid usage, including an unreadable password or key file, no password option when there is no console to ask the password on (input or output redirected), no password entered at the prompt, and a setting the client refuses (a cipher suite without integrity, a user name longer than 16 bytes, a password or BMC key longer than 20 bytes). |
+| `64` | Invalid usage, including a password or key option given twice, an unreadable password or key file, no password option when there is no console to ask the password on (input or output redirected), no password entered at the prompt, `sol --no-escape` on a terminal, and a setting the client refuses (a cipher suite without integrity, a user name longer than 16 bytes, a password or BMC key longer than 20 bytes). |
 | `66` | `fru <id>`: no such FRU. |
 | `69` | BMC unreachable: unknown host, socket error, no reply to the session setup (wrong host, UDP port 623 filtered, IPMI over LAN disabled, a BMC without IPMI 2.0 with a one-ID `-C`). |
 | `70` | IPMI failure: an error completion code (also in the reply to `raw`), no common cipher suite, a BMC without IPMI 2.0 (RMCP+), a malformed reply, a `power cycle` of a system that is off, the SOL payload in use by another session, SOL input the BMC does not accept, the SOL console deactivated by the BMC. |

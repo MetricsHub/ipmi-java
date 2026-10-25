@@ -15,7 +15,9 @@ import static org.metricshub.ipmi.core.transport.FakeSdrRepository.COMPACT_SENSO
 import static org.metricshub.ipmi.core.transport.FakeSdrRepository.compactSensorRecord;
 import static org.metricshub.ipmi.core.transport.FakeSdrRepository.fruDeviceLocatorRecord;
 import static org.metricshub.ipmi.core.transport.FakeSdrRepository.record;
+import static org.metricshub.ipmi.core.transport.FakeSdrRepository.withAccess;
 import static org.metricshub.ipmi.core.transport.FakeSdrRepository.withId;
+import static org.metricshub.ipmi.core.transport.FakeSdrRepository.withOwner;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
@@ -252,7 +254,10 @@ class IpmiCliTest {
 			assertTrue(reset.err.contains("completion code D5h"), reset.err);
 			Result cycleOff = login(bmc, "power", "cycle");
 			assertEquals(IpmiCli.EXIT_PROTOCOL, cycleOff.code, "a cycle of a system that is off is refused by the client");
-			assertTrue(cycleOff.err.contains("ipmicli: The system is off"), cycleOff.err);
+			assertTrue(
+					cycleOff.err
+							.contains("ipmicli: the system is off: a power cycle would power it up on some BMCs, use 'power on'\n"),
+					cycleOff.err);
 			assertEquals("off\n", login(bmc, "power", "status").out, "nothing was sent");
 			assertEquals(0, login(bmc, "power", "on").code);
 			assertEquals(1, bmc.getChassisControl());
@@ -411,7 +416,7 @@ class IpmiCliTest {
 							+ "  Module mfg date            2019-W23\n",
 					dimm.out);
 			assertEquals(
-					"{\"id\":2,\"name\":\"DIMM 1\",\"entity\":\"MemoryDevice\",\"entityInstance\":1,\"manufacturer\":\"Samsung\","
+					"{\"id\":2,\"address\":32,\"lun\":0,\"channel\":0,\"name\":\"DIMM 1\",\"entity\":\"MemoryDevice\",\"entityInstance\":1,\"manufacturer\":\"Samsung\","
 							+ "\"model\":\"M393A2K43BB1-CTD\",\"serialNumber\":\"409F3CA2\",\"partNumber\":\"M393A2K43BB1-CTD\","
 							+ "\"spd\":{\"memoryType\":\"DDR4\",\"moduleType\":\"RDIMM\",\"capacityMegabytes\":16384,\"ecc\":true,"
 							+ "\"manufacturer\":\"Samsung\",\"dramManufacturer\":\"Samsung\",\"partNumber\":\"M393A2K43BB1-CTD\","
@@ -451,7 +456,7 @@ class IpmiCliTest {
 							+ "  Processor Tcase max        77 C\n",
 					cpu.out);
 			assertEquals(
-					"{\"id\":85,\"name\":\"PIROM 1\",\"entity\":\"Processor\",\"entityInstance\":1,\"manufacturer\":\"Intel\","
+					"{\"id\":85,\"address\":32,\"lun\":0,\"channel\":0,\"name\":\"PIROM 1\",\"entity\":\"Processor\",\"entityInstance\":1,\"manufacturer\":\"Intel\","
 							+ "\"model\":\"SR3GH\",\"serialNumber\":\"634AFBC3354D3C6D\",\"partNumber\":\"37608DC00416530\","
 							+ "\"pirom\":{\"sSpec\":\"SR3GH\",\"partNumber\":\"37608DC00416530\",\"ppin\":\"634AFBC3354D3C6D\","
 							+ "\"cpuid\":\"0654\",\"cores\":8,\"hyperThreading\":true,\"baseFrequencyMhz\":2100,"
@@ -582,6 +587,105 @@ class IpmiCliTest {
 			assertEquals(0, sol(bmc, "data\r~", "sol").code, "a lone escape character at the end of the input is data");
 			assertEquals("root\r~\r\r~.\r.\r\r.~.\rdata\r~", ascii(bmc.getSolReceived()));
 		}
+	}
+
+	@Test
+	void sensorsJsonNamesTheOwnerOfEachSensor() throws Exception {
+		try (
+				FakeRmcpPlusBmc bmc = new FakeRmcpPlusBmc(
+						Fixtures.SUITES,
+						Fixtures.USER,
+						Fixtures.utf8(Fixtures.PASSWORD),
+						null)) {
+			// The same sensor number on the BMC, at LUN 1 of the BMC, on a satellite controller and in the BIOS: the
+			// owner is given as the low byte of a SEL generator ID (the 7-bit address shifted left, bit 0 for a
+			// software ID), with the LUN and the channel
+			byte[] sensor = Fixtures.FRONT_PANEL_FULL_RECORD;
+			new FakeSdrRepository()
+					.add(withOwner(sensor, 0x20, 0, 0))
+					.add(withOwner(withId(sensor, 2), 0x20, 0, 1))
+					.add(withOwner(withId(sensor, 3), 0x2c, 6, 0))
+					.add(withOwner(withId(sensor, 4), 0xb1, 0, 0))
+					.install(bmc);
+			String[] json = login(bmc, "sensors", "--json").out.split("\n");
+			assertEquals(4, json.length, Arrays.toString(json));
+			assertTrue(json[0].contains(",\"entityInstance\":1,\"ownerId\":32,\"ownerLun\":0,\"ownerChannel\":0,"), json[0]);
+			assertTrue(json[1].contains(",\"ownerId\":32,\"ownerLun\":1,\"ownerChannel\":0,"), json[1]);
+			assertTrue(json[2].contains(",\"ownerId\":44,\"ownerLun\":0,\"ownerChannel\":6,"), json[2]);
+			assertTrue(json[3].contains(",\"ownerId\":177,\"ownerLun\":0,\"ownerChannel\":0,"), json[3]);
+		}
+	}
+
+	@Test
+	void frusOfAnotherControllerOrLunAreToldApart() throws Exception {
+		try (
+				FakeRmcpPlusBmc bmc = new FakeRmcpPlusBmc(
+						Fixtures.SUITES,
+						Fixtures.USER,
+						Fixtures.utf8(Fixtures.PASSWORD),
+						null)) {
+			// Three FRUs numbered 5: at LUN 0 and LUN 1 of the BMC, and on a controller behind it (none readable), and
+			// the "BMC FRU" of a Supermicro BMC, at 20h on channel 2, which the client reads as a FRU of the BMC
+			int psu = EntityId.PowerSupply.getCode();
+			new FakeSdrRepository()
+					.add(fruDeviceLocatorRecord(1, 5, psu, 1, "BMC LUN 0"))
+					.add(withAccess(fruDeviceLocatorRecord(2, 5, psu, 2, "BMC LUN 1"), 0x20, 0, 1))
+					.add(withAccess(fruDeviceLocatorRecord(3, 5, psu, 3, "Satellite"), 0x2c, 6, 0))
+					.add(withAccess(fruDeviceLocatorRecord(4, 0, EntityId.SystemBoard.getCode(), 1, "BMC FRU"), 0x20, 2, 0))
+					.install(bmc);
+			Result frus = login(bmc, "fru");
+			assertTrue(frus.out.contains("FRU 5: BMC LUN 0 (PowerSupply 1)\n"), frus.out);
+			assertTrue(frus.out.contains("FRU 5 at 20h LUN 1: BMC LUN 1 (PowerSupply 2)\n"), frus.out);
+			assertTrue(frus.out.contains("FRU 5 at 2Ch channel 6: Satellite (PowerSupply 3)\n"), frus.out);
+			assertTrue(frus.out.contains("FRU 0: BMC FRU (SystemBoard 1)\n"), "the channel of a FRU of the BMC is ignored");
+			assertTrue(frus.err.contains("ipmicli: FRU 5: "), frus.err);
+			assertTrue(frus.err.contains("ipmicli: FRU 5 at 20h LUN 1: "), frus.err);
+			assertTrue(frus.err.contains("ipmicli: FRU 5 at 2Ch channel 6: "), frus.err);
+			String[] json = login(bmc, "fru", "--json").out.split("\n");
+			assertEquals(4, json.length, Arrays.toString(json));
+			assertTrue(json[3].startsWith("{\"id\":0,\"address\":32,\"lun\":0,\"channel\":2,\"name\":\"BMC FRU\","), json[3]);
+			assertTrue(
+					json[0].startsWith("{\"id\":5,\"address\":32,\"lun\":0,\"channel\":0,\"name\":\"BMC LUN 0\","),
+					json[0]);
+			assertTrue(
+					json[1].startsWith("{\"id\":5,\"address\":32,\"lun\":1,\"channel\":0,\"name\":\"BMC LUN 1\","),
+					json[1]);
+			assertTrue(
+					json[2].startsWith("{\"id\":5,\"address\":44,\"lun\":0,\"channel\":6,\"name\":\"Satellite\","),
+					json[2]);
+		}
+	}
+
+	@Test
+	void noEscapeNeedsARedirectedInput() throws Exception {
+		// Refused before anything is sent: on a terminal in raw mode, nothing typed would close the console
+		ByteArrayOutputStream out = new ByteArrayOutputStream();
+		ByteArrayOutputStream err = new ByteArrayOutputStream();
+		int code = IpmiCli
+				.run(
+						new String[]
+						{ "-h", "bmc", "-u", "admin", "-p", "secret", "sol", "--no-escape" },
+						new PrintStream(out, true, "UTF-8"),
+						new PrintStream(err, true, "UTF-8"),
+						NO_PROMPT,
+						new ByteArrayInputStream(new byte[0]),
+						true);
+		assertEquals(IpmiCli.EXIT_USAGE, code);
+		assertTrue(
+				text(err)
+						.startsWith(
+								"ipmicli: --no-escape needs a redirected input: on a terminal, ~. is the only way out"
+										+ " (use --escape to pick another character)\n"),
+				text(err));
+		assertEquals("", text(out));
+	}
+
+	@Test
+	void aConsoleIsATerminalOnlyWhenItSaysSo() {
+		assertFalse(IpmiCli.isTerminal(null));
+		// The standard streams of a forked test JVM are pipes: no console up to Java 21 and from 25, a console whose
+		// isTerminal() is false on Java 22 to 24
+		assertFalse(IpmiCli.isTerminal(System.console()));
 	}
 
 	@Test

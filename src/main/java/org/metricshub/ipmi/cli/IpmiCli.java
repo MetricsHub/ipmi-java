@@ -74,7 +74,9 @@ import org.metricshub.ipmi.client.SensorsRequest;
 import org.metricshub.ipmi.client.SkippedRecord;
 import org.metricshub.ipmi.client.SolConsole;
 import org.metricshub.ipmi.core.coding.commands.PrivilegeLevel;
+import org.metricshub.ipmi.core.coding.commands.chassis.PowerCommand;
 import org.metricshub.ipmi.core.coding.commands.sdr.record.AbstractSensorRecord;
+import org.metricshub.ipmi.core.coding.commands.sdr.record.AddressType;
 import org.metricshub.ipmi.core.coding.commands.sdr.record.SensorType;
 import org.metricshub.ipmi.core.coding.commands.sdr.record.SensorUnit;
 import org.metricshub.ipmi.core.coding.commands.fru.record.BoardInfo;
@@ -116,6 +118,11 @@ public final class IpmiCli {
 	private static final int RAW_BYTES_PER_LINE = 16;
 	/** Event/reading type code of the threshold sensors (IPMI 2.0 table 42-1). */
 	private static final int THRESHOLD_EVENT_READING_TYPE = 1;
+	/** The 8-bit slave address of the BMC. */
+	private static final int BMC_ADDRESS = 0x20;
+	private static final int OWNER_ID_MASK = 0x7f;
+	private static final int LUN_MASK = 0x03;
+	private static final int CHANNEL_MASK = 0x0f;
 
 	private IpmiCli() {}
 
@@ -125,7 +132,25 @@ public final class IpmiCli {
 	 * @param args the command line
 	 */
 	public static void main(String[] args) {
-		System.exit(run(args, System.out, System.err, IpmiCli::readConsolePassword, System.in, System.console() != null));
+		System
+				.exit(run(args, System.out, System.err, IpmiCli::readConsolePassword, System.in, isTerminal(System.console())));
+	}
+
+	/**
+	 * Tells whether a console is an interactive terminal. Up to Java 21, {@code System.console()} is null when stdin or
+	 * stdout is redirected; Java 22 to 24 return a console even then (JDK-8308591) and added {@code isTerminal()} to
+	 * tell, which is called by reflection as the library compiles for Java 8.
+	 */
+	static boolean isTerminal(Console console) {
+		if (console == null) {
+			return false;
+		}
+		try {
+			return (Boolean) Console.class.getMethod("isTerminal").invoke(console);
+		} catch (ReflectiveOperationException e) {
+			// Java 8 to 21: a console exists only on a terminal
+			return true;
+		}
 	}
 
 	/**
@@ -154,6 +179,13 @@ public final class IpmiCli {
 			if (arguments.subcommand() == CliArguments.Subcommand.VERSION) {
 				out.println("ipmi-java " + version());
 				return out.checkError() ? outputFailed(err) : 0;
+			}
+			if (terminal && arguments.subcommand() == CliArguments.Subcommand.SOL && arguments.escape() < 0) {
+				// In raw mode every keystroke is for the BMC, Ctrl+C and Ctrl+D included: without an escape sequence, only
+				// a kill from another terminal would close the console
+				throw new CliUsageException(
+						"--no-escape needs a redirected input: on a terminal, " + CliArguments.DEFAULT_ESCAPE
+								+ ". is the only way out (use --escape to pick another character)");
 			}
 			if (arguments.subcommand() != CliArguments.Subcommand.PROBE && arguments.password() == null) {
 				char[] password;
@@ -288,10 +320,20 @@ public final class IpmiCli {
 				out.println(timed(arguments, err, "chassis status", client::chassisStatus).powerOn() ? "on" : "off");
 			} else {
 				// Nothing to print: the exit code says whether the BMC accepted the command
-				timed(arguments, err, "chassis control", () -> {
-					client.chassisControl(arguments.powerCommand());
-					return null;
-				});
+				try {
+					timed(arguments, err, "chassis control", () -> {
+						client.chassisControl(arguments.powerCommand());
+						return null;
+					});
+				} catch (IllegalStateException e) {
+					if (arguments.powerCommand() != PowerCommand.PowerCycle) {
+						throw e;
+					}
+					// The message of the client names the Java constant: say the CLI action instead
+					throw new IllegalStateException(
+							"the system is off: a power cycle would power it up on some BMCs, use 'power on'",
+							e);
+				}
 			}
 			return 0;
 		case IDENTIFY:
@@ -623,6 +665,18 @@ public final class IpmiCli {
 		fields.put("typeCode", sensor.typeCode());
 		fields.put("entity", sensor.entity().name());
 		fields.put("entityInstance", sensor.entityInstance());
+		if (sensor.record() instanceof AbstractSensorRecord) {
+			// The owner as the low byte of a SEL generator ID: the 7-bit address shifted left, bit 0 set for a software
+			// ID (IPMI 2.0 table 32-1), so that a script joins sel --json on it as SelEntry.isFrom() does
+			AbstractSensorRecord owner = (AbstractSensorRecord) sensor.record();
+			fields
+					.put(
+							"ownerId",
+							(owner.getSensorOwnerId() & OWNER_ID_MASK) << 1
+									| (owner.getAddressType() == AddressType.SystemSoftwareId ? 1 : 0));
+			fields.put("ownerLun", owner.getSensorOwnerLun() & LUN_MASK);
+			fields.put("ownerChannel", owner.getChannelNumber() & CHANNEL_MASK);
+		}
 		if (sensor.unit() != SensorUnit.Unspecified) {
 			fields.put("unit", sensor.unit().name());
 		}
@@ -668,7 +722,7 @@ public final class IpmiCli {
 			}
 			found.add(fru.id());
 			for (String problem : fru.problems()) {
-				diagnostic(err, "FRU " + fru.id() + ": " + problem);
+				diagnostic(err, fruLabel(fru) + ": " + problem);
 				code = EXIT_PARTIAL;
 			}
 		}
@@ -681,10 +735,30 @@ public final class IpmiCli {
 		return code;
 	}
 
+	/** The 8-bit slave address of the controller that holds a FRU: 20h for the BMC. */
+	private static int fruAddress(Fru fru) {
+		return fru.locator().getDeviceAccessAddress() << 1;
+	}
+
+	/**
+	 * Names a FRU by its ID, with the address, LUN and channel of its controller when it is not held by the BMC at
+	 * LUN 0 ({@code FRU 5 at 2Ch}, {@code FRU 5 at 20h LUN 1}): since two FRUs on different controllers or LUNs may
+	 * have the same ID, the ID alone does not tell them apart. The channel of a FRU held by the BMC itself is ignored,
+	 * as the client ignores it (a Supermicro BMC locates its own FRU at 20h on channel 2).
+	 */
+	private static String fruLabel(Fru fru) {
+		int address = fruAddress(fru);
+		int lun = fru.locator().getAccessLun();
+		int channel = address == BMC_ADDRESS ? 0 : fru.locator().getManagementChannelNumber();
+		if (address == BMC_ADDRESS && lun == 0) {
+			return "FRU " + fru.id();
+		}
+		return String.format(Locale.ROOT, "FRU %d at %02Xh", fru.id(), address) + (lun == 0 ? "" : " LUN " + lun)
+				+ (channel == 0 ? "" : " channel " + channel);
+	}
+
 	private static void fru(Fru fru, PrintStream out) {
-		out
-				.println(
-						"FRU " + fru.id() + ": " + printable(fru.name()) + " (" + fru.entity() + " " + fru.entityInstance() + ")");
+		out.println(fruLabel(fru) + ": " + printable(fru.name()) + " (" + fru.entity() + " " + fru.entityInstance() + ")");
 		Optional<ChassisInfo> chassis = fru.chassis();
 		if (chassis.isPresent()) {
 			ChassisInfo area = chassis.get();
@@ -775,6 +849,9 @@ public final class IpmiCli {
 	private static Map<String, Object> fruFields(Fru fru) {
 		Map<String, Object> fields = new LinkedHashMap<String, Object>();
 		fields.put("id", fru.id());
+		fields.put("address", fruAddress(fru));
+		fields.put("lun", fru.locator().getAccessLun());
+		fields.put("channel", fru.locator().getManagementChannelNumber());
 		fields.put("name", fru.name());
 		fields.put("entity", fru.entity().name());
 		fields.put("entityInstance", fru.entityInstance());
@@ -962,10 +1039,8 @@ public final class IpmiCli {
 								+ (raw == null ?
 										", line-oriented: the input is sent when Enter is pressed and echoed by the remote console only" :
 										"")
-								+ (arguments.escape() < 0 ?
-										"; the end of the input closes it" :
-										"; " + (char) arguments.escape() + ". at the start of a line closes it, "
-												+ (char) arguments.escape() + "? lists the escape sequences"));
+								+ "; " + (char) arguments.escape() + ". at the start of a line closes it, "
+								+ (char) arguments.escape() + "? lists the escape sequences");
 			}
 			boolean lineMode = terminal && raw == null;
 			// In line mode the console would echo the typed line locally, and the remote console echoes it again (or
@@ -1379,7 +1454,7 @@ public final class IpmiCli {
 
 	private static char[] readConsolePassword() throws CliUsageException {
 		Console console = System.console();
-		if (console == null) {
+		if (!isTerminal(console)) {
 			throw new CliUsageException("no interactive console to ask the password: use --password-file");
 		}
 		return console.readPassword("Password: ");
