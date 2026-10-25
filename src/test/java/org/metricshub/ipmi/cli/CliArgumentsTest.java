@@ -194,6 +194,10 @@ class CliArgumentsTest {
 		assertEquals("--hostname requires a value", usageError("-u", "admin", "--hostname"));
 		assertEquals("--password and --password-file are mutually exclusive", usageError("-p", "a", "-pf", "f"));
 		assertEquals("--bmc-key and --bmc-key-file are mutually exclusive", usageError("-k", "01", "-kf", "f"));
+		// A secret given twice is a mistake, in either form of the option; the other options take their last value
+		assertEquals("--password is given twice", usageError("--password=a", "-p", "b"));
+		assertEquals("--bmc-key is given twice", usageError("-k", "01", "-k", "02", "-p", "x"));
+		assertEquals("bmc2", parse("-h", "bmc2", "chassis").hostname(), "the last -h wins");
 		assertEquals(
 				"--escape and --no-escape are mutually exclusive",
 				usageError(login("sol", "--escape", "!", "--no-escape")));
@@ -338,11 +342,11 @@ class CliArgumentsTest {
 		assertEquals("-p", joined[4], "blanked even when the parsing fails later");
 
 		String[] twice = { "-h", "bmc", "-u", "admin", "-p", "one", "-p", "two", "-k", "01", "--bmc-key=02", "chassis" };
-		assertEquals("--password and --password-file are mutually exclusive", usageError(twice));
+		assertEquals("--password is given twice", usageError(twice));
 		assertEquals("", twice[7], "a rejected duplicate secret is blanked too");
 		assertEquals("", twice[5], "and the accepted one");
 		String[] keys = { "-h", "bmc", "-u", "admin", "-k", "01", "--bmc-key=02", "chassis" };
-		assertEquals("--bmc-key and --bmc-key-file are mutually exclusive", usageError(keys));
+		assertEquals("--bmc-key is given twice", usageError(keys));
 		assertEquals("--bmc-key", keys[6]);
 	}
 
