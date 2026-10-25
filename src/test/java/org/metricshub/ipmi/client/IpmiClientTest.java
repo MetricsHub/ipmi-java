@@ -106,8 +106,7 @@ class IpmiClientTest {
 	private static final int RECORDS = 6;
 
 	private static IpmiClient.Builder client(FakeRmcpPlusBmc bmc) {
-		return IpmiClient
-				.builder(bmc.getAddress().getHostAddress())
+		return IpmiClient.builder(bmc.getAddress().getHostAddress())
 				.port(bmc.getPort())
 				.credentials(USER, PASSWORD.toCharArray())
 				.messageTimeout(MESSAGE_TIMEOUT)
@@ -323,18 +322,17 @@ class IpmiClientTest {
 				// The log is cleared and six other events are logged: the IDs 1 to 6 name other entries now
 				sel.clear();
 				for (int id = 1; id <= 6; id++) {
-					sel
-							.add(
-									systemEvent(
-											id,
-											SEL_RESET_TIME + 1000 + id,
-											SensorType.Fan.getCode(),
-											FAN_SENSOR,
-											0x0a,
-											true,
-											0x01,
-											0xff,
-											0xff));
+					sel.add(
+							systemEvent(
+									id,
+									SEL_RESET_TIME + 1000 + id,
+									SensorType.Fan.getCode(),
+									FAN_SENSOR,
+									0x0a,
+									true,
+									0x01,
+									0xff,
+									0xff));
 				}
 				SelEntryList afterClear = client.sel().since(last).execute();
 				assertEquals(6, afterClear.size(), "another entry under the ID of the last one read: the whole log");
@@ -389,18 +387,17 @@ class IpmiClientTest {
 			sel.before(2, () -> {
 				sel.clear();
 				for (int id = 1; id <= 6; id++) {
-					sel
-							.add(
-									systemEvent(
-											id,
-											SEL_RESET_TIME + 2000 + id,
-											SensorType.Fan.getCode(),
-											FAN_SENSOR,
-											0x0a,
-											true,
-											0x01,
-											0xff,
-											0xff));
+					sel.add(
+							systemEvent(
+									id,
+									SEL_RESET_TIME + 2000 + id,
+									SensorType.Fan.getCode(),
+									FAN_SENSOR,
+									0x0a,
+									true,
+									0x01,
+									0xff,
+									0xff));
 				}
 			});
 			try (IpmiClient client = client(bmc).build()) {
@@ -429,18 +426,17 @@ class IpmiClientTest {
 			sel.before(5, () -> {
 				sel.clear();
 				for (int id = 1; id <= 4; id++) {
-					sel
-							.add(
-									systemEvent(
-											id,
-											SEL_RESET_TIME + 3000 + id,
-											SensorType.Fan.getCode(),
-											FAN_SENSOR,
-											0x0a,
-											true,
-											0x01,
-											0xff,
-											0xff));
+					sel.add(
+							systemEvent(
+									id,
+									SEL_RESET_TIME + 3000 + id,
+									SensorType.Fan.getCode(),
+									FAN_SENSOR,
+									0x0a,
+									true,
+									0x01,
+									0xff,
+									0xff));
 				}
 			});
 			try (IpmiClient client = client(bmc).build()) {
@@ -461,18 +457,17 @@ class IpmiClientTest {
 			sel.before(4, () -> {
 				sel.clearWithoutErase();
 				for (int id = 1; id <= 5; id++) {
-					sel
-							.add(
-									systemEvent(
-											id,
-											SEL_RESET_TIME + 4000 + id,
-											SensorType.Fan.getCode(),
-											FAN_SENSOR,
-											0x0a,
-											true,
-											0x01,
-											0xff,
-											0xff));
+					sel.add(
+							systemEvent(
+									id,
+									SEL_RESET_TIME + 4000 + id,
+									SensorType.Fan.getCode(),
+									FAN_SENSOR,
+									0x0a,
+									true,
+									0x01,
+									0xff,
+									0xff));
 				}
 			});
 			try (IpmiClient client = client(bmc).build()) {
@@ -523,18 +518,17 @@ class IpmiClientTest {
 				sel.before(6, () -> sel.before(6, () -> {
 					sel.clearWithoutErase();
 					for (int id = 1; id <= 6; id++) {
-						sel
-								.add(
-										systemEvent(
-												id,
-												SEL_RESET_TIME + 5000 + id,
-												SensorType.Fan.getCode(),
-												FAN_SENSOR,
-												0x0a,
-												true,
-												0x01,
-												0xff,
-												0xff));
+						sel.add(
+								systemEvent(
+										id,
+										SEL_RESET_TIME + 5000 + id,
+										SensorType.Fan.getCode(),
+										FAN_SENSOR,
+										0x0a,
+										true,
+										0x01,
+										0xff,
+										0xff));
 					}
 				}));
 				SelEntryList refilled = client.sel().since(last).execute();
@@ -555,18 +549,17 @@ class IpmiClientTest {
 			sel.before(1, () -> {
 				sel.clear();
 				for (int id = 1; id <= 3; id++) {
-					sel
-							.add(
-									systemEvent(
-											id,
-											SEL_RESET_TIME + 6000 + id,
-											SensorType.Fan.getCode(),
-											FAN_SENSOR,
-											0x0a,
-											true,
-											0x01,
-											0xff,
-											0xff));
+					sel.add(
+							systemEvent(
+									id,
+									SEL_RESET_TIME + 6000 + id,
+									SensorType.Fan.getCode(),
+									FAN_SENSOR,
+									0x0a,
+									true,
+									0x01,
+									0xff,
+									0xff));
 				}
 			});
 			try (IpmiClient client = client(bmc).build()) {
@@ -621,8 +614,7 @@ class IpmiClientTest {
 
 				sel.nextRecordId(4, 4);
 				assertTrue(
-						assertThrows(IpmiClientException.class, () -> client.sel().execute())
-								.getMessage()
+						assertThrows(IpmiClientException.class, () -> client.sel().execute()).getMessage()
 								.contains("entry 0004h names entry 0004h as the next one"),
 						"an entry that names itself");
 			}
@@ -693,22 +685,11 @@ class IpmiClientTest {
 				sel.add(systemEvent(1, SEL_RESET_TIME, SensorType.Fan.getCode(), FAN_SENSOR, 0x0a, true, 0x01, 0xff, 0xff));
 				assertEquals(1, client.sel().execute().size());
 				assertEquals(
-						"1 SEL entry: [SEL entry 1 at 2024-05-15T09:15:25Z: Fan sensor 16, Transition to In Test"
-								+ " (assertion)]",
+						"1 SEL entry: [SEL entry 1 at 2024-05-15T09:15:25Z: Fan sensor 16, Transition to In Test" + " (assertion)]",
 						client.sel().execute().toString());
 
-				sel
-						.add(
-								systemEvent(
-										2,
-										SEL_RESET_TIME + 1,
-										SensorType.Fan.getCode(),
-										FAN_SENSOR,
-										0x0a,
-										false,
-										0x01,
-										0xff,
-										0xff));
+				sel.add(
+						systemEvent(2, SEL_RESET_TIME + 1, SensorType.Fan.getCode(), FAN_SENSOR, 0x0a, false, 0x01, 0xff, 0xff));
 				sel.cancelReservationOnce(2);
 				assertEquals(2, client.sel().execute().size(), "a canceled reservation: take one and read the entry again");
 				assertEquals(1, bmc.getCount(NETFN_STORAGE, RESERVE_SEL));
@@ -812,8 +793,7 @@ class IpmiClientTest {
 	@Timeout(30)
 	void aRefusedReadingAndAnUnreadableFruAreReportedInTheResult() throws Exception {
 		try (FakeRmcpPlusBmc bmc = bmc()) {
-			new FakeSdrRepository()
-					.add(Fixtures.FRONT_PANEL_FULL_RECORD)
+			new FakeSdrRepository().add(Fixtures.FRONT_PANEL_FULL_RECORD)
 					.add(fruDeviceLocatorRecord(4, PSU_FRU, EntityId.PowerSupply.getCode(), 1, "PSU 1"))
 					.reading(TEMPERATURE_SENSOR, 0xcb)
 					.install(bmc);
@@ -835,8 +815,7 @@ class IpmiClientTest {
 	@Timeout(30)
 	void aBmcThatRefusesLargeReadsIsReadInSmallerChunksAndAskedOnce() throws Exception {
 		try (FakeRmcpPlusBmc bmc = new FakeRmcpPlusBmc(SUITES, USER, utf8(PASSWORD), null)) {
-			new FakeSdrRepository()
-					.add(fruDeviceLocatorRecord(1, 0, EntityId.SystemBoard.getCode(), 1, "Board"))
+			new FakeSdrRepository().add(fruDeviceLocatorRecord(1, 0, EntityId.SystemBoard.getCode(), 1, "Board"))
 					.add(fruDeviceLocatorRecord(2, PSU_FRU, EntityId.PowerSupply.getCode(), 1, "PSU 1"))
 					.fru(0, BASE_BOARD_PRODUCT_INFO)
 					.fru(PSU_FRU, DDR4_SPD)
@@ -861,8 +840,7 @@ class IpmiClientTest {
 	void aRefusedCountBacksOffFromTheCountSent() throws Exception {
 		try (FakeRmcpPlusBmc bmc = new FakeRmcpPlusBmc(SUITES, USER, utf8(PASSWORD), null)) {
 			// A 40-byte FRU on a controller that answers 32 bytes at most: 40 refused, then 32 and 8
-			new FakeSdrRepository()
-					.add(fruDeviceLocatorRecord(1, 0, EntityId.SystemBoard.getCode(), 1, "Board"))
+			new FakeSdrRepository().add(fruDeviceLocatorRecord(1, 0, EntityId.SystemBoard.getCode(), 1, "Board"))
 					.fru(0, Arrays.copyOf(BASE_BOARD_PRODUCT_INFO, 40))
 					.readLimit(32)
 					.install(bmc);
@@ -878,8 +856,7 @@ class IpmiClientTest {
 	@Timeout(30)
 	void aWordAddressedFruIsReadAnEvenNumberOfBytesAtATime() throws Exception {
 		try (FakeRmcpPlusBmc bmc = new FakeRmcpPlusBmc(SUITES, USER, utf8(PASSWORD), null)) {
-			new FakeSdrRepository()
-					.add(fruDeviceLocatorRecord(1, 0, EntityId.SystemBoard.getCode(), 1, "Board"))
+			new FakeSdrRepository().add(fruDeviceLocatorRecord(1, 0, EntityId.SystemBoard.getCode(), 1, "Board"))
 					.wordFru(0, BASE_BOARD_PRODUCT_INFO)
 					.install(bmc);
 			try (IpmiClient client = client(bmc).build()) {
@@ -898,8 +875,7 @@ class IpmiClientTest {
 	@Timeout(30)
 	void aReadRefusedAtTheSmallestCountIsReported() throws Exception {
 		try (FakeRmcpPlusBmc bmc = new FakeRmcpPlusBmc(SUITES, USER, utf8(PASSWORD), null)) {
-			new FakeSdrRepository()
-					.add(fruDeviceLocatorRecord(1, 0, EntityId.SystemBoard.getCode(), 1, "Board"))
+			new FakeSdrRepository().add(fruDeviceLocatorRecord(1, 0, EntityId.SystemBoard.getCode(), 1, "Board"))
 					.fru(0, BASE_BOARD_PRODUCT_INFO)
 					.readLimit(8)
 					.install(bmc);
@@ -994,8 +970,7 @@ class IpmiClientTest {
 	@Timeout(30)
 	void aMemoryModuleFruIsDecodedFromItsSpdData() throws Exception {
 		try (FakeRmcpPlusBmc bmc = new FakeRmcpPlusBmc(SUITES, USER, utf8(PASSWORD), null)) {
-			new FakeSdrRepository()
-					.add(fruDeviceLocatorRecord(1, DIMM_FRU, EntityId.MemoryDevice.getCode(), 1, "DIMM 1"))
+			new FakeSdrRepository().add(fruDeviceLocatorRecord(1, DIMM_FRU, EntityId.MemoryDevice.getCode(), 1, "DIMM 1"))
 					.fru(DIMM_FRU, DDR4_SPD)
 					.install(bmc);
 			try (IpmiClient client = client(bmc).build()) {
@@ -1076,8 +1051,7 @@ class IpmiClientTest {
 		byte[] nonLinear = Fixtures.FRONT_PANEL_FULL_RECORD.clone();
 		nonLinear[23] = 0x70; // linearization: non-linear
 		try (FakeRmcpPlusBmc bmc = new FakeRmcpPlusBmc(SUITES, USER, utf8(PASSWORD), null)) {
-			FakeSdrRepository sdr = new FakeSdrRepository()
-					.add(nonLinear)
+			FakeSdrRepository sdr = new FakeSdrRepository().add(nonLinear)
 					.reading(TEMPERATURE_SENSOR, 0x9a, 0x40, 0x00)
 					// next reading A0h, M=2, B=0, R exponent -1
 					.factors(TEMPERATURE_SENSOR, 0x9a, 0xa0, 0x02, 0x00, 0x00, 0x00, 0x00, 0xf0);
@@ -1106,8 +1080,7 @@ class IpmiClientTest {
 	void aThresholdSensorBeyondItsThresholdsListsThemAsStates() throws Exception {
 		try (FakeRmcpPlusBmc bmc = new FakeRmcpPlusBmc(SUITES, USER, utf8(PASSWORD), null)) {
 			// B0h = 44 degrees C, byte 3 bits 3 and 4: at or above UNC (38) and UC (41), IPMI 2.0 table 35-15
-			new FakeSdrRepository()
-					.add(Fixtures.FRONT_PANEL_FULL_RECORD)
+			new FakeSdrRepository().add(Fixtures.FRONT_PANEL_FULL_RECORD)
 					.reading(TEMPERATURE_SENSOR, 0xb0, 0x40, 0x18)
 					.install(bmc);
 			try (IpmiClient client = client(bmc).build()) {
@@ -1302,8 +1275,7 @@ class IpmiClientTest {
 						SensorType.Processor.getCode(),
 						0x6f,
 						"S");
-				new FakeSdrRepository()
-						.add(withOwner(sensor, 0x20, 0, 0))
+				new FakeSdrRepository().add(withOwner(sensor, 0x20, 0, 0))
 						.add(withOwner(FakeSdrRepository.withId(sensor, 2), 0x20, 0, 1))
 						.add(withOwner(FakeSdrRepository.withId(sensor, 3), 0x2c, 6, 0))
 						.add(withOwner(FakeSdrRepository.withId(sensor, 4), 0xb1, 0, 0))
@@ -1348,8 +1320,7 @@ class IpmiClientTest {
 			// channel; the "BMC FRU" of a Supermicro BMC, at 20h on channel 2; and on the first controller, FRU 7
 			// (busy), FRU 8 (the controller answers the area info, not the data) and FRU 9
 			int psu = EntityId.PowerSupply.getCode();
-			new FakeSdrRepository()
-					.add(fruDeviceLocatorRecord(1, 5, psu, 1, "BMC LUN 0"))
+			new FakeSdrRepository().add(fruDeviceLocatorRecord(1, 5, psu, 1, "BMC LUN 0"))
 					.add(withAccess(fruDeviceLocatorRecord(2, 5, psu, 2, "BMC LUN 1"), 0x20, 0, 1))
 					.add(withAccess(fruDeviceLocatorRecord(3, 5, psu, 3, "Satellite"), 0x2c, 6, 0))
 					.add(withAccess(fruDeviceLocatorRecord(4, 5, psu, 4, "Absent"), 0x42, 0, 0))
@@ -1364,26 +1335,23 @@ class IpmiClientTest {
 					.fru(5, DDR4_SPD)
 					.fruAtLun(1, 5, PIROM)
 					.install(bmc);
-			FakeSdrRepository controller = new FakeSdrRepository()
-					.fru(5, BASE_BOARD_PRODUCT_INFO)
+			FakeSdrRepository controller = new FakeSdrRepository().fru(5, BASE_BOARD_PRODUCT_INFO)
 					.fru(7, BASE_BOARD_PRODUCT_INFO)
 					.fru(8, BASE_BOARD_PRODUCT_INFO)
 					.fru(9, BASE_BOARD_PRODUCT_INFO);
-			bmc
-					.satellite(
-							6,
-							0x2c,
-							NETFN_STORAGE,
-							GET_FRU_INVENTORY_AREA_INFO,
-							data -> controller.fruInventoryAreaInfo(bmc.getRequestLun(), data));
-			bmc
-					.satellite(
-							6,
-							0x2c,
-							NETFN_STORAGE,
-							READ_FRU_DATA,
-							data -> data[0] == 7 ? new byte[]
-							{ (byte) 0x81 } : data[0] == 8 ? null : controller.readFruData(bmc.getRequestLun(), data));
+			bmc.satellite(
+					6,
+					0x2c,
+					NETFN_STORAGE,
+					GET_FRU_INVENTORY_AREA_INFO,
+					data -> controller.fruInventoryAreaInfo(bmc.getRequestLun(), data));
+			bmc.satellite(
+					6,
+					0x2c,
+					NETFN_STORAGE,
+					READ_FRU_DATA,
+					data -> data[0] == 7 ? new byte[]
+					{ (byte) 0x81 } : data[0] == 8 ? null : controller.readFruData(bmc.getRequestLun(), data));
 			bmc.satellite(0, 0x44, NETFN_STORAGE, GET_FRU_INVENTORY_AREA_INFO, data -> null);
 			try (IpmiClient client = client(bmc).build()) {
 				FruList frus = client.frus().execute();
@@ -1393,10 +1361,9 @@ class IpmiClientTest {
 				assertEquals("IBM", frus.get(2).manufacturer(), "read from its controller");
 				assertTrue(frus.get(2).complete(), frus.get(2).problems().toString());
 				assertEquals(
-						Collections
-								.singletonList(
-										"Cannot read FRU 5 from the controller at 42h on channel 0: NAK on write: no controller"
-												+ " acknowledged the address (completion code 83h)"),
+						Collections.singletonList(
+								"Cannot read FRU 5 from the controller at 42h on channel 0: NAK on write: no controller"
+										+ " acknowledged the address (completion code 83h)"),
 						frus.get(3).problems());
 				assertEquals(
 						Collections
@@ -1418,10 +1385,9 @@ class IpmiClientTest {
 				assertEquals("IBM", frus.get(9).manufacturer(), "a controller that answered the area info is not silent");
 				assertTrue(frus.get(9).complete(), frus.get(9).problems().toString());
 				assertEquals(
-						Collections
-								.singletonList(
-										"Cannot read FRU 5 from the controller at 2Ch on channel 0: NAK on write: no controller"
-												+ " acknowledged the address (completion code 83h)"),
+						Collections.singletonList(
+								"Cannot read FRU 5 from the controller at 2Ch on channel 0: NAK on write: no controller"
+										+ " acknowledged the address (completion code 83h)"),
 						frus.get(10).problems(),
 						"the same address on another channel is another controller");
 
@@ -1449,8 +1415,7 @@ class IpmiClientTest {
 			// No locator points at FRU 0 and no sensor of the system board anchors it. The BMC clears FRU Inventory
 			// Device in its own MC Device Locator, as Supermicro BMCs do, yet serves FRU 0; of the two controllers
 			// behind it, one sets the bit and the other clears it
-			new FakeSdrRepository()
-					.add(mcDeviceLocatorRecord(1, 0x20, 0, 0x07, "BMC"))
+			new FakeSdrRepository().add(mcDeviceLocatorRecord(1, 0x20, 0, 0x07, "BMC"))
 					.add(fruDeviceLocatorRecord(2, PSU_FRU, EntityId.PowerSupply.getCode(), 1, "PSU 1"))
 					.add(mcDeviceLocatorRecord(3, 0x2c, 6, 0x08, "Satellite"))
 					.add(mcDeviceLocatorRecord(4, 0x44, 0, 0x01, "No FRU"))
@@ -1458,20 +1423,13 @@ class IpmiClientTest {
 					.fru(PSU_FRU, BASE_BOARD_PRODUCT_INFO)
 					.install(bmc);
 			FakeSdrRepository controller = new FakeSdrRepository().fru(0, BASE_BOARD_PRODUCT_INFO);
-			bmc
-					.satellite(
-							6,
-							0x2c,
-							NETFN_STORAGE,
-							GET_FRU_INVENTORY_AREA_INFO,
-							data -> controller.fruInventoryAreaInfo(bmc.getRequestLun(), data));
-			bmc
-					.satellite(
-							6,
-							0x2c,
-							NETFN_STORAGE,
-							READ_FRU_DATA,
-							data -> controller.readFruData(bmc.getRequestLun(), data));
+			bmc.satellite(
+					6,
+					0x2c,
+					NETFN_STORAGE,
+					GET_FRU_INVENTORY_AREA_INFO,
+					data -> controller.fruInventoryAreaInfo(bmc.getRequestLun(), data));
+			bmc.satellite(6, 0x2c, NETFN_STORAGE, READ_FRU_DATA, data -> controller.readFruData(bmc.getRequestLun(), data));
 			try (IpmiClient client = client(bmc).build()) {
 				FruList frus = client.frus().execute();
 				assertEquals(3, frus.size(), frus.toString());
@@ -1509,8 +1467,7 @@ class IpmiClientTest {
 			// "BMC FRU", Cisco IMC "FRU_RAM")
 			byte[] board = FakeSdrRepository.withId(Fixtures.FRONT_PANEL_FULL_RECORD, 1);
 			board[8] = (byte) EntityId.SystemBoard.getCode(); // entity ID (table 43-1, byte 9)
-			new FakeSdrRepository()
-					.add(board)
+			new FakeSdrRepository().add(board)
 					.add(fruDeviceLocatorRecord(2, PSU_FRU, EntityId.PowerSupply.getCode(), 1, "PSU 1"))
 					.fru(0, BASE_BOARD_PRODUCT_INFO)
 					.fru(PSU_FRU, BASE_BOARD_PRODUCT_INFO)
@@ -1539,8 +1496,7 @@ class IpmiClientTest {
 					SensorType.Processor.getCode(),
 					0x6f,
 					"S");
-			new FakeSdrRepository()
-					.add(withOwner(sensor, 0x2c, 6, 0))
+			new FakeSdrRepository().add(withOwner(sensor, 0x2c, 6, 0))
 					.add(withOwner(FakeSdrRepository.withId(sensor, 2), 0x2c, 6, 0))
 					.add(withOwner(FakeSdrRepository.withId(sensor, 3), 0x42, 0, 0))
 					.add(FakeSdrRepository.withId(sensor, 4))
@@ -1578,20 +1534,18 @@ class IpmiClientTest {
 					SensorType.Processor.getCode(),
 					0x6f,
 					"S");
-			new FakeSdrRepository()
-					.add(withOwner(sensor, 0x2c, 0, 0))
+			new FakeSdrRepository().add(withOwner(sensor, 0x2c, 0, 0))
 					.add(withOwner(FakeSdrRepository.withId(sensor, 2), 0x2c, 0, 1))
 					.add(withOwner(FakeSdrRepository.withId(sensor, 3), 0x2c, 0, 0))
 					.install(bmc);
 			// The controller answers at LUN 1, not at LUN 0
-			bmc
-					.satellite(
-							0,
-							0x2c,
-							NETFN_SENSOR,
-							GET_SENSOR_READING,
-							data -> bmc.getRequestLun() == 0 ? null : new byte[]
-							{ 0x00, 0x20, 0x40, 0x00 });
+			bmc.satellite(
+					0,
+					0x2c,
+					NETFN_SENSOR,
+					GET_SENSOR_READING,
+					data -> bmc.getRequestLun() == 0 ? null : new byte[]
+					{ 0x00, 0x20, 0x40, 0x00 });
 			try (IpmiClient client = client(bmc).build()) {
 				SensorList sensors = client.sensors().execute();
 				assertEquals(
@@ -1634,10 +1588,9 @@ class IpmiClientTest {
 						assertEquals(2, sensors.size(), what);
 						assertEquals(1, sensors.skippedRecords().size(), what);
 						assertEquals(
-								String
-										.format(
-												"SDR record 0002h (type 02h): Names record %04Xh as the next one, which was read already: the walk ends there",
-												next),
+								String.format(
+										"SDR record 0002h (type 02h): Names record %04Xh as the next one, which was read already: the walk ends there",
+										next),
 								sensors.skippedRecords().get(0).toString(),
 								what);
 						assertEquals(
@@ -1684,8 +1637,10 @@ class IpmiClientTest {
 				assertEquals(1, bmc.getCount(NETFN_SENSOR, GET_DEVICE_SDR));
 
 				// A dynamic population may have lost its records between its count and the first read
-				bmc
-						.handle(NETFN_SENSOR, GET_DEVICE_SDR_INFO, data -> new byte[]
+				bmc.handle(
+						NETFN_SENSOR,
+						GET_DEVICE_SDR_INFO,
+						data -> new byte[]
 						{ 0x00, 0x01, (byte) 0x81, 0x01, 0x00, 0x00, 0x00 });
 				assertTrue(client.sensors().execute().isEmpty());
 				assertEquals(2, bmc.getCount(NETFN_SENSOR, GET_DEVICE_SDR));
@@ -1702,8 +1657,7 @@ class IpmiClientTest {
 				});
 				assertEquals(3, client.send(new GetDeviceSdrInfo(false, 2)).getCount());
 				assertEquals(2, lun[0]);
-				sdr
-						.add(compactSensorRecord(1, 1, EntityId.Processor.getCode(), 1, SensorType.Processor.getCode(), 0x6f, "S"))
+				sdr.add(compactSensorRecord(1, 1, EntityId.Processor.getCode(), 1, SensorType.Processor.getCode(), 0x6f, "S"))
 						.reading(1, 0x10, 0x40, 0x00);
 				assertEquals(1, client.sensors().execute().size());
 			}
@@ -1770,15 +1724,13 @@ class IpmiClientTest {
 					0x6f,
 					"S");
 			new FakeSdrRepository().add(nonLinear).add(withOwner(other, 0x2c, 0, 0)).install(bmc);
-			bmc
-					.satellite(
-							0,
-							0x2c,
-							NETFN_SENSOR,
-							GET_SENSOR_READING,
-							data -> data[0] == TEMPERATURE_SENSOR ?
-									new byte[]
-									{ 0x00, (byte) 0x9a, 0x40, 0x00 } : new byte[] { 0x00, 0x10, 0x40, 0x00 });
+			bmc.satellite(
+					0,
+					0x2c,
+					NETFN_SENSOR,
+					GET_SENSOR_READING,
+					data -> data[0] == TEMPERATURE_SENSOR ? new byte[]
+					{ 0x00, (byte) 0x9a, 0x40, 0x00 } : new byte[] { 0x00, 0x10, 0x40, 0x00 });
 			bmc.satellite(0, 0x2c, NETFN_SENSOR, FakeSdrRepository.GET_SENSOR_READING_FACTORS, data -> null);
 			try (IpmiClient client = client(bmc).build()) {
 				SensorList sensors = client.sensors().execute();
@@ -1914,9 +1866,7 @@ class IpmiClientTest {
 	@Timeout(30)
 	void aSessionLostUnderACommandSentOnceIsReplacedByTheNextOperation() throws Exception {
 		// #209: a client that only sends control commands recovers from a dead session
-		try (
-				FakeRmcpPlusBmc bmc = bmc();
-				IpmiClient client = client(bmc).privilege(PrivilegeLevel.Operator).build()) {
+		try (FakeRmcpPlusBmc bmc = bmc(); IpmiClient client = client(bmc).privilege(PrivilegeLevel.Operator).build()) {
 			client.chassisIdentify(5);
 			bmc.expireSession();
 			assertThrows(IpmiTimeoutException.class, () -> client.chassisIdentify(5));
@@ -2015,8 +1965,7 @@ class IpmiClientTest {
 				IllegalArgumentException.class,
 				() -> IpmiClient.builder("bmc").credentials("user", "twenty-one characters".toCharArray()).build());
 		assertThrows(IllegalArgumentException.class, () -> IpmiClient.builder("bmc").bmcKey(new byte[21]).build());
-		IpmiClient
-				.builder("bmc")
+		IpmiClient.builder("bmc")
 				.credentials("sixteen-letters!", "twenty characters...".toCharArray())
 				.bmcKey(new byte[20])
 				.cipherSuites(17, 3)
@@ -2077,8 +2026,7 @@ class IpmiClientTest {
 		}
 		try (FakeBmc silent = FakeBmc.silent()) {
 			try (
-					IpmiClient client = IpmiClient
-							.builder(silent.getAddress().getHostAddress())
+					IpmiClient client = IpmiClient.builder(silent.getAddress().getHostAddress())
 							.port(silent.getPort())
 							.credentials(USER, PASSWORD.toCharArray())
 							.messageTimeout(MESSAGE_TIMEOUT)
@@ -2318,8 +2266,10 @@ class IpmiClientTest {
 		try (FakeRmcpPlusBmc bmc = bmc()) {
 			// A busy BMC (C0h) fails the raise, thrown as such, and the raise is tried again at the next D4h: no ceiling
 			AtomicBoolean busy = new AtomicBoolean(true);
-			bmc
-					.handle(NETFN_APP, SET_SESSION_PRIVILEGE_LEVEL, data -> busy.get() ? new byte[]
+			bmc.handle(
+					NETFN_APP,
+					SET_SESSION_PRIVILEGE_LEVEL,
+					data -> busy.get() ? new byte[]
 					{ (byte) 0xc0 } : bmc.setSessionPrivilegeLevel(data));
 			try (IpmiClient client = client(bmc).privilege(PrivilegeLevel.MaximumAvailable).build()) {
 				IpmiClientException failed = assertThrows(IpmiClientException.class, client::chassisStatus);
@@ -2583,8 +2533,10 @@ class IpmiClientTest {
 				bmc.expireSession();
 			}
 			// The BMC still has the session that holds the payload
-			bmc
-					.handle(NETFN_APP, FakeRmcpPlusBmc.GET_SESSION_INFO, data -> new byte[]
+			bmc.handle(
+					NETFN_APP,
+					FakeRmcpPlusBmc.GET_SESSION_INFO,
+					data -> new byte[]
 					{ 0x00, 0x02, 0x10, 0x02, 0x02, 0x04, 0x01 });
 			try (IpmiClient second = client(bmc).privilege(PrivilegeLevel.Administrator).build()) {
 				IpmiClientException failure = assertThrows(IpmiClientException.class, () -> second.sol().open());
@@ -2595,9 +2547,7 @@ class IpmiClientTest {
 			// A BMC that refuses the lookup: the refusal reaches the caller, the holder keeps its console
 			bmc.handle(NETFN_APP, FakeRmcpPlusBmc.GET_SESSION_INFO, data -> new byte[] { (byte) 0xd4 });
 			try (IpmiClient third = client(bmc).privilege(PrivilegeLevel.Administrator).build()) {
-				IpmiCompletionCodeException refused = assertThrows(
-						IpmiCompletionCodeException.class,
-						() -> third.sol().open());
+				IpmiCompletionCodeException refused = assertThrows(IpmiCompletionCodeException.class, () -> third.sol().open());
 				assertEquals(CompletionCode.InsufficientPrivilege, refused.completionCode());
 				assertEquals(0, bmc.getCount(NETFN_APP, FakeRmcpPlusBmc.DEACTIVATE_PAYLOAD), "still never deactivated");
 			}
@@ -2650,9 +2600,7 @@ class IpmiClientTest {
 			try (IpmiClient client = client(bmc).privilege(PrivilegeLevel.Administrator).build()) {
 				// Get Payload Activation Status
 				bmc.handle(NETFN_APP, FakeRmcpPlusBmc.GET_PAYLOAD_ACTIVATION_STATUS, data -> new byte[] { (byte) 0xc1 });
-				IpmiCompletionCodeException status = assertThrows(
-						IpmiCompletionCodeException.class,
-						() -> client.sol().open());
+				IpmiCompletionCodeException status = assertThrows(IpmiCompletionCodeException.class, () -> client.sol().open());
 				assertCommand(status, FakeRmcpPlusBmc.GET_PAYLOAD_ACTIVATION_STATUS, 0xc1);
 				assertTrue(status.getMessage().startsWith("GetPayloadActivationStatus failed: "), status.getMessage());
 				bmc.enableSol(bmc.getPort(), 255, ADMINISTRATOR);
@@ -2686,9 +2634,7 @@ class IpmiClientTest {
 			try (IpmiClient client = client(bmc).privilege(PrivilegeLevel.MaximumAvailable).build()) {
 				client.chassisStatus();
 				bmc.handle(NETFN_APP, SET_SESSION_PRIVILEGE_LEVEL, data -> new byte[] { (byte) 0xc0 });
-				IpmiCompletionCodeException busy = assertThrows(
-						IpmiCompletionCodeException.class,
-						() -> client.sol().open());
+				IpmiCompletionCodeException busy = assertThrows(IpmiCompletionCodeException.class, () -> client.sol().open());
 				assertCommand(busy, SET_SESSION_PRIVILEGE_LEVEL, 0xc0);
 			}
 

@@ -71,17 +71,11 @@ public class CloseSession extends IpmiCommandCoder<CloseSessionResponseData> {
 	}
 
 	@Override
-	protected IpmiPayload preparePayload(int sequenceNumber)
-			throws NoSuchAlgorithmException,
-			InvalidKeyException {
+	protected IpmiPayload preparePayload(int sequenceNumber) throws NoSuchAlgorithmException, InvalidKeyException {
 
 		byte[] payload = TypeConverter.intToLittleEndianByteArray(sessionId);
 
-		return new IpmiLanRequest(
-				getNetworkFunction(),
-				getCommandCode(),
-				payload,
-				TypeConverter.intToByte(sequenceNumber));
+		return new IpmiLanRequest(getNetworkFunction(), getCommandCode(), payload, TypeConverter.intToByte(sequenceNumber));
 	}
 
 	@Override

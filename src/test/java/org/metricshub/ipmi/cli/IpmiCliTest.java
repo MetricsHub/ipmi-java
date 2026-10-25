@@ -328,8 +328,7 @@ class IpmiCliTest {
 			percent[7] = 51; // sensor number
 			percent[20] = 0x01; // Sensor Units 1 bit 0: percentage
 			percent[21] = 18; // of RPM
-			new FakeSdrRepository()
-					.add(Fixtures.FRONT_PANEL_FULL_RECORD)
+			new FakeSdrRepository().add(Fixtures.FRONT_PANEL_FULL_RECORD)
 					.add(percent)
 					.add(compactSensorRecord(3, 0x30, EntityId.SystemBoard.getCode(), 1, 0xc1, 0x08, "OEM Presence"))
 					// at or above UNC and UC
@@ -347,9 +346,8 @@ class IpmiCliTest {
 					sensors.out);
 			String[] json = login(bmc, "sensors", "--json").out.split("\n");
 			assertTrue(
-					json[0]
-							.contains(
-									"\"status\":\"CRITICAL\",\"states\":[\"Upper Non Critical Going High\",\"Upper Critical Going High\"]"),
+					json[0].contains(
+							"\"status\":\"CRITICAL\",\"states\":[\"Upper Non Critical Going High\",\"Upper Critical Going High\"]"),
 					json[0]);
 			assertTrue(json[1].contains("\"unit\":\"Rpm\",\"percentage\":true,"), json[1]);
 			assertTrue(json[2].contains("\"type\":\"Oem\",\"typeCode\":193,"), json[2]);
@@ -362,8 +360,7 @@ class IpmiCliTest {
 		try (FakeRmcpPlusBmc bmc = Fixtures.bmc()) {
 			// A Compact record cut at 31 bytes, before its ID string type/length byte
 			byte[] full = compactSensorRecord(2, Fixtures.FAN_SENSOR, EntityId.Fan.getCode(), 1, 0x04, 0x08, "");
-			new FakeSdrRepository()
-					.add(record(2, COMPACT_SENSOR_RECORD, Arrays.copyOfRange(full, 5, 31)))
+			new FakeSdrRepository().add(record(2, COMPACT_SENSOR_RECORD, Arrays.copyOfRange(full, 5, 31)))
 					.reading(Fixtures.FAN_SENSOR, 0x00, 0x40, 0x02)
 					.install(bmc);
 			Result sensors = login(bmc, "sensors");
@@ -406,14 +403,10 @@ class IpmiCliTest {
 			Result dimm = login(bmc, "fru");
 			assertEquals(0, dimm.code, dimm.err);
 			assertEquals(
-					"FRU 2: DIMM 1 (MemoryDevice 1)\n"
-							+ "  Memory type                DDR4 RDIMM ECC\n"
-							+ "  Memory capacity            16384 MB\n"
-							+ "  Module manufacturer        Samsung\n"
-							+ "  DRAM manufacturer          Samsung\n"
-							+ "  Module part number         M393A2K43BB1-CTD\n"
-							+ "  Module serial number       409F3CA2\n"
-							+ "  Module mfg date            2019-W23\n",
+					"FRU 2: DIMM 1 (MemoryDevice 1)\n" + "  Memory type                DDR4 RDIMM ECC\n"
+							+ "  Memory capacity            16384 MB\n" + "  Module manufacturer        Samsung\n"
+							+ "  DRAM manufacturer          Samsung\n" + "  Module part number         M393A2K43BB1-CTD\n"
+							+ "  Module serial number       409F3CA2\n" + "  Module mfg date            2019-W23\n",
 					dimm.out);
 			assertEquals(
 					"{\"id\":2,\"address\":32,\"lun\":0,\"channel\":0,\"name\":\"DIMM 1\",\"entity\":\"MemoryDevice\",\"entityInstance\":1,\"manufacturer\":\"Samsung\","
@@ -442,18 +435,12 @@ class IpmiCliTest {
 			Result cpu = login(bmc, "fru");
 			assertEquals(0, cpu.code, cpu.err);
 			assertEquals(
-					"FRU 85: PIROM 1 (Processor 1)\n"
-							+ "  Processor S-spec           SR3GH\n"
-							+ "  Processor part number      37608DC00416530\n"
-							+ "  Processor PPIN             634AFBC3354D3C6D\n"
-							+ "  Processor CPUID            0654h\n"
-							+ "  Processor cores            8 with Hyper-Threading\n"
-							+ "  Processor frequency        2100-3000 MHz\n"
-							+ "  Processor L2 cache         1024 KB per core\n"
-							+ "  Processor L3 cache         11264 KB\n"
-							+ "  Processor NVM DIMM max     768 GB\n"
-							+ "  Processor TDP              85 W\n"
-							+ "  Processor Tcase max        77 C\n",
+					"FRU 85: PIROM 1 (Processor 1)\n" + "  Processor S-spec           SR3GH\n"
+							+ "  Processor part number      37608DC00416530\n" + "  Processor PPIN             634AFBC3354D3C6D\n"
+							+ "  Processor CPUID            0654h\n" + "  Processor cores            8 with Hyper-Threading\n"
+							+ "  Processor frequency        2100-3000 MHz\n" + "  Processor L2 cache         1024 KB per core\n"
+							+ "  Processor L3 cache         11264 KB\n" + "  Processor NVM DIMM max     768 GB\n"
+							+ "  Processor TDP              85 W\n" + "  Processor Tcase max        77 C\n",
 					cpu.out);
 			assertEquals(
 					"{\"id\":85,\"address\":32,\"lun\":0,\"channel\":0,\"name\":\"PIROM 1\",\"entity\":\"Processor\",\"entityInstance\":1,\"manufacturer\":\"Intel\","
@@ -496,9 +483,8 @@ class IpmiCliTest {
 							+ "6   pre-init 5s  Processor          2       IERR                                             assertion\n",
 					since.out);
 			assertTrue(
-					since.err
-							.contains(
-									"ipmicli: SEL: 6 entries, last addition 2024-05-15T09:23:34Z, last erase unknown, SEL time UTC offset 0 min\n"),
+					since.err.contains(
+							"ipmicli: SEL: 6 entries, last addition 2024-05-15T09:23:34Z, last erase unknown, SEL time UTC offset 0 min\n"),
 					since.err);
 			assertEquals(
 					"ID  Time  Type  Sensor  Event  Direction\n",
@@ -601,8 +587,7 @@ class IpmiCliTest {
 			// owner is given as the low byte of a SEL generator ID (the 7-bit address shifted left, bit 0 for a
 			// software ID), with the LUN and the channel
 			byte[] sensor = Fixtures.FRONT_PANEL_FULL_RECORD;
-			new FakeSdrRepository()
-					.add(withOwner(sensor, 0x20, 0, 0))
+			new FakeSdrRepository().add(withOwner(sensor, 0x20, 0, 0))
 					.add(withOwner(withId(sensor, 2), 0x20, 0, 1))
 					.add(withOwner(withId(sensor, 3), 0x2c, 6, 0))
 					.add(withOwner(withId(sensor, 4), 0xb1, 0, 0))
@@ -627,8 +612,7 @@ class IpmiCliTest {
 			// Three FRUs numbered 5: at LUN 0 and LUN 1 of the BMC, and on a controller behind it (none readable), and
 			// the "BMC FRU" of a Supermicro BMC, at 20h on channel 2, which the client reads as a FRU of the BMC
 			int psu = EntityId.PowerSupply.getCode();
-			new FakeSdrRepository()
-					.add(fruDeviceLocatorRecord(1, 5, psu, 1, "BMC LUN 0"))
+			new FakeSdrRepository().add(fruDeviceLocatorRecord(1, 5, psu, 1, "BMC LUN 0"))
 					.add(withAccess(fruDeviceLocatorRecord(2, 5, psu, 2, "BMC LUN 1"), 0x20, 0, 1))
 					.add(withAccess(fruDeviceLocatorRecord(3, 5, psu, 3, "Satellite"), 0x2c, 6, 0))
 					.add(withAccess(fruDeviceLocatorRecord(4, 0, EntityId.SystemBoard.getCode(), 1, "BMC FRU"), 0x20, 2, 0))
@@ -662,9 +646,8 @@ class IpmiCliTest {
 		ByteArrayOutputStream out = new ByteArrayOutputStream();
 		ByteArrayOutputStream err = new ByteArrayOutputStream();
 		int code = IpmiCli
-				.run(
-						new String[]
-						{ "-h", "bmc", "-u", "admin", "-p", "secret", "sol", "--no-escape" },
+				.run(new String[]
+				{ "-h", "bmc", "-u", "admin", "-p", "secret", "sol", "--no-escape" },
 						new PrintStream(out, true, "UTF-8"),
 						new PrintStream(err, true, "UTF-8"),
 						NO_PROMPT,
@@ -672,10 +655,9 @@ class IpmiCliTest {
 						true);
 		assertEquals(IpmiCli.EXIT_USAGE, code);
 		assertTrue(
-				text(err)
-						.startsWith(
-								"ipmicli: --no-escape needs a redirected input: on a terminal, ~. is the only way out"
-										+ " (use --escape to pick another character)\n"),
+				text(err).startsWith(
+						"ipmicli: --no-escape needs a redirected input: on a terminal, ~. is the only way out"
+								+ " (use --escape to pick another character)\n"),
 				text(err));
 		assertEquals("", text(out));
 	}
@@ -741,8 +723,7 @@ class IpmiCliTest {
 		try (FakeRmcpPlusBmc bmc = Fixtures.bmc()) {
 			bmc.enableSol(bmc.getPort(), 255, ADMINISTRATOR);
 			try (
-					IpmiClient client = IpmiClient
-							.builder(bmc.getAddress().getHostAddress())
+					IpmiClient client = IpmiClient.builder(bmc.getAddress().getHostAddress())
 							.port(bmc.getPort())
 							.credentials(Fixtures.USER, Fixtures.PASSWORD.toCharArray())
 							.privilege(PrivilegeLevel.Administrator)
@@ -751,15 +732,14 @@ class IpmiCliTest {
 					SolConsole console = client.sol().open()) {
 				ByteArrayOutputStream out = new ByteArrayOutputStream();
 				ByteArrayOutputStream err = new ByteArrayOutputStream();
-				int code = SolBridge
-						.run(
-								console,
-								new ByteArrayInputStream("~?\nls\r\nid\n~B\n~.".getBytes(StandardCharsets.US_ASCII)),
-								new PrintStream(out, true, "UTF-8"),
-								new PrintStream(err, true, "UTF-8"),
-								'~',
-								true,
-								false);
+				int code = SolBridge.run(
+						console,
+						new ByteArrayInputStream("~?\nls\r\nid\n~B\n~.".getBytes(StandardCharsets.US_ASCII)),
+						new PrintStream(out, true, "UTF-8"),
+						new PrintStream(err, true, "UTF-8"),
+						'~',
+						true,
+						false);
 				assertEquals(0, code);
 				assertEquals("ls\rid\r", ascii(bmc.getSolReceived()), "the Enters that end ~? and ~B are not sent");
 				assertTrue(err.toString("UTF-8").contains("~.  close the console"));
@@ -855,31 +835,28 @@ class IpmiCliTest {
 	private static Result run(FakeRmcpPlusBmc bmc, IpmiCli.PasswordReader reader, InputStream stdin, String... args) {
 		List<String> full = new ArrayList<String>();
 		if (bmc != null) {
-			full
-					.addAll(
-							Arrays
-									.asList(
-											"-h",
-											bmc.getAddress().getHostAddress(),
-											"-P",
-											String.valueOf(bmc.getPort()),
-											"--message-timeout",
-											"300",
-											"--retries",
-											"1"));
+			full.addAll(
+					Arrays.asList(
+							"-h",
+							bmc.getAddress().getHostAddress(),
+							"-P",
+							String.valueOf(bmc.getPort()),
+							"--message-timeout",
+							"300",
+							"--retries",
+							"1"));
 		}
 		full.addAll(Arrays.asList(args));
 		ByteArrayOutputStream out = new ByteArrayOutputStream();
 		ByteArrayOutputStream err = new ByteArrayOutputStream();
 		try {
-			int code = IpmiCli
-					.run(
-							full.toArray(new String[0]),
-							new PrintStream(out, true, "UTF-8"),
-							new PrintStream(err, true, "UTF-8"),
-							reader,
-							stdin,
-							false);
+			int code = IpmiCli.run(
+					full.toArray(new String[0]),
+					new PrintStream(out, true, "UTF-8"),
+					new PrintStream(err, true, "UTF-8"),
+					reader,
+					stdin,
+					false);
 			return new Result(code, text(out), text(err));
 		} catch (IOException e) {
 			throw new IllegalStateException(e);

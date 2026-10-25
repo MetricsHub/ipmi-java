@@ -74,9 +74,7 @@ public class SessionValid extends State {
 	}
 
 	@Override
-	public void doTransition(
-			StateMachine stateMachine,
-			StateMachineEvent machineEvent) {
+	public void doTransition(StateMachine stateMachine, StateMachineEvent machineEvent) {
 		if (machineEvent instanceof Sendv20Message) {
 			Sendv20Message event = (Sendv20Message) machineEvent;
 			try {
@@ -91,24 +89,19 @@ public class SessionValid extends State {
 
 			try {
 				stateMachine.setCurrent(new Authcap());
-				stateMachine
-						.sendMessage(
-								Encoder
-										.encode(
-												new Protocolv20Encoder(),
-												closeSession(event.getSessionId()),
-												event.getMessageSequenceNumber(),
-												event.getSessionSequenceNumber(),
-												event.getSessionId()));
+				stateMachine.sendMessage(
+						Encoder.encode(
+								new Protocolv20Encoder(),
+								closeSession(event.getSessionId()),
+								event.getMessageSequenceNumber(),
+								event.getSessionSequenceNumber(),
+								event.getSessionId()));
 			} catch (Exception e) {
 				stateMachine.setCurrent(this);
 				stateMachine.doExternalAction(new ErrorAction(e));
 			}
 		} else {
-			stateMachine
-					.doExternalAction(
-							new ErrorAction(
-									new IllegalArgumentException("Invalid transition")));
+			stateMachine.doExternalAction(new ErrorAction(new IllegalArgumentException("Invalid transition")));
 		}
 
 	}
@@ -122,13 +115,12 @@ public class SessionValid extends State {
 		PayloadCoder coder = event.getPayloadCoder();
 		synchronized (coder) {
 			coder.setSessionParameters(IpmiVersion.V20, cipherSuite, AuthenticationType.RMCPPlus);
-			return Encoder
-					.encode(
-							new Protocolv20Encoder(),
-							coder,
-							event.getMessageSequenceNumber(),
-							event.getSessionSequenceNumber(),
-							event.getSessionId());
+			return Encoder.encode(
+					new Protocolv20Encoder(),
+					coder,
+					event.getMessageSequenceNumber(),
+					event.getSessionSequenceNumber(),
+					event.getSessionId());
 		}
 	}
 

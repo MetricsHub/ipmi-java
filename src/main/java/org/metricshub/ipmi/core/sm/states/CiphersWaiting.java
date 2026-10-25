@@ -68,9 +68,7 @@ public class CiphersWaiting extends State {
 	}
 
 	@Override
-	public void doTransition(
-			StateMachine stateMachine,
-			StateMachineEvent machineEvent) {
+	public void doTransition(StateMachine stateMachine, StateMachineEvent machineEvent) {
 		if (machineEvent instanceof Timeout) {
 			stateMachine.setCurrent(new Uninitialized());
 		} else if (machineEvent instanceof GetChannelCipherSuitesPending) {
@@ -81,14 +79,7 @@ public class CiphersWaiting extends State {
 			try {
 				tag = event.getSequenceNumber();
 				stateMachine
-						.sendMessage(
-								Encoder
-										.encode(
-												new Protocolv20Encoder(),
-												cipherSuites,
-												event.getSequenceNumber(),
-												0,
-												0));
+						.sendMessage(Encoder.encode(new Protocolv20Encoder(), cipherSuites, event.getSequenceNumber(), 0, 0));
 				++index;
 			} catch (Exception e) {
 				stateMachine.setCurrent(new Uninitialized());
@@ -97,10 +88,7 @@ public class CiphersWaiting extends State {
 		} else if (machineEvent instanceof DefaultAck) {
 			stateMachine.setCurrent(new Ciphers());
 		} else {
-			stateMachine
-					.doExternalAction(
-							new ErrorAction(
-									new IllegalArgumentException("Invalid transition")));
+			stateMachine.doExternalAction(new ErrorAction(new IllegalArgumentException("Invalid transition")));
 		}
 	}
 
@@ -115,8 +103,7 @@ public class CiphersWaiting extends State {
 		if (Protocolv20Decoder.decodePayloadType(message.getData()[1]) != PayloadType.Ipmi) {
 			return;
 		}
-		Protocolv20Decoder decoder = new Protocolv20Decoder(
-				CipherSuite.getEmpty());
+		Protocolv20Decoder decoder = new Protocolv20Decoder(CipherSuite.getEmpty());
 		if (decoder.decodeAuthentication(message.getData()[1])) {
 			return; // message is authenticated so it does belong to the other session
 		}
@@ -125,15 +112,8 @@ public class CiphersWaiting extends State {
 			ipmiMessage = decoder.decode(message);
 			GetChannelCipherSuites suites = new GetChannelCipherSuites();
 			if (suites.isCommandResponse(ipmiMessage)
-					&& TypeConverter
-							.byteToInt(
-									((IpmiLanResponse) ipmiMessage
-											.getPayload()).getSequenceNumber()) == tag) {
-				stateMachine
-						.doExternalAction(
-								new ResponseAction(
-										suites
-												.getResponseData(ipmiMessage)));
+					&& TypeConverter.byteToInt(((IpmiLanResponse) ipmiMessage.getPayload()).getSequenceNumber()) == tag) {
+				stateMachine.doExternalAction(new ResponseAction(suites.getResponseData(ipmiMessage)));
 			}
 		} catch (Exception e) {
 			stateMachine.setCurrent(new Uninitialized());

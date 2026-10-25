@@ -235,11 +235,10 @@ final class SelReader {
 			if (!read.add(entry.id()) || self) {
 				// A BMC whose next record IDs loop would be read for ever
 				throw new IpmiClientException(
-						String
-								.format(
-										"The System Event Log loops: entry %04Xh names entry %04Xh as the next one, which was read already",
-										self ? entry.id() : previous,
-										entry.id()));
+						String.format(
+								"The System Event Log loops: entry %04Xh names entry %04Xh as the next one, which was read already",
+								self ? entry.id() : previous,
+								entry.id()));
 			}
 			entries.add(entry);
 			previous = entry.id();

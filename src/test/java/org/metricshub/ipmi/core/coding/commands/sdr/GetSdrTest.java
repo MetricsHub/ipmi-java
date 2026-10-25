@@ -9,9 +9,7 @@ import org.metricshub.ipmi.core.coding.commands.CommandCodes;
 
 class GetSdrTest {
 
-	private static final GetSdr COMMAND = new GetSdr(
-			0,
-			1);
+	private static final GetSdr COMMAND = new GetSdr(0, 1);
 
 	@Test
 	void replyWithoutRecordDataStillGivesTheNextRecordId() throws Exception {

@@ -20,22 +20,8 @@ class GetDeviceIdTest {
 		GetDeviceId command = new GetDeviceId();
 		assertEquals(NetworkFunction.ApplicationRequest, command.getNetworkFunction());
 		assertEquals(CommandCodes.GET_DEVICE_ID, command.getCommandCode());
-		GetDeviceIdResponseData data = command
-				.getResponseData(
-						response(
-								CommandCodes.GET_DEVICE_ID,
-								0x00,
-								0x20,
-								0x81,
-								0x81,
-								0x05,
-								0x51,
-								0x40,
-								0x7c,
-								0x2a,
-								0x0f,
-								0x34,
-								0x12));
+		GetDeviceIdResponseData data = command.getResponseData(
+				response(CommandCodes.GET_DEVICE_ID, 0x00, 0x20, 0x81, 0x81, 0x05, 0x51, 0x40, 0x7c, 0x2a, 0x0f, 0x34, 0x12));
 		assertEquals(0x20, data.getDeviceId());
 		assertEquals(1, data.getDeviceRevision());
 		assertTrue(data.providesDeviceSdrs());

@@ -35,8 +35,7 @@ class CipherSuiteTest {
 	}
 
 	private static List<Integer> ids(String hex) {
-		return CipherSuite
-				.getCipherSuites(bytes(hex))
+		return CipherSuite.getCipherSuites(bytes(hex))
 				.stream()
 				.map(suite -> (int) suite.getId())
 				.collect(Collectors.toList());
@@ -87,8 +86,7 @@ class CipherSuiteTest {
 	@Test
 	void isSupportedTellsTheSuitesThisLibraryImplements() {
 		List<CipherSuite> suites = CipherSuite.getCipherSuites(bytes(XCC));
-		List<Integer> supported = suites
-				.stream()
+		List<Integer> supported = suites.stream()
 				.filter(CipherSuite::isSupported)
 				.map(suite -> (int) suite.getId())
 				.collect(Collectors.toList());

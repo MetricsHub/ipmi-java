@@ -294,8 +294,7 @@ public final class Fru {
 
 	@Override
 	public String toString() {
-		StringBuilder text = new StringBuilder("FRU ")
-				.append(id())
+		StringBuilder text = new StringBuilder("FRU ").append(id())
 				.append(' ')
 				.append(name())
 				.append(" (")

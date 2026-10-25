@@ -52,8 +52,7 @@ public class OpenSession extends IpmiCommandCoder<OpenSessionResponseData> {
 	 */
 	private int sessionID;
 
-	public void setRequestedPrivilegeLevel(
-			PrivilegeLevel requestedPrivilegeLevel) {
+	public void setRequestedPrivilegeLevel(PrivilegeLevel requestedPrivilegeLevel) {
 		this.requestedPrivilegeLevel = requestedPrivilegeLevel;
 	}
 
@@ -126,8 +125,7 @@ public class OpenSession extends IpmiCommandCoder<OpenSessionResponseData> {
 	 * @see IntegrityAlgorithm
 	 * @see ConfidentialityAlgorithm
 	 */
-	public OpenSession(int sessionID, PrivilegeLevel privilegeLevel,
-			CipherSuite cipherSuite) {
+	public OpenSession(int sessionID, PrivilegeLevel privilegeLevel, CipherSuite cipherSuite) {
 		setSessionParameters(IpmiVersion.V20, cipherSuite, AuthenticationType.RMCPPlus);
 
 		setSessionID(sessionID);
@@ -226,8 +224,7 @@ public class OpenSession extends IpmiCommandCoder<OpenSessionResponseData> {
 	@Override
 	public OpenSessionResponseData getResponseData(IpmiMessage message) throws IPMIException {
 		if (!isCommandResponse(message)) {
-			throw new IllegalArgumentException(
-					"This is not a response for Open Session command");
+			throw new IllegalArgumentException("This is not a response for Open Session command");
 		}
 
 		byte[] payload = validateSessionSetupResponse(message);
@@ -248,17 +245,11 @@ public class OpenSession extends IpmiCommandCoder<OpenSessionResponseData> {
 
 		System.arraycopy(payload, 4, buffer, 0, 4);
 
-		data
-				.setRemoteConsoleSessionId(
-						TypeConverter
-								.littleEndianByteArrayToInt(buffer));
+		data.setRemoteConsoleSessionId(TypeConverter.littleEndianByteArrayToInt(buffer));
 
 		System.arraycopy(payload, 8, buffer, 0, 4);
 
-		data
-				.setManagedSystemSessionId(
-						TypeConverter
-								.littleEndianByteArrayToInt(buffer));
+		data.setManagedSystemSessionId(TypeConverter.littleEndianByteArrayToInt(buffer));
 
 		byte[] auth = new byte[8];
 

@@ -39,10 +39,7 @@ import org.metricshub.ipmi.core.sm.states.State;
 public class GetChannelCipherSuitesPending extends Default {
 
 	public GetChannelCipherSuitesPending(int sequenceNumber) {
-		super(
-				CipherSuite.getEmpty(),
-				sequenceNumber,
-				PrivilegeLevel.MaximumAvailable);
+		super(CipherSuite.getEmpty(), sequenceNumber, PrivilegeLevel.MaximumAvailable);
 	}
 
 }

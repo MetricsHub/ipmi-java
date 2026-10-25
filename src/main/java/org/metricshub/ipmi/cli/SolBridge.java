@@ -97,13 +97,12 @@ final class SolBridge {
 			// A write is one read of the input: a keystroke, a line or a block, which the library sends in one SOL packet
 			// or several when it exceeds the payload size of the BMC
 			long writes = stats.writes.get();
-			IpmiCli
-					.diagnostic(
-							err,
-							"SOL console closed in " + (System.nanoTime() - closing) / NANOS_PER_MILLI + " ms: " + writes
-									+ " write(s) and " + stats.bytesSent.get() + " byte(s) sent, acknowledged in "
-									+ (writes == 0 ? 0 : stats.ackNanos.get() / writes / NANOS_PER_MILLI) + " ms per write on average, "
-									+ stats.bytesReceived.get() + " byte(s) received");
+			IpmiCli.diagnostic(
+					err,
+					"SOL console closed in " + (System.nanoTime() - closing) / NANOS_PER_MILLI + " ms: " + writes
+							+ " write(s) and " + stats.bytesSent.get() + " byte(s) sent, acknowledged in "
+							+ (writes == 0 ? 0 : stats.ackNanos.get() / writes / NANOS_PER_MILLI) + " ms per write on average, "
+							+ stats.bytesReceived.get() + " byte(s) received");
 		}
 		switch (first) {
 		case DEACTIVATED:

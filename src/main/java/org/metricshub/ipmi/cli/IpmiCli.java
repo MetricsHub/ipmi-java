@@ -264,8 +264,7 @@ public final class IpmiCli {
 	}
 
 	private static IpmiClient.Builder builder(CliArguments arguments, PrintStream err) {
-		IpmiClient.Builder builder = IpmiClient
-				.builder(arguments.hostname())
+		IpmiClient.Builder builder = IpmiClient.builder(arguments.hostname())
 				.port(arguments.port())
 				.privilege(arguments.privilege())
 				.timeout(Duration.ofMillis(arguments.timeoutMs()))
@@ -288,8 +287,10 @@ public final class IpmiCli {
 					err,
 					"connecting to " + arguments.hostname() + ":" + arguments.port()
 							+ (arguments.subcommand() == CliArguments.Subcommand.PROBE ?
-									"" : " as '" + arguments.username() + "' with the " + arguments.privilege() + " privilege")
-							+ ", cipher suite" + (suites == null ?
+									"" :
+									" as '" + arguments.username() + "' with the " + arguments.privilege() + " privilege")
+							+ ", cipher suite"
+							+ (suites == null ?
 									"s " + join(CliArguments.DEFAULT_CIPHER_SUITES) :
 									suites.length == 1 ? " " + suites[0] + " without discovery" : "s " + join(suites))
 							+ ", message timeout " + arguments.messageTimeoutMs() + " ms, " + arguments.retries() + " retries");
@@ -436,15 +437,14 @@ public final class IpmiCli {
 		List<String[]> rows = new ArrayList<String[]>();
 		rows.add(new String[] { "  ID", "Authentication", "Integrity", "Confidentiality", "Library" });
 		for (CipherSuite suite : capabilities.cipherSuites()) {
-			rows
-					.add(
-							new String[]
-							{
-									"  " + suite.getId(),
-									authenticationName(suite.getAuthenticationAlgorithmCode()),
-									integrityName(suite.getIntegrityAlgorithmCode()),
-									confidentialityName(suite.getConfidentialityAlgorithmCode()),
-									suite.isSupported() ? "supported" : "not implemented" });
+			rows.add(
+					new String[]
+					{
+							"  " + suite.getId(),
+							authenticationName(suite.getAuthenticationAlgorithmCode()),
+							integrityName(suite.getIntegrityAlgorithmCode()),
+							confidentialityName(suite.getConfidentialityAlgorithmCode()),
+							suite.isSupported() ? "supported" : "not implemented" });
 		}
 		out.print(table(rows));
 		line(
@@ -579,55 +579,50 @@ public final class IpmiCli {
 		}
 		List<String[]> rows = new ArrayList<String[]>();
 		boolean longFormat = arguments.longFormat();
-		rows
-				.add(
-						longFormat ?
-								new String[]
-								{
-										"Name",
-										"Number",
-										"Type",
-										"Entity",
-										"Reading",
-										"Unit",
-										"Status",
-										"LNR",
-										"LC",
-										"LNC",
-										"UNC",
-										"UC",
-										"UNR",
-										"Problem" } :
-								new String[]
-								{ "Name", "Type", "Reading", "Unit", "Status" });
+		rows.add(
+				longFormat ? new String[]
+				{
+						"Name",
+						"Number",
+						"Type",
+						"Entity",
+						"Reading",
+						"Unit",
+						"Status",
+						"LNR",
+						"LC",
+						"LNC",
+						"UNC",
+						"UC",
+						"UNR",
+						"Problem" } : new String[]
+						{ "Name", "Type", "Reading", "Unit", "Status" });
 		for (Sensor sensor : sensors) {
 			String reading = number(sensor.reading());
 			String unit = unit(sensor);
 			// A threshold sensor keeps its status (critical...) in the column, its states being the thresholds crossed
 			String status = sensor.states().isEmpty() || isThreshold(sensor) ?
-					sensor.status().name().toLowerCase(Locale.ROOT).replace('_', '-') : String.join(", ", sensor.states());
+					sensor.status().name().toLowerCase(Locale.ROOT).replace('_', '-') :
+					String.join(", ", sensor.states());
 			String type = typeName(sensor.type(), sensor.typeCode());
-			rows
-					.add(
-							longFormat ?
-									new String[]
-									{
-											sensor.name(),
-											String.valueOf(sensor.number()),
-											type,
-											sensor.entity() + " " + sensor.entityInstance(),
-											reading,
-											unit,
-											status,
-											number(sensor.lowerNonRecoverable()),
-											number(sensor.lowerCritical()),
-											number(sensor.lowerNonCritical()),
-											number(sensor.upperNonCritical()),
-											number(sensor.upperCritical()),
-											number(sensor.upperNonRecoverable()),
-											sensor.problem().orElse("") } :
-									new String[]
-									{ sensor.name(), type, reading, unit, status });
+			rows.add(
+					longFormat ? new String[]
+					{
+							sensor.name(),
+							String.valueOf(sensor.number()),
+							type,
+							sensor.entity() + " " + sensor.entityInstance(),
+							reading,
+							unit,
+							status,
+							number(sensor.lowerNonRecoverable()),
+							number(sensor.lowerCritical()),
+							number(sensor.lowerNonCritical()),
+							number(sensor.upperNonCritical()),
+							number(sensor.upperCritical()),
+							number(sensor.upperNonRecoverable()),
+							sensor.problem().orElse("") } : new String[]
+							{ sensor.name(), type, reading, unit, status });
 		}
 		out.print(table(rows));
 		return 0;
@@ -669,11 +664,10 @@ public final class IpmiCli {
 			// The owner as the low byte of a SEL generator ID: the 7-bit address shifted left, bit 0 set for a software
 			// ID (IPMI 2.0 table 32-1), so that a script joins sel --json on it as SelEntry.isFrom() does
 			AbstractSensorRecord owner = (AbstractSensorRecord) sensor.record();
-			fields
-					.put(
-							"ownerId",
-							(owner.getSensorOwnerId() & OWNER_ID_MASK) << 1
-									| (owner.getAddressType() == AddressType.SystemSoftwareId ? 1 : 0));
+			fields.put(
+					"ownerId",
+					(owner.getSensorOwnerId() & OWNER_ID_MASK) << 1
+							| (owner.getAddressType() == AddressType.SystemSoftwareId ? 1 : 0));
 			fields.put("ownerLun", owner.getSensorOwnerLun() & LUN_MASK);
 			fields.put("ownerChannel", owner.getChannelNumber() & CHANNEL_MASK);
 		}
@@ -791,10 +785,7 @@ public final class IpmiCli {
 		Optional<SpdInfo> spd = fru.spd();
 		if (spd.isPresent()) {
 			SpdInfo module = spd.get();
-			field(
-					out,
-					"Memory type",
-					module.getMemoryType() + " " + module.getModuleType() + (module.isEcc() ? " ECC" : ""));
+			field(out, "Memory type", module.getMemoryType() + " " + module.getModuleType() + (module.isEcc() ? " ECC" : ""));
 			field(out, "Memory capacity", module.getCapacityMegabytes() + " MB");
 			field(out, "Module manufacturer", module.getManufacturer());
 			field(out, "DRAM manufacturer", module.getDramManufacturer());
@@ -952,19 +943,17 @@ public final class IpmiCli {
 		List<String[]> rows = new ArrayList<String[]>();
 		rows.add(new String[] { "ID", "Time", "Type", "Sensor", "Event", "Direction" });
 		for (SelEntry entry : entries) {
-			rows
-					.add(
-							new String[]
-							{
-									String.valueOf(entry.id()),
-									entry.timestamp().map(Instant::toString).orElse(preInit(entry)),
-									entry
-											.sensorType()
-											.map(type -> typeName(type, entry.sensorTypeCode().getAsInt()))
-											.orElse(entry.type().name()),
-									entry.sensorNumber().isPresent() ? String.valueOf(entry.sensorNumber().getAsInt()) : "",
-									entry.description(),
-									entry.direction().map(direction -> direction.name().toLowerCase(Locale.ROOT)).orElse("") });
+			rows.add(
+					new String[]
+					{
+							String.valueOf(entry.id()),
+							entry.timestamp().map(Instant::toString).orElse(preInit(entry)),
+							entry.sensorType()
+									.map(type -> typeName(type, entry.sensorTypeCode().getAsInt()))
+									.orElse(entry.type().name()),
+							entry.sensorNumber().isPresent() ? String.valueOf(entry.sensorNumber().getAsInt()) : "",
+							entry.description(),
+							entry.direction().map(direction -> direction.name().toLowerCase(Locale.ROOT)).orElse("") });
 		}
 		out.print(table(rows));
 		return 0;
@@ -1039,8 +1028,8 @@ public final class IpmiCli {
 								+ (raw == null ?
 										", line-oriented: the input is sent when Enter is pressed and echoed by the remote console only" :
 										"")
-								+ "; " + (char) arguments.escape() + ". at the start of a line closes it, "
-								+ (char) arguments.escape() + "? lists the escape sequences");
+								+ "; " + (char) arguments.escape() + ". at the start of a line closes it, " + (char) arguments.escape()
+								+ "? lists the escape sequences");
 			}
 			boolean lineMode = terminal && raw == null;
 			// In line mode the console would echo the typed line locally, and the remote console echoes it again (or
@@ -1106,39 +1095,26 @@ public final class IpmiCli {
 	 */
 	static final String KEY_READER = "$csi = @{ UpArrow = 'A'; DownArrow = 'B'; RightArrow = 'C'; LeftArrow = 'D'; Home = 'H'; End = 'F'; F1 = 'P'; F2 = 'Q'; F3 = 'R'; F4 = 'S' }\n"
 			+ "$tilde = @{ Insert = 2; Delete = 3; PageUp = 5; PageDown = 6; F5 = 15; F6 = 17; F7 = 18; F8 = 19; F9 = 20; F10 = 21; F11 = 23; F12 = 24 }\n"
-			+ "function Encode($k) {\n"
-			+ "  $shift = ($k.Modifiers -band [ConsoleModifiers]::Shift) -ne 0\n"
+			+ "function Encode($k) {\n" + "  $shift = ($k.Modifiers -band [ConsoleModifiers]::Shift) -ne 0\n"
 			+ "  $alt = ($k.Modifiers -band [ConsoleModifiers]::Alt) -ne 0\n"
 			+ "  $ctrl = ($k.Modifiers -band [ConsoleModifiers]::Control) -ne 0\n"
-			+ "  $m = 1 + [int]$shift + 2 * [int]$alt + 4 * [int]$ctrl\n"
-			+ "  $key = \"$($k.Key)\"\n"
-			+ "  $b = @()\n"
-			+ "  if ($csi.ContainsKey($key)) {\n"
-			+ "    $final = [int][char]$csi[$key]\n"
+			+ "  $m = 1 + [int]$shift + 2 * [int]$alt + 4 * [int]$ctrl\n" + "  $key = \"$($k.Key)\"\n" + "  $b = @()\n"
+			+ "  if ($csi.ContainsKey($key)) {\n" + "    $final = [int][char]$csi[$key]\n"
 			+ "    if ($m -eq 1) { $b = @(27, $(if ($key -like 'F?') { 79 } else { 91 }), $final) }\n"
 			+ "    else { $b = @(27, 91, 49, 59) + [Text.Encoding]::ASCII.GetBytes(\"$m\") + @($final) }\n"
 			+ "  } elseif ($tilde.ContainsKey($key)) {\n"
 			+ "    $b = @(27, 91) + [Text.Encoding]::ASCII.GetBytes(\"$($tilde[$key])\")\n"
-			+ "    if ($m -gt 1) { $b = $b + @(59) + [Text.Encoding]::ASCII.GetBytes(\"$m\") }\n"
-			+ "    $b = $b + @(126)\n"
-			+ "  } elseif ($key -eq 'Tab' -and $shift) {\n"
-			+ "    $b = @(27, 91, 90)\n"
+			+ "    if ($m -gt 1) { $b = $b + @(59) + [Text.Encoding]::ASCII.GetBytes(\"$m\") }\n" + "    $b = $b + @(126)\n"
+			+ "  } elseif ($key -eq 'Tab' -and $shift) {\n" + "    $b = @(27, 91, 90)\n"
 			+ "  } elseif ($ctrl -and -not $alt -and [int]$k.KeyChar -eq 0) {\n" + "    $b = @(0)\n"
 			+ "  } elseif ([int]$k.KeyChar -ne 0) {\n"
 			+ "    if ([char]::IsHighSurrogate($k.KeyChar)) { $script:high = $k.KeyChar; return [byte[]]@() }\n"
 			+ "    $text = if ($script:high -and [char]::IsLowSurrogate($k.KeyChar)) { [string]$script:high + [string]$k.KeyChar }"
 			+ " else { [string]$k.KeyChar }\n" + "    $script:high = $null\n"
-			+ "    $b = [Text.Encoding]::UTF8.GetBytes($text)\n"
-			+ "    if ($alt -and -not $ctrl) { $b = @(27) + $b }\n"
-			+ "  }\n"
-			+ "  return [byte[]]$b\n"
-			+ "}\n"
-			+ "[Console]::TreatControlCAsInput = $true\n"
-			+ "$out = [Console]::OpenStandardOutput()\n"
-			+ "while ($true) {\n"
-			+ "  $b = Encode([Console]::ReadKey($true))\n"
-			+ "  if ($b.Count -gt 0) { $out.Write($b, 0, $b.Count); $out.Flush() }\n"
-			+ "}\n";
+			+ "    $b = [Text.Encoding]::UTF8.GetBytes($text)\n" + "    if ($alt -and -not $ctrl) { $b = @(27) + $b }\n"
+			+ "  }\n" + "  return [byte[]]$b\n" + "}\n" + "[Console]::TreatControlCAsInput = $true\n"
+			+ "$out = [Console]::OpenStandardOutput()\n" + "while ($true) {\n" + "  $b = Encode([Console]::ReadKey($true))\n"
+			+ "  if ($b.Count -gt 0) { $out.Write($b, 0, $b.Count); $out.Flush() }\n" + "}\n";
 
 	private static boolean isWindows() {
 		return System.getProperty("os.name", "").toLowerCase(Locale.ROOT).contains("win");
@@ -1196,7 +1172,8 @@ public final class IpmiCli {
 		private String exitCode() {
 			try {
 				return reader.waitFor(KEY_READER_START_MS, TimeUnit.MILLISECONDS) ?
-						" with exit code " + reader.exitValue() : "";
+						" with exit code " + reader.exitValue() :
+						"";
 			} catch (InterruptedException e) {
 				Thread.currentThread().interrupt();
 				return "";
@@ -1246,8 +1223,7 @@ public final class IpmiCli {
 	}
 
 	private static String stty(String arguments) throws IOException, InterruptedException {
-		Process process = new ProcessBuilder("sh", "-c", "stty " + arguments + " < /dev/tty")
-				.redirectErrorStream(true)
+		Process process = new ProcessBuilder("sh", "-c", "stty " + arguments + " < /dev/tty").redirectErrorStream(true)
 				.start();
 		ByteArrayOutputStream output = new ByteArrayOutputStream();
 		byte[] buffer = new byte[256];
@@ -1470,8 +1446,7 @@ public final class IpmiCli {
 	/** The command the usage names: the launcher of the installer when it sets the variable, the jar otherwise. */
 	static String programName() {
 		String name = System.getenv(PROGRAM_NAME_VARIABLE);
-		return name == null || name.trim().isEmpty() ?
-				"java -jar ipmi-java-" + version() + "-standalone.jar" : name.trim();
+		return name == null || name.trim().isEmpty() ? "java -jar ipmi-java-" + version() + "-standalone.jar" : name.trim();
 	}
 
 	static String usage() {
@@ -1479,13 +1454,12 @@ public final class IpmiCli {
 		// Wrapped for an 80-column terminal (the descriptions start at column 33), except the usage lines, which name
 		// the program and run longer with java -jar
 		return "Usage:\n" + "  " + program + " -h <host> [options] probe [--json]\n" + "  " + program
-				+ " -h <host> -u <user> [options] <subcommand> [arguments]\n" + "  " + program + " --help | --version\n"
-				+ "\n" + "<subcommand> [arguments]:\n" + "  info [--json]\n" + "  chassis [--json]\n"
+				+ " -h <host> -u <user> [options] <subcommand> [arguments]\n" + "  " + program + " --help | --version\n" + "\n"
+				+ "<subcommand> [arguments]:\n" + "  info [--json]\n" + "  chassis [--json]\n"
 				+ "  power status | on | off | cycle | reset | soft | diag\n" + "  identify [<seconds> | force | off]\n"
 				+ "  sensors [--type <type>,...] [--name <glob>,...] [--long] [--json]\n" + "  fru [<id>...] [--json]\n"
 				+ "  sel [--since <id>] [--json]\n" + "  sol [--escape <char> | --no-escape]\n"
-				+ "  raw <netfn> <command> [<data byte>...] [--json]\n" + "\n"
-				+ "Connection options (before the subcommand):\n"
+				+ "  raw <netfn> <command> [<data byte>...] [--json]\n" + "\n" + "Connection options (before the subcommand):\n"
 				+ "  -h, --hostname <host>         BMC host name or IP address (required)\n"
 				+ "  -u, --username <user>         User name (required, except for probe); the\n"
 				+ "                                empty name \"\" is the null user name\n"
@@ -1530,11 +1504,9 @@ public final class IpmiCli {
 				+ "                                transfers); the end of the input closes\n"
 				+ "                                the console\n" + "\n"
 				+ "Default privilege: user for info, chassis, power status, sensors, fru and\n"
-				+ "sel; operator for the other power actions and identify; administrator for\n"
-				+ "sol and raw.\n"
+				+ "sel; operator for the other power actions and identify; administrator for\n" + "sol and raw.\n"
 				+ "raw takes bytes in hexadecimal, 0x optional: raw 0x06 0x01 is Get Device ID.\n"
-				+ "If neither password option is given, the password is requested from the\n"
-				+ "interactive console.\n" + "\n"
+				+ "If neither password option is given, the password is requested from the\n" + "interactive console.\n" + "\n"
 				+ "Full manual (output formats, SOL console, exit codes, ipmitool equivalents):\n"
 				+ "  https://metricshub.org/ipmi-java/cli.html\n";
 	}

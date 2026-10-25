@@ -52,9 +52,7 @@ public class ManagementControllerConfirmationRecord extends SensorRecord {
 	private byte[] deviceGuid;
 
 	@Override
-	protected void populateTypeSpecficValues(
-			byte[] recordData,
-			SensorRecord record) {
+	protected void populateTypeSpecficValues(byte[] recordData, SensorRecord record) {
 
 		setDeviceSlaveAddress(TypeConverter.byteToInt(recordData[5]) >> 1);
 
@@ -66,9 +64,7 @@ public class ManagementControllerConfirmationRecord extends SensorRecord {
 
 		setFirmwareRevision1(TypeConverter.byteToInt(recordData[8]) & 0x7f);
 
-		setFirmwareRevision2(
-				TypeConverter
-						.littleEndianBcdByteToInt(recordData[9]));
+		setFirmwareRevision2(TypeConverter.littleEndianBcdByteToInt(recordData[9]));
 
 		setIpmiVersion(TypeConverter.littleEndianBcdByteToInt(recordData[10]));
 

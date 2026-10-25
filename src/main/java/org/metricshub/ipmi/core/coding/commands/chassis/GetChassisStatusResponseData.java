@@ -246,11 +246,7 @@ public class GetChassisStatusResponseData implements ResponseData {
 			throw new IllegalStateException("Chassis Identify command and state not supported");
 		}
 
-		return ChassisIdentifyState
-				.parseInt(
-						(miscChassisState
-								& TypeConverter
-										.intToByte(0x30)) >> 4);
+		return ChassisIdentifyState.parseInt((miscChassisState & TypeConverter.intToByte(0x30)) >> 4);
 	}
 
 	/**
@@ -296,8 +292,7 @@ public class GetChassisStatusResponseData implements ResponseData {
 	 *
 	 * @param frontPanelButtonCapabilities the front panel button capabilities byte (byte 5)
 	 */
-	public void setFrontPanelButtonCapabilities(
-			byte frontPanelButtonCapabilities) {
+	public void setFrontPanelButtonCapabilities(byte frontPanelButtonCapabilities) {
 		this.frontPanelButtonCapabilities = frontPanelButtonCapabilities;
 		setFrontPanelButtonCapabilitiesSet(true);
 	}
@@ -319,8 +314,7 @@ public class GetChassisStatusResponseData implements ResponseData {
 	 * @throws IllegalAccessException
 	 *         when Front Panel Button Capabilities wasn't set.
 	 */
-	public boolean isStandbyButtonDisableAllowed()
-			throws IllegalAccessException {
+	public boolean isStandbyButtonDisableAllowed() throws IllegalAccessException {
 		if (!isFrontPanelButtonCapabilitiesSet()) {
 			throw new IllegalAccessException(FRONT_PANEL_BUTTON_CAPABILITIES_NOT_SET_MESSAGE);
 		}
@@ -334,8 +328,7 @@ public class GetChassisStatusResponseData implements ResponseData {
 	 * @throws IllegalAccessException
 	 *         when Front Panel Button Capabilities wasn't set.
 	 */
-	public boolean isDiagnosticInterruptButtonDisableAllowed()
-			throws IllegalAccessException {
+	public boolean isDiagnosticInterruptButtonDisableAllowed() throws IllegalAccessException {
 		if (!isFrontPanelButtonCapabilitiesSet()) {
 			throw new IllegalAccessException(FRONT_PANEL_BUTTON_CAPABILITIES_NOT_SET_MESSAGE);
 		}
@@ -365,8 +358,7 @@ public class GetChassisStatusResponseData implements ResponseData {
 	 * @throws IllegalAccessException
 	 *         when Front Panel Button Capabilities wasn't set.
 	 */
-	public boolean isPowerOffButtonDisableAllowed()
-			throws IllegalAccessException {
+	public boolean isPowerOffButtonDisableAllowed() throws IllegalAccessException {
 		if (!isFrontPanelButtonCapabilitiesSet()) {
 			throw new IllegalAccessException(FRONT_PANEL_BUTTON_CAPABILITIES_NOT_SET_MESSAGE);
 		}
@@ -394,8 +386,7 @@ public class GetChassisStatusResponseData implements ResponseData {
 	 * @throws IllegalAccessException
 	 *         when Front Panel Button Capabilities wasn't set.
 	 */
-	public boolean isDiagnosticInterruptButtonDisabled()
-			throws IllegalAccessException {
+	public boolean isDiagnosticInterruptButtonDisabled() throws IllegalAccessException {
 		if (!isFrontPanelButtonCapabilitiesSet()) {
 			throw new IllegalAccessException(FRONT_PANEL_BUTTON_CAPABILITIES_NOT_SET_MESSAGE);
 		}
@@ -427,14 +418,12 @@ public class GetChassisStatusResponseData implements ResponseData {
 	 */
 	public boolean isPowerOffButtonDisabled() throws IllegalAccessException {
 		if (!isFrontPanelButtonCapabilitiesSet()) {
-			throw new IllegalAccessException(
-					FRONT_PANEL_BUTTON_CAPABILITIES_NOT_SET_MESSAGE);
+			throw new IllegalAccessException(FRONT_PANEL_BUTTON_CAPABILITIES_NOT_SET_MESSAGE);
 		}
 		return (frontPanelButtonCapabilities & TypeConverter.intToByte(0x1)) != 0;
 	}
 
-	private void setFrontPanelButtonCapabilitiesSet(
-			boolean frontPanelButtonCapabilitiesSet) {
+	private void setFrontPanelButtonCapabilitiesSet(boolean frontPanelButtonCapabilitiesSet) {
 		this.isFrontPanelButtonCapabilitiesSet = frontPanelButtonCapabilitiesSet;
 	}
 

@@ -56,16 +56,11 @@ public class AuthcapWaiting extends State {
 	}
 
 	@Override
-	public void doTransition(
-			StateMachine stateMachine,
-			StateMachineEvent machineEvent) {
+	public void doTransition(StateMachine stateMachine, StateMachineEvent machineEvent) {
 		if (machineEvent instanceof Timeout || machineEvent instanceof DefaultAck) {
 			stateMachine.setCurrent(new Uninitialized());
 		} else {
-			stateMachine
-					.doExternalAction(
-							new ErrorAction(
-									new IllegalArgumentException("Invalid transition")));
+			stateMachine.doExternalAction(new ErrorAction(new IllegalArgumentException("Invalid transition")));
 		}
 	}
 
@@ -80,15 +75,8 @@ public class AuthcapWaiting extends State {
 			ipmiMessage = decoder.decode(message);
 			GetChannelAuthenticationCapabilities capabilities = new GetChannelAuthenticationCapabilities();
 			if (capabilities.isCommandResponse(ipmiMessage)
-					&& TypeConverter
-							.byteToInt(
-									((IpmiLanResponse) ipmiMessage
-											.getPayload()).getSequenceNumber()) == tag) {
-				stateMachine
-						.doExternalAction(
-								new ResponseAction(
-										capabilities
-												.getResponseData(ipmiMessage)));
+					&& TypeConverter.byteToInt(((IpmiLanResponse) ipmiMessage.getPayload()).getSequenceNumber()) == tag) {
+				stateMachine.doExternalAction(new ResponseAction(capabilities.getResponseData(ipmiMessage)));
 			}
 		} catch (Exception e) {
 			stateMachine.setCurrent(new Uninitialized());

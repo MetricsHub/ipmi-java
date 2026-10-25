@@ -54,12 +54,10 @@ public enum EntityId {
 	PowerSupply(EntityId.POWERSUPPLY),
 	AddInCard(EntityId.ADDINCARD),
 	FrontPanelBoard(EntityId.FRONTPANELBOARD),
-	BackPanelBoard(
-			EntityId.BACKPANELBOARD),
+	BackPanelBoard(EntityId.BACKPANELBOARD),
 	PowerSystemBoard(EntityId.POWERSYSTEMBOARD),
 	DriveBackplane(EntityId.DRIVEBACKPLANE),
-	SystemInternalExpansionBoard(
-			EntityId.SYSTEMINTERNALEXPANSIONBOARD),
+	SystemInternalExpansionBoard(EntityId.SYSTEMINTERNALEXPANSIONBOARD),
 	OtherSystemBoard(EntityId.OTHERSYSTEMBOARD),
 	ProcessorBoard(EntityId.PROCESSORBOARD),
 	/**
@@ -78,8 +76,7 @@ public enum EntityId {
 	PowerManagement(EntityId.POWERMANAGEMENT),
 	ChassisBackPanelBoard(EntityId.CHASSISBACKPANELBOARD),
 	SystemChassis(EntityId.SYSTEMCHASSIS),
-	SubChassis(
-			EntityId.SUBCHASSIS),
+	SubChassis(EntityId.SUBCHASSIS),
 	OtherChassis(EntityId.OTHERCHASSIS),
 	DiskDriveBay(EntityId.DISKDRIVEBAY),
 	/**
@@ -89,12 +86,10 @@ public enum EntityId {
 	DeviceBay(EntityId.DEVICEBAY),
 	Fan(EntityId.FAN),
 	CoolingUnit(EntityId.COOLINGUNIT),
-	CableInterconnect(
-			EntityId.CABLEINTERCONNECT),
+	CableInterconnect(EntityId.CABLEINTERCONNECT),
 	MemoryDevice(EntityId.MEMORYDEVICE),
 	SystemManagementSoftware(EntityId.SYSTEMMANAGEMENTSOFTWARE),
-	SystemFirmware(
-			EntityId.SYSTEMFIRMWARE),
+	SystemFirmware(EntityId.SYSTEMFIRMWARE),
 	OperatingSystem(EntityId.OPERATINGSYSTEM),
 	SystemBus(EntityId.SYSTEMBUS),
 	/**
@@ -133,8 +128,7 @@ public enum EntityId {
 	IoModule(EntityId.IOMODULE),
 	ProcessorIoModule(EntityId.PROCESSORIOMODULE),
 	ManagementControllerFirmware(EntityId.MANAGEMENTCONTROLLERFIRMWARE),
-	IpmiChannel(
-			EntityId.IPMICHANNEL),
+	IpmiChannel(EntityId.IPMICHANNEL),
 	PciBus(EntityId.PCIBUS),
 	PciExpressBus(EntityId.PCIEXPRESSBUS),
 	ScsiBus(EntityId.SCSIBUS),

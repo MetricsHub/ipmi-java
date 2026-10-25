@@ -37,16 +37,11 @@ import org.metricshub.ipmi.core.sm.events.StateMachineEvent;
 public class Ciphers extends State {
 
 	@Override
-	public void doTransition(
-			StateMachine stateMachine,
-			StateMachineEvent machineEvent) {
+	public void doTransition(StateMachine stateMachine, StateMachineEvent machineEvent) {
 		if (machineEvent instanceof AuthenticationCapabilitiesReceived) {
 			stateMachine.setCurrent(new Authcap());
 		} else {
-			stateMachine
-					.doExternalAction(
-							new ErrorAction(
-									new IllegalArgumentException("Invalid transition")));
+			stateMachine.doExternalAction(new ErrorAction(new IllegalArgumentException("Invalid transition")));
 		}
 	}
 

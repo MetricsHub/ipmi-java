@@ -83,11 +83,7 @@ class IpmiCommandCoderTest {
 
 	@Test
 	void readFruDataKnowsItsBusyCode() {
-		ReadFruData readFruData = new ReadFruData(
-				0,
-				BaseUnit.Bytes,
-				0,
-				16);
+		ReadFruData readFruData = new ReadFruData(0, BaseUnit.Bytes, 0, 16);
 		IPMIException e = assertThrows(
 				IPMIException.class,
 				() -> readFruData.getResponseData(response(CommandCodes.READ_FRU_DATA, 0x81)));
@@ -96,8 +92,7 @@ class IpmiCommandCoderTest {
 
 	@Test
 	void closeSessionKnowsItsSessionCodes() {
-		CloseSession closeSession = new CloseSession(
-				0x1234);
+		CloseSession closeSession = new CloseSession(0x1234);
 		IPMIException invalidId = assertThrows(
 				IPMIException.class,
 				() -> closeSession.getResponseData(response(CLOSE_SESSION, 0x87)));

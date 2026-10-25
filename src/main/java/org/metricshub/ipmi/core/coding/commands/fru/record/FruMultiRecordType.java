@@ -28,15 +28,11 @@ package org.metricshub.ipmi.core.coding.commands.fru.record;
 public enum FruMultiRecordType {
 	PowerSupplyInformation(FruMultiRecordType.POWERSUPPLYINFORMATION),
 	DcOutput(FruMultiRecordType.DCOUTPUT),
-	OemRecord(
-			FruMultiRecordType.OEMRECORD),
+	OemRecord(FruMultiRecordType.OEMRECORD),
 	DcLoad(FruMultiRecordType.DCLOAD),
-	ManagementAccessRecord(
-			FruMultiRecordType.MANAGEMENTACCESSRECORD),
-	BaseCompatibilityRecord(
-			FruMultiRecordType.BASECOMPATIBILITYRECORD),
-	ExtendedCompatibilityRecord(
-			FruMultiRecordType.EXTENDEDCOMPATIBILITYRECORD),
+	ManagementAccessRecord(FruMultiRecordType.MANAGEMENTACCESSRECORD),
+	BaseCompatibilityRecord(FruMultiRecordType.BASECOMPATIBILITYRECORD),
+	ExtendedCompatibilityRecord(FruMultiRecordType.EXTENDEDCOMPATIBILITYRECORD),
 	Unspecified(FruMultiRecordType.UNSPECIFIED),;
 
 	private static final int POWERSUPPLYINFORMATION = 0;

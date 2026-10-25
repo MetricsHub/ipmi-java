@@ -93,8 +93,7 @@ class RmcpPlusSessionTest {
 	private static void assertIpmiClientSession(byte[] suites, int[] algorithms) throws Exception {
 		try (FakeRmcpPlusBmc bmc = new FakeRmcpPlusBmc(suites, USER, utf8(PASSWORD), null)) {
 			try (
-					IpmiClient client = IpmiClient
-							.builder(bmc.getAddress().getHostAddress())
+					IpmiClient client = IpmiClient.builder(bmc.getAddress().getHostAddress())
 							.port(bmc.getPort())
 							.credentials(USER, PASSWORD.toCharArray())
 							.timeout(Duration.ofSeconds(20))
@@ -173,9 +172,8 @@ class RmcpPlusSessionTest {
 		// As the handle of a response, which the connector creates for each one
 		assertCredentialsWiped(
 				17,
-				(connector, handle) -> connector
-						.closeConnection(
-								new ConnectionHandle(handle.getHandle(), handle.getRemoteAddress(), handle.getRemotePort())));
+				(connector, handle) -> connector.closeConnection(
+						new ConnectionHandle(handle.getHandle(), handle.getRemoteAddress(), handle.getRemotePort())));
 	}
 
 	@Test
@@ -373,8 +371,7 @@ class RmcpPlusSessionTest {
 			try {
 				ConnectionHandle handle = connector.createConnection(bmc.getAddress(), bmc.getPort());
 				connector.setTimeout(handle, TIMEOUT_MS);
-				CipherSuite suite = connector
-						.getAvailableCipherSuites(handle)
+				CipherSuite suite = connector.getAvailableCipherSuites(handle)
 						.stream()
 						.filter(cipherSuite -> cipherSuite.getId() == 17)
 						.findFirst()
@@ -438,8 +435,7 @@ class RmcpPlusSessionTest {
 					assertEquals(raises, bmc.getCount(NETFN_APP, SET_SESSION_PRIVILEGE_LEVEL), levels[i].toString());
 
 					// The present level of the session, as the BMC reports it (the fake starts every session at User)
-					int sessionId = connector
-							.getExistingSessionForCriteria(bmc.getAddress(), bmc.getPort(), USER)
+					int sessionId = connector.getExistingSessionForCriteria(bmc.getAddress(), bmc.getPort(), USER)
 							.getManagedSystemSessionId();
 					assertEquals(i + 2, connector.sendMessage(handle, new GetSessionInfo(sessionId)).getPrivilegeLevel());
 
@@ -466,12 +462,11 @@ class RmcpPlusSessionTest {
 		try (FakeRmcpPlusBmc bmc = new FakeRmcpPlusBmc(XCC_SUITES, USER, utf8(PASSWORD), null)) {
 			// Refused once (80h: the level is not available for this user), then accepted
 			AtomicInteger calls = new AtomicInteger();
-			bmc
-					.handle(
-							NETFN_APP,
-							SET_SESSION_PRIVILEGE_LEVEL,
-							data -> calls.getAndIncrement() == 0 ? new byte[]
-							{ (byte) 0x80 } : new byte[] { 0x00, 0x04 });
+			bmc.handle(
+					NETFN_APP,
+					SET_SESSION_PRIVILEGE_LEVEL,
+					data -> calls.getAndIncrement() == 0 ? new byte[]
+					{ (byte) 0x80 } : new byte[] { 0x00, 0x04 });
 			IpmiConnector connector = new IpmiConnector(0, 0);
 			try {
 				ConnectionHandle handle = connector
@@ -511,8 +506,7 @@ class RmcpPlusSessionTest {
 				assertEquals(2, bmc.getCount(FakeRmcpPlusBmc.RAKP_1), "Administrator refused to the account, then Operator");
 				assertEquals(1, bmc.getCount(NETFN_APP, SET_SESSION_PRIVILEGE_LEVEL), "set to User after the handshake");
 				assertEquals(FakeRmcpPlusBmc.USER, bmc.getPrivilege());
-				int sessionId = connector
-						.getExistingSessionForCriteria(bmc.getAddress(), bmc.getPort(), USER)
+				int sessionId = connector.getExistingSessionForCriteria(bmc.getAddress(), bmc.getPort(), USER)
 						.getManagedSystemSessionId();
 				assertEquals(2, connector.sendMessage(handle, new GetSessionInfo(sessionId)).getPrivilegeLevel());
 
@@ -620,8 +614,7 @@ class RmcpPlusSessionTest {
 			throws Exception {
 		ConnectionHandle handle = connector.createConnection(bmc.getAddress(), bmc.getPort());
 		connector.setTimeout(handle, TIMEOUT_MS);
-		CipherSuite suite = connector
-				.getAvailableCipherSuites(handle)
+		CipherSuite suite = connector.getAvailableCipherSuites(handle)
 				.stream()
 				.filter(cipherSuite -> cipherSuite.getId() == suiteId)
 				.findFirst()
@@ -633,10 +626,7 @@ class RmcpPlusSessionTest {
 
 	private static GetChassisStatusResponseData getChassisStatus(IpmiConnector connector, ConnectionHandle handle)
 			throws Exception {
-		return (GetChassisStatusResponseData) connector
-				.sendMessage(
-						handle,
-						new GetChassisStatus());
+		return (GetChassisStatusResponseData) connector.sendMessage(handle, new GetChassisStatus());
 	}
 
 	private static void assertChassisStatus(GetChassisStatusResponseData status) {

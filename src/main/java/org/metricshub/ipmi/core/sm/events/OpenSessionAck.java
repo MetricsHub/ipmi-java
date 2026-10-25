@@ -68,10 +68,8 @@ public class OpenSessionAck extends Default {
 	 *        {@link GetChannelAuthenticationCapabilitiesResponseData#isKgEnabled()}
 	 *        == false)
 	 */
-	public OpenSessionAck(CipherSuite cipherSuite,
-			PrivilegeLevel privilegeLevel, int sequenceNumber,
-			int managedSystemSessionId, String username, byte[] password,
-			byte[] bmcKey) {
+	public OpenSessionAck(CipherSuite cipherSuite, PrivilegeLevel privilegeLevel, int sequenceNumber,
+			int managedSystemSessionId, String username, byte[] password, byte[] bmcKey) {
 		super(cipherSuite, sequenceNumber, privilegeLevel);
 		this.managedSystemSessionId = managedSystemSessionId;
 		this.username = username;

@@ -67,19 +67,11 @@ public final class Decoder {
 	 * @throws InvalidKeyException
 	 *         when creating of the authentication algorithm key fails
 	 */
-	public static ResponseData decode(
-			byte[] data,
-			IpmiDecoder protocolDecoder,
-			PayloadCoder payloadCoder)
+	public static ResponseData decode(byte[] data, IpmiDecoder protocolDecoder, PayloadCoder payloadCoder)
 			throws IPMIException,
 			NoSuchAlgorithmException,
 			InvalidKeyException {
-		return payloadCoder
-				.getResponseData(
-						protocolDecoder
-								.decode(
-										RmcpDecoder
-												.decode(data)));
+		return payloadCoder.getResponseData(protocolDecoder.decode(RmcpDecoder.decode(data)));
 	}
 
 	private Decoder() {}

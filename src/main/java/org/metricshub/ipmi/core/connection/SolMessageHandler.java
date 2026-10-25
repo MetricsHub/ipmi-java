@@ -120,9 +120,7 @@ public class SolMessageHandler extends MessageHandler {
 		// The ACK/NACK carried by a packet that the BMC sends again was applied with the first copy: applied again, it
 		// could complete a newer packet that has the same number
 		boolean retry = isRetry(payload);
-		boolean reported = payload.isAcknowledgeMessage()
-				&& !retry
-				&& handleIncomingAcknowledgeMessage(message, payload);
+		boolean reported = payload.isAcknowledgeMessage() && !retry && handleIncomingAcknowledgeMessage(message, payload);
 
 		// Characters, or statuses that no packet of the console waits for (an informational packet: SOL deactivated, or
 		// the acknowledgement of operations)

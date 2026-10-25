@@ -63,8 +63,7 @@ public abstract class SensorRecord {
 			sensorRecord = new FullSensorRecord();
 			break;
 		case RecordTypes.BMC_MESSAGE_CHANNEL_INFO_RECORD:
-			throw new IllegalArgumentException(
-					"The BMC Message Channel Info record (type 14h) is deprecated since IPMI 1.5");
+			throw new IllegalArgumentException("The BMC Message Channel Info record (type 14h) is deprecated since IPMI 1.5");
 		case RecordTypes.COMPACT_SENSOR_RECORD://
 			sensorRecord = new CompactSensorRecord();
 			break;
@@ -105,8 +104,7 @@ public abstract class SensorRecord {
 				break;
 			}
 			// Every type left is below C0h and unmodeled: reserved (IPMI 2.0 section 43.6)
-			throw new IllegalArgumentException(
-					String.format("Reserved record type %02Xh", TypeConverter.byteToInt(recType)));
+			throw new IllegalArgumentException(String.format("Reserved record type %02Xh", TypeConverter.byteToInt(recType)));
 		}
 
 		byte[] buffer = new byte[4];
@@ -118,10 +116,7 @@ public abstract class SensorRecord {
 
 		sensorRecord.setId(TypeConverter.littleEndianByteArrayToInt(buffer));
 
-		sensorRecord
-				.setSdrVersion(
-						TypeConverter
-								.littleEndianBcdByteToInt(recordData[2]));
+		sensorRecord.setSdrVersion(TypeConverter.littleEndianBcdByteToInt(recordData[2]));
 
 		sensorRecord.setRecordType(recordData[3]);
 
@@ -140,9 +135,7 @@ public abstract class SensorRecord {
 	 * @param record
 	 *        - {@link SensorRecord} being populated
 	 */
-	protected abstract void populateTypeSpecficValues(
-			byte[] recordData,
-			SensorRecord record);
+	protected abstract void populateTypeSpecficValues(byte[] recordData, SensorRecord record);
 
 	/**
 	 * Sets the record ID.

@@ -186,8 +186,7 @@ public class Connection extends TimerTask implements MachineObserver {
 	 *         - when the connection cannot be created
 	 * @see #disconnect()
 	 */
-	public void connect(InetAddress address, int port, long pingPeriod)
-			throws IOException {
+	public void connect(InetAddress address, int port, long pingPeriod) throws IOException {
 		connect(address, port, pingPeriod, false);
 	}
 
@@ -316,8 +315,7 @@ public class Connection extends TimerTask implements MachineObserver {
 
 			if (!(action.getIpmiResponseData() instanceof GetChannelCipherSuitesResponseData)) {
 				stateMachine.doTransition(new Timeout());
-				throw new ConnectionException(
-						"Response data not matching Get Channel Cipher Suites command.");
+				throw new ConnectionException("Response data not matching Get Channel Cipher Suites command.");
 			}
 
 			GetChannelCipherSuitesResponseData responseData = (GetChannelCipherSuitesResponseData) action
@@ -388,9 +386,7 @@ public class Connection extends TimerTask implements MachineObserver {
 			if (lastAction instanceof ErrorAction) {
 				throw ((ErrorAction) lastAction).getException();
 			}
-			throw new ConnectionException(
-					"Invalid StateMachine response: "
-							+ lastAction.getClass().getSimpleName());
+			throw new ConnectionException("Invalid StateMachine response: " + lastAction.getClass().getSimpleName());
 		}
 	}
 
@@ -419,17 +415,12 @@ public class Connection extends TimerTask implements MachineObserver {
 
 		if (stateMachine.getCurrent().getClass() != Ciphers.class) {
 			throw new ConnectionException(
-					ILLEGAL_CONNECTION_STATE_MESSAGE
-							+ stateMachine.getCurrent().getClass().getSimpleName());
+					ILLEGAL_CONNECTION_STATE_MESSAGE + stateMachine.getCurrent().getClass().getSimpleName());
 		}
 
 		sessionId = SessionManager.generateSessionId();
 
-		stateMachine
-				.doTransition(
-						new AuthenticationCapabilitiesReceived(
-								sessionId,
-								requestedPrivilegeLevel));
+		stateMachine.doTransition(new AuthenticationCapabilitiesReceived(sessionId, requestedPrivilegeLevel));
 
 		return authenticationCapabilities;
 	}
@@ -471,8 +462,7 @@ public class Connection extends TimerTask implements MachineObserver {
 			throws Exception {
 		if (stateMachine.getCurrent().getClass() != Authcap.class) {
 			throw new ConnectionException(
-					ILLEGAL_CONNECTION_STATE_MESSAGE
-							+ stateMachine.getCurrent().getClass().getSimpleName());
+					ILLEGAL_CONNECTION_STATE_MESSAGE + stateMachine.getCurrent().getClass().getSimpleName());
 		}
 
 		Rakp1.checkCredentials(username, password, bmcKey);
@@ -487,13 +477,7 @@ public class Connection extends TimerTask implements MachineObserver {
 		lastAction = null;
 
 		// Open Session
-		stateMachine
-				.doTransition(
-						new Authorize(
-								cipherSuite,
-								tag,
-								privilegeLevel,
-								sessionId));
+		stateMachine.doTransition(new Authorize(cipherSuite, tag, privilegeLevel, sessionId));
 
 		waitForResponse();
 
@@ -503,8 +487,7 @@ public class Connection extends TimerTask implements MachineObserver {
 
 		if (!(action.getIpmiResponseData() instanceof OpenSessionResponseData)) {
 			stateMachine.doTransition(new Timeout());
-			throw new ConnectionException(
-					"Response data not matching OpenSession response data");
+			throw new ConnectionException("Response data not matching OpenSession response data");
 		}
 
 		OpenSessionResponseData openSessionResponseData = (OpenSessionResponseData) action.getIpmiResponseData();
@@ -515,12 +498,10 @@ public class Connection extends TimerTask implements MachineObserver {
 				"Open Session Response",
 				openSessionResponseData.getRemoteConsoleSessionId() == sessionId
 						&& openSessionResponseData.getManagedSystemSessionId() != 0
-						&& openSessionResponseData.getAuthenticationAlgorithm() == cipherSuite
-								.getAuthenticationAlgorithm()
+						&& openSessionResponseData.getAuthenticationAlgorithm() == cipherSuite.getAuthenticationAlgorithm()
 								.getCode()
 						&& openSessionResponseData.getIntegrityAlgorithm() == cipherSuite.getIntegrityAlgorithm().getCode()
-						&& openSessionResponseData.getConfidentialityAlgorithm() == cipherSuite
-								.getConfidentialityAlgorithm()
+						&& openSessionResponseData.getConfidentialityAlgorithm() == cipherSuite.getConfidentialityAlgorithm()
 								.getCode());
 
 		managedSystemSessionId = openSessionResponseData.getManagedSystemSessionId();
@@ -528,16 +509,8 @@ public class Connection extends TimerTask implements MachineObserver {
 		stateMachine.doTransition(new DefaultAck());
 
 		// RAKP 1
-		stateMachine
-				.doTransition(
-						new OpenSessionAck(
-								cipherSuite,
-								privilegeLevel,
-								tag,
-								managedSystemSessionId,
-								username,
-								password,
-								bmcKey));
+		stateMachine.doTransition(
+				new OpenSessionAck(cipherSuite, privilegeLevel, tag, managedSystemSessionId, username, password, bmcKey));
 
 		waitForResponse();
 
@@ -548,29 +521,17 @@ public class Connection extends TimerTask implements MachineObserver {
 		if (!(action.getIpmiResponseData() instanceof Rakp1ResponseData)) {
 			stateMachine.doTransition(new Timeout());
 			throw new ConnectionException(
-					"Response data not matching RAKP Message 2: "
-							+ action
-									.getIpmiResponseData()
-									.getClass()
-									.getSimpleName());
+					"Response data not matching RAKP Message 2: " + action.getIpmiResponseData().getClass().getSimpleName());
 		}
 
-		Rakp1ResponseData rakp1ResponseData = (Rakp1ResponseData) action
-				.getIpmiResponseData();
+		Rakp1ResponseData rakp1ResponseData = (Rakp1ResponseData) action.getIpmiResponseData();
 
 		checkHandshakeReply("RAKP Message 2", rakp1ResponseData.getRemoteConsoleSessionId() == sessionId);
 
 		stateMachine.doTransition(new DefaultAck());
 
 		// RAKP 3
-		stateMachine
-				.doTransition(
-						new Rakp2Ack(
-								cipherSuite,
-								tag,
-								(byte) 0,
-								managedSystemSessionId,
-								rakp1ResponseData));
+		stateMachine.doTransition(new Rakp2Ack(cipherSuite, tag, (byte) 0, managedSystemSessionId, rakp1ResponseData));
 
 		waitForResponse();
 
@@ -586,8 +547,7 @@ public class Connection extends TimerTask implements MachineObserver {
 
 		if (!(action.getIpmiResponseData() instanceof Rakp3ResponseData)) {
 			stateMachine.doTransition(new Timeout());
-			throw new ConnectionException(
-					"Response data not matching RAKP Message 4");
+			throw new ConnectionException("Response data not matching RAKP Message 4");
 		}
 
 		checkHandshakeReply(
@@ -626,16 +586,14 @@ public class Connection extends TimerTask implements MachineObserver {
 	public void closeSession() throws ConnectionException {
 		if (stateMachine.getCurrent().getClass() != SessionValid.class) {
 			throw new ConnectionException(
-					ILLEGAL_CONNECTION_STATE_MESSAGE
-							+ stateMachine.getCurrent().getClass().getSimpleName());
+					ILLEGAL_CONNECTION_STATE_MESSAGE + stateMachine.getCurrent().getClass().getSimpleName());
 		}
 
-		stateMachine
-				.doTransition(
-						new CloseSession(
-								managedSystemSessionId,
-								messageHandlers.get(PayloadType.Ipmi).getSequenceNumber(),
-								getNextSessionSequenceNumber()));
+		stateMachine.doTransition(
+				new CloseSession(
+						managedSystemSessionId,
+						messageHandlers.get(PayloadType.Ipmi).getSequenceNumber(),
+						getNextSessionSequenceNumber()));
 	}
 
 	/**
@@ -681,7 +639,8 @@ public class Connection extends TimerTask implements MachineObserver {
 	public int retry(int tag, PayloadType messagePayloadType) throws ConnectionException {
 
 		MessageHandler messageHandler = messageHandlers.containsKey(messagePayloadType) ?
-				messageHandlers.get(messagePayloadType) : messageHandlers.get(PayloadType.Ipmi);
+				messageHandlers.get(messagePayloadType) :
+				messageHandlers.get(PayloadType.Ipmi);
 
 		return messageHandler.retryMessage(tag, stateMachine, managedSystemSessionId);
 	}
@@ -691,11 +650,7 @@ public class Connection extends TimerTask implements MachineObserver {
 		messageHandler.handleIncomingMessage(message);
 	}
 
-	public void notifyResponseListeners(
-			int handleId,
-			int tag,
-			ResponseData responseData,
-			Exception exception) {
+	public void notifyResponseListeners(int handleId, int tag, ResponseData responseData, Exception exception) {
 		for (ConnectionListener listener : listeners) {
 			if (listener != null) {
 				listener.processResponse(responseData, handleId, tag, exception);

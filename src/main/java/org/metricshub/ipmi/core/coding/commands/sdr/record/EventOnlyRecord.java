@@ -31,9 +31,7 @@ package org.metricshub.ipmi.core.coding.commands.sdr.record;
 public class EventOnlyRecord extends AbstractSensorRecord {
 
 	@Override
-	protected void populateTypeSpecficValues(
-			byte[] recordData,
-			SensorRecord record) {
+	protected void populateTypeSpecficValues(byte[] recordData, SensorRecord record) {
 		populateSensorHeader(recordData, 10);
 		populateSharing(recordData, 12);
 		populateName(recordData, 16);

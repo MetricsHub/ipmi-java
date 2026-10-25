@@ -228,8 +228,7 @@ public final class FakeSel {
 		if (!infoSupported) {
 			return new byte[] { (byte) infoRefusal };
 		}
-		return ByteBuffer
-				.allocate(15)
+		return ByteBuffer.allocate(15)
 				.order(ByteOrder.LITTLE_ENDIAN)
 				.put((byte) 0x00)
 				.put((byte) SEL_VERSION)
@@ -268,11 +267,8 @@ public final class FakeSel {
 			return new byte[] { (byte) 0xcb }; // requested record not present
 		}
 		int next = nextOverrides
-				.getOrDefault(
-						id(records.get(index)),
-						index + 1 < records.size() ? id(records.get(index + 1)) : LAST_RECORD_ID);
-		return ByteBuffer
-				.allocate(3 + RECORD_SIZE)
+				.getOrDefault(id(records.get(index)), index + 1 < records.size() ? id(records.get(index + 1)) : LAST_RECORD_ID);
+		return ByteBuffer.allocate(3 + RECORD_SIZE)
 				.order(ByteOrder.LITTLE_ENDIAN)
 				.put((byte) 0x00)
 				.putShort((short) next)
@@ -327,8 +323,7 @@ public final class FakeSel {
 			int eventType,
 			boolean assertion,
 			int... eventData) {
-		return ByteBuffer
-				.allocate(RECORD_SIZE)
+		return ByteBuffer.allocate(RECORD_SIZE)
 				.order(ByteOrder.LITTLE_ENDIAN)
 				.putShort((short) recordId)
 				.put((byte) 0x02)
@@ -360,8 +355,7 @@ public final class FakeSel {
 			long timestamp,
 			int manufacturerId,
 			int... oemData) {
-		ByteBuffer record = ByteBuffer
-				.allocate(RECORD_SIZE)
+		ByteBuffer record = ByteBuffer.allocate(RECORD_SIZE)
 				.order(ByteOrder.LITTLE_ENDIAN)
 				.putShort((short) recordId)
 				.put((byte) recordType)
@@ -384,8 +378,7 @@ public final class FakeSel {
 	 * @return the 16 bytes of the record
 	 */
 	public static byte[] selRecord(int recordId, int recordType, int... body) {
-		ByteBuffer record = ByteBuffer
-				.allocate(RECORD_SIZE)
+		ByteBuffer record = ByteBuffer.allocate(RECORD_SIZE)
 				.order(ByteOrder.LITTLE_ENDIAN)
 				.putShort((short) recordId)
 				.put((byte) recordType);

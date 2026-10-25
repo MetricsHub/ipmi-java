@@ -38,10 +38,8 @@ public enum PayloadType {
 	 * OEM Explicit
 	 */
 	Oem(PayloadType.OEM),
-	RmcpOpenSessionRequest(
-			PayloadType.RMCPOPENSESSIONREQUEST),
-	RmcpOpenSessionResponse(
-			PayloadType.RMCPOPENSESSIONRESPONSE),
+	RmcpOpenSessionRequest(PayloadType.RMCPOPENSESSIONREQUEST),
+	RmcpOpenSessionResponse(PayloadType.RMCPOPENSESSIONRESPONSE),
 	/**
 	 * RAKP Message 1
 	 */
@@ -60,12 +58,10 @@ public enum PayloadType {
 	Rakp4(PayloadType.RAKP4),
 	Oem0(PayloadType.OEM0),
 	Oem1(PayloadType.OEM1),
-	Oem2(
-			PayloadType.OEM2),
+	Oem2(PayloadType.OEM2),
 	Oem3(PayloadType.OEM3),
 	Oem4(PayloadType.OEM4),
-	Oem5(
-			PayloadType.OEM5),
+	Oem5(PayloadType.OEM5),
 	Oem6(PayloadType.OEM6),
 	Oem7(PayloadType.OEM7),;
 

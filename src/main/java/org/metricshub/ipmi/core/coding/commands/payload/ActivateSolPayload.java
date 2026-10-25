@@ -49,8 +49,7 @@ public class ActivateSolPayload extends ActivatePayload<ActivateSolPayloadRespon
 	protected byte[] prepareAuxilaryRequestData() {
 		byte[] result = new byte[4];
 
-		boolean isAuthenticationEnabled = getCipherSuite()
-				.getAuthenticationAlgorithm()
+		boolean isAuthenticationEnabled = getCipherSuite().getAuthenticationAlgorithm()
 				.getCode() != SecurityConstants.AA_RAKP_NONE;
 		boolean isEncryptionEnabled = getCipherSuite().getConfidentialityAlgorithm().getCode() != SecurityConstants.CA_NONE;
 

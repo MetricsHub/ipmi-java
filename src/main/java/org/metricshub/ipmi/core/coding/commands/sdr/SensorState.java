@@ -27,19 +27,13 @@ package org.metricshub.ipmi.core.coding.commands.sdr;
  */
 public enum SensorState {
 	BelowLowerNonRecoverable(SensorState.BELOWLOWERNONRECOVERABLE),
-	AboveUpperNonCritical(
-			SensorState.ABOVEUPPERNONCRITICAL),
-	AboveUpperNonRecoverable(
-			SensorState.ABOVEUPPERNONRECOVERABLE),
-	BelowLowerNonCritical(
-			SensorState.BELOWLOWERNONCRITICAL),
-	BelowLowerCritical(
-			SensorState.BELOWLOWERCRITICAL),
-	AboveUpperCritical(
-			SensorState.ABOVEUPPERCRITICAL),
+	AboveUpperNonCritical(SensorState.ABOVEUPPERNONCRITICAL),
+	AboveUpperNonRecoverable(SensorState.ABOVEUPPERNONRECOVERABLE),
+	BelowLowerNonCritical(SensorState.BELOWLOWERNONCRITICAL),
+	BelowLowerCritical(SensorState.BELOWLOWERCRITICAL),
+	AboveUpperCritical(SensorState.ABOVEUPPERCRITICAL),
 	Ok(SensorState.OK),
-	Invalid(
-			SensorState.INVALID);
+	Invalid(SensorState.INVALID);
 
 	private static final int BELOWLOWERNONRECOVERABLE = 4;
 	private static final int ABOVEUPPERNONCRITICAL = 8;

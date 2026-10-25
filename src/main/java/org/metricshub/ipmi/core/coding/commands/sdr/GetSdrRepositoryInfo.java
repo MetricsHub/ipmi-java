@@ -57,14 +57,8 @@ public class GetSdrRepositoryInfo extends IpmiCommandCoder<GetSdrRepositoryInfoR
 	}
 
 	@Override
-	protected IpmiPayload preparePayload(int sequenceNumber)
-			throws NoSuchAlgorithmException,
-			InvalidKeyException {
-		return new IpmiLanRequest(
-				getNetworkFunction(),
-				getCommandCode(),
-				null,
-				TypeConverter.intToByte(sequenceNumber));
+	protected IpmiPayload preparePayload(int sequenceNumber) throws NoSuchAlgorithmException, InvalidKeyException {
+		return new IpmiLanRequest(getNetworkFunction(), getCommandCode(), null, TypeConverter.intToByte(sequenceNumber));
 	}
 
 	@Override
@@ -75,16 +69,12 @@ public class GetSdrRepositoryInfo extends IpmiCommandCoder<GetSdrRepositoryInfoR
 		byte[] raw = validateResponse(message);
 
 		if (raw == null || raw.length != 14) {
-			throw new IllegalArgumentException(
-					"Invalid response payload length");
+			throw new IllegalArgumentException("Invalid response payload length");
 		}
 
 		GetSdrRepositoryInfoResponseData responseData = new GetSdrRepositoryInfoResponseData();
 
-		responseData
-				.setSdrVersion(
-						TypeConverter
-								.littleEndianBcdByteToInt(raw[0]));
+		responseData.setSdrVersion(TypeConverter.littleEndianBcdByteToInt(raw[0]));
 
 		byte[] buffer = new byte[4];
 
@@ -93,27 +83,17 @@ public class GetSdrRepositoryInfo extends IpmiCommandCoder<GetSdrRepositoryInfoR
 		buffer[2] = 0;
 		buffer[3] = 0;
 
-		responseData
-				.setRecordCount(
-						TypeConverter
-								.littleEndianByteArrayToInt(buffer));
+		responseData.setRecordCount(TypeConverter.littleEndianByteArrayToInt(buffer));
 
 		System.arraycopy(raw, 5, buffer, 0, 4);
 
-		responseData
-				.setAddTimestamp(
-						TypeConverter
-								.littleEndianByteArrayToInt(buffer));
+		responseData.setAddTimestamp(TypeConverter.littleEndianByteArrayToInt(buffer));
 
 		System.arraycopy(raw, 9, buffer, 0, 4);
 
-		responseData
-				.setDelTimestamp(
-						TypeConverter
-								.littleEndianByteArrayToInt(buffer));
+		responseData.setDelTimestamp(TypeConverter.littleEndianByteArrayToInt(buffer));
 
-		responseData
-				.setReserveSupported((TypeConverter.byteToInt(raw[13]) & 0x2) != 0);
+		responseData.setReserveSupported((TypeConverter.byteToInt(raw[13]) & 0x2) != 0);
 
 		return responseData;
 	}

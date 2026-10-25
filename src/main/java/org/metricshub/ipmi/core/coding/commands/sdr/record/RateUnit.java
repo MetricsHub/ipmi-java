@@ -25,11 +25,9 @@ package org.metricshub.ipmi.core.coding.commands.sdr.record;
 public enum RateUnit {
 	Microseconds(RateUnit.US, "us"),
 	Miliseconds(RateUnit.MS, "ms"),
-	Seconds(
-			RateUnit.S, "s"),
+	Seconds(RateUnit.S, "s"),
 	Minutes(RateUnit.MIN, "min"),
-	Hours(RateUnit.H,
-			"h"),
+	Hours(RateUnit.H, "h"),
 	Days(RateUnit.D, "days"),
 	None(RateUnit.NONE, "");
 

@@ -46,11 +46,7 @@ public class GetChassisStatus extends IpmiCommandCoder<GetChassisStatusResponseD
 
 	@Override
 	protected IpmiLanMessage preparePayload(int sequenceNumber) {
-		return new IpmiLanRequest(
-				getNetworkFunction(),
-				getCommandCode(),
-				null,
-				TypeConverter.intToByte(sequenceNumber));
+		return new IpmiLanRequest(getNetworkFunction(), getCommandCode(), null, TypeConverter.intToByte(sequenceNumber));
 	}
 
 	@Override
@@ -71,8 +67,7 @@ public class GetChassisStatus extends IpmiCommandCoder<GetChassisStatusResponseD
 		byte[] raw = validateResponse(message);
 
 		if (raw == null || (raw.length != 3 && raw.length != 4)) {
-			throw new IllegalArgumentException(
-					"Invalid response payload length");
+			throw new IllegalArgumentException("Invalid response payload length");
 		}
 
 		GetChassisStatusResponseData responseData = new GetChassisStatusResponseData();

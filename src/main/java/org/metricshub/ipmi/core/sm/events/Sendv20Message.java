@@ -51,8 +51,8 @@ public class Sendv20Message extends StateMachineEvent {
 	 * @param messageSequenceNumber
 	 *        - generated sequence number for the message to send
 	 */
-	public Sendv20Message(PayloadCoder payloadCoder, int sessionId,
-			int messageSequenceNumber, int sessionSequenceNumber) {
+	public Sendv20Message(PayloadCoder payloadCoder, int sessionId, int messageSequenceNumber,
+			int sessionSequenceNumber) {
 		message = payloadCoder;
 		this.sessionId = sessionId;
 		this.messageSequenceNumber = messageSequenceNumber;

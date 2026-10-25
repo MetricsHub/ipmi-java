@@ -84,8 +84,7 @@ public class PiromInfo extends FruRecord {
 		}
 		if (fruData.length < offset + SIZE) {
 			throw new IllegalArgumentException(
-					"The processor information ROM is truncated: " + (fruData.length - offset) + " of " + SIZE
-							+ " bytes read");
+					"The processor information ROM is truncated: " + (fruData.length - offset) + " of " + SIZE + " bytes read");
 		}
 		byte[] rom = new byte[SIZE];
 		System.arraycopy(fruData, offset, rom, 0, SIZE);
@@ -165,12 +164,11 @@ public class PiromInfo extends FruRecord {
 		}
 		if (offset < HEADER_SIZE || offset + length > SIZE) {
 			throw new IllegalArgumentException(
-					String
-							.format(
-									Locale.ROOT,
-									"The processor information ROM section pointer at %02Xh (%02Xh) is outside the ROM",
-									pointer,
-									offset));
+					String.format(
+							Locale.ROOT,
+							"The processor information ROM section pointer at %02Xh (%02Xh) is outside the ROM",
+							pointer,
+							offset));
 		}
 		return offset;
 	}

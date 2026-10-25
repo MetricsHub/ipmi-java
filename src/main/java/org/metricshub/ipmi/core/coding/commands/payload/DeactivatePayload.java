@@ -82,8 +82,7 @@ public class DeactivatePayload extends IpmiCommandCoder<DeactivatePayloadRespons
 	protected IpmiPayload preparePayload(int sequenceNumber) throws NoSuchAlgorithmException, InvalidKeyException {
 		// We put just 2 bytes into the 6-bytes array, as specification for this command says to leave the rest 4 bytes as
 		// zeros
-		byte[] message = MessageComposer
-				.get(REQUEST_DATA_LENGTH)
+		byte[] message = MessageComposer.get(REQUEST_DATA_LENGTH)
 				.appendField(TypeConverter.intToByte(payloadType.getCode()))
 				.appendField(TypeConverter.intToByte(payloadInstance))
 				.getMessage();

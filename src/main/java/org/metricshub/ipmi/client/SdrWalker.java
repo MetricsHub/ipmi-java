@@ -146,15 +146,13 @@ final class SdrWalker {
 				// Record IDs are unique (IPMI 2.0 section 33.8): a next record ID already read, 0000h included, would
 				// read the repository again and again, so the walk ends there
 				if (nextRecordId < LAST_RECORD_ID && readIds.contains(nextRecordId)) {
-					skipped
-							.add(
-									new SkippedRecord(
-											recordId,
-											lastRecordType,
-											String
-													.format(
-															"Names record %04Xh as the next one, which was read already: the walk ends there",
-															nextRecordId)));
+					skipped.add(
+							new SkippedRecord(
+									recordId,
+									lastRecordType,
+									String.format(
+											"Names record %04Xh as the next one, which was read already: the walk ends there",
+											nextRecordId)));
 					return;
 				}
 			} catch (IpmiCompletionCodeException e) {
@@ -168,8 +166,7 @@ final class SdrWalker {
 					throw e;
 				}
 				lastReservationId = reservationId;
-				reservationId = exchange
-						.send(device ? new ReserveDeviceSdrRepository() : new ReserveSdrRepository())
+				reservationId = exchange.send(device ? new ReserveDeviceSdrRepository() : new ReserveSdrRepository())
 						.getReservationId();
 			}
 		}
@@ -210,13 +207,12 @@ final class SdrWalker {
 		remember(recordId, header);
 		if (header == null || header.length < HEADER_SIZE) {
 			nextRecordId = first.getNextRecordId();
-			skipped
-					.add(
-							new SkippedRecord(
-									recordId,
-									-1,
-									"The BMC returned " + (header == null ? 0 : header.length) + " byte(s) instead of the "
-											+ HEADER_SIZE + "-byte header"));
+			skipped.add(
+					new SkippedRecord(
+							recordId,
+							-1,
+							"The BMC returned " + (header == null ? 0 : header.length) + " byte(s) instead of the " + HEADER_SIZE
+									+ "-byte header"));
 			return null;
 		}
 		int size = TypeConverter.byteToInt(header[HEADER_SIZE - 1]) + HEADER_SIZE;
@@ -229,12 +225,11 @@ final class SdrWalker {
 			int got = chunk == null ? 0 : Math.min(toRead, chunk.length);
 			if (got == 0) {
 				nextRecordId = first.getNextRecordId();
-				skipped
-						.add(
-								new SkippedRecord(
-										recordId,
-										TypeConverter.byteToInt(header[3]),
-										"The BMC returned no data at offset " + read + " of " + size));
+				skipped.add(
+						new SkippedRecord(
+								recordId,
+								TypeConverter.byteToInt(header[3]),
+								"The BMC returned no data at offset " + read + " of " + size));
 				return null;
 			}
 			System.arraycopy(chunk, 0, bytes, read, got);
@@ -259,19 +254,19 @@ final class SdrWalker {
 
 	private GetSdr getSdr(int recordId, int offset, int size) {
 		return device ?
-				new GetDeviceSdr(reservationId, recordId, offset, size) : new GetSdr(reservationId, recordId, offset, size);
+				new GetDeviceSdr(reservationId, recordId, offset, size) :
+				new GetSdr(reservationId, recordId, offset, size);
 	}
 
 	private SensorRecord decode(int recordId, byte[] data) {
 		try {
 			return SensorRecord.populateSensorRecord(data);
 		} catch (RuntimeException e) {
-			skipped
-					.add(
-							new SkippedRecord(
-									recordId,
-									data.length > 3 ? TypeConverter.byteToInt(data[3]) : -1,
-									"Cannot decode the record: " + e.getMessage()));
+			skipped.add(
+					new SkippedRecord(
+							recordId,
+							data.length > 3 ? TypeConverter.byteToInt(data[3]) : -1,
+							"Cannot decode the record: " + e.getMessage()));
 			return null;
 		}
 	}

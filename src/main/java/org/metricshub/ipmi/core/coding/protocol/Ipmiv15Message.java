@@ -36,8 +36,7 @@ public class Ipmiv15Message extends IpmiMessage {
 	@Override
 	public void setAuthenticationType(AuthenticationType authenticationType) {
 		if (authenticationType == AuthenticationType.RMCPPlus) {
-			throw new IllegalArgumentException(
-					"IPMIv1.5 does not support RMCP+");
+			throw new IllegalArgumentException("IPMIv1.5 does not support RMCP+");
 		}
 		super.setAuthenticationType(authenticationType);
 	}

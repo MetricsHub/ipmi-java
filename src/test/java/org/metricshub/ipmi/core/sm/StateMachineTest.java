@@ -67,13 +67,12 @@ class StateMachineTest {
 	void anInSessionMessageIsDispatchedOutsideTheLock() throws Exception {
 		start(new SilentMessenger());
 		machine.setCurrent(new SessionValid(CipherSuite.getEmpty(), SESSION_ID));
-		byte[] raw = Encoder
-				.encode(
-						new Protocolv20Encoder(),
-						new GetChannelAuthenticationCapabilities(IpmiVersion.V20, IpmiVersion.V20, CipherSuite.getEmpty()),
-						1,
-						1,
-						SESSION_ID);
+		byte[] raw = Encoder.encode(
+				new Protocolv20Encoder(),
+				new GetChannelAuthenticationCapabilities(IpmiVersion.V20, IpmiVersion.V20, CipherSuite.getEmpty()),
+				1,
+				1,
+				SESSION_ID);
 		UdpMessage message = new UdpMessage();
 		message.setAddress(InetAddress.getLoopbackAddress());
 		message.setPort(623);

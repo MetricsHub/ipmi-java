@@ -54,17 +54,14 @@ public class GenericDeviceLocatorRecord extends SensorRecord {
 	private String name;
 
 	@Override
-	protected void populateTypeSpecficValues(
-			byte[] recordData,
-			SensorRecord record) {
+	protected void populateTypeSpecficValues(byte[] recordData, SensorRecord record) {
 
 		setDeviceAccessAddress((TypeConverter.byteToInt(recordData[5]) & 0xfe) >> 1);
 
 		setDeviceSlaveAddress((TypeConverter.byteToInt(recordData[6]) & 0xfe) >> 1);
 
 		setChannelNumber(
-				((TypeConverter.byteToInt(recordData[6]) & 0x1) << 3)
-						| ((TypeConverter.byteToInt(recordData[7]) & 0xe0) >> 5));
+				((TypeConverter.byteToInt(recordData[6]) & 0x1) << 3) | ((TypeConverter.byteToInt(recordData[7]) & 0xe0) >> 5));
 
 		setAccessLun((TypeConverter.byteToInt(recordData[7]) & 0x18) >> 3);
 

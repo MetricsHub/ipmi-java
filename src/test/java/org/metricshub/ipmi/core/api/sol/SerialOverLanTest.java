@@ -78,8 +78,7 @@ class SerialOverLanTest {
 	/** The capacity of the buffer of a console. */
 	private static final int BUFFER = 64 * 1024;
 
-	private static final CipherSuiteSelectionHandler SUITE_17 = suites -> suites
-			.stream()
+	private static final CipherSuiteSelectionHandler SUITE_17 = suites -> suites.stream()
 			.filter(suite -> suite.getId() == 17)
 			.findFirst()
 			.orElseThrow(() -> new IllegalArgumentException("The BMC does not offer cipher suite 17"));
@@ -134,8 +133,7 @@ class SerialOverLanTest {
 		// Only suite 3 is offered: a selector that returns null must not open a suite 0 session (#215)
 		try (FakeRmcpPlusBmc bmc = new FakeRmcpPlusBmc(bytes("c0 03 01 41 81"), USER, utf8(PASSWORD), null)) {
 			IpmiConnector connector = new IpmiConnector(0, 0);
-			CipherSuiteSelectionHandler none = suites -> suites
-					.stream()
+			CipherSuiteSelectionHandler none = suites -> suites.stream()
 					.filter(suite -> suite.getId() == 17)
 					.findFirst()
 					.orElse(null);
@@ -287,11 +285,8 @@ class SerialOverLanTest {
 			bmc.enableSol(solPort.getPort(), PAYLOAD_SIZE, FakeRmcpPlusBmc.USER);
 			solPort.enableSol(solPort.getPort(), PAYLOAD_SIZE, FakeRmcpPlusBmc.USER);
 			solPort
-					.handle(
-							NETFN_APP,
-							SET_SESSION_PRIVILEGE_LEVEL,
-							data -> (data[0] & 0x0f) > 3 ? new byte[]
-							{ (byte) 0x81 } : new byte[] { 0x00, data[0] });
+					.handle(NETFN_APP, SET_SESSION_PRIVILEGE_LEVEL, data -> (data[0] & 0x0f) > 3 ? new byte[]
+					{ (byte) 0x81 } : new byte[] { 0x00, data[0] });
 			IpmiConnector connector = new IpmiConnector(0, 0);
 			try {
 				SerialOverLan sol = new SerialOverLan(connector, openSession(connector, bmc, null, PrivilegeLevel.User));
@@ -911,12 +906,11 @@ class SerialOverLanTest {
 	void aPayloadActiveInAnotherSessionIsLeftToIt() throws Exception {
 		try (FakeRmcpPlusBmc bmc = solBmc(null)) {
 			bmc.handle(NETFN_APP, FakeRmcpPlusBmc.ACTIVATE_PAYLOAD, data -> new byte[] { (byte) 0x80 });
-			bmc
-					.handle(
-							NETFN_APP,
-							FakeRmcpPlusBmc.GET_PAYLOAD_INSTANCE_INFO,
-							data -> new byte[]
-							{ 0x00, 0x12, 0x34, 0x56, 0x78, 0, 0, 0, 0, 0, 0, 0, 0 });
+			bmc.handle(
+					NETFN_APP,
+					FakeRmcpPlusBmc.GET_PAYLOAD_INSTANCE_INFO,
+					data -> new byte[]
+					{ 0x00, 0x12, 0x34, 0x56, 0x78, 0, 0, 0, 0, 0, 0, 0, 0 });
 			IpmiConnector connector = new IpmiConnector(0, 0);
 			try {
 				Session session = openSession(connector, bmc, null);
@@ -1136,19 +1130,17 @@ class SerialOverLanTest {
 				SerialOverLan sol = new SerialOverLan(connector, session);
 				assertTrue(sol.writeByte((byte) 'a'));
 				// A BMC with an instance free, which refuses it: the payload is active in another session
-				bmc
-						.handle(
-								NETFN_APP,
-								FakeRmcpPlusBmc.GET_PAYLOAD_ACTIVATION_STATUS,
-								data -> new byte[]
-								{ 0x00, 0x02, 0x01, 0x00 });
+				bmc.handle(
+						NETFN_APP,
+						FakeRmcpPlusBmc.GET_PAYLOAD_ACTIVATION_STATUS,
+						data -> new byte[]
+						{ 0x00, 0x02, 0x01, 0x00 });
 				bmc.handle(NETFN_APP, FakeRmcpPlusBmc.ACTIVATE_PAYLOAD, data -> new byte[] { (byte) 0x80 });
-				bmc
-						.handle(
-								NETFN_APP,
-								FakeRmcpPlusBmc.GET_PAYLOAD_INSTANCE_INFO,
-								data -> new byte[]
-								{ 0x00, 0x12, 0x34, 0x56, 0x78, 0, 0, 0, 0, 0, 0, 0, 0 });
+				bmc.handle(
+						NETFN_APP,
+						FakeRmcpPlusBmc.GET_PAYLOAD_INSTANCE_INFO,
+						data -> new byte[]
+						{ 0x00, 0x12, 0x34, 0x56, 0x78, 0, 0, 0, 0, 0, 0, 0, 0 });
 				assertThrows(SOLException.class, () -> new SerialOverLan(connector, session));
 				// The first console goes on numbering its packets
 				assertTrue(sol.writeByte((byte) 'b'));
@@ -1212,15 +1204,14 @@ class SerialOverLanTest {
 						copies++;
 						if (random.nextInt(4) == 0) {
 							// This copy also arrives after 1 to 6 newer packets
-							late
-									.add(
-											new Object[]
-											{
-													packet + 1 + random.nextInt(6),
-													sequenceNumber,
-													copyStatus,
-													text.substring(0, length),
-													text.length() });
+							late.add(
+									new Object[]
+									{
+											packet + 1 + random.nextInt(6),
+											sequenceNumber,
+											copyStatus,
+											text.substring(0, length),
+											text.length() });
 						}
 					}
 					expected.append(text);
@@ -1530,9 +1521,7 @@ class SerialOverLanTest {
 
 	private static void assertChassisStatus(IpmiConnector connector, ConnectionHandle handle) throws Exception {
 		GetChassisStatusResponseData status = (GetChassisStatusResponseData) connector
-				.sendMessage(
-						handle,
-						new GetChassisStatus());
+				.sendMessage(handle, new GetChassisStatus());
 		assertEquals(FakeRmcpPlusBmc.CHASSIS_STATUS[0], status.getCurrentPowerState());
 	}
 
@@ -1581,8 +1570,7 @@ class SerialOverLanTest {
 	 * @return how many Resume ACKs (ACK of 0 characters of a packet) the BMC received
 	 */
 	private static long resumes(FakeRmcpPlusBmc bmc) {
-		return bmc
-				.getSolPackets()
+		return bmc.getSolPackets()
 				.stream()
 				.filter(packet -> packet.sequenceNumber == 0 && packet.ackSequenceNumber != 0)
 				.filter(packet -> !packet.isNack() && packet.acceptedCharacters == 0)
@@ -1593,8 +1581,7 @@ class SerialOverLanTest {
 	 * @return how many ACK-only packets the BMC received with the given acknowledgement, as {@link #ack}
 	 */
 	private static long acks(FakeRmcpPlusBmc bmc, String acknowledgement) {
-		return bmc
-				.getSolPackets()
+		return bmc.getSolPackets()
 				.stream()
 				.filter(packet -> packet.sequenceNumber == 0 && acknowledgement.equals(ack(packet)))
 				.count();

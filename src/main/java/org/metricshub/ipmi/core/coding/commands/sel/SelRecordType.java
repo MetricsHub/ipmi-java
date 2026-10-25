@@ -38,8 +38,7 @@ public enum SelRecordType {
 	/**
 	 * A non-timestamped OEM record (E0h-FFh, IPMI 2.0 section 32.3): 13 OEM-defined bytes.
 	 */
-	OemNonTimestamped(
-			SelRecordType.OEMNONTIMESTAMPED),
+	OemNonTimestamped(SelRecordType.OEMNONTIMESTAMPED),
 	/**
 	 * A reserved record type (00h-01h and 03h-BFh, IPMI 2.0 section 31.6.1): only the record ID of such an entry is
 	 * meaningful.

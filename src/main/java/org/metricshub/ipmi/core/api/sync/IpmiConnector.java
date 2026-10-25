@@ -248,11 +248,7 @@ public class IpmiConnector {
 			CipherSuite cipherSuite,
 			PrivilegeLevel requestedPrivilegeLevel)
 			throws Exception {
-		return asyncConnector
-				.getChannelAuthenticationCapabilities(
-						connectionHandle,
-						cipherSuite,
-						requestedPrivilegeLevel);
+		return asyncConnector.getChannelAuthenticationCapabilities(connectionHandle, cipherSuite, requestedPrivilegeLevel);
 	}
 
 	/**

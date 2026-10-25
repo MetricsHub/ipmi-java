@@ -59,10 +59,7 @@ public class BaseCompatibilityInfo extends MultiRecordInfo {
 		buffer[3] = 0;
 
 		manufacturerId = TypeConverter.littleEndianByteArrayToInt(buffer);
-		entityId = EntityId
-				.parseInt(
-						TypeConverter
-								.byteToInt(fruData[offset + 3]));
+		entityId = EntityId.parseInt(TypeConverter.byteToInt(fruData[offset + 3]));
 		compatibilityBase = TypeConverter.byteToInt(fruData[offset + 4]);
 		codeStart = TypeConverter.byteToInt(fruData[offset + 5]) & 0x7f;
 		codeRangeMasks = new byte[length - 6];

@@ -15,9 +15,8 @@ class GetPayloadInstanceInfoTest {
 	@Test
 	void theSessionIdIsReadLsByteFirst() throws Exception {
 		// Session ID, then 8 bytes of payload-specific information (table 24-7)
-		GetPayloadInstanceInfoResponseData data = (GetPayloadInstanceInfoResponseData) command
-				.getResponseData(
-						response(CommandCodes.GET_PAYLOAD_INSTANCE_INFO, 0x00, 0x78, 0x56, 0x34, 0x12, 1, 0, 0, 0, 0, 0, 0, 0));
+		GetPayloadInstanceInfoResponseData data = (GetPayloadInstanceInfoResponseData) command.getResponseData(
+				response(CommandCodes.GET_PAYLOAD_INSTANCE_INFO, 0x00, 0x78, 0x56, 0x34, 0x12, 1, 0, 0, 0, 0, 0, 0, 0));
 		assertEquals(0x12345678, data.getSessionId());
 	}
 

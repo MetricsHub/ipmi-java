@@ -187,8 +187,7 @@ public final class ChassisStatus {
 
 	@Override
 	public String toString() {
-		StringBuilder text = new StringBuilder("Power ")
-				.append(powerOn() ? "on" : "off")
+		StringBuilder text = new StringBuilder("Power ").append(powerOn() ? "on" : "off")
 				.append(", restore policy ")
 				.append(powerRestorePolicy())
 				.append(", last power event ")

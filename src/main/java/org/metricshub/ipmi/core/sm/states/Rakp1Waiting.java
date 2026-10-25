@@ -66,18 +66,13 @@ public class Rakp1Waiting extends State {
 	}
 
 	@Override
-	public void doTransition(
-			StateMachine stateMachine,
-			StateMachineEvent machineEvent) {
+	public void doTransition(StateMachine stateMachine, StateMachineEvent machineEvent) {
 		if (machineEvent instanceof DefaultAck) {
 			stateMachine.setCurrent(new Rakp1Complete(rakp1));
 		} else if (machineEvent instanceof Timeout) {
 			stateMachine.setCurrent(new Authcap());
 		} else {
-			stateMachine
-					.doExternalAction(
-							new ErrorAction(
-									new IllegalArgumentException("Invalid transition")));
+			stateMachine.doExternalAction(new ErrorAction(new IllegalArgumentException("Invalid transition")));
 		}
 
 	}
@@ -87,8 +82,7 @@ public class Rakp1Waiting extends State {
 		if (ProtocolDecoder.decodeAuthenticationType(message) != AuthenticationType.RMCPPlus) {
 			return; // this isn't IPMI v2.0 message so we ignore it
 		}
-		PlainCommandv20Decoder decoder = new PlainCommandv20Decoder(
-				CipherSuite.getEmpty());
+		PlainCommandv20Decoder decoder = new PlainCommandv20Decoder(CipherSuite.getEmpty());
 		if (Protocolv20Decoder.decodePayloadType(message.getData()[1]) != PayloadType.Rakp2) {
 			return;
 		}
@@ -96,15 +90,8 @@ public class Rakp1Waiting extends State {
 		try {
 			ipmiMessage = decoder.decode(message);
 			if (rakp1.isCommandResponse(ipmiMessage)
-					&& TypeConverter
-							.byteToInt(
-									((PlainMessage) ipmiMessage
-											.getPayload()).getPayloadData()[0]) == tag) {
-				stateMachine
-						.doExternalAction(
-								new ResponseAction(
-										rakp1
-												.getResponseData(ipmiMessage)));
+					&& TypeConverter.byteToInt(((PlainMessage) ipmiMessage.getPayload()).getPayloadData()[0]) == tag) {
+				stateMachine.doExternalAction(new ResponseAction(rakp1.getResponseData(ipmiMessage)));
 			}
 		} catch (Exception e) {
 			stateMachine.setCurrent(new Authcap());

@@ -69,8 +69,7 @@ public class GetPayloadActivationStatus extends IpmiCommandCoder<GetPayloadActiv
 
 	@Override
 	protected IpmiPayload preparePayload(int sequenceNumber) throws NoSuchAlgorithmException, InvalidKeyException {
-		byte[] message = MessageComposer
-				.get(REQUEST_DATA_LENGTH)
+		byte[] message = MessageComposer.get(REQUEST_DATA_LENGTH)
 				.appendField(TypeConverter.intToByte(payloadType.getCode()))
 				.getMessage();
 

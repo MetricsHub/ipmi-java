@@ -27,16 +27,11 @@ package org.metricshub.ipmi.core.coding.payload.lan;
  */
 public enum NetworkFunction {
 	ChassisRequest(NetworkFunction.CHASSISREQUEST),
-	ChassisResponse(
-			NetworkFunction.CHASSISRESPONSE),
-	StorageRequest(
-			NetworkFunction.STORAGEREQUEST),
-	StorageResponse(
-			NetworkFunction.STORAGERESPONSE),
-	BridgeRequest(
-			NetworkFunction.BRIDGEREQUEST),
-	BridgeResponse(
-			NetworkFunction.BRIDGERESPONSE),
+	ChassisResponse(NetworkFunction.CHASSISRESPONSE),
+	StorageRequest(NetworkFunction.STORAGEREQUEST),
+	StorageResponse(NetworkFunction.STORAGERESPONSE),
+	BridgeRequest(NetworkFunction.BRIDGEREQUEST),
+	BridgeResponse(NetworkFunction.BRIDGERESPONSE),
 	/**
 	 * Sensor/Event Request
 	 */
@@ -45,14 +40,10 @@ public enum NetworkFunction {
 	 * Sensor/Event Response
 	 */
 	SensorResponse(NetworkFunction.SENSORRESPONSE),
-	ApplicationRequest(
-			NetworkFunction.APPLICATIONREQUEST),
-	ApplicationResponse(
-			NetworkFunction.APPLICATIONRESPONSE),
-	FirmwareRequest(
-			NetworkFunction.FIRMWAREREQUEST),
-	FirmwareResponse(
-			NetworkFunction.FIRMWARERESPONSE),;
+	ApplicationRequest(NetworkFunction.APPLICATIONREQUEST),
+	ApplicationResponse(NetworkFunction.APPLICATIONRESPONSE),
+	FirmwareRequest(NetworkFunction.FIRMWAREREQUEST),
+	FirmwareResponse(NetworkFunction.FIRMWARERESPONSE),;
 
 	private static final int CHASSISREQUEST = 0;
 	private static final int CHASSISRESPONSE = 1;

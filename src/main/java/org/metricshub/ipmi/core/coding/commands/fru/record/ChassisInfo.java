@@ -60,10 +60,7 @@ public class ChassisInfo extends FruRecord {
 			throw new IllegalArgumentException(String.format("Invalid format version %02Xh", fruData[offset] & 0xff));
 		}
 
-		chassisType = ChassisType
-				.parseInt(
-						TypeConverter
-								.byteToInt(fruData[offset + 2]));
+		chassisType = ChassisType.parseInt(TypeConverter.byteToInt(fruData[offset + 2]));
 
 		int partNumber = TypeConverter.byteToInt(fruData[offset + 3]);
 
@@ -83,38 +80,19 @@ public class ChassisInfo extends FruRecord {
 
 				byte[] partNumberData = new byte[partDataLength];
 
-				System
-						.arraycopy(
-								fruData,
-								currentOffset,
-								partNumberData,
-								0,
-								partDataLength);
+				System.arraycopy(fruData, currentOffset, partNumberData, 0, partDataLength);
 
 				currentOffset += partDataLength;
 
 				switch (index) {
 				case 0:
-					setChassisPartNumber(
-							decodeString(
-									partType,
-									partNumberData,
-									true));
+					setChassisPartNumber(decodeString(partType, partNumberData, true));
 					break;
 				case 1:
-					setChassisSerialNumber(
-							decodeString(
-									partType,
-									partNumberData,
-									true));
+					setChassisSerialNumber(decodeString(partType, partNumberData, true));
 					break;
 				default:
-					customInfo
-							.add(
-									decodeString(
-											partType,
-											partNumberData,
-											true));
+					customInfo.add(decodeString(partType, partNumberData, true));
 					break;
 				}
 			}

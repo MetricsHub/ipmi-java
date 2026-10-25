@@ -51,11 +51,7 @@ public interface ConnectionListener {
 	 *        - null if everything went correctly or timeout occured,
 	 *        contains exception that occured during decoding if it failed.
 	 */
-	void processResponse(
-			ResponseData responseData,
-			int handle,
-			int id,
-			Exception exception);
+	void processResponse(ResponseData responseData, int handle, int id, Exception exception);
 
 	/**
 	 * Notifies the {@link ConnectionListener} of a payload the remote system sent on its own initiative (Serial over

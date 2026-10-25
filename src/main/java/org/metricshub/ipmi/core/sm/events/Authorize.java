@@ -41,8 +41,7 @@ public class Authorize extends Default {
 		return sessionId;
 	}
 
-	public Authorize(CipherSuite cipherSuite, int sequenceNumber,
-			PrivilegeLevel privilegeLevel, int sessionId) {
+	public Authorize(CipherSuite cipherSuite, int sequenceNumber, PrivilegeLevel privilegeLevel, int sessionId) {
 		super(cipherSuite, sequenceNumber, privilegeLevel);
 		this.sessionId = sessionId;
 	}

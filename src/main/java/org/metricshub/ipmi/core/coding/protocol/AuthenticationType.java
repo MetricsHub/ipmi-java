@@ -29,11 +29,9 @@ package org.metricshub.ipmi.core.coding.protocol;
 public enum AuthenticationType {
 	None(AuthenticationType.NONE),
 	Md2(AuthenticationType.MD2),
-	Md5(
-			AuthenticationType.MD5),
+	Md5(AuthenticationType.MD5),
 	Simple(AuthenticationType.SIMPLE),
-	Oem(
-			AuthenticationType.OEM),
+	Oem(AuthenticationType.OEM),
 	RMCPPlus(AuthenticationType.RMCPPLUS),;
 
 	private static final int NONE = 0;

@@ -18,16 +18,15 @@ class GetChannelPayloadSupportTest {
 		GetChannelPayloadSupportResponseData data = (GetChannelPayloadSupportResponseData) new GetChannelPayloadSupport()
 				.getResponseData(response(CommandCodes.GET_CHANNEL_PAYLOAD_SUPPORT, 0x00, 0x03, 0x00, 0x3f, 0, 0, 0, 0, 0));
 		assertEquals(
-				EnumSet
-						.of(
-								PayloadType.Ipmi,
-								PayloadType.Sol,
-								PayloadType.RmcpOpenSessionRequest,
-								PayloadType.RmcpOpenSessionResponse,
-								PayloadType.Rakp1,
-								PayloadType.Rakp2,
-								PayloadType.Rakp3,
-								PayloadType.Rakp4),
+				EnumSet.of(
+						PayloadType.Ipmi,
+						PayloadType.Sol,
+						PayloadType.RmcpOpenSessionRequest,
+						PayloadType.RmcpOpenSessionResponse,
+						PayloadType.Rakp1,
+						PayloadType.Rakp2,
+						PayloadType.Rakp3,
+						PayloadType.Rakp4),
 				data.getSupportedPayloads());
 	}
 
@@ -37,7 +36,6 @@ class GetChannelPayloadSupportTest {
 		assertThrows(
 				IllegalArgumentException.class,
 				() -> command
-						.getResponseData(
-								response(CommandCodes.GET_CHANNEL_PAYLOAD_SUPPORT, 0x00, 0x03, 0x00, 0x3f, 0, 0, 0, 0)));
+						.getResponseData(response(CommandCodes.GET_CHANNEL_PAYLOAD_SUPPORT, 0x00, 0x03, 0x00, 0x3f, 0, 0, 0, 0)));
 	}
 }

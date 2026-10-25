@@ -37,22 +37,13 @@ import org.metricshub.ipmi.core.sm.events.StateMachineEvent;
 public class Rakp3Complete extends State {
 
 	@Override
-	public void doTransition(
-			StateMachine stateMachine,
-			StateMachineEvent machineEvent) {
+	public void doTransition(StateMachine stateMachine, StateMachineEvent machineEvent) {
 		if (machineEvent instanceof StartSession) {
 			StartSession event = (StartSession) machineEvent;
-			stateMachine
-					.setCurrent(
-							new SessionValid(
-									event.getCipherSuite(),
-									event.getSessionId()));
+			stateMachine.setCurrent(new SessionValid(event.getCipherSuite(), event.getSessionId()));
 
 		} else {
-			stateMachine
-					.doExternalAction(
-							new ErrorAction(
-									new IllegalArgumentException("Invalid transition")));
+			stateMachine.doExternalAction(new ErrorAction(new IllegalArgumentException("Invalid transition")));
 		}
 	}
 

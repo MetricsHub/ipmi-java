@@ -50,8 +50,7 @@ public final class Fixtures {
 	 */
 	public static FakeRmcpPlusBmc bmc() throws IOException {
 		FakeRmcpPlusBmc bmc = new FakeRmcpPlusBmc(SUITES, USER, utf8(PASSWORD), null);
-		new FakeSdrRepository()
-				.add(FRONT_PANEL_FULL_RECORD)
+		new FakeSdrRepository().add(FRONT_PANEL_FULL_RECORD)
 				.add(compactSensorRecord(2, FAN_SENSOR, EntityId.Fan.getCode(), 1, SensorType.Fan.getCode(), 0x08, "Fan 1"))
 				.add(
 						compactSensorRecord(
@@ -85,18 +84,8 @@ public final class Fixtures {
 	 * @return the log
 	 */
 	public static FakeSel sel() {
-		return new FakeSel()
-				.add(
-						systemEvent(
-								1,
-								SEL_RESET_TIME,
-								SensorType.EventLoggingDisabled.getCode(),
-								0x72,
-								0x6f,
-								true,
-								0x02,
-								0xff,
-								0xff))
+		return new FakeSel().add(
+				systemEvent(1, SEL_RESET_TIME, SensorType.EventLoggingDisabled.getCode(), 0x72, 0x6f, true, 0x02, 0xff, 0xff))
 				.add(oemTimestamped(2, 0xc0, SEL_RESET_TIME + 5, LENOVO, 0x02, 0x01, 0x05, 0x00, 0x00, 0x00))
 				.add(
 						systemEvent(
@@ -109,17 +98,7 @@ public final class Fixtures {
 								0x57,
 								0x9a,
 								0x98))
-				.add(
-						systemEvent(
-								4,
-								SEL_RESET_TIME + 489,
-								SensorType.PowerUnit.getCode(),
-								1,
-								0x6f,
-								false,
-								0x00,
-								0xff,
-								0xff))
+				.add(systemEvent(4, SEL_RESET_TIME + 489, SensorType.PowerUnit.getCode(), 1, 0x6f, false, 0x00, 0xff, 0xff))
 				.add(selRecord(5, 0xe0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13))
 				.add(systemEvent(6, 5, SensorType.Processor.getCode(), 2, 0x6f, true, 0x00, 0xff, 0xff));
 	}

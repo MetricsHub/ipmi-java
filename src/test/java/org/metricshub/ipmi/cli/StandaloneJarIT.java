@@ -38,8 +38,7 @@ class StandaloneJarIT {
 			assertEquals("org.metricshub.ipmi.cli.IpmiCli", attributes.getValue(Attributes.Name.MAIN_CLASS));
 			assertEquals(projectVersion, attributes.getValue("Implementation-Version"));
 			// The library has no dependency: no third-party class may leak into the standalone jar
-			jar
-					.stream()
+			jar.stream()
 					.map(entry -> entry.getName())
 					.filter(name -> name.endsWith(".class"))
 					.forEach(

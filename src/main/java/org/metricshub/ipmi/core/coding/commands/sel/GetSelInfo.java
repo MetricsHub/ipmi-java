@@ -55,14 +55,8 @@ public class GetSelInfo extends IpmiCommandCoder<GetSelInfoResponseData> {
 	}
 
 	@Override
-	protected IpmiPayload preparePayload(int sequenceNumber)
-			throws NoSuchAlgorithmException,
-			InvalidKeyException {
-		return new IpmiLanRequest(
-				getNetworkFunction(),
-				getCommandCode(),
-				null,
-				TypeConverter.intToByte(sequenceNumber));
+	protected IpmiPayload preparePayload(int sequenceNumber) throws NoSuchAlgorithmException, InvalidKeyException {
+		return new IpmiLanRequest(getNetworkFunction(), getCommandCode(), null, TypeConverter.intToByte(sequenceNumber));
 	}
 
 	@Override
@@ -78,10 +72,7 @@ public class GetSelInfo extends IpmiCommandCoder<GetSelInfoResponseData> {
 
 		GetSelInfoResponseData responseData = new GetSelInfoResponseData();
 
-		responseData
-				.setSelVersion(
-						TypeConverter
-								.littleEndianBcdByteToInt(raw[0]));
+		responseData.setSelVersion(TypeConverter.littleEndianBcdByteToInt(raw[0]));
 
 		byte[] buffer = new byte[4];
 
@@ -90,26 +81,15 @@ public class GetSelInfo extends IpmiCommandCoder<GetSelInfoResponseData> {
 		buffer[2] = 0;
 		buffer[3] = 0;
 
-		responseData
-				.setEntriesCount(
-						TypeConverter
-								.littleEndianByteArrayToInt(buffer));
+		responseData.setEntriesCount(TypeConverter.littleEndianByteArrayToInt(buffer));
 
 		System.arraycopy(raw, 5, buffer, 0, 4);
 
-		responseData
-				.setAdditionTimestamp(
-						TypeConverter
-								.decodeDate(TypeConverter.littleEndianByteArrayToInt(buffer)));
+		responseData.setAdditionTimestamp(TypeConverter.decodeDate(TypeConverter.littleEndianByteArrayToInt(buffer)));
 
 		System.arraycopy(raw, 9, buffer, 0, 4);
 
-		responseData
-				.setEraseTimestamp(
-						TypeConverter
-								.decodeDate(
-										TypeConverter
-												.littleEndianByteArrayToInt(buffer)));
+		responseData.setEraseTimestamp(TypeConverter.decodeDate(TypeConverter.littleEndianByteArrayToInt(buffer)));
 
 		return responseData;
 	}

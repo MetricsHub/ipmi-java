@@ -65,10 +65,7 @@ public abstract class FruRecord {
 	 *        - true if the Language Code is English
 	 * @return - decoded string
 	 */
-	protected static String decodeString(
-			int typeFormat,
-			byte[] data,
-			boolean isEnglishLanguageCode) {
+	protected static String decodeString(int typeFormat, byte[] data, boolean isEnglishLanguageCode) {
 		// TODO: Test different encoding types
 		switch (typeFormat) {
 		case 0:

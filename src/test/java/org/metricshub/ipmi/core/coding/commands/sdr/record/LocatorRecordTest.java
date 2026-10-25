@@ -30,9 +30,8 @@ class LocatorRecordTest {
 		// inventory device, modifier, system board, instance 1, OEM, 8-bit ASCII ID string
 		FruDeviceLocatorRecord locator = assertInstanceOf(
 				FruDeviceLocatorRecord.class,
-				SensorRecord
-						.populateSensorRecord(
-								record(0x11, 0x40, 0x03, 0x8a, 0x10, 0x00, 0x10, 0x00, 0x07, 0x01, 0x00, 0xc3, 'F', 'R', 'U')));
+				SensorRecord.populateSensorRecord(
+						record(0x11, 0x40, 0x03, 0x8a, 0x10, 0x00, 0x10, 0x00, 0x07, 0x01, 0x00, 0xc3, 'F', 'R', 'U')));
 
 		assertEquals(RECORD_ID, locator.getId(), "the SDR record ID, not the device ID");
 		assertEquals(3, locator.getDeviceId());
@@ -50,9 +49,8 @@ class LocatorRecordTest {
 		// device type, modifier, system board, instance 1, OEM, 8-bit ASCII ID string at byte 16
 		GenericDeviceLocatorRecord locator = assertInstanceOf(
 				GenericDeviceLocatorRecord.class,
-				SensorRecord
-						.populateSensorRecord(
-								record(0x10, 0x40, 0x42, 0x0d, 0x07, 0x00, 0x10, 0x00, 0x07, 0x01, 0x00, 0xc4, 'N', 'A', 'M', 'E')));
+				SensorRecord.populateSensorRecord(
+						record(0x10, 0x40, 0x42, 0x0d, 0x07, 0x00, 0x10, 0x00, 0x07, 0x01, 0x00, 0xc4, 'N', 'A', 'M', 'E')));
 
 		assertEquals(RECORD_ID, locator.getId());
 		assertEquals(0x21, locator.getDeviceSlaveAddress());
@@ -81,8 +79,7 @@ class LocatorRecordTest {
 				assertInstanceOf(FruDeviceLocatorRecord.class, SensorRecord.populateSensorRecord(shortFru)).getName());
 		assertEquals(
 				"NAME",
-				assertInstanceOf(GenericDeviceLocatorRecord.class, SensorRecord.populateSensorRecord(paddedGeneric))
-						.getName());
+				assertInstanceOf(GenericDeviceLocatorRecord.class, SensorRecord.populateSensorRecord(paddedGeneric)).getName());
 		assertEquals(
 				"BMC",
 				assertInstanceOf(

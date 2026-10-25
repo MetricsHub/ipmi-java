@@ -46,7 +46,8 @@ public class IpmiLanResponse extends IpmiLanMessage {
 	public void setCompletionCode(byte completionCode) {
 		rawCompletionCode = TypeConverter.byteToInt(completionCode);
 		this.completionCode = rawCompletionCode == 0 || rawCompletionCode >= GENERIC_CODES_START ?
-				CompletionCode.parseInt(rawCompletionCode) : CompletionCode.Unknown;
+				CompletionCode.parseInt(rawCompletionCode) :
+				CompletionCode.Unknown;
 	}
 
 	public CompletionCode getCompletionCode() {
@@ -73,34 +74,14 @@ public class IpmiLanResponse extends IpmiLanMessage {
 			throw new IllegalArgumentException("IPMI LAN response is too short: " + rawData.length + " bytes");
 		}
 		setRequesterAddress(rawData[0]);
-		setNetworkFunctionCode(
-				TypeConverter
-						.intToByte(
-								(TypeConverter
-										.byteToInt(rawData[1])
-										& 0xfC) >> 2));
-		setRequesterLogicalUnitNumber(
-				TypeConverter
-						.intToByte(
-								TypeConverter
-										.byteToInt(rawData[1])
-										& 0x03));
+		setNetworkFunctionCode(TypeConverter.intToByte((TypeConverter.byteToInt(rawData[1]) & 0xfC) >> 2));
+		setRequesterLogicalUnitNumber(TypeConverter.intToByte(TypeConverter.byteToInt(rawData[1]) & 0x03));
 		if (rawData[2] != getChecksum1(rawData)) {
 			throw new IllegalArgumentException("Checksum 1 failed");
 		}
 		setResponderAddress(rawData[3]);
-		setSequenceNumber(
-				TypeConverter
-						.intToByte(
-								(TypeConverter
-										.byteToInt(rawData[4])
-										& 0xfC) >> 2));
-		setResponderLogicalUnitNumber(
-				TypeConverter
-						.intToByte(
-								TypeConverter
-										.byteToInt(rawData[4])
-										& 0x03));
+		setSequenceNumber(TypeConverter.intToByte((TypeConverter.byteToInt(rawData[4]) & 0xfC) >> 2));
+		setResponderLogicalUnitNumber(TypeConverter.intToByte(TypeConverter.byteToInt(rawData[4]) & 0x03));
 		setCommand(rawData[5]);
 		setCompletionCode(rawData[6]);
 

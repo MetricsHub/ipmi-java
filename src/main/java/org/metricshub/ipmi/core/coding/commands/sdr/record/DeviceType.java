@@ -54,8 +54,7 @@ public enum DeviceType {
 	LM75TemperatureSensor(DeviceType.LM75TEMPERATURESENSOR),
 	HecetaASIC(DeviceType.HECETAASIC),
 	Eeprom24C01(DeviceType.EEPROM24C01),
-	Eeprom24C02(DeviceType.EEPROM24C02),
-	;
+	Eeprom24C02(DeviceType.EEPROM24C02),;
 
 	private static final int EEPROM24C04 = 10;
 	private static final int EEPROM24C08 = 11;

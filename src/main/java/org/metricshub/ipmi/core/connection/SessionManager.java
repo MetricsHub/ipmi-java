@@ -155,17 +155,15 @@ public class SessionManager {
 		try {
 			handle = connector.createConnection(connectionHandle.getRemoteAddress(), remotePort);
 			connector.getAvailableCipherSuites(handle);
-			connector
-					.getChannelAuthenticationCapabilities(
-							handle,
-							connectionHandle.getCipherSuite().copy(),
-							connectionHandle.getPrivilegeLevel());
-			return connector
-					.openSession(
-							handle,
-							connectionHandle.getUser(),
-							connectionHandle.getPasswordBytes(),
-							connectionHandle.getBmcKey());
+			connector.getChannelAuthenticationCapabilities(
+					handle,
+					connectionHandle.getCipherSuite().copy(),
+					connectionHandle.getPrivilegeLevel());
+			return connector.openSession(
+					handle,
+					connectionHandle.getUser(),
+					connectionHandle.getPasswordBytes(),
+					connectionHandle.getBmcKey());
 		} catch (Exception e) {
 			closeConnection(connector, handle);
 			throw new SessionException("Cannot create new session: " + e.getMessage(), e);

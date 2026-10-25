@@ -52,8 +52,7 @@ public class GetChannelAuthenticationCapabilities
 
 	private IpmiVersion requestVersion;
 
-	public void setRequestedPrivilegeLevel(
-			PrivilegeLevel requestedPrivilegeLevel) {
+	public void setRequestedPrivilegeLevel(PrivilegeLevel requestedPrivilegeLevel) {
 		this.requestedPrivilegeLevel = requestedPrivilegeLevel;
 	}
 
@@ -71,10 +70,7 @@ public class GetChannelAuthenticationCapabilities
 	 * @throws IllegalArgumentException
 	 */
 	public void setChannelNumber(int channelNumber) {
-		if (channelNumber < 0
-				|| channelNumber > 0xF
-				|| channelNumber == 0xC
-				|| channelNumber == 0xD) {
+		if (channelNumber < 0 || channelNumber > 0xF || channelNumber == 0xC || channelNumber == 0xD) {
 			throw new IllegalArgumentException("Invalid channel number");
 		}
 		this.channelNumber = TypeConverter.intToByte(channelNumber);
@@ -124,8 +120,8 @@ public class GetChannelAuthenticationCapabilities
 	 *        confidentiality and integrity algorithms for this session.
 	 * @see IpmiVersion
 	 */
-	public GetChannelAuthenticationCapabilities(IpmiVersion version,
-			IpmiVersion requestVersion, CipherSuite cipherSuite) {
+	public GetChannelAuthenticationCapabilities(IpmiVersion version, IpmiVersion requestVersion,
+			CipherSuite cipherSuite) {
 		setSessionParameters(version, cipherSuite, AuthenticationType.None);
 		this.setRequestVersion(requestVersion);
 		setRequestedPrivilegeLevel(PrivilegeLevel.User);
@@ -155,8 +151,7 @@ public class GetChannelAuthenticationCapabilities
 	 * @see IpmiVersion
 	 * @see PrivilegeLevel
 	 */
-	public GetChannelAuthenticationCapabilities(IpmiVersion version,
-			IpmiVersion requestVersion, CipherSuite cipherSuite,
+	public GetChannelAuthenticationCapabilities(IpmiVersion version, IpmiVersion requestVersion, CipherSuite cipherSuite,
 			PrivilegeLevel privilegeLevel, byte channelNumber) {
 		setSessionParameters(version, cipherSuite, AuthenticationType.None);
 		this.setRequestVersion(requestVersion);
@@ -204,11 +199,7 @@ public class GetChannelAuthenticationCapabilities
 		payload[0] |= channelNumber;
 
 		payload[1] = encodePrivilegeLevel(requestedPrivilegeLevel);
-		return new IpmiLanRequest(
-				getNetworkFunction(),
-				getCommandCode(),
-				payload,
-				TypeConverter.intToByte(sequenceNumber));
+		return new IpmiLanRequest(getNetworkFunction(), getCommandCode(), payload, TypeConverter.intToByte(sequenceNumber));
 	}
 
 	@Override
@@ -237,17 +228,14 @@ public class GetChannelAuthenticationCapabilities
 		// (IPMI 2.0 table 22-15; raw[0] is byte 2, the channel number)
 		responseData.setIpmiv20Support((raw[1] & 0x80) != 0 && (raw[3] & 0x02) != 0);
 
-		responseData
-				.setAuthenticationTypes(new ArrayList<AuthenticationType>());
+		responseData.setAuthenticationTypes(new ArrayList<AuthenticationType>());
 
 		if ((raw[1] & 0x20) != 0) {
 			responseData.getAuthenticationTypes().add(AuthenticationType.Oem);
 		}
 
 		if ((raw[1] & 0x10) != 0) {
-			responseData
-					.getAuthenticationTypes()
-					.add(AuthenticationType.Simple);
+			responseData.getAuthenticationTypes().add(AuthenticationType.Simple);
 		}
 
 		if ((raw[1] & 0x04) != 0) {
@@ -307,8 +295,7 @@ public class GetChannelAuthenticationCapabilities
 		if (version == IpmiVersion.V20
 				&& authenticationType != AuthenticationType.RMCPPlus
 				&& authenticationType != AuthenticationType.None) {
-			throw new IllegalArgumentException(
-					"Authentication Type must be RMCPPlus for IPMI v2.0 messages");
+			throw new IllegalArgumentException("Authentication Type must be RMCPPlus for IPMI v2.0 messages");
 		}
 
 		setIpmiVersion(version);

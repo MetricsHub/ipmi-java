@@ -75,8 +75,7 @@ public class Protocolv20Decoder extends ProtocolDecoder {
 	 */
 	@Override
 	public IpmiMessage decode(RmcpMessage rmcpMessage) throws InvalidKeyException {
-		Ipmiv20Message message = new Ipmiv20Message(
-				cipherSuite.getConfidentialityAlgorithm());
+		Ipmiv20Message message = new Ipmiv20Message(cipherSuite.getConfidentialityAlgorithm());
 
 		byte[] raw = rmcpMessage.getData();
 
@@ -105,11 +104,7 @@ public class Protocolv20Decoder extends ProtocolDecoder {
 		message.setSessionID(decodeSessionID(raw, offset));
 		offset += 4;
 
-		message
-				.setSessionSequenceNumber(
-						decodeSessionSequenceNumber(
-								raw,
-								offset));
+		message.setSessionSequenceNumber(decodeSessionSequenceNumber(raw, offset));
 		offset += 4;
 
 		int payloadLength = decodePayloadLength(raw, offset);
@@ -131,23 +126,11 @@ public class Protocolv20Decoder extends ProtocolDecoder {
 		}
 
 		if (message.isPayloadEncrypted()) {
-			message
-					.setPayload(
-							decodePayload(
-									raw,
-									offset,
-									payloadLength,
-									message.getConfidentialityAlgorithm(),
-									message.getPayloadType()));
+			message.setPayload(
+					decodePayload(raw, offset, payloadLength, message.getConfidentialityAlgorithm(), message.getPayloadType()));
 		} else {
 			message
-					.setPayload(
-							decodePayload(
-									raw,
-									offset,
-									payloadLength,
-									new ConfidentialityNone(),
-									message.getPayloadType()));
+					.setPayload(decodePayload(raw, offset, payloadLength, new ConfidentialityNone(), message.getPayloadType()));
 		}
 
 		return message;
@@ -187,12 +170,7 @@ public class Protocolv20Decoder extends ProtocolDecoder {
 	}
 
 	public static PayloadType decodePayloadType(byte payloadType) {
-		return PayloadType
-				.parseInt(
-						TypeConverter
-								.intToByte(
-										payloadType
-												& TypeConverter.intToByte(0x3f)));
+		return PayloadType.parseInt(TypeConverter.intToByte(payloadType & TypeConverter.intToByte(0x3f)));
 	}
 
 	/**
@@ -294,10 +272,9 @@ public class Protocolv20Decoder extends ProtocolDecoder {
 	 *         - when initiation of the integrity algorithm fails
 	 */
 	private boolean validateAuthCode(byte[] rawMessage, int offset) {
-		return MessageDigest
-				.isEqual(
-						decodeAuthCode(rawMessage, offset),
-						cipherSuite.getIntegrityAlgorithm().generateAuthCode(Arrays.copyOf(rawMessage, offset)));
+		return MessageDigest.isEqual(
+				decodeAuthCode(rawMessage, offset),
+				cipherSuite.getIntegrityAlgorithm().generateAuthCode(Arrays.copyOf(rawMessage, offset)));
 	}
 
 	/**

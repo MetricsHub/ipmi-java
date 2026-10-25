@@ -78,9 +78,7 @@ public class FullSensorRecord extends AbstractSensorRecord {
 	private static final int LAST_NON_LINEAR = 0x7f;
 
 	@Override
-	protected void populateTypeSpecficValues(
-			byte[] recordData,
-			SensorRecord record) {
+	protected void populateTypeSpecficValues(byte[] recordData, SensorRecord record) {
 		populateSensorHeader(recordData, 12);
 		populateCapabilitiesAndUnits(recordData);
 
@@ -92,64 +90,35 @@ public class FullSensorRecord extends AbstractSensorRecord {
 		// Needed by calcFormula(): set before the first conversion
 		linearization = TypeConverter.byteToInt(recordData[23]) & 0x7f;
 
-		setSensorDirection(
-				SensorDirection
-						.parseInt(
-								TypeConverter
-										.byteToInt(recordData[28])
-										& 0x3));
+		setSensorDirection(SensorDirection.parseInt(TypeConverter.byteToInt(recordData[28]) & 0x3));
 
 		setNominalReading(calcFormula(TypeConverter.byteToInt(recordData[31])));
 		setNormalMaximum(calcFormula(TypeConverter.byteToInt(recordData[32])));
 		setNormalMinimum(calcFormula(TypeConverter.byteToInt(recordData[33])));
 
-		setSensorMaximumReading(
-				calcFormula(
-						TypeConverter
-								.byteToInt(recordData[34])));
-		setSensorMinmumReading(
-				calcFormula(
-						TypeConverter
-								.byteToInt(recordData[35])));
+		setSensorMaximumReading(calcFormula(TypeConverter.byteToInt(recordData[34])));
+		setSensorMinmumReading(calcFormula(TypeConverter.byteToInt(recordData[35])));
 
 		// Byte 12 bits [3:2] (Table 43-1): 00b means the sensor has no thresholds
 		if ((TypeConverter.byteToInt(recordData[11]) & 0x0c) != 0) {
 			if ((TypeConverter.byteToInt(recordData[18]) & 0x20) != 0) {
-				setUpperNonRecoverableThreshold(
-						calcFormula(
-								TypeConverter
-										.byteToInt(recordData[36])));
+				setUpperNonRecoverableThreshold(calcFormula(TypeConverter.byteToInt(recordData[36])));
 			}
 			if ((TypeConverter.byteToInt(recordData[18]) & 0x10) != 0) {
-				setUpperCriticalThreshold(
-						calcFormula(
-								TypeConverter
-										.byteToInt(recordData[37])));
+				setUpperCriticalThreshold(calcFormula(TypeConverter.byteToInt(recordData[37])));
 			}
 			if ((TypeConverter.byteToInt(recordData[18]) & 0x8) != 0) {
-				setUpperNonCriticalThreshold(
-						calcFormula(
-								TypeConverter
-										.byteToInt(recordData[38])));
+				setUpperNonCriticalThreshold(calcFormula(TypeConverter.byteToInt(recordData[38])));
 			}
 
 			if ((TypeConverter.byteToInt(recordData[18]) & 0x4) != 0) {
-				setLowerNonRecoverableThreshold(
-						calcFormula(
-								TypeConverter
-										.byteToInt(recordData[39])));
+				setLowerNonRecoverableThreshold(calcFormula(TypeConverter.byteToInt(recordData[39])));
 			}
 			if ((TypeConverter.byteToInt(recordData[18]) & 0x2) != 0) {
-				setLowerCriticalThreshold(
-						calcFormula(
-								TypeConverter
-										.byteToInt(recordData[40])));
+				setLowerCriticalThreshold(calcFormula(TypeConverter.byteToInt(recordData[40])));
 			}
 			if ((TypeConverter.byteToInt(recordData[18]) & 0x1) != 0) {
-				setLowerNonCriticalThreshold(
-						calcFormula(
-								TypeConverter
-										.byteToInt(recordData[41])));
+				setLowerNonCriticalThreshold(calcFormula(TypeConverter.byteToInt(recordData[41])));
 			}
 		}
 
@@ -315,8 +284,7 @@ public class FullSensorRecord extends AbstractSensorRecord {
 	 * @param upperNonRecoverableThreshold the threshold, in the unit of the sensor, {@link Double#NaN} when the record
 	 *        does not define it
 	 */
-	public void setUpperNonRecoverableThreshold(
-			double upperNonRecoverableThreshold) {
+	public void setUpperNonRecoverableThreshold(double upperNonRecoverableThreshold) {
 		this.upperNonRecoverableThreshold = upperNonRecoverableThreshold;
 	}
 
@@ -338,8 +306,7 @@ public class FullSensorRecord extends AbstractSensorRecord {
 	 * @param lowerNonRecoverableThreshold the threshold, in the unit of the sensor, {@link Double#NaN} when the record
 	 *        does not define it
 	 */
-	public void setLowerNonRecoverableThreshold(
-			double lowerNonRecoverableThreshold) {
+	public void setLowerNonRecoverableThreshold(double lowerNonRecoverableThreshold) {
 		this.lowerNonRecoverableThreshold = lowerNonRecoverableThreshold;
 	}
 

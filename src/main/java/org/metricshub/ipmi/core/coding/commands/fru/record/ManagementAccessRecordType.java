@@ -24,11 +24,9 @@ package org.metricshub.ipmi.core.coding.commands.fru.record;
 
 public enum ManagementAccessRecordType {
 	SystemManagementUrl(ManagementAccessRecordType.SYSTEMMANAGEMENTURL),
-	SystemName(
-			ManagementAccessRecordType.SYSTEMNAME),
+	SystemName(ManagementAccessRecordType.SYSTEMNAME),
 	SystemPingAddress(ManagementAccessRecordType.SYSTEMPINGADDRESS),
-	ComponentManagementURL(
-			ManagementAccessRecordType.COMPONENTMANAGEMENTURL),
+	ComponentManagementURL(ManagementAccessRecordType.COMPONENTMANAGEMENTURL),
 	Unspecified(ManagementAccessRecordType.UNSPECIFIED),;
 
 	private static final int SYSTEMMANAGEMENTURL = 1;

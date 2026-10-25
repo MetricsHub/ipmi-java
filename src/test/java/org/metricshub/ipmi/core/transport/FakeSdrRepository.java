@@ -280,8 +280,7 @@ public final class FakeSdrRepository {
 		if (device || !infoSupported) {
 			return new byte[] { (byte) 0xc1 };
 		}
-		return ByteBuffer
-				.allocate(15)
+		return ByteBuffer.allocate(15)
 				.order(ByteOrder.LITTLE_ENDIAN)
 				.put((byte) 0x00)
 				.put((byte) SDR_VERSION)
@@ -313,8 +312,7 @@ public final class FakeSdrRepository {
 				.getOrDefault(id(record), index + 1 < records.size() ? id(records.get(index + 1)) : LAST_RECORD_ID);
 		int end = count == 0xff ? record.length : Math.min(record.length, offset + count);
 		byte[] chunk = Arrays.copyOfRange(record, Math.min(offset, record.length), end);
-		return ByteBuffer
-				.allocate(3 + chunk.length)
+		return ByteBuffer.allocate(3 + chunk.length)
 				.order(ByteOrder.LITTLE_ENDIAN)
 				.put((byte) 0x00)
 				.putShort((short) next)
@@ -368,8 +366,7 @@ public final class FakeSdrRepository {
 		if (image == null) {
 			return new byte[] { (byte) 0xc3 }; // timeout while processing the command: the FRU is absent
 		}
-		return ByteBuffer
-				.allocate(4)
+		return ByteBuffer.allocate(4)
 				.order(ByteOrder.LITTLE_ENDIAN)
 				.put((byte) 0x00)
 				.putShort((short) image.length)

@@ -252,10 +252,9 @@ public final class ReadingTypeDescription {
 		map.put(AcpiS2SleepingProcessorContextLost, "S2: sleeping, processor context lost");
 		map.put(PowerSupplyFailureDetected, "Failure detected");
 		map.put(TimerInterrupt, "Timer interrupt");
-		map
-				.put(
-						AcpiS3SleepingProcessorContextLostMemoryRetained,
-						"S3: sleeping, processor & hw context lost, memory retained");
+		map.put(
+				AcpiS3SleepingProcessorContextLostMemoryRetained,
+				"S3: sleeping, processor & hw context lost, memory retained");
 		map.put(PowerSupplyPredictiveFailure, PREDICTIVE_FAILURE);
 		map.put(NonRedundant_SufficientResourcesFromInsufficientResources, "Non-Redundant: Sufficient from Insufficient");
 		map.put(AcpiS4NonVolatileSleep, "S4: non-volatile sleep/suspend-to-disk");

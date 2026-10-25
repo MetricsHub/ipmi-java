@@ -30,32 +30,25 @@ public enum ChassisType {
 	Other(ChassisType.OTHER),
 	Notebook(ChassisType.NOTEBOOK),
 	HandHeld(ChassisType.HANDHELD),
-	DockingStation(
-			ChassisType.DOCKINGSTATION),
+	DockingStation(ChassisType.DOCKINGSTATION),
 	AllInOne(ChassisType.ALLINONE),
 	SubNotebook(ChassisType.SUBNOTEBOOK),
-	SpaceSaving(
-			ChassisType.SPACESAVING),
+	SpaceSaving(ChassisType.SPACESAVING),
 	LunchBox(ChassisType.LUNCHBOX),
 	MainServerChassis(ChassisType.MAINSERVERCHASSIS),
-	ExpansionChassis(
-			ChassisType.EXPANSIONCHASSIS),
+	ExpansionChassis(ChassisType.EXPANSIONCHASSIS),
 	SubChassis(ChassisType.SUBCHASSIS),
 	Unknown(ChassisType.UNKNOWN),
-	BusExpansionChassis(
-			ChassisType.BUSEXPANSIONCHASSIS),
+	BusExpansionChassis(ChassisType.BUSEXPANSIONCHASSIS),
 	PeripheralChassis(ChassisType.PERIPHERALCHASSIS),
-	RaidChassis(
-			ChassisType.RAIDCHASSIS),
+	RaidChassis(ChassisType.RAIDCHASSIS),
 	RackMountChassis(ChassisType.RACKMOUNTCHASSIS),
 	Desktop(ChassisType.DESKTOP),
-	Low(
-			ChassisType.LOW),
+	Low(ChassisType.LOW),
 	Pizza(ChassisType.PIZZA),
 	Mini(ChassisType.MINI),
 	Tower(ChassisType.TOWER),
-	Portable(
-			ChassisType.PORTABLE),
+	Portable(ChassisType.PORTABLE),
 	LapTop(ChassisType.LAPTOP),;
 
 	private static final int OTHER = 1;

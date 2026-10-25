@@ -104,13 +104,7 @@ public class UdpMessenger extends Thread implements Messenger {
 				message.setAddress(response.getAddress());
 				message.setPort(response.getPort());
 				byte[] buffer = new byte[response.getLength()];
-				System
-						.arraycopy(
-								response.getData(),
-								0,
-								buffer,
-								0,
-								buffer.length);
+				System.arraycopy(response.getData(), 0, buffer, 0, buffer.length);
 				message.setMessage(buffer);
 
 				notifyListeners(message);

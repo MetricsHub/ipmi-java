@@ -47,9 +47,7 @@ public abstract class State {
 	 *        - the {@link StateMachineEvent} that was the cause of the
 	 *        transition
 	 */
-	public abstract void doTransition(
-			StateMachine stateMachine,
-			StateMachineEvent machineEvent);
+	public abstract void doTransition(StateMachine stateMachine, StateMachineEvent machineEvent);
 
 	/**
 	 * Defines the action that should be performed when a response form the

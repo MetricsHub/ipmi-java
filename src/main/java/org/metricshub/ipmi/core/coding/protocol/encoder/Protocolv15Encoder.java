@@ -46,8 +46,7 @@ public class Protocolv15Encoder extends ProtocolEncoder {
 	@Override
 	public byte[] encode(IpmiMessage ipmiMessage) throws InvalidKeyException {
 		if (!(ipmiMessage instanceof Ipmiv15Message)) {
-			throw new IllegalArgumentException(
-					"IPMIMessage must be in 1.5 version.");
+			throw new IllegalArgumentException("IPMIMessage must be in 1.5 version.");
 		}
 		Ipmiv15Message message = (Ipmiv15Message) ipmiMessage;
 
@@ -57,10 +56,7 @@ public class Protocolv15Encoder extends ProtocolEncoder {
 
 		int offset = 1;
 
-		encodeSessionSequenceNumber(
-				message.getSessionSequenceNumber(),
-				raw,
-				offset);
+		encodeSessionSequenceNumber(message.getSessionSequenceNumber(), raw, offset);
 		offset += 4;
 
 		encodeSessionId(message.getSessionID(), raw, offset);
@@ -74,10 +70,7 @@ public class Protocolv15Encoder extends ProtocolEncoder {
 		byte[] payload = message.getPayload().getEncryptedPayload();
 
 		if (payload == null) {
-			message
-					.getPayload()
-					.encryptPayload(
-							message.getConfidentialityAlgorithm());
+			message.getPayload().encryptPayload(message.getConfidentialityAlgorithm());
 			payload = message.getPayload().getEncryptedPayload();
 		}
 
@@ -93,10 +86,7 @@ public class Protocolv15Encoder extends ProtocolEncoder {
 
 	private int getMessageLength(IpmiMessage ipmiMessage) {
 		int length = 11
-				+ ipmiMessage
-						.getConfidentialityAlgorithm()
-						.getConfidentialityOverheadSize(
-								ipmiMessage.getPayloadLength())
+				+ ipmiMessage.getConfidentialityAlgorithm().getConfidentialityOverheadSize(ipmiMessage.getPayloadLength())
 				+ ipmiMessage.getPayloadLength();
 
 		if (ipmiMessage.getAuthenticationType() != AuthenticationType.None) {

@@ -24,8 +24,7 @@ package org.metricshub.ipmi.core.coding.commands.sdr.record;
 
 public enum InstanceModifierType {
 	Numeric(InstanceModifierType.NUMERIC),
-	Alpha(InstanceModifierType.ALPHA),
-	;
+	Alpha(InstanceModifierType.ALPHA),;
 
 	private static final int NUMERIC = 0;
 	private static final int ALPHA = 1;

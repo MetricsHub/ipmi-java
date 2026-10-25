@@ -39,8 +39,7 @@ public class RmcpPingMessage extends RmcpMessage {
 	public RmcpPingMessage(int sequenceNumber) {
 		super();
 		if (sequenceNumber > 254 || sequenceNumber < 0) {
-			throw new IllegalArgumentException(
-					"Sequence number must be in range 0-254");
+			throw new IllegalArgumentException("Sequence number must be in range 0-254");
 		}
 		setVersion(RmcpVersion.RMCP1_0);
 		setClassOfMessage(RmcpClassOfMessage.Asf);
@@ -51,13 +50,7 @@ public class RmcpPingMessage extends RmcpMessage {
 		byte[] message = new byte[8];
 
 		// set IANA Enterprise Number
-		System
-				.arraycopy(
-						TypeConverter.intToByteArray(RmcpConstants.ASFIANA),
-						0,
-						message,
-						0,
-						4);
+		System.arraycopy(TypeConverter.intToByteArray(RmcpConstants.ASFIANA), 0, message, 0, 4);
 
 		// set message type as presence ping
 		message[4] = RmcpConstants.PRESENCE_PING;

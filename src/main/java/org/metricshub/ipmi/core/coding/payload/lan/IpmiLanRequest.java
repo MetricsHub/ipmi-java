@@ -45,14 +45,8 @@ public class IpmiLanRequest extends IpmiLanMessage {
 	 * @param sequenceNumber
 	 *        - used to match request and response - must be in range [0-63]
 	 */
-	public IpmiLanRequest(NetworkFunction networkFunction, byte commandCode,
-			byte[] requestData, byte sequenceNumber) {
-		this(
-				networkFunction,
-				commandCode,
-				requestData,
-				sequenceNumber,
-				TypeConverter.intToByte(0));
+	public IpmiLanRequest(NetworkFunction networkFunction, byte commandCode, byte[] requestData, byte sequenceNumber) {
+		this(networkFunction, commandCode, requestData, sequenceNumber, TypeConverter.intToByte(0));
 	}
 
 	/**
@@ -69,8 +63,8 @@ public class IpmiLanRequest extends IpmiLanMessage {
 	 * @param lun
 	 *        - target Logical Unit Number. Must be in range [0-3].
 	 */
-	public IpmiLanRequest(NetworkFunction networkFunction, byte commandCode,
-			byte[] requestData, byte sequenceNumber, byte lun) {
+	public IpmiLanRequest(NetworkFunction networkFunction, byte commandCode, byte[] requestData, byte sequenceNumber,
+			byte lun) {
 		this(networkFunction.getCode(), commandCode, requestData, sequenceNumber, lun);
 	}
 
@@ -125,16 +119,14 @@ public class IpmiLanRequest extends IpmiLanMessage {
 		byte[] message = new byte[getPayloadLength()];
 
 		message[0] = getResponderAddress();
-		message[1] = TypeConverter
-				.intToByte(
-						(getNetworkFunctionCode() << 2)
-								| getResponderLogicalUnitNumber());
+		message[1] = TypeConverter.intToByte((getNetworkFunctionCode() << 2) | getResponderLogicalUnitNumber());
 		message[2] = getChecksum1(message);
 		message[3] = getRequesterAddress();
-		message[4] = TypeConverter
-				.intToByte(
-						((getSequenceNumber() & 0x3f) << 2)
-								| getRequesterLogicalUnitNumber()); // rqSeq/rqLUN (IPMI 2.0 figure 13-4)
+		message[4] = TypeConverter.intToByte(((getSequenceNumber() & 0x3f) << 2) | getRequesterLogicalUnitNumber()); // rqSeq/rqLUN
+																																																									// (IPMI
+																																																									// 2.0
+																																																									// figure
+																																																									// 13-4)
 		message[5] = getCommand();
 
 		if (getData() != null) {
