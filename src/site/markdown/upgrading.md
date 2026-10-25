@@ -336,6 +336,7 @@ messages:
 | `ReadFruData failed: Command-specific completion code 0x81. (completion code 81h)` | `ReadFruData failed: Command-specific completion code 81h` |
 | `Get Sensor Reading failed: Unknown completion code. (completion code 81h)` | `Get Sensor Reading failed: Command-specific completion code 81h` |
 | `Invalid format version: -1` | `Invalid format version FFh` |
+| `Invalid format version` (board, chassis and product info areas) | `Invalid format version 80h` |
 | `Invalid record type: 11` | `Reserved record type 0Bh` |
 | `This format is deprecated` | `The BMC Message Channel Info record (type 14h) is deprecated since IPMI 1.5` |
 

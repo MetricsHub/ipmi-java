@@ -89,7 +89,7 @@ public class BoardInfo extends FruRecord {
 
 	private void validateFruData(byte fruDatum) {
 		if (fruDatum != 0x1) {
-			throw new IllegalArgumentException("Invalid format version");
+			throw new IllegalArgumentException(String.format("Invalid format version %02Xh", fruDatum & 0xff));
 		}
 	}
 
