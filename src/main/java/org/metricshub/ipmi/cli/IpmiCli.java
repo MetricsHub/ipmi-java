@@ -743,13 +743,14 @@ public final class IpmiCli {
 	/**
 	 * Names a FRU by its ID, with the address, LUN and channel of its controller when it is not held by the BMC at
 	 * LUN 0 ({@code FRU 5 at 2Ch}, {@code FRU 5 at 20h LUN 1}): since two FRUs on different controllers or LUNs may
-	 * have the same ID, the ID alone does not tell them apart.
+	 * have the same ID, the ID alone does not tell them apart. The channel of a FRU held by the BMC itself is ignored,
+	 * as the client ignores it (a Supermicro BMC locates its own FRU at 20h on channel 2).
 	 */
 	private static String fruLabel(Fru fru) {
 		int address = fruAddress(fru);
 		int lun = fru.locator().getAccessLun();
-		int channel = fru.locator().getManagementChannelNumber();
-		if (address == BMC_ADDRESS && lun == 0 && channel == 0) {
+		int channel = address == BMC_ADDRESS ? 0 : fru.locator().getManagementChannelNumber();
+		if (address == BMC_ADDRESS && lun == 0) {
 			return "FRU " + fru.id();
 		}
 		return String.format(Locale.ROOT, "FRU %d at %02Xh", fru.id(), address) + (lun == 0 ? "" : " LUN " + lun)

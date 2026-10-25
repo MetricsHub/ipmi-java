@@ -624,22 +624,26 @@ class IpmiCliTest {
 						Fixtures.USER,
 						Fixtures.utf8(Fixtures.PASSWORD),
 						null)) {
-			// Three FRUs numbered 5: at LUN 0 and LUN 1 of the BMC, and on a controller behind it (none readable)
+			// Three FRUs numbered 5: at LUN 0 and LUN 1 of the BMC, and on a controller behind it (none readable), and
+			// the "BMC FRU" of a Supermicro BMC, at 20h on channel 2, which the client reads as a FRU of the BMC
 			int psu = EntityId.PowerSupply.getCode();
 			new FakeSdrRepository()
 					.add(fruDeviceLocatorRecord(1, 5, psu, 1, "BMC LUN 0"))
 					.add(withAccess(fruDeviceLocatorRecord(2, 5, psu, 2, "BMC LUN 1"), 0x20, 0, 1))
 					.add(withAccess(fruDeviceLocatorRecord(3, 5, psu, 3, "Satellite"), 0x2c, 6, 0))
+					.add(withAccess(fruDeviceLocatorRecord(4, 0, EntityId.SystemBoard.getCode(), 1, "BMC FRU"), 0x20, 2, 0))
 					.install(bmc);
 			Result frus = login(bmc, "fru");
 			assertTrue(frus.out.contains("FRU 5: BMC LUN 0 (PowerSupply 1)\n"), frus.out);
 			assertTrue(frus.out.contains("FRU 5 at 20h LUN 1: BMC LUN 1 (PowerSupply 2)\n"), frus.out);
 			assertTrue(frus.out.contains("FRU 5 at 2Ch channel 6: Satellite (PowerSupply 3)\n"), frus.out);
+			assertTrue(frus.out.contains("FRU 0: BMC FRU (SystemBoard 1)\n"), "the channel of a FRU of the BMC is ignored");
 			assertTrue(frus.err.contains("ipmicli: FRU 5: "), frus.err);
 			assertTrue(frus.err.contains("ipmicli: FRU 5 at 20h LUN 1: "), frus.err);
 			assertTrue(frus.err.contains("ipmicli: FRU 5 at 2Ch channel 6: "), frus.err);
 			String[] json = login(bmc, "fru", "--json").out.split("\n");
-			assertEquals(3, json.length, Arrays.toString(json));
+			assertEquals(4, json.length, Arrays.toString(json));
+			assertTrue(json[3].startsWith("{\"id\":0,\"address\":32,\"lun\":0,\"channel\":2,\"name\":\"BMC FRU\","), json[3]);
 			assertTrue(
 					json[0].startsWith("{\"id\":5,\"address\":32,\"lun\":0,\"channel\":0,\"name\":\"BMC LUN 0\","),
 					json[0]);
