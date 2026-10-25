@@ -81,7 +81,10 @@ installer runs in Windows PowerShell 5.1 and PowerShell 7. Neither installer nee
 The launcher finds a Java runtime, 8 or later, each time it runs: `IPMICLI_JAVA_HOME`, then
 `JAVA_HOME`, then `java` on the `PATH` (on Linux and macOS, then `/usr/libexec/java_home`, sdkman
 and `/usr/lib/jvm`). Installing or upgrading Java needs no reinstallation. Without a suitable
-runtime, it exits with code 127 and points to [Adoptium](https://adoptium.net).
+runtime, it exits with code 127 and points to [Adoptium](https://adoptium.net). The Windows
+launcher is a batch file: a `%NAME%` reference, and `^`, `&`, `|`, `<` or `>` outside double
+quotes, do not reach `ipmicli` as typed (see
+[Passwords and BMC key](cli.html#passwords-and-bmc-key)).
 
 ```shell-session
 $ ipmicli --version

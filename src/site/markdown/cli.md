@@ -182,6 +182,18 @@ character of a `-p` or `-u` value that this code page lacks (Cyrillic or CJK on 
 European system, for instance) reaches the CLI as `?`, and the BMC refuses the login. Put such a
 password in a UTF-8 file and pass it with `-pf`.
 
+The Windows launcher is a batch file, so `cmd.exe` parses the command line before the CLI sees
+it, from PowerShell as well. A `%NAME%` reference is replaced by the variable wherever it is;
+outside double quotes, `^` is dropped, `&` and `|` end the arguments and run what follows as a
+command (`-p 'a&ver'` logs in with `a`, then runs `ver`), and `<` and `>` end them and redirect
+the input or output of the CLI to the file that follows (`-p 'a>out.txt'` logs in with `a` and
+writes the output to `out.txt`). PowerShell puts double quotes only around a value that contains
+a space, so a `-p`, `-u`, `--name` or `-pf` value with one of these characters and no space
+(`C:\R&D\pw.txt`) does not reach the CLI as typed; from `cmd.exe`, a value in double quotes is
+safe except for `%NAME%`. Give such a password at the prompt or in a file with `-pf`, and such a
+path or name through `java -jar` from PowerShell, where Java receives every value unchanged
+(from `cmd.exe`, `java -jar` goes through the same parsing as the launcher).
+
 Secrets are never printed: not in the usage errors, not with `--verbose`, not in the failure
 messages. The CLI wipes its copies of the password and of the key when it ends, but a `-p` or
 `-k` value stays in memory as text that the CLI cannot wipe (the JVM keeps its command line in the
