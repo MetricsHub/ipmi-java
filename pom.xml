@@ -306,7 +306,7 @@
 			<!-- surefire report: renders the unit-test results from target/surefire-reports -->
 			<plugin>
 				<artifactId>maven-surefire-report-plugin</artifactId>
-				<version>3.6.0</version>
+				<version>3.6.1</version>
 			</plugin>
 
 			<!-- spotbugs: same version as the build gate, so the report shows what the gate checked -->
