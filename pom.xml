@@ -8,7 +8,7 @@
 	</parent>
 
 	<artifactId>ipmi-java</artifactId>
-	<version>2.1.00</version>
+	<version>2.2.00-SNAPSHOT</version>
 
 	<name>IPMI Java Client</name>
 	<description>A Java client library and command-line tool (ipmicli) for IPMI 2.0 over LAN (RMCP+): identify a server's BMC, read its chassis status, FRU inventory, sensors and System Event Log, control the power, open a Serial over LAN console, or send any IPMI command. Java 8 or later, no dependency.</description>
@@ -38,7 +38,7 @@
 	<scm>
 		<connection>scm:git:https://github.com/metricshub/ipmi-java.git</connection>
 		<url>https://github.com/metricshub/ipmi-java</url>
-		<tag>v2.1.00</tag>
+		<tag>HEAD</tag>
 	</scm>
 
 	<developers>
@@ -79,7 +79,7 @@
 		<!-- Reproducible Build -->
 		<!-- See https://maven.apache.org/guides/mini/guide-reproducible-builds.html -->
 		<!-- Also drives the Maven site copyright year and "Documentation as of" date; bumped at release. -->
-		<project.build.outputTimestamp>2026-10-26T23:20:54Z</project.build.outputTimestamp>
+		<project.build.outputTimestamp>2026-10-26T23:23:44Z</project.build.outputTimestamp>
 	</properties>
 
 	<dependencyManagement>
