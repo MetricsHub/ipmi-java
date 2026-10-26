@@ -71,12 +71,8 @@ public final class Sensor {
 	private final List<ReadingType> rawStates;
 	private final List<String> states;
 
-	private Sensor(
-			AbstractSensorRecord record,
-			int instance,
-			GetSensorReadingResponseData reading,
-			SensorReadingFactors factors,
-			String problem) {
+	private Sensor(AbstractSensorRecord record, int instance, GetSensorReadingResponseData reading,
+			SensorReadingFactors factors, String problem) {
 		this.record = record;
 		this.instance = instance;
 		this.reading = reading;
@@ -84,8 +80,7 @@ public final class Sensor {
 		this.problem = problem;
 		this.rawStates = reading == null || !isValid(reading) ?
 				Collections.<ReadingType>emptyList() :
-				Collections
-						.unmodifiableList(reading.getStatesAsserted(record.getSensorType(), record.getEventReadingType()));
+				Collections.unmodifiableList(reading.getStatesAsserted(record.getSensorType(), record.getEventReadingType()));
 		this.states = Collections.unmodifiableList(describeStates());
 	}
 
@@ -194,18 +189,16 @@ public final class Sensor {
 		if (ReadingType.isOem(record.getEventReadingType())) {
 			// An OEM event/reading type (70h-7Fh): the state bytes as they are, which only the vendor documents
 			byte[] raw = reading.getRaw();
-			return Collections
-					.singletonList(
-							raw.length == 3 ?
-									String.format("0x%02x", raw[2]) :
-									String.format("0x%02x%02x", raw[3], raw[2]));
+			return Collections.singletonList(
+					raw.length == 3 ? String.format("0x%02x", raw[2]) : String.format("0x%02x%02x", raw[3], raw[2]));
 		}
 		// The thresholds crossed get the wording of their SEL events; the discrete states without a wording are left out
 		boolean threshold = record.getEventReadingType() == THRESHOLD_EVENT_READING_TYPE;
 		Set<String> descriptions = new LinkedHashSet<String>();
 		for (ReadingType state : rawStates) {
 			String description = threshold ?
-					ReadingTypeDescription.describe(state) : ReadingTypeDescription.getReadingType(state);
+					ReadingTypeDescription.describe(state) :
+					ReadingTypeDescription.getReadingType(state);
 			if (description != null) {
 				descriptions.add(description);
 			}
@@ -325,7 +318,8 @@ public final class Sensor {
 			return OptionalDouble.empty();
 		}
 		double value = factors == null ?
-				reading.getSensorReading(full) : full.calcFormula(rawReading().getAsInt(), factors);
+				reading.getSensorReading(full) :
+				full.calcFormula(rawReading().getAsInt(), factors);
 		return Double.isNaN(value) ? OptionalDouble.empty() : OptionalDouble.of(value);
 	}
 
@@ -336,7 +330,8 @@ public final class Sensor {
 	 */
 	public OptionalInt rawReading() {
 		return reading == null || !isValid(reading) ?
-				OptionalInt.empty() : OptionalInt.of((int) reading.getPlainSensorReading());
+				OptionalInt.empty() :
+				OptionalInt.of((int) reading.getPlainSensorReading());
 	}
 
 	/**
@@ -520,8 +515,7 @@ public final class Sensor {
 
 	@Override
 	public String toString() {
-		StringBuilder text = new StringBuilder(name())
-				.append(" (")
+		StringBuilder text = new StringBuilder(name()).append(" (")
 				.append(typeName(type(), typeCode()))
 				.append(", ")
 				.append(entity())

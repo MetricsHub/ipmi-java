@@ -70,9 +70,7 @@ class ConnectionTest {
 		Connection connection = connect(TIMEOUT_MS);
 		try {
 			long start = System.nanoTime();
-			ConnectionException e = assertThrows(
-					ConnectionException.class,
-					() -> connection.getAvailableCipherSuites(1));
+			ConnectionException e = assertThrows(ConnectionException.class, () -> connection.getAvailableCipherSuites(1));
 			long elapsed = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - start);
 
 			assertEquals(COMMAND_TIMED_OUT, e.getMessage());
@@ -111,9 +109,7 @@ class ConnectionTest {
 
 			// The state machine was rolled back: the step can be tried again
 			connection.setTimeout(TIMEOUT_MS);
-			ConnectionException e = assertThrows(
-					ConnectionException.class,
-					() -> connection.getAvailableCipherSuites(2));
+			ConnectionException e = assertThrows(ConnectionException.class, () -> connection.getAvailableCipherSuites(2));
 			assertEquals(COMMAND_TIMED_OUT, e.getMessage());
 		} finally {
 			connection.disconnect();
@@ -272,22 +268,20 @@ class ConnectionTest {
 		Connection connection = connect(60000);
 		try {
 			MessageHandler ipmi = handler(connection, PayloadType.Ipmi);
-			int tag = ipmi
-					.takeTag(
-							new GetChannelAuthenticationCapabilities(
-									IpmiVersion.V20,
-									IpmiVersion.V20,
-									CipherSuite.getEmpty(),
-									PrivilegeLevel.Callback,
-									(byte) 0xe),
-							true);
+			int tag = ipmi.takeTag(
+					new GetChannelAuthenticationCapabilities(
+							IpmiVersion.V20,
+							IpmiVersion.V20,
+							CipherSuite.getEmpty(),
+							PrivilegeLevel.Callback,
+							(byte) 0xe),
+					true);
 			assertTrue(ipmi.getMessageQueue().getElement(tag).isOneWay());
 
 			// The BMC never acknowledges an ACK-only SOL packet: a stream of them must not fill the 8-slot window
 			MessageHandler sol = handler(connection, PayloadType.Sol);
 			for (int i = 0; i < 32; i++) {
-				int solTag = sol
-						.takeTag(new SolCoder((byte) (i % 15 + 1), (byte) 1, SolAckState.ACK), true);
+				int solTag = sol.takeTag(new SolCoder((byte) (i % 15 + 1), (byte) 1, SolAckState.ACK), true);
 				assertTrue(solTag > 0, "ACK " + i + " got no tag");
 				assertNull(sol.getMessageQueue().getElement(solTag), "ACK " + i + " was queued");
 			}
@@ -306,10 +300,7 @@ class ConnectionTest {
 			assertNull(sol.getMessageQueue().getElement(tag), "packet 7 of the BMC acknowledges the packet");
 
 			// A newer packet of the console has the same number, and the BMC sends its packet 7 again
-			assertEquals(
-					tag,
-					sol.getMessageQueue().add(new SolCoder(new byte[]
-					{ 'b' }), false, tag));
+			assertEquals(tag, sol.getMessageQueue().add(new SolCoder(new byte[] { 'b' }), false, tag));
 			connection.notify(new MessageAction(solPacket(7, tag)));
 			assertNotNull(sol.getMessageQueue().getElement(tag), "the old ACK must not complete the newer packet");
 		} finally {
@@ -335,25 +326,20 @@ class ConnectionTest {
 			MessageHandler ipmi = handler(connection, PayloadType.Ipmi);
 			// A request whose command code is read when its reply is matched: the test closes the connection then
 			int tag = ipmi
-					.takeTag(
-							new GetChannelAuthenticationCapabilities(
-									IpmiVersion.V20,
-									IpmiVersion.V20,
-									CipherSuite.getEmpty()) {
-								@Override
-								public byte getCommandCode() {
-									if (armed.getAndSet(false)) {
-										matching.countDown();
-										try {
-											closed.await(5, TimeUnit.SECONDS);
-										} catch (InterruptedException e) {
-											Thread.currentThread().interrupt();
-										}
-									}
-									return super.getCommandCode();
+					.takeTag(new GetChannelAuthenticationCapabilities(IpmiVersion.V20, IpmiVersion.V20, CipherSuite.getEmpty()) {
+						@Override
+						public byte getCommandCode() {
+							if (armed.getAndSet(false)) {
+								matching.countDown();
+								try {
+									closed.await(5, TimeUnit.SECONDS);
+								} catch (InterruptedException e) {
+									Thread.currentThread().interrupt();
 								}
-							},
-							false);
+							}
+							return super.getCommandCode();
+						}
+					}, false);
 			armed.set(true);
 			Thread receiver = new Thread(() -> connection.notify(new MessageAction(reply(tag, (byte) 0x38))));
 			receiver.start();
@@ -378,10 +364,7 @@ class ConnectionTest {
 			connection.notify(new MessageAction(solPacket(8, 0)));
 			connection.notify(new MessageAction(solPacket(9, 0)));
 			// A newer packet of the console has the same number, and a copy of packet 7 arrives after packets 8 and 9
-			assertEquals(
-					tag,
-					sol.getMessageQueue().add(new SolCoder(new byte[]
-					{ 'b' }), false, tag));
+			assertEquals(tag, sol.getMessageQueue().add(new SolCoder(new byte[] { 'b' }), false, tag));
 			connection.notify(new MessageAction(solPacket(7, tag)));
 			assertNotNull(sol.getMessageQueue().getElement(tag), "the old ACK must not complete the newer packet");
 		} finally {

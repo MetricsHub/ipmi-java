@@ -123,7 +123,8 @@ final class FruReader {
 		// FRU 0 describes the system board on most BMCs; not all of them expose it, and the walk must not depend on it
 		List<String> systemBoardProblems = new ArrayList<String>();
 		List<FruRecord> systemBoard = isSelected(SYSTEM_BOARD_FRU_ID) ?
-				inventory(bmcLocator(), systemBoardProblems) : Collections.<FruRecord>emptyList();
+				inventory(bmcLocator(), systemBoardProblems) :
+				Collections.<FruRecord>emptyList();
 		for (SensorRecord record : records) {
 			if (record instanceof FruDeviceLocatorRecord) {
 				FruDeviceLocatorRecord locator = (FruDeviceLocatorRecord) record;

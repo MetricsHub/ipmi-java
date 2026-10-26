@@ -194,9 +194,7 @@ public class GetSensorReadingResponseData implements ResponseData {
 	 *        {@link EventOnlyRecord#getEventReadingType()}
 	 * @return the asserted states, empty when the reply has no state byte
 	 */
-	public List<ReadingType> getStatesAsserted(
-			SensorType sensorType,
-			int sensorEventReadingType) {
+	public List<ReadingType> getStatesAsserted(SensorType sensorType, int sensorEventReadingType) {
 		ArrayList<ReadingType> list = new ArrayList<ReadingType>();
 		if (statesAsserted == null) {
 			return list;
@@ -213,13 +211,7 @@ public class GetSensorReadingResponseData implements ResponseData {
 		}
 		for (int i = 0; i < statesAsserted.length; ++i) {
 			if (statesAsserted[i]) {
-				list
-						.add(
-								ReadingType
-										.parseInt(
-												sensorType,
-												sensorEventReadingType,
-												i));
+				list.add(ReadingType.parseInt(sensorType, sensorEventReadingType, i));
 			}
 		}
 		return list;

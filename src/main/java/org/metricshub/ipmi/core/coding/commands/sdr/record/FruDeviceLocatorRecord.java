@@ -76,11 +76,7 @@ public class FruDeviceLocatorRecord extends SensorRecord {
 
 		setManagementChannelNumber((TypeConverter.byteToInt(recordData[8]) & 0xf0) >> 4);
 
-		setDeviceType(
-				DeviceType
-						.parseInt(
-								TypeConverter
-										.byteToInt(recordData[10])));
+		setDeviceType(DeviceType.parseInt(TypeConverter.byteToInt(recordData[10])));
 
 		setDeviceTypeModifier(TypeConverter.byteToInt(recordData[11]));
 

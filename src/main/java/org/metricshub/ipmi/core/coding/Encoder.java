@@ -72,13 +72,10 @@ public final class Encoder {
 			int sessionId)
 			throws NoSuchAlgorithmException,
 			InvalidKeyException {
-		return RmcpEncoder
-				.encode(
-						new RmcpIpmiMessage(
-								protcolEncoder
-										.encode(
-												payloadCoder
-														.encodePayload(messageSequenceNumber, sessionSequenceNumber, sessionId))));
+		return RmcpEncoder.encode(
+				new RmcpIpmiMessage(
+						protcolEncoder
+								.encode(payloadCoder.encodePayload(messageSequenceNumber, sessionSequenceNumber, sessionId))));
 	}
 
 	private Encoder() {}

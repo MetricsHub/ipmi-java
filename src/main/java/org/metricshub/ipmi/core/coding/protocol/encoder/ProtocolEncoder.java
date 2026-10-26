@@ -31,8 +31,7 @@ import org.metricshub.ipmi.core.common.TypeConverter;
  */
 public abstract class ProtocolEncoder implements IpmiEncoder {
 
-	protected byte encodeAuthenticationType(
-			AuthenticationType authenticationType) {
+	protected byte encodeAuthenticationType(AuthenticationType authenticationType) {
 		return TypeConverter.intToByte(authenticationType.getCode());
 	}
 

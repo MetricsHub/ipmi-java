@@ -44,9 +44,7 @@ public class OemRecord extends SensorRecord {
 	private byte[] oemData;
 
 	@Override
-	protected void populateTypeSpecficValues(
-			byte[] recordData,
-			SensorRecord record) {
+	protected void populateTypeSpecficValues(byte[] recordData, SensorRecord record) {
 
 		// Only the C0h OEM record has a defined layout (3-byte manufacturer ID
 		// followed by OEM data). Vendor-defined record types C1h-FFh carry an

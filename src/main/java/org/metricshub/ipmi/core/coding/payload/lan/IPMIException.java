@@ -95,8 +95,10 @@ public class IPMIException extends Exception {
 		}
 		if (completionCode == CompletionCode.Unknown && rawCode >= 0) {
 			String kind = isReserved(rawCode) ?
-					"Reserved" : rawCode < COMMAND_SPECIFIC_CODES_START ?
-							"OEM" : rawCode < GENERIC_CODES_START ? "Command-specific" : "Generic";
+					"Reserved" :
+					rawCode < COMMAND_SPECIFIC_CODES_START ?
+							"OEM" :
+							rawCode < GENERIC_CODES_START ? "Command-specific" : "Generic";
 			return String.format("%s completion code %02Xh.", kind, rawCode);
 		}
 		return completionCode.getMessage();

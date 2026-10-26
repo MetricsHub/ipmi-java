@@ -93,9 +93,7 @@ public class GetPayloadActivationStatusResponseData implements ResponseData {
 
 	@Override
 	public String toString() {
-		return "GetPayloadActivationStatusResponseData{" +
-				"instanceCapacity=" + getInstanceCapacity() +
-				", availableInstances=" + getAvailableInstances() +
-				'}';
+		return "GetPayloadActivationStatusResponseData{" + "instanceCapacity=" + getInstanceCapacity()
+				+ ", availableInstances=" + getAvailableInstances() + '}';
 	}
 }

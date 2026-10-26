@@ -2,7 +2,7 @@
 
 ## Code format
 
-The code is formatted with the MetricsHub Eclipse formatter profile (`metricshub-eclipse-formatter.xml`, byte-identical to jawk's): tabs, 120-column lines. `formatter:validate` runs at the `validate` phase, so unformatted code fails the build. Simply run `mvn formatter:format` before committing, and do not hand-format code.
+The code is formatted with the MetricsHub Eclipse formatter profile (`metricshub-eclipse-formatter.xml`, jawk's with the wrapping changes of #223: a single selector stays on the line, wrapped lines are joined back when they fit): tabs, 120-column lines. `formatter:validate` runs at the `validate` phase, so unformatted code fails the build. Simply run `mvn formatter:format` before committing, and do not hand-format code.
 
 Checkstyle (`checkstyle.xml`, byte-identical to jawk's) runs at `verify` with `failOnViolation=true`. Fix violations rather than suppressing them; when a suppression is justified, wrap the code in `// CHECKSTYLE.OFF: <RuleName>` / `// CHECKSTYLE.ON: <RuleName>` comments.
 

@@ -114,44 +114,22 @@ public class BoardInfo extends FruRecord {
 
 				byte[] partNumberData = new byte[partDataLength];
 
-				System
-						.arraycopy(
-								fruData,
-								currentOffset,
-								partNumberData,
-								0,
-								partDataLength);
+				System.arraycopy(fruData, currentOffset, partNumberData, 0, partDataLength);
 
 				currentOffset += partDataLength;
 
 				switch (index) {
 				case 0:
-					setBoardManufacturer(
-							decodeString(
-									partType,
-									partNumberData,
-									languageCode == 0 || languageCode == 25));
+					setBoardManufacturer(decodeString(partType, partNumberData, languageCode == 0 || languageCode == 25));
 					break;
 				case 1:
-					setBoardProductName(
-							decodeString(
-									partType,
-									partNumberData,
-									languageCode == 0 || languageCode == 25));
+					setBoardProductName(decodeString(partType, partNumberData, languageCode == 0 || languageCode == 25));
 					break;
 				case 2:
-					setBoardSerialNumber(
-							decodeString(
-									partType,
-									partNumberData,
-									true));
+					setBoardSerialNumber(decodeString(partType, partNumberData, true));
 					break;
 				case 3:
-					setBoardPartNumber(
-							decodeString(
-									partType,
-									partNumberData,
-									languageCode == 0 || languageCode == 25));
+					setBoardPartNumber(decodeString(partType, partNumberData, languageCode == 0 || languageCode == 25));
 					break;
 				case 4:
 					setFruFileId(partNumberData);
@@ -162,12 +140,7 @@ public class BoardInfo extends FruRecord {
 						++currentOffset;
 						continue;
 					}
-					customInfo
-							.add(
-									decodeString(
-											partType,
-											partNumberData,
-											languageCode == 0 || languageCode == 25));
+					customInfo.add(decodeString(partType, partNumberData, languageCode == 0 || languageCode == 25));
 					break;
 				}
 			}

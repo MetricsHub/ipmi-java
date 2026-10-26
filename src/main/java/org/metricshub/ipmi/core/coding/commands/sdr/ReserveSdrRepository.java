@@ -55,14 +55,8 @@ public class ReserveSdrRepository extends IpmiCommandCoder<ReserveSdrRepositoryR
 	}
 
 	@Override
-	protected IpmiPayload preparePayload(int sequenceNumber)
-			throws NoSuchAlgorithmException,
-			InvalidKeyException {
-		return new IpmiLanRequest(
-				getNetworkFunction(),
-				getCommandCode(),
-				null,
-				TypeConverter.intToByte(sequenceNumber));
+	protected IpmiPayload preparePayload(int sequenceNumber) throws NoSuchAlgorithmException, InvalidKeyException {
+		return new IpmiLanRequest(getNetworkFunction(), getCommandCode(), null, TypeConverter.intToByte(sequenceNumber));
 	}
 
 	@Override
@@ -73,8 +67,7 @@ public class ReserveSdrRepository extends IpmiCommandCoder<ReserveSdrRepositoryR
 		byte[] raw = validateResponse(message);
 
 		if (raw == null || raw.length != 2) {
-			throw new IllegalArgumentException(
-					"Invalid response payload length");
+			throw new IllegalArgumentException("Invalid response payload length");
 		}
 
 		ReserveSdrRepositoryResponseData responseData = new ReserveSdrRepositoryResponseData();
@@ -86,10 +79,7 @@ public class ReserveSdrRepository extends IpmiCommandCoder<ReserveSdrRepositoryR
 		buffer[2] = 0;
 		buffer[3] = 0;
 
-		responseData
-				.setReservationId(
-						TypeConverter
-								.littleEndianByteArrayToInt(buffer));
+		responseData.setReservationId(TypeConverter.littleEndianByteArrayToInt(buffer));
 
 		return responseData;
 	}

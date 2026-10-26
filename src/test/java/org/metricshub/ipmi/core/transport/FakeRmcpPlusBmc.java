@@ -275,15 +275,14 @@ public class FakeRmcpPlusBmc implements AutoCloseable {
 
 		@Override
 		public String toString() {
-			return String
-					.format(
-							"seq %d, ack %d/%d%s, operation %02x, %d bytes",
-							sequenceNumber,
-							ackSequenceNumber,
-							acceptedCharacters,
-							isNack() ? " NACK" : "",
-							operation,
-							data.length);
+			return String.format(
+					"seq %d, ack %d/%d%s, operation %02x, %d bytes",
+					sequenceNumber,
+					ackSequenceNumber,
+					acceptedCharacters,
+					isNack() ? " NACK" : "",
+					operation,
+					data.length);
 		}
 	}
 
@@ -797,8 +796,7 @@ public class FakeRmcpPlusBmc implements AutoCloseable {
 		if (response == null) {
 			return null;
 		}
-		return ByteBuffer
-				.allocate(14 + response.length)
+		return ByteBuffer.allocate(14 + response.length)
 				.put(RMCP_HEADER)
 				.put((byte) 0x00)
 				.putInt(0)
@@ -823,8 +821,7 @@ public class FakeRmcpPlusBmc implements AutoCloseable {
 		Session opened = new Session(consoleId, random.nextInt(Integer.MAX_VALUE - 1) + 1, algorithms);
 		session = opened;
 		int role = request[1] & 0x0f;
-		out
-				.put((byte) 0x00)
+		out.put((byte) 0x00)
 				.put((byte) (role == 0 ? 4 : role))
 				.put((byte) 0x00)
 				.putInt(has(Fault.OPEN_SESSION_OTHER_CONSOLE_SESSION_ID) ? consoleId + 1 : consoleId)
@@ -877,8 +874,7 @@ public class FakeRmcpPlusBmc implements AutoCloseable {
 				current.rc,
 				guid,
 				current.identity);
-		return ByteBuffer
-				.allocate(40 + code.length)
+		return ByteBuffer.allocate(40 + code.length)
 				.order(ByteOrder.LITTLE_ENDIAN)
 				.put(request[0])
 				.put((byte) 0x00)
@@ -916,10 +912,8 @@ public class FakeRmcpPlusBmc implements AutoCloseable {
 		current.k1 = hmac(current.mac, sik, filled(1));
 		current.k2 = hmac(current.mac, sik, filled(2));
 		current.active = true;
-		byte[] icv = Arrays
-				.copyOf(hmac(current.mac, sik, current.rm, le(current.managedId), guid), current.macLength);
-		return ByteBuffer
-				.allocate(8 + icv.length)
+		byte[] icv = Arrays.copyOf(hmac(current.mac, sik, current.rm, le(current.managedId), guid), current.macLength);
+		return ByteBuffer.allocate(8 + icv.length)
 				.order(ByteOrder.LITTLE_ENDIAN)
 				.put(request[0])
 				.put((byte) 0x00)
@@ -1108,8 +1102,7 @@ public class FakeRmcpPlusBmc implements AutoCloseable {
 			lastSolSequenceNumber = 0;
 			lastSolAccepted = false;
 		}
-		return ByteBuffer
-				.allocate(13)
+		return ByteBuffer.allocate(13)
 				.order(ByteOrder.LITTLE_ENDIAN)
 				.put((byte) 0x00)
 				.putInt(0)
@@ -1137,8 +1130,7 @@ public class FakeRmcpPlusBmc implements AutoCloseable {
 	 */
 	private byte[] getPayloadInstanceInfo(byte[] data) {
 		Session current = session;
-		return ByteBuffer
-				.allocate(13)
+		return ByteBuffer.allocate(13)
 				.order(ByteOrder.LITTLE_ENDIAN)
 				.put((byte) 0x00)
 				.putInt(solActive ? solSessionId : 0)
@@ -1155,7 +1147,8 @@ public class FakeRmcpPlusBmc implements AutoCloseable {
 		Session current = session;
 		boolean alive = current != null && !current.expired && !current.closed;
 		int lookedUp = data.length >= 5 && (data[0] & 0xff) == 0xff ?
-				ByteBuffer.wrap(data, 1, 4).order(ByteOrder.LITTLE_ENDIAN).getInt() : current == null ? 0 : current.managedId;
+				ByteBuffer.wrap(data, 1, 4).order(ByteOrder.LITTLE_ENDIAN).getInt() :
+				current == null ? 0 : current.managedId;
 		if (alive && lookedUp == current.managedId) {
 			return new byte[] { 0x00, 0x01, 0x10, 0x01, 0x02, (byte) current.privilege, 0x01 };
 		}
@@ -1205,8 +1198,7 @@ public class FakeRmcpPlusBmc implements AutoCloseable {
 		aes.init(Cipher.ENCRYPT_MODE, new SecretKeySpec(current.k2, 0, 16, "AES"), new IvParameterSpec(iv));
 		byte[] payload = concat(iv, aes.doFinal(plain));
 		int integrityPad = (4 - (12 + payload.length + 2) % 4) % 4;
-		ByteBuffer out = ByteBuffer
-				.allocate(16 + payload.length + integrityPad + 2 + current.macLength)
+		ByteBuffer out = ByteBuffer.allocate(16 + payload.length + integrityPad + 2 + current.macLength)
 				.order(ByteOrder.LITTLE_ENDIAN)
 				.put(RMCP_HEADER)
 				.put((byte) 0x06)
@@ -1242,8 +1234,7 @@ public class FakeRmcpPlusBmc implements AutoCloseable {
 	 * Builds an RMCP+ packet without session trailer.
 	 */
 	private static byte[] packet(int payloadType, int sessionId, int sequenceNumber, byte[] payload) {
-		return ByteBuffer
-				.allocate(16 + payload.length)
+		return ByteBuffer.allocate(16 + payload.length)
 				.order(ByteOrder.LITTLE_ENDIAN)
 				.put(RMCP_HEADER)
 				.put((byte) 0x06)
@@ -1322,7 +1313,8 @@ public class FakeRmcpPlusBmc implements AutoCloseable {
 				.get((long) channel << 24 | address << 16 | netFn << 8 | request[5] & 0xff);
 		byte[] result = handler == null ?
 				new byte[]
-				{ (byte) 0xc1 } : handler.apply(Arrays.copyOfRange(request, 6, request.length - 1));
+				{ (byte) 0xc1 } :
+				handler.apply(Arrays.copyOfRange(request, 6, request.length - 1));
 		if (result == null) {
 			return new byte[] { 0x00 }; // forwarded, and the controller does not answer
 		}

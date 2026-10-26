@@ -81,8 +81,7 @@ public abstract class IpmiPayload {
 	 *         - when confidentiality algorithm fails.
 	 * @see IpmiPayload#getEncryptedPayload()
 	 */
-	public void encryptPayload(ConfidentialityAlgorithm confidentialityAlgorithm)
-			throws InvalidKeyException {
+	public void encryptPayload(ConfidentialityAlgorithm confidentialityAlgorithm) throws InvalidKeyException {
 		encryptedPayload = confidentialityAlgorithm.encrypt(getPayloadData());
 	}
 }

@@ -305,10 +305,8 @@ public final class TypeConverter {
 		char[] result = new char[text.length * 2];
 
 		for (int i = 0; i < text.length; ++i) {
-			result[2 * i] = decodeBcdPlusChar(
-					intToByte((byteToInt(text[i]) & 0xf0) >> 4));
-			result[2 * i + 1] = decodeBcdPlusChar(
-					intToByte(byteToInt(text[i]) & 0xf));
+			result[2 * i] = decodeBcdPlusChar(intToByte((byteToInt(text[i]) & 0xf0) >> 4));
+			result[2 * i + 1] = decodeBcdPlusChar(intToByte(byteToInt(text[i]) & 0xf));
 		}
 
 		return new String(result);
@@ -365,28 +363,16 @@ public final class TypeConverter {
 		for (int i = 0; i < text.length; ++i) {
 			switch (i % 3) {
 			case 0:
-				newText[index++] = intToByte(
-						byteToInt(text[i])
-								& 0x3f);
-				newText[index] = intToByte(
-						(byteToInt(text[i])
-								& 0xc0) >> 6);
+				newText[index++] = intToByte(byteToInt(text[i]) & 0x3f);
+				newText[index] = intToByte((byteToInt(text[i]) & 0xc0) >> 6);
 				break;
 			case 1:
-				newText[index++] |= intToByte(
-						(byteToInt(text[i])
-								& 0xf) << 2);
-				newText[index] = intToByte(
-						(byteToInt(text[i])
-								& 0xf0) >> 4);
+				newText[index++] |= intToByte((byteToInt(text[i]) & 0xf) << 2);
+				newText[index] = intToByte((byteToInt(text[i]) & 0xf0) >> 4);
 				break;
 			case 2:
-				newText[index++] |= intToByte(
-						(byteToInt(text[i])
-								& 0x3) << 4);
-				newText[index++] = intToByte(
-						(byteToInt(text[i])
-								& 0xfc) >> 2);
+				newText[index++] |= intToByte((byteToInt(text[i]) & 0x3) << 4);
+				newText[index++] = intToByte((byteToInt(text[i]) & 0xfc) >> 2);
 				break;
 			default:
 				break;
@@ -394,8 +380,7 @@ public final class TypeConverter {
 		}
 
 		for (int i = 0; i < newText.length; ++i) {
-			newText[i] = intToByte(
-					byteToInt(newText[i]) + 0x20);
+			newText[i] = intToByte(byteToInt(newText[i]) + 0x20);
 		}
 
 		return new String(newText, Charset.forName("US-ASCII"));

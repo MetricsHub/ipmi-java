@@ -111,8 +111,7 @@ public class ReadFruData extends IpmiCommandCoder<ReadFruDataResponseData> {
 		super();
 
 		if (countToRead > 255) {
-			throw new IllegalArgumentException(
-					"Count to read cannot exceed 255");
+			throw new IllegalArgumentException("Count to read cannot exceed 255");
 		}
 
 		if (fruId > 255) {
@@ -137,9 +136,7 @@ public class ReadFruData extends IpmiCommandCoder<ReadFruDataResponseData> {
 	}
 
 	@Override
-	protected IpmiPayload preparePayload(int sequenceNumber)
-			throws NoSuchAlgorithmException,
-			InvalidKeyException {
+	protected IpmiPayload preparePayload(int sequenceNumber) throws NoSuchAlgorithmException, InvalidKeyException {
 		byte[] payload = new byte[4];
 		payload[0] = TypeConverter.intToByte(fruId);
 		byte[] buffer = TypeConverter.intToLittleEndianByteArray(offset);
@@ -171,8 +168,7 @@ public class ReadFruData extends IpmiCommandCoder<ReadFruDataResponseData> {
 
 		// Table 34-3: the count returned, then that many bytes; a count of 0 with no data is a well-formed reply
 		if (raw == null || raw.length < 1) {
-			throw new IllegalArgumentException(
-					"Invalid response payload length");
+			throw new IllegalArgumentException("Invalid response payload length");
 		}
 
 		ReadFruDataResponseData responseData = new ReadFruDataResponseData();
@@ -261,10 +257,8 @@ public class ReadFruData extends IpmiCommandCoder<ReadFruDataResponseData> {
 		// length: it ends where the next area starts
 		int internalUseOffset = TypeConverter.byteToInt(data[1]) * 8;
 		if (internalUseOffset >= data.length) {
-			problems
-					.add(
-							"The internal use area at offset " + internalUseOffset + " is beyond the " + data.length
-									+ " byte(s) read");
+			problems.add(
+					"The internal use area at offset " + internalUseOffset + " is beyond the " + data.length + " byte(s) read");
 		} else if (internalUseOffset != 0) {
 			int end = data.length;
 			for (int area = 2; area <= 5; area++) {
@@ -309,10 +303,9 @@ public class ReadFruData extends IpmiCommandCoder<ReadFruDataResponseData> {
 		}
 		int length = TypeConverter.byteToInt(data[offset + 1]) * 8;
 		if (offset + length > data.length) {
-			problems
-					.add(
-							"The " + area + " info area at offset " + offset + " is truncated (" + (data.length - offset) + " of "
-									+ length + " bytes read)");
+			problems.add(
+					"The " + area + " info area at offset " + offset + " is truncated (" + (data.length - offset) + " of "
+							+ length + " bytes read)");
 			return;
 		}
 		try {
@@ -333,10 +326,9 @@ public class ReadFruData extends IpmiCommandCoder<ReadFruDataResponseData> {
 		while (!last && offset + MULTIRECORD_HEADER_SIZE <= data.length) {
 			// A corrupt header (section 16.2.5) means the length and the end-of-list flag cannot be trusted
 			if (!isChecksumValid(data, offset, MULTIRECORD_HEADER_SIZE)) {
-				problems
-						.add(
-								"The multirecord header at offset " + offset
-										+ " has an invalid checksum: the rest of the multirecord area is skipped");
+				problems.add(
+						"The multirecord header at offset " + offset
+								+ " has an invalid checksum: the rest of the multirecord area is skipped");
 				return;
 			}
 			last = (TypeConverter.byteToInt(data[offset + 1]) & 0x80) != 0;
@@ -358,10 +350,9 @@ public class ReadFruData extends IpmiCommandCoder<ReadFruDataResponseData> {
 			offset += MULTIRECORD_HEADER_SIZE + length;
 		}
 		if (!last) {
-			problems
-					.add(
-							"The multirecord area at offset " + multiRecordOffset
-									+ " ends at offset " + offset + " without its end-of-list record: the data read is truncated");
+			problems.add(
+					"The multirecord area at offset " + multiRecordOffset + " ends at offset " + offset
+							+ " without its end-of-list record: the data read is truncated");
 		}
 	}
 

@@ -440,7 +440,7 @@ public class SpdInfo extends FruRecord {
 
 	@Override
 	public String toString() {
-		return memoryType + " " + moduleType + " " + capacityMegabytes + " MB " + manufacturer + " " + partNumber
-				+ " S/N " + serialNumber;
+		return memoryType + " " + moduleType + " " + capacityMegabytes + " MB " + manufacturer + " " + partNumber + " S/N "
+				+ serialNumber;
 	}
 }

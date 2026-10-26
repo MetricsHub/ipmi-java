@@ -39,10 +39,8 @@ public abstract class SolMessage extends IpmiPayload {
 	private static final int ACCEPTED_CHARACTERS_LENGTH = 1;
 	private static final int OPERATION_STATUS_LENGTH = 1;
 
-	public static final int PAYLOAD_HEADER_LENGTH = PACKET_SEQUENCE_NUMBER_LENGTH +
-			PACKET_ACK_SEQUENCE_NUMBER_LENGTH +
-			ACCEPTED_CHARACTERS_LENGTH +
-			OPERATION_STATUS_LENGTH;
+	public static final int PAYLOAD_HEADER_LENGTH = PACKET_SEQUENCE_NUMBER_LENGTH + PACKET_ACK_SEQUENCE_NUMBER_LENGTH
+			+ ACCEPTED_CHARACTERS_LENGTH + OPERATION_STATUS_LENGTH;
 
 	/**
 	 * Sequence number of this packet.
@@ -85,8 +83,7 @@ public abstract class SolMessage extends IpmiPayload {
 
 	@Override
 	public byte[] getPayloadData() {
-		return MessageComposer
-				.get(getPayloadLength())
+		return MessageComposer.get(getPayloadLength())
 				.appendField(sequenceNumber)
 				.appendField(ackNackSequenceNumber)
 				.appendField(acceptedCharacterCount)

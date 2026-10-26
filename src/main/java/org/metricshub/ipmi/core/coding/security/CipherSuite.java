@@ -124,8 +124,7 @@ public class CipherSuite {
 	 * @param confidentialityAlgorithm the code of the confidentiality algorithm
 	 * @param integrityAlgorithm the code of the integrity algorithm
 	 */
-	public CipherSuite(byte id, byte authenticationAlgorithm,
-			byte confidentialityAlgorithm, byte integrityAlgorithm) {
+	public CipherSuite(byte id, byte authenticationAlgorithm, byte confidentialityAlgorithm, byte integrityAlgorithm) {
 		this.id = id;
 		this.authenticationAlgorithm = authenticationAlgorithm;
 		this.confidentialityAlgorithm = confidentialityAlgorithm;
@@ -254,8 +253,7 @@ public class CipherSuite {
 	 */
 	public ConfidentialityAlgorithm getConfidentialityAlgorithm() {
 		if (ca != null && ca.getCode() != confidentialityAlgorithm) {
-			throw new IllegalArgumentException(
-					"Invalid confidentiality algorithm code");
+			throw new IllegalArgumentException("Invalid confidentiality algorithm code");
 		}
 		switch (confidentialityAlgorithm) {
 		case SecurityConstants.CA_NONE:
@@ -275,8 +273,7 @@ public class CipherSuite {
 		case SecurityConstants.CA_XRC4_128:
 			throw new IllegalArgumentException("Confidentiality algorithm XRC4-128 is not implemented.");
 		default:
-			throw new IllegalArgumentException(
-					"Invalid confidentiality algorithm.");
+			throw new IllegalArgumentException("Invalid confidentiality algorithm.");
 
 		}
 	}

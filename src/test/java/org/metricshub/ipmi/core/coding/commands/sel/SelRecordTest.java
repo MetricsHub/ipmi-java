@@ -27,9 +27,8 @@ class SelRecordTest {
 	void systemEventRecordIsDecoded() {
 		// IPMI 2.0 section 32.1: record 1, type 02h, timestamp, generator 0020h, EvM rev 04h, temperature sensor 5,
 		// assertion of threshold event offset 7 (upper non-critical going high), event data
-		SelRecord record = SelRecord
-				.populateSelRecord(
-						bytes(0x01, 0x00, 0x02, 0x10, 0x20, 0x30, 0x40, 0x20, 0x00, 0x04, 0x01, 0x05, 0x01, 0x07, 0x00, 0x00));
+		SelRecord record = SelRecord.populateSelRecord(
+				bytes(0x01, 0x00, 0x02, 0x10, 0x20, 0x30, 0x40, 0x20, 0x00, 0x04, 0x01, 0x05, 0x01, 0x07, 0x00, 0x00));
 
 		assertEquals(1, record.getRecordId());
 		assertEquals(SelRecordType.System, record.getRecordType());
@@ -47,9 +46,8 @@ class SelRecordTest {
 	@Test
 	void theGeneratorIdAndEventDataAreThoseOfTheRecord() {
 		// Logged by system software ID 41h on channel 1, deassertion of a sensor-specific event with its data bytes
-		SelRecord record = SelRecord
-				.populateSelRecord(
-						bytes(0x05, 0x00, 0x02, 0xff, 0xff, 0xff, 0xff, 0x41, 0x10, 0x04, 0x09, 0x01, 0xef, 0xa0, 0x12, 0x34));
+		SelRecord record = SelRecord.populateSelRecord(
+				bytes(0x05, 0x00, 0x02, 0xff, 0xff, 0xff, 0xff, 0x41, 0x10, 0x04, 0x09, 0x01, 0xef, 0xa0, 0x12, 0x34));
 
 		assertEquals(0x1041, record.getGeneratorId());
 		assertEquals(0x6f, record.getEventType());
@@ -85,8 +83,7 @@ class SelRecordTest {
 	@Test
 	void oemNonTimestampedRecordKeepsItsData() {
 		// Section 32.3: type E0h, 13 OEM bytes
-		SelRecord record = SelRecord
-				.populateSelRecord(bytes(0x03, 0x00, 0xe0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13));
+		SelRecord record = SelRecord.populateSelRecord(bytes(0x03, 0x00, 0xe0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13));
 
 		assertEquals(SelRecordType.OemNonTimestamped, record.getRecordType());
 		assertNull(record.getTimestamp());
@@ -105,8 +102,7 @@ class SelRecordTest {
 
 	@Test
 	void reservedRecordTypeDoesNotAbortTheWalk() {
-		SelRecord record = SelRecord
-				.populateSelRecord(bytes(0x04, 0x00, 0x10, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13));
+		SelRecord record = SelRecord.populateSelRecord(bytes(0x04, 0x00, 0x10, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13));
 
 		assertEquals(4, record.getRecordId());
 		assertEquals(SelRecordType.Reserved, record.getRecordType());

@@ -93,19 +93,11 @@ public class Rakp3 extends IpmiCommandCoder<Rakp3ResponseData> {
 	 *        - RAKP Message 2 received earlier in the authentification
 	 *        process
 	 */
-	public Rakp3(CipherSuite cipherSuite, Rakp1 rakp1,
-			Rakp1ResponseData rakp1ResponseData) {
+	public Rakp3(CipherSuite cipherSuite, Rakp1 rakp1, Rakp1ResponseData rakp1ResponseData) {
 		setSessionParameters(IpmiVersion.V20, cipherSuite, AuthenticationType.RMCPPlus);
 		this.rakp1 = rakp1;
 		this.rakp1ResponseData = rakp1ResponseData;
-		setCipherSuite(
-				new CipherSuite(
-						(byte) 0,
-						cipherSuite
-								.getAuthenticationAlgorithm()
-								.getCode(),
-						(byte) 0,
-						(byte) 0));
+		setCipherSuite(new CipherSuite((byte) 0, cipherSuite.getAuthenticationAlgorithm().getCode(), (byte) 0, (byte) 0));
 	}
 
 	/**
@@ -130,22 +122,14 @@ public class Rakp3 extends IpmiCommandCoder<Rakp3ResponseData> {
 	 *        - RAKP Message 2 received earlier in the authentification
 	 *        process
 	 */
-	public Rakp3(byte statusCode, int managedSystemSessionId,
-			CipherSuite cipherSuite, Rakp1 rakp1,
+	public Rakp3(byte statusCode, int managedSystemSessionId, CipherSuite cipherSuite, Rakp1 rakp1,
 			Rakp1ResponseData rakp1ResponseData) {
 		setSessionParameters(IpmiVersion.V20, cipherSuite, AuthenticationType.RMCPPlus);
 		setStatusCode(statusCode);
 		setManagedSystemSessionId(managedSystemSessionId);
 		this.rakp1 = rakp1;
 		this.rakp1ResponseData = rakp1ResponseData;
-		setCipherSuite(
-				new CipherSuite(
-						(byte) 0,
-						cipherSuite
-								.getAuthenticationAlgorithm()
-								.getCode(),
-						(byte) 0,
-						(byte) 0));
+		setCipherSuite(new CipherSuite((byte) 0, cipherSuite.getAuthenticationAlgorithm().getCode(), (byte) 0, (byte) 0));
 	}
 
 	@Override
@@ -163,29 +147,20 @@ public class Rakp3 extends IpmiCommandCoder<Rakp3ResponseData> {
 		message.setSessionID(0);
 		message.setSessionSequenceNumber(0);
 		message.setAuthenticationType(getAuthenticationType());
-		message
-				.setPayloadAuthenticated(
-						getCipherSuite()
-								.getIntegrityAlgorithm()
-								.getCode() != SecurityConstants.IA_NONE);
+		message.setPayloadAuthenticated(getCipherSuite().getIntegrityAlgorithm().getCode() != SecurityConstants.IA_NONE);
 		message.setPayloadEncrypted(false);
 
 		message.setPayload(preparePayload(messageSequenceNumber));
 
-		message
-				.setAuthCode(
-						getCipherSuite()
-								.getIntegrityAlgorithm()
-								.generateAuthCode(
-										message.getIntegrityAlgorithmBase(new Protocolv20Encoder())));
+		message.setAuthCode(
+				getCipherSuite().getIntegrityAlgorithm()
+						.generateAuthCode(message.getIntegrityAlgorithmBase(new Protocolv20Encoder())));
 
 		return message;
 	}
 
 	@Override
-	protected IpmiPayload preparePayload(int sequenceNumber)
-			throws NoSuchAlgorithmException,
-			InvalidKeyException {
+	protected IpmiPayload preparePayload(int sequenceNumber) throws NoSuchAlgorithmException, InvalidKeyException {
 		byte[] payload = new byte[8];
 
 		payload[0] = TypeConverter.intToByte(sequenceNumber); // message
@@ -196,31 +171,21 @@ public class Rakp3 extends IpmiCommandCoder<Rakp3ResponseData> {
 		payload[2] = 0; // reserved
 		payload[3] = 0; // reserved
 
-		byte[] manSesId = TypeConverter
-				.intToLittleEndianByteArray(getManagedSystemSessionId());
+		byte[] manSesId = TypeConverter.intToLittleEndianByteArray(getManagedSystemSessionId());
 
 		System.arraycopy(manSesId, 0, payload, 4, 4); // managed system session
 																									// id
 
-		byte[] exchangeAuthCode = getCipherSuite()
-				.getAuthenticationAlgorithm()
+		byte[] exchangeAuthCode = getCipherSuite().getAuthenticationAlgorithm()
 				.getKeyExchangeAuthenticationCode(
-						prepareKeyExchangeAuthenticationCodeBase(
-								rakp1,
-								rakp1ResponseData),
+						prepareKeyExchangeAuthenticationCodeBase(rakp1, rakp1ResponseData),
 						rakp1.getPasswordBytes());
 
 		byte[] result = null;
 
 		if (exchangeAuthCode != null) {
 			result = new byte[8 + exchangeAuthCode.length];
-			System
-					.arraycopy(
-							exchangeAuthCode,
-							0,
-							result,
-							8,
-							exchangeAuthCode.length);
+			System.arraycopy(exchangeAuthCode, 0, result, 8, exchangeAuthCode.length);
 		} else {
 			result = new byte[8];
 		}
@@ -234,37 +199,16 @@ public class Rakp3 extends IpmiCommandCoder<Rakp3ResponseData> {
 	 * @return byte array holding prepared base for calculating
 	 *         KeyExchangeAuthenticationCode for RAKP Message 3
 	 */
-	private byte[] prepareKeyExchangeAuthenticationCodeBase(
-			Rakp1 rakp1Message,
-			Rakp1ResponseData responseData) {
+	private byte[] prepareKeyExchangeAuthenticationCodeBase(Rakp1 rakp1Message, Rakp1ResponseData responseData) {
 		byte[] username = rakp1Message.getUsernameBytes();
 		byte[] keac = new byte[22 + username.length];
 
-		System
-				.arraycopy(
-						responseData.getManagedSystemRandomNumber(),
-						0,
-						keac,
-						0,
-						16);
+		System.arraycopy(responseData.getManagedSystemRandomNumber(), 0, keac, 0, 16);
 
 		System
-				.arraycopy(
-						TypeConverter
-								.intToLittleEndianByteArray(
-										responseData
-												.getRemoteConsoleSessionId()),
-						0,
-						keac,
-						16,
-						4);
+				.arraycopy(TypeConverter.intToLittleEndianByteArray(responseData.getRemoteConsoleSessionId()), 0, keac, 16, 4);
 
-		keac[20] = TypeConverter
-				.intToByte(
-						encodePrivilegeLevel(
-								rakp1Message
-										.getRequestedMaximumPrivilegeLevel())
-								| 0x10);
+		keac[20] = TypeConverter.intToByte(encodePrivilegeLevel(rakp1Message.getRequestedMaximumPrivilegeLevel()) | 0x10);
 
 		keac[21] = TypeConverter.intToByte(username.length);
 		System.arraycopy(username, 0, keac, 22, username.length);
@@ -300,9 +244,7 @@ public class Rakp3 extends IpmiCommandCoder<Rakp3ResponseData> {
 
 		data.setStatusCode(payload[1]);
 
-		int integrityCheckLength = getCipherSuite()
-				.getAuthenticationAlgorithm()
-				.getIntegrityCheckBaseLength();
+		int integrityCheckLength = getCipherSuite().getAuthenticationAlgorithm().getIntegrityCheckBaseLength();
 
 		if (payload.length < 8 + integrityCheckLength) {
 			throw new IllegalArgumentException("Invalid payload length");
@@ -312,16 +254,12 @@ public class Rakp3 extends IpmiCommandCoder<Rakp3ResponseData> {
 
 		System.arraycopy(payload, 4, buffer, 0, 4);
 
-		data
-				.setConsoleSessionId(
-						TypeConverter
-								.littleEndianByteArrayToInt(buffer));
+		data.setConsoleSessionId(TypeConverter.littleEndianByteArrayToInt(buffer));
 
 		byte[] integrityCheck = new byte[integrityCheckLength];
 		System.arraycopy(payload, 8, integrityCheck, 0, integrityCheckLength);
 
-		if (!getCipherSuite()
-				.getAuthenticationAlgorithm()
+		if (!getCipherSuite().getAuthenticationAlgorithm()
 				.doIntegrityCheck(
 						prepareIntegrityCheckBase(rakp1, rakp1ResponseData),
 						integrityCheck,
@@ -335,23 +273,12 @@ public class Rakp3 extends IpmiCommandCoder<Rakp3ResponseData> {
 	/**
 	 * @return byte array holding prepared base for calculating Integrity Check
 	 */
-	private byte[] prepareIntegrityCheckBase(
-			Rakp1 rakp1Message,
-			Rakp1ResponseData responseData) {
+	private byte[] prepareIntegrityCheckBase(Rakp1 rakp1Message, Rakp1ResponseData responseData) {
 		byte[] icb = new byte[36];
 
 		System.arraycopy(rakp1Message.getConsoleRandomNumber(), 0, icb, 0, 16);
 
-		System
-				.arraycopy(
-						TypeConverter
-								.intToLittleEndianByteArray(
-										rakp1Message
-												.getManagedSystemSessionId()),
-						0,
-						icb,
-						16,
-						4);
+		System.arraycopy(TypeConverter.intToLittleEndianByteArray(rakp1Message.getManagedSystemSessionId()), 0, icb, 16, 4);
 
 		System.arraycopy(responseData.getManagedSystemGuid(), 0, icb, 20, 16);
 

@@ -175,8 +175,7 @@ public final class IpmiClient implements AutoCloseable {
 	 * The suites without integrity (0, 1, 6, 15), which the builder refuses: the list of suites comes unauthenticated,
 	 * so falling back to them would let an attacker downgrade the session to one whose replies can be forged.
 	 */
-	private static final Set<Integer> SUITES_WITHOUT_INTEGRITY = new HashSet<Integer>(
-			Arrays.asList(0, 1, 6, 15));
+	private static final Set<Integer> SUITES_WITHOUT_INTEGRITY = new HashSet<Integer>(Arrays.asList(0, 1, 6, 15));
 
 	private static final int LAST_STANDARD_SUITE = 19;
 	private static final int MAX_PORT = 65535;
@@ -552,16 +551,14 @@ public final class IpmiClient implements AutoCloseable {
 	 */
 	private Sensor readSensor(AbstractSensorRecord record, int instance, Set<Integer> silentOwners) {
 		if (record.getAddressType() == AddressType.SystemSoftwareId) {
-			return Sensor
-					.of(
-							record,
-							instance,
-							null,
-							null,
-							String
-									.format(
-											"The sensor belongs to system software (owner ID %02Xh), not to a controller: it has no reading",
-											ownerAddress(record) | 1));
+			return Sensor.of(
+					record,
+					instance,
+					null,
+					null,
+					String.format(
+							"The sensor belongs to system software (owner ID %02Xh), not to a controller: it has no reading",
+							ownerAddress(record) | 1));
 		}
 		boolean bridged = isBridged(record);
 		int owner = TypeConverter.byteToInt(record.getChannelNumber()) << 10
@@ -581,30 +578,28 @@ public final class IpmiClient implements AutoCloseable {
 					&& Sensor.isValid(reading)) {
 				// IPMI 2.0 section 36.2: the factors of the record hold at the nominal reading only
 				int raw = (int) reading.getPlainSensorReading();
-				return Sensor
-						.of(
-								record,
-								instance,
-								reading,
-								sendToOwner(record, new GetSensorReadingFactors(number, raw, lun)).getFactors(),
-								null);
+				return Sensor.of(
+						record,
+						instance,
+						reading,
+						sendToOwner(record, new GetSensorReadingFactors(number, raw, lun)).getFactors(),
+						null);
 			}
 			return Sensor.of(record, instance, reading, null, null);
 		} catch (IpmiCompletionCodeException e) {
 			// A reading the BMC refuses (not present, insufficient privilege...) costs that sensor, not the whole walk;
 			// refused factors cost its reading only
 			String meaning = bridged ? SendMessage.describeCompletionCode(e.rawCompletionCode()) : null;
-			return Sensor
-					.of(
-							record,
-							instance,
-							reading,
-							null,
-							(reading == null ? "Get Sensor Reading" : "Get Sensor Reading Factors")
-									+ (bridged ? " through the BMC to " + describeOwner(record) : "") + " failed: "
-									+ (meaning == null ?
-											((IPMIException) e.getCause()).describe() :
-											IPMIException.describe(meaning, e.rawCompletionCode())));
+			return Sensor.of(
+					record,
+					instance,
+					reading,
+					null,
+					(reading == null ? "Get Sensor Reading" : "Get Sensor Reading Factors")
+							+ (bridged ? " through the BMC to " + describeOwner(record) : "") + " failed: "
+							+ (meaning == null ?
+									((IPMIException) e.getCause()).describe() :
+									IPMIException.describe(meaning, e.rawCompletionCode())));
 		} catch (IpmiTimeoutException e) {
 			if (!bridged || link.lost) {
 				// The BMC stopped answering: the walk cannot go on
@@ -616,14 +611,13 @@ public final class IpmiClient implements AutoCloseable {
 			if (reading == null) {
 				silentOwners.add(owner);
 			}
-			return Sensor
-					.of(
-							record,
-							instance,
-							reading,
-							null,
-							"No reply from " + describeOwner(record) + " through the BMC"
-									+ (reading == null ? "" : " to Get Sensor Reading Factors"));
+			return Sensor.of(
+					record,
+					instance,
+					reading,
+					null,
+					"No reply from " + describeOwner(record) + " through the BMC"
+							+ (reading == null ? "" : " to Get Sensor Reading Factors"));
 		} catch (IpmiConnectionException e) {
 			throw e;
 		} catch (IpmiClientException e) {
@@ -638,9 +632,8 @@ public final class IpmiClient implements AutoCloseable {
 	 */
 	private <R extends ResponseData> R sendToOwner(AbstractSensorRecord record, IpmiCommandCoder<R> command) {
 		return isBridged(record) ?
-				link
-						.send(
-								new SendMessage<R>(TypeConverter.byteToInt(record.getChannelNumber()), ownerAddress(record), command)) :
+				link.send(
+						new SendMessage<R>(TypeConverter.byteToInt(record.getChannelNumber()), ownerAddress(record), command)) :
 				link.send(command);
 	}
 
@@ -801,8 +794,7 @@ public final class IpmiClient implements AutoCloseable {
 				link.send(new DeactivatePayload(PayloadType.Sol, instance));
 				return true;
 			}
-			holders
-					.append(holders.length() == 0 ? "" : ", ")
+			holders.append(holders.length() == 0 ? "" : ", ")
 					.append(String.format("instance %d by session %08Xh", instance, holder))
 					.append(" (user ID ")
 					.append(session.getUserId())
@@ -838,7 +830,8 @@ public final class IpmiClient implements AutoCloseable {
 			return repository;
 		}
 		SdrRepository walked = info == null && holdsDeviceSdrsOnly() ?
-				SdrWalker.walkDevice(link) : SdrWalker.walk(link, info);
+				SdrWalker.walkDevice(link) :
+				SdrWalker.walk(link, info);
 		repository = sdrCache ? walked : null;
 		return walked;
 	}

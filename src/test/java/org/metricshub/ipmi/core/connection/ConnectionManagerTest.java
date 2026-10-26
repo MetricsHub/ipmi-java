@@ -126,9 +126,7 @@ class ConnectionManagerTest {
 			int handle = manager.createConnection(InetAddress.getLoopbackAddress(), 623);
 			manager.closeConnection(handle);
 			assertThrows(IllegalStateException.class, () -> manager.getAvailableCipherSuites(handle));
-			assertThrows(
-					IllegalStateException.class,
-					() -> manager.getChannelAuthenticationCapabilities(handle, null, null));
+			assertThrows(IllegalStateException.class, () -> manager.getChannelAuthenticationCapabilities(handle, null, null));
 			assertThrows(IllegalStateException.class, () -> manager.startSession(handle, null, null, "", new byte[0], null));
 			assertThrows(IllegalStateException.class, () -> manager.registerListener(handle, null));
 			assertThrows(IllegalStateException.class, () -> manager.getConnection(handle));
@@ -143,8 +141,6 @@ class ConnectionManagerTest {
 		int handle = manager.createConnection(InetAddress.getLoopbackAddress(), 623);
 		manager.close();
 		assertFalse(manager.getConnection(handle).isActive(), "close() disconnects the connections");
-		assertThrows(
-				IllegalStateException.class,
-				() -> manager.createConnection(InetAddress.getLoopbackAddress(), 623));
+		assertThrows(IllegalStateException.class, () -> manager.createConnection(InetAddress.getLoopbackAddress(), 623));
 	}
 }

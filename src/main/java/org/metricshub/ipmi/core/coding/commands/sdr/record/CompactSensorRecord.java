@@ -28,9 +28,7 @@ package org.metricshub.ipmi.core.coding.commands.sdr.record;
 public class CompactSensorRecord extends AbstractSensorRecord {
 
 	@Override
-	protected void populateTypeSpecficValues(
-			byte[] recordData,
-			SensorRecord record) {
+	protected void populateTypeSpecficValues(byte[] recordData, SensorRecord record) {
 		populateSensorHeader(recordData, 12);
 		populateCapabilitiesAndUnits(recordData);
 		populateSharing(recordData, 23);

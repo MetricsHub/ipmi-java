@@ -48,10 +48,7 @@ public class ManagementAccessInfo extends MultiRecordInfo {
 	public ManagementAccessInfo(byte[] fruData, int offset, int length) {
 		super();
 
-		recordType = ManagementAccessRecordType
-				.parseInt(
-						TypeConverter
-								.byteToInt(fruData[offset]));
+		recordType = ManagementAccessRecordType.parseInt(TypeConverter.byteToInt(fruData[offset]));
 
 		byte[] buffer = new byte[length - 1];
 

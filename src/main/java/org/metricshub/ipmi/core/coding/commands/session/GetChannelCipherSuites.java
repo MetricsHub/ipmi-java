@@ -57,10 +57,7 @@ public class GetChannelCipherSuites extends IpmiCommandCoder<GetChannelCipherSui
 	 * @throws IllegalArgumentException
 	 */
 	public void setChannelNumber(int channelNumber) {
-		if (channelNumber < 0
-				|| channelNumber > 0xF
-				|| channelNumber == 0xC
-				|| channelNumber == 0xD) {
+		if (channelNumber < 0 || channelNumber > 0xF || channelNumber == 0xC || channelNumber == 0xD) {
 			throw new IllegalArgumentException("Invalid channel number");
 		}
 		this.channelNumber = TypeConverter.intToByte(channelNumber);

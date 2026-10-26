@@ -102,58 +102,28 @@ public class ProductInfo extends FruRecord {
 
 				byte[] partNumberData = new byte[partDataLength];
 
-				System
-						.arraycopy(
-								fruData,
-								currentOffset,
-								partNumberData,
-								0,
-								partDataLength);
+				System.arraycopy(fruData, currentOffset, partNumberData, 0, partDataLength);
 
 				currentOffset += partDataLength;
 
 				switch (index) {
 				case 0:
-					setManufacturerName(
-							decodeString(
-									partType,
-									partNumberData,
-									isEnglishLanguageCode(languageCode)));
+					setManufacturerName(decodeString(partType, partNumberData, isEnglishLanguageCode(languageCode)));
 					break;
 				case 1:
-					setProductName(
-							decodeString(
-									partType,
-									partNumberData,
-									isEnglishLanguageCode(languageCode)));
+					setProductName(decodeString(partType, partNumberData, isEnglishLanguageCode(languageCode)));
 					break;
 				case 2:
-					setProductModelNumber(
-							decodeString(
-									partType,
-									partNumberData,
-									isEnglishLanguageCode(languageCode)));
+					setProductModelNumber(decodeString(partType, partNumberData, isEnglishLanguageCode(languageCode)));
 					break;
 				case 3:
-					setProductVersion(
-							decodeString(
-									partType,
-									partNumberData,
-									isEnglishLanguageCode(languageCode)));
+					setProductVersion(decodeString(partType, partNumberData, isEnglishLanguageCode(languageCode)));
 					break;
 				case 4:
-					setProductSerialNumber(
-							decodeString(
-									partType,
-									partNumberData,
-									true));
+					setProductSerialNumber(decodeString(partType, partNumberData, true));
 					break;
 				case 5:
-					setAssetTag(
-							decodeString(
-									partType,
-									partNumberData,
-									isEnglishLanguageCode(languageCode)));
+					setAssetTag(decodeString(partType, partNumberData, isEnglishLanguageCode(languageCode)));
 					break;
 				case 6:
 					setFruFileId(partNumberData);
@@ -164,12 +134,7 @@ public class ProductInfo extends FruRecord {
 						++currentOffset;
 						continue;
 					}
-					customInfo
-							.add(
-									decodeString(
-											partType,
-											partNumberData,
-											isEnglishLanguageCode(languageCode)));
+					customInfo.add(decodeString(partType, partNumberData, isEnglishLanguageCode(languageCode)));
 					break;
 				}
 			}

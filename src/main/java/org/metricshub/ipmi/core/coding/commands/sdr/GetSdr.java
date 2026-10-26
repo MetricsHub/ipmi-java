@@ -57,13 +57,8 @@ public class GetSdr extends IpmiCommandCoder<GetSdrResponseData> {
 	 * @param recordId
 	 *        - ID of the record to get
 	 */
-	public GetSdr(int reservationId,
-			int recordId) {
-		this(
-				reservationId,
-				recordId,
-				0,
-				0xFF);
+	public GetSdr(int reservationId, int recordId) {
+		this(reservationId, recordId, 0, 0xFF);
 	}
 
 	/**
@@ -79,8 +74,7 @@ public class GetSdr extends IpmiCommandCoder<GetSdrResponseData> {
 	 * @param bytesToRead
 	 *        - number of bytes to read
 	 */
-	public GetSdr(int reservationId,
-			int recordId, int offset, int bytesToRead) {
+	public GetSdr(int reservationId, int recordId, int offset, int bytesToRead) {
 		this.recordId = recordId;
 		this.reservationId = reservationId;
 		this.offset = offset;
@@ -98,9 +92,7 @@ public class GetSdr extends IpmiCommandCoder<GetSdrResponseData> {
 	}
 
 	@Override
-	protected IpmiPayload preparePayload(int sequenceNumber)
-			throws NoSuchAlgorithmException,
-			InvalidKeyException {
+	protected IpmiPayload preparePayload(int sequenceNumber) throws NoSuchAlgorithmException, InvalidKeyException {
 		byte[] payload = new byte[6];
 
 		byte[] buffer = TypeConverter.intToByteArray(reservationId);
@@ -116,11 +108,7 @@ public class GetSdr extends IpmiCommandCoder<GetSdrResponseData> {
 		payload[4] = TypeConverter.intToByte(offset);
 		payload[5] = TypeConverter.intToByte(bytesToRead);
 
-		return new IpmiLanRequest(
-				getNetworkFunction(),
-				getCommandCode(),
-				payload,
-				TypeConverter.intToByte(sequenceNumber));
+		return new IpmiLanRequest(getNetworkFunction(), getCommandCode(), payload, TypeConverter.intToByte(sequenceNumber));
 	}
 
 	@Override
@@ -132,8 +120,7 @@ public class GetSdr extends IpmiCommandCoder<GetSdrResponseData> {
 
 		// Two bytes (the next record ID) and no record data is a valid, if unhelpful, answer: the walk must go on
 		if (raw == null || raw.length < 2) {
-			throw new IllegalArgumentException(
-					"Invalid response payload length");
+			throw new IllegalArgumentException("Invalid response payload length");
 		}
 
 		GetSdrResponseData responseData = new GetSdrResponseData();
@@ -145,10 +132,7 @@ public class GetSdr extends IpmiCommandCoder<GetSdrResponseData> {
 		buffer[2] = 0;
 		buffer[3] = 0;
 
-		responseData
-				.setNextRecordId(
-						TypeConverter
-								.littleEndianByteArrayToInt(buffer));
+		responseData.setNextRecordId(TypeConverter.littleEndianByteArrayToInt(buffer));
 
 		byte[] recordData = new byte[raw.length - 2];
 

@@ -1,2 +1,5 @@
 # Whole-tree reformat with mvn formatter:format (#118)
 13b1fdb37e3aa7f621d68d93c5118c7932ea7425
+
+# Formatter profile change and whole-tree reformat (#223)
+4893b52e187a8e8c6034c6a707ebce0cd82f0344

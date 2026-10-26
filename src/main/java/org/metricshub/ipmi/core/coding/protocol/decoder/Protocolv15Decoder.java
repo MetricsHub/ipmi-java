@@ -64,11 +64,7 @@ public class Protocolv15Decoder extends ProtocolDecoder {
 
 		int offset = 1;
 
-		message
-				.setSessionSequenceNumber(
-						decodeSessionSequenceNumber(
-								raw,
-								offset));
+		message.setSessionSequenceNumber(decodeSessionSequenceNumber(raw, offset));
 
 		offset += 4;
 
@@ -94,13 +90,7 @@ public class Protocolv15Decoder extends ProtocolDecoder {
 		}
 
 		message
-				.setPayload(
-						decodePayload(
-								raw,
-								offset,
-								payloadLength,
-								message.getConfidentialityAlgorithm(),
-								PayloadType.Ipmi));
+				.setPayload(decodePayload(raw, offset, payloadLength, message.getConfidentialityAlgorithm(), PayloadType.Ipmi));
 
 		return message;
 	}

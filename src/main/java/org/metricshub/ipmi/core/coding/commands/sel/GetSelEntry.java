@@ -52,8 +52,7 @@ public class GetSelEntry extends IpmiCommandCoder<GetSelEntryResponseData> {
 	 * @param recordId
 	 *        - ID of the record to get
 	 */
-	public GetSelEntry(int reservationId,
-			int recordId) {
+	public GetSelEntry(int reservationId, int recordId) {
 		this.recordId = recordId;
 		this.reservationId = reservationId;
 	}
@@ -69,9 +68,7 @@ public class GetSelEntry extends IpmiCommandCoder<GetSelEntryResponseData> {
 	}
 
 	@Override
-	protected IpmiPayload preparePayload(int sequenceNumber)
-			throws NoSuchAlgorithmException,
-			InvalidKeyException {
+	protected IpmiPayload preparePayload(int sequenceNumber) throws NoSuchAlgorithmException, InvalidKeyException {
 		byte[] payload = new byte[6];
 
 		byte[] buffer = TypeConverter.intToByteArray(reservationId);
@@ -87,11 +84,7 @@ public class GetSelEntry extends IpmiCommandCoder<GetSelEntryResponseData> {
 		payload[4] = 0;
 		payload[5] = TypeConverter.intToByte(0xff);
 
-		return new IpmiLanRequest(
-				getNetworkFunction(),
-				getCommandCode(),
-				payload,
-				TypeConverter.intToByte(sequenceNumber));
+		return new IpmiLanRequest(getNetworkFunction(), getCommandCode(), payload, TypeConverter.intToByte(sequenceNumber));
 	}
 
 	@Override
@@ -102,8 +95,7 @@ public class GetSelEntry extends IpmiCommandCoder<GetSelEntryResponseData> {
 		byte[] raw = validateResponse(message);
 
 		if (raw == null || raw.length < 3) {
-			throw new IllegalArgumentException(
-					"Invalid response payload length");
+			throw new IllegalArgumentException("Invalid response payload length");
 		}
 
 		GetSelEntryResponseData responseData = new GetSelEntryResponseData();
@@ -115,10 +107,7 @@ public class GetSelEntry extends IpmiCommandCoder<GetSelEntryResponseData> {
 		buffer[2] = 0;
 		buffer[3] = 0;
 
-		responseData
-				.setNextRecordId(
-						TypeConverter
-								.littleEndianByteArrayToInt(buffer));
+		responseData.setNextRecordId(TypeConverter.littleEndianByteArrayToInt(buffer));
 
 		byte[] recordData = new byte[raw.length - 2];
 

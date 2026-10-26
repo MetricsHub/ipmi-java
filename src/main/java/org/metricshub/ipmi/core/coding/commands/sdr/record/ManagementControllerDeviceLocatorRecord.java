@@ -89,9 +89,7 @@ public class ManagementControllerDeviceLocatorRecord extends SensorRecord {
 	private String name;
 
 	@Override
-	protected void populateTypeSpecficValues(
-			byte[] recordData,
-			SensorRecord record) {
+	protected void populateTypeSpecficValues(byte[] recordData, SensorRecord record) {
 
 		setDeviceAddress(TypeConverter.byteToInt(recordData[5]) >> 1);
 

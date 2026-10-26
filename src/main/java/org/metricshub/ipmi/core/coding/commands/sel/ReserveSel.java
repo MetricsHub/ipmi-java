@@ -55,14 +55,8 @@ public class ReserveSel extends IpmiCommandCoder<ReserveSelResponseData> {
 	}
 
 	@Override
-	protected IpmiPayload preparePayload(int sequenceNumber)
-			throws NoSuchAlgorithmException,
-			InvalidKeyException {
-		return new IpmiLanRequest(
-				getNetworkFunction(),
-				getCommandCode(),
-				null,
-				TypeConverter.intToByte(sequenceNumber));
+	protected IpmiPayload preparePayload(int sequenceNumber) throws NoSuchAlgorithmException, InvalidKeyException {
+		return new IpmiLanRequest(getNetworkFunction(), getCommandCode(), null, TypeConverter.intToByte(sequenceNumber));
 	}
 
 	@Override
@@ -74,8 +68,7 @@ public class ReserveSel extends IpmiCommandCoder<ReserveSelResponseData> {
 		byte[] raw = validateResponse(message);
 
 		if (raw == null || raw.length != 2) {
-			throw new IllegalArgumentException(
-					"Invalid response payload length: " + (raw != null ? raw.length : "null"));
+			throw new IllegalArgumentException("Invalid response payload length: " + (raw != null ? raw.length : "null"));
 		}
 
 		ReserveSelResponseData responseData = new ReserveSelResponseData();
@@ -87,10 +80,7 @@ public class ReserveSel extends IpmiCommandCoder<ReserveSelResponseData> {
 		buffer[2] = 0;
 		buffer[3] = 0;
 
-		responseData
-				.setReservationId(
-						TypeConverter
-								.littleEndianByteArrayToInt(buffer));
+		responseData.setReservationId(TypeConverter.littleEndianByteArrayToInt(buffer));
 
 		return responseData;
 	}

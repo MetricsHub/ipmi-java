@@ -47,26 +47,21 @@ public class Protocolv20Encoder extends ProtocolEncoder {
 	@Override
 	public byte[] encode(IpmiMessage ipmiMessage) throws InvalidKeyException {
 		if (!(ipmiMessage instanceof Ipmiv20Message)) {
-			throw new IllegalArgumentException(
-					"IPMIMessage must be in 2.0 version.");
+			throw new IllegalArgumentException("IPMIMessage must be in 2.0 version.");
 		}
 		Ipmiv20Message message = (Ipmiv20Message) ipmiMessage;
 
 		byte[] payload = message.getPayload().getEncryptedPayload();
 
 		if (payload == null) {
-			message
-					.getPayload()
-					.encryptPayload(
-							message.getConfidentialityAlgorithm());
+			message.getPayload().encryptPayload(message.getConfidentialityAlgorithm());
 			payload = message.getPayload().getEncryptedPayload();
 		}
 
 		byte[] raw = new byte[getMessageLength(message)];
 
 		if (message.getAuthenticationType() != AuthenticationType.RMCPPlus) {
-			throw new IllegalArgumentException(
-					"Authentication type must be RMCP+ for IPMI v2.0");
+			throw new IllegalArgumentException("Authentication type must be RMCP+ for IPMI v2.0");
 		}
 
 		raw[0] = encodeAuthenticationType(message.getAuthenticationType());
@@ -91,10 +86,7 @@ public class Protocolv20Encoder extends ProtocolEncoder {
 		encodeSessionId(message.getSessionID(), raw, offset);
 		offset += 4;
 
-		encodeSessionSequenceNumber(
-				message.getSessionSequenceNumber(),
-				raw,
-				offset);
+		encodeSessionSequenceNumber(message.getSessionSequenceNumber(), raw, offset);
 		offset += 4;
 
 		encodePayloadLength(payload.length, raw, offset);
@@ -117,18 +109,14 @@ public class Protocolv20Encoder extends ProtocolEncoder {
 	 */
 	private int getMessageLength(Ipmiv20Message ipmiMessage) {
 		int length = 12
-				+ ipmiMessage
-						.getConfidentialityAlgorithm()
-						.getConfidentialityOverheadSize(
-								ipmiMessage.getPayloadLength())
+				+ ipmiMessage.getConfidentialityAlgorithm().getConfidentialityOverheadSize(ipmiMessage.getPayloadLength())
 				+ ipmiMessage.getPayloadLength();
 
 		if (ipmiMessage.getPayloadType() == PayloadType.Oem) {
 			length += 6;
 		}
 
-		if (ipmiMessage.isPayloadAuthenticated()
-				&& ipmiMessage.getSessionID() != 0) {
+		if (ipmiMessage.isPayloadAuthenticated() && ipmiMessage.getSessionID() != 0) {
 			if (ipmiMessage.getAuthCode() != null) {
 				if ((length + ipmiMessage.getAuthCode().length + 2) % 4 != 0) {
 					length += 4 - (length + ipmiMessage.getAuthCode().length + 2) % 4;
@@ -141,10 +129,7 @@ public class Protocolv20Encoder extends ProtocolEncoder {
 		return length;
 	}
 
-	private byte encodePayloadType(
-			boolean isEncrypted,
-			boolean isAuthenticated,
-			PayloadType payloadType) {
+	private byte encodePayloadType(boolean isEncrypted, boolean isAuthenticated, PayloadType payloadType) {
 		byte result = 0;
 
 		if (isEncrypted) {

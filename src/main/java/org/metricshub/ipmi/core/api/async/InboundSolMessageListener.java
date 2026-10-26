@@ -154,8 +154,10 @@ public class InboundSolMessageListener implements InboundMessageListener {
 			// Only a copy of the last packet brings characters: the BMC left an older one once its characters were
 			// acknowledged, or dropped them (retries exhausted), and newer characters already followed them
 			int known = !copy ?
-					0 : sequenceNumber == lastSequenceNumber ?
-							Math.min(receivedCharacters[sequenceNumber].length, characters.length) : characters.length;
+					0 :
+					sequenceNumber == lastSequenceNumber ?
+							Math.min(receivedCharacters[sequenceNumber].length, characters.length) :
+							characters.length;
 			byte[] newCharacters = Arrays.copyOfRange(characters, known, characters.length);
 			accepted = newCharacters.length <= buffer.remainingSpace();
 			if (sequenceNumber != 0 && !copy) {
@@ -233,11 +235,7 @@ public class InboundSolMessageListener implements InboundMessageListener {
 	 */
 	private void acknowledge(byte sequenceNumber, SolAckState ackState, int characterCount) {
 		try {
-			SolCoder acknowledgement = new SolCoder(
-					sequenceNumber,
-					(byte) characterCount,
-					ackState,
-					lineOperations);
+			SolCoder acknowledgement = new SolCoder(sequenceNumber, (byte) characterCount, ackState, lineOperations);
 			connector.sendOneWayMessage(connectionHandle, acknowledgement);
 		} catch (Exception e) {
 			// An acknowledgement that could not be sent: the BMC sends its packet again (IPMI 2.0 section 15.9)

@@ -39,9 +39,7 @@ import org.metricshub.ipmi.core.sm.events.StateMachineEvent;
 public class OpenSessionComplete extends State {
 
 	@Override
-	public void doTransition(
-			StateMachine stateMachine,
-			StateMachineEvent machineEvent) {
+	public void doTransition(StateMachine stateMachine, StateMachineEvent machineEvent) {
 		if (machineEvent instanceof OpenSessionAck) {
 			OpenSessionAck event = (OpenSessionAck) machineEvent;
 
@@ -55,24 +53,13 @@ public class OpenSessionComplete extends State {
 						event.getCipherSuite());
 
 				stateMachine.setCurrent(new Rakp1Waiting(event.getSequenceNumber(), rakp1));
-				stateMachine
-						.sendMessage(
-								Encoder
-										.encode(
-												new Protocolv20Encoder(),
-												rakp1,
-												event.getSequenceNumber(),
-												0,
-												0));
+				stateMachine.sendMessage(Encoder.encode(new Protocolv20Encoder(), rakp1, event.getSequenceNumber(), 0, 0));
 			} catch (Exception e) {
 				stateMachine.setCurrent(new Authcap());
 				stateMachine.doExternalAction(new ErrorAction(e));
 			}
 		} else {
-			stateMachine
-					.doExternalAction(
-							new ErrorAction(
-									new IllegalArgumentException("Invalid transition")));
+			stateMachine.doExternalAction(new ErrorAction(new IllegalArgumentException("Invalid transition")));
 		}
 
 	}

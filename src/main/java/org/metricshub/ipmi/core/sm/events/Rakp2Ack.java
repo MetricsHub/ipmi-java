@@ -59,8 +59,7 @@ public class Rakp2Ack extends StateMachineEvent {
 	 *        - RAKP Message 2 received earlier in the authentification
 	 *        process
 	 */
-	public Rakp2Ack(CipherSuite cipherSuite, int sequenceNumber,
-			byte statusCode, int managedSystemSessionId,
+	public Rakp2Ack(CipherSuite cipherSuite, int sequenceNumber, byte statusCode, int managedSystemSessionId,
 			Rakp1ResponseData rakp1ResponseData) {
 		this.statusCode = statusCode;
 		this.cipherSuite = cipherSuite;

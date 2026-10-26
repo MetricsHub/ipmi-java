@@ -40,9 +40,7 @@ import org.metricshub.ipmi.core.sm.events.StateMachineEvent;
 public class Authcap extends State {
 
 	@Override
-	public void doTransition(
-			StateMachine stateMachine,
-			StateMachineEvent machineEvent) {
+	public void doTransition(StateMachine stateMachine, StateMachineEvent machineEvent) {
 		if (machineEvent instanceof Authorize) {
 			Authorize event = (Authorize) machineEvent;
 
@@ -54,25 +52,15 @@ public class Authcap extends State {
 			try {
 				stateMachine.setCurrent(new OpenSessionWaiting(event.getSequenceNumber()));
 				stateMachine
-						.sendMessage(
-								Encoder
-										.encode(
-												new Protocolv20Encoder(),
-												openSession,
-												event.getSequenceNumber(),
-												0,
-												0));
+						.sendMessage(Encoder.encode(new Protocolv20Encoder(), openSession, event.getSequenceNumber(), 0, 0));
 			} catch (Exception e) {
 				stateMachine.setCurrent(this);
 				stateMachine.doExternalAction(new ErrorAction(e));
 			}
 		} else {
-			stateMachine
-					.doExternalAction(
-							new ErrorAction(
-									new IllegalArgumentException(
-											"Invalid transition: "
-													+ machineEvent.getClass().getSimpleName())));
+			stateMachine.doExternalAction(
+					new ErrorAction(
+							new IllegalArgumentException("Invalid transition: " + machineEvent.getClass().getSimpleName())));
 		}
 
 	}

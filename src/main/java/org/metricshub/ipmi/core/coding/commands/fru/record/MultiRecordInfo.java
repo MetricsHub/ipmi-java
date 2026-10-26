@@ -54,8 +54,7 @@ public abstract class MultiRecordInfo extends FruRecord {
 			throw new IllegalArgumentException("Invalid FRU record version");
 		}
 
-		FruMultiRecordType recordType = FruMultiRecordType
-				.parseInt(TypeConverter.byteToInt(fruData[offset]));
+		FruMultiRecordType recordType = FruMultiRecordType.parseInt(TypeConverter.byteToInt(fruData[offset]));
 
 		int length = TypeConverter.byteToInt(fruData[offset + 2]);
 

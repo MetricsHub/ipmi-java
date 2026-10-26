@@ -247,8 +247,7 @@ class FullSensorRecordTest {
 	void reservedLinearizationsHaveNoComputableReading() {
 		int[] codes = { 0x0c, 0x6f };
 		for (int code : codes) {
-			FullSensorRecord record = (FullSensorRecord) SensorRecord
-					.populateSensorRecord(conversionRecord(0x00, code));
+			FullSensorRecord record = (FullSensorRecord) SensorRecord.populateSensorRecord(conversionRecord(0x00, code));
 			assertFalse(record.hasAnalogReading(), "linearization " + code);
 			assertTrue(Double.isNaN(record.calcFormula(7)), "linearization " + code);
 			assertTrue(Double.isNaN(record.getNominalReading()), "linearization " + code);

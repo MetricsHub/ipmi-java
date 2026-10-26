@@ -68,9 +68,7 @@ public final class SensorList extends AbstractList<Sensor> {
 
 	@Override
 	public String toString() {
-		return sensors.size() + " sensor(s)" + (skippedRecords.isEmpty() ?
-				"" : ", " + skippedRecords.size()
-						+ " SDR record(s) skipped")
-				+ ": " + sensors;
+		return sensors.size() + " sensor(s)"
+				+ (skippedRecords.isEmpty() ? "" : ", " + skippedRecords.size() + " SDR record(s) skipped") + ": " + sensors;
 	}
 }

@@ -77,9 +77,7 @@ public class GetSensorReading extends IpmiCommandCoder<GetSensorReadingResponseD
 	}
 
 	@Override
-	protected IpmiPayload preparePayload(int sequenceNumber)
-			throws NoSuchAlgorithmException,
-			InvalidKeyException {
+	protected IpmiPayload preparePayload(int sequenceNumber) throws NoSuchAlgorithmException, InvalidKeyException {
 		byte[] payloadData = new byte[] { sensorId };
 		return new IpmiLanRequest(
 				getNetworkFunction(),
@@ -107,17 +105,12 @@ public class GetSensorReading extends IpmiCommandCoder<GetSensorReadingResponseD
 
 		responseData.setSensorReading(raw[0]);
 
-		responseData
-				.setSensorStateValid((TypeConverter.byteToInt(raw[1]) & 0x20) == 0);
+		responseData.setSensorStateValid((TypeConverter.byteToInt(raw[1]) & 0x20) == 0);
 
 		responseData.setScanningEnabled((TypeConverter.byteToInt(raw[1]) & 0x40) != 0);
 
 		if (raw.length >= 3) {
-			responseData
-					.setSensorState(
-							SensorState
-									.parseInt(
-											TypeConverter.byteToInt(raw[2]) & 0x3f));
+			responseData.setSensorState(SensorState.parseInt(TypeConverter.byteToInt(raw[2]) & 0x3f));
 
 			boolean[] states = null;
 

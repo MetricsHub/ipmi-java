@@ -33,8 +33,7 @@ public enum AddressType {
 	/**
 	 * System Software ID
 	 */
-	SystemSoftwareId(AddressType.SYSTEMSOFTWAREID),
-	;
+	SystemSoftwareId(AddressType.SYSTEMSOFTWAREID),;
 
 	private static final int IPMBSLAVEADDRESS = 0;
 	private static final int SYSTEMSOFTWAREID = 1;

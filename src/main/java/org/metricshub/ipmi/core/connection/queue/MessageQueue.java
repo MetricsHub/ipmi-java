@@ -373,12 +373,7 @@ public class MessageQueue extends TimerTask {
 
 		if (!done && !message.isOneWay()) {
 			try {
-				connection
-						.notifyResponseListeners(
-								connection.getHandle(),
-								tag,
-								null,
-								new ConnectionException(failure));
+				connection.notifyResponseListeners(connection.getHandle(), tag, null, new ConnectionException(failure));
 			} catch (RuntimeException e) {
 				// A failing listener must not kill the timer thread that expires the other messages
 			}

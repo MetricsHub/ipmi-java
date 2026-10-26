@@ -45,8 +45,7 @@ class IpmiAsyncConnectorTest {
 			IpmiAsyncConnector connector = new IpmiAsyncConnector(0, 0);
 			try {
 				ConnectionHandle handle = connector.createConnection(bmc.getAddress(), bmc.getPort());
-				CipherSuite suite = connector
-						.getAvailableCipherSuites(handle)
+				CipherSuite suite = connector.getAvailableCipherSuites(handle)
 						.stream()
 						.filter(cipherSuite -> cipherSuite.getId() == 17)
 						.findFirst()
@@ -63,8 +62,7 @@ class IpmiAsyncConnectorTest {
 						replied.countDown();
 					}
 				});
-				int tag = connector
-						.sendMessage(handle, new GetChassisStatus(), false);
+				int tag = connector.sendMessage(handle, new GetChassisStatus(), false);
 				assertTrue(replied.await(5, TimeUnit.SECONDS));
 				Thread.sleep(200);
 				// The request answered must not be reported again as failed by the closing connection

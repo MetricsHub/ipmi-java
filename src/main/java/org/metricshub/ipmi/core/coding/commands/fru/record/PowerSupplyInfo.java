@@ -83,10 +83,8 @@ public class PowerSupplyInfo extends MultiRecordInfo {
 		highEndInputVoltage2 = TypeConverter.byteToInt(fruData[offset + 12]);
 		highEndInputVoltage2 |= TypeConverter.byteToInt(fruData[offset + 13]) << 8;
 
-		lowEndInputFrequencyRange = TypeConverter
-				.byteToInt(fruData[offset + 14]);
-		highEndInputFrequencyRange = TypeConverter
-				.byteToInt(fruData[offset + 15]);
+		lowEndInputFrequencyRange = TypeConverter.byteToInt(fruData[offset + 14]);
+		highEndInputFrequencyRange = TypeConverter.byteToInt(fruData[offset + 15]);
 	}
 
 	/**

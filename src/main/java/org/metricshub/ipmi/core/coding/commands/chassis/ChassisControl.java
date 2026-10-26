@@ -62,9 +62,7 @@ public class ChassisControl extends IpmiCommandCoder<ChassisControlResponseData>
 	}
 
 	@Override
-	protected IpmiPayload preparePayload(int sequenceNumber)
-			throws NoSuchAlgorithmException,
-			InvalidKeyException {
+	protected IpmiPayload preparePayload(int sequenceNumber) throws NoSuchAlgorithmException, InvalidKeyException {
 		byte[] requestData = new byte[1];
 
 		requestData[0] = TypeConverter.intToByte(powerCommand.getCode());

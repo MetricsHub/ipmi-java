@@ -158,7 +158,7 @@ public final class DeviceId {
 
 	@Override
 	public String toString() {
-		return "Device " + id() + " revision " + revision() + ", firmware " + firmwareRevision() + ", IPMI "
-				+ ipmiVersion() + ", manufacturer " + manufacturerId() + ", product " + productId() + ", " + functions();
+		return "Device " + id() + " revision " + revision() + ", firmware " + firmwareRevision() + ", IPMI " + ipmiVersion()
+				+ ", manufacturer " + manufacturerId() + ", product " + productId() + ", " + functions();
 	}
 }

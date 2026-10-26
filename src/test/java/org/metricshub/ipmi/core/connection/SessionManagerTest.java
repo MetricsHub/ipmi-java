@@ -23,14 +23,13 @@ class SessionManagerTest {
 				CipherSuiteSelectionHandler firstSuite = suites -> suites.isEmpty() ? null : suites.get(0);
 				assertThrows(
 						SessionException.class,
-						() -> SessionManager
-								.establishSession(
-										connector,
-										bmc.getAddress().getHostAddress(),
-										bmc.getPort(),
-										"user",
-										"password",
-										firstSuite));
+						() -> SessionManager.establishSession(
+								connector,
+								bmc.getAddress().getHostAddress(),
+								bmc.getPort(),
+								"user",
+								"password",
+								firstSuite));
 
 				// The failed connection (handle 1) is closed; the other one still sends and times out, instead of
 				// being told that the socket is closed

@@ -81,35 +81,25 @@ public abstract class ProtocolDecoder implements IpmiDecoder {
 
 		message.setAuthenticationType(decodeAuthenticationType(raw[0]));
 
-		message
-				.setSessionSequenceNumber(
-						decodeSessionSequenceNumber(
-								raw,
-								sequenceNumberOffset));
+		message.setSessionSequenceNumber(decodeSessionSequenceNumber(raw, sequenceNumberOffset));
 
 		message.setPayloadLength(decodePayloadLength(raw, payloadLengthOffset));
 
-		message
-				.setPayload(
-						decodePayload(
-								raw,
-								payloadLengthOffset
-										+ payloadLengthLength,
-								message.getPayloadLength(),
-								message.getConfidentialityAlgorithm(),
-								PayloadType.Ipmi));
+		message.setPayload(
+				decodePayload(
+						raw,
+						payloadLengthOffset + payloadLengthLength,
+						message.getPayloadLength(),
+						message.getConfidentialityAlgorithm(),
+						PayloadType.Ipmi));
 
-		return payloadLengthOffset + payloadLengthLength
-				+ message.getPayloadLength();
+		return payloadLengthOffset + payloadLengthLength + message.getPayloadLength();
 	}
 
 	protected static AuthenticationType decodeAuthenticationType(byte authenticationType) {
 		authenticationType &= TypeConverter.intToByte(0x0f);
 
-		return AuthenticationType
-				.parseInt(
-						TypeConverter
-								.byteToInt(authenticationType));
+		return AuthenticationType.parseInt(TypeConverter.byteToInt(authenticationType));
 	}
 
 	/**
@@ -120,8 +110,7 @@ public abstract class ProtocolDecoder implements IpmiDecoder {
 	 *        - RMCP message to decode.
 	 * @return {@link AuthenticationType} of the message.
 	 */
-	public static AuthenticationType decodeAuthenticationType(
-			RmcpMessage message) {
+	public static AuthenticationType decodeAuthenticationType(RmcpMessage message) {
 		return decodeAuthenticationType(message.getData()[0]);
 	}
 

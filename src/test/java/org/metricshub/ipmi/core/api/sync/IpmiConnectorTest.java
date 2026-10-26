@@ -139,11 +139,7 @@ class IpmiConnectorTest {
 				connector.setTimeout(handle, TIMEOUT_MS);
 				openSession(connector, handle);
 
-				assertNotNull(
-						connector
-								.sendMessage(
-										handle,
-										new GetChassisStatus()));
+				assertNotNull(connector.sendMessage(handle, new GetChassisStatus()));
 				assertEquals(2, arrivals.size(), "the request must be sent twice");
 				return TimeUnit.NANOSECONDS.toMillis(arrivals.get(1) - arrivals.get(0));
 			} finally {

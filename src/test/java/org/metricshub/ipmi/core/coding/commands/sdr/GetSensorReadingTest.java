@@ -13,16 +13,14 @@ import org.metricshub.ipmi.core.coding.commands.sdr.record.SensorType;
 
 class GetSensorReadingTest {
 
-	private static final GetSensorReading COMMAND = new GetSensorReading(
-			5);
+	private static final GetSensorReading COMMAND = new GetSensorReading(5);
 
 	private static final int THRESHOLD_TYPE = 1;
 
 	private static final byte GET_SENSOR_READING = 0x2d;
 
 	private static GetSensorReadingResponseData decode(int... data) throws Exception {
-		return (GetSensorReadingResponseData) COMMAND
-				.getResponseData(response(GET_SENSOR_READING, 0x00, data));
+		return (GetSensorReadingResponseData) COMMAND.getResponseData(response(GET_SENSOR_READING, 0x00, data));
 	}
 
 	@Test

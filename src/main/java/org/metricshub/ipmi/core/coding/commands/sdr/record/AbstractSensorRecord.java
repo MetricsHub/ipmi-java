@@ -146,8 +146,7 @@ public abstract class AbstractSensorRecord extends SensorRecord {
 	 */
 	protected void populateSharing(byte[] recordData, int index) {
 		setSensorDirection(SensorDirection.parseInt((TypeConverter.byteToInt(recordData[index]) & 0xc0) >> 6));
-		setIdInstanceModifierType(
-				InstanceModifierType.parseInt((TypeConverter.byteToInt(recordData[index]) & 0x30) >> 4));
+		setIdInstanceModifierType(InstanceModifierType.parseInt((TypeConverter.byteToInt(recordData[index]) & 0x30) >> 4));
 		setShareCount(TypeConverter.byteToInt(recordData[index]) & 0xf);
 		setEntityInstanceIncrements((TypeConverter.byteToInt(recordData[index + 1]) & 0x80) != 0);
 		setIdInstanceModifierOffset(TypeConverter.byteToInt(recordData[index + 1]) & 0x7f);

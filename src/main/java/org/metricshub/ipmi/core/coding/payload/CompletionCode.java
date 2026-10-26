@@ -221,8 +221,7 @@ public enum CompletionCode {
 	 * A code this enumeration does not list: OEM, command-specific or reserved. The raw value is available on the
 	 * {@link org.metricshub.ipmi.core.coding.payload.lan.IPMIException}.
 	 */
-	Unknown(CompletionCode.UNKNOWN),
-	;
+	Unknown(CompletionCode.UNKNOWN),;
 
 	/**
 	 * The misspelled name of {@link #InsufficientPrivilege}, kept so that code built against 2.0 keeps working: it is

@@ -30,35 +30,29 @@ public enum ReadingType {
 	 * FRU in standby or 'hot spare' state.
 	 */
 	FruInactive(ReadingType.FRUINACTIVE),
-	SlotConnectorIdentifyStatusAsserted(
-			ReadingType.SLOTCONNECTORIDENTIFYSTATUSASSERTED),
+	SlotConnectorIdentifyStatusAsserted(ReadingType.SLOTCONNECTORIDENTIFYSTATUSASSERTED),
 	HardReset(ReadingType.HARDRESET),
 	/**
 	 * Switch indicating FRU latch is in 'unlatched' position and FRU is mechanically removable
 	 */
 	FruLatchOpen(ReadingType.FRULATCHOPEN),
 	FruActivationRequested(ReadingType.FRUACTIVATIONREQUESTED),
-	SlotConnectorDeviceInstalled(
-			ReadingType.SLOTCONNECTORDEVICEINSTALLED),
+	SlotConnectorDeviceInstalled(ReadingType.SLOTCONNECTORDEVICEINSTALLED),
 	WarmReset(ReadingType.WARMRESET),
-	FruActivationInProgress(
-			ReadingType.FRUACTIVATIONINPROGRESS),
+	FruActivationInProgress(ReadingType.FRUACTIVATIONINPROGRESS),
 	/**
 	 * Typically, this means that the slot power is off. The Ready for Installation, Ready for Removal, and Slot Power
 	 * states can transition together, depending on the slot implementation.
 	 */
 	SlotConnectorReadyForDeviceInstallation(ReadingType.SLOTCONNECTORREADYFORDEVICEINSTALLATION),
-	PxeBootRequested(
-			ReadingType.PXEBOOTREQUESTED),
+	PxeBootRequested(ReadingType.PXEBOOTREQUESTED),
 	FruActive(ReadingType.FRUACTIVE),
 	/**
 	 * An Invalid Username or Password was received during the session establishment process.
 	 */
 	InvalidUsernameOrPassword(ReadingType.INVALIDUSERNAMEORPASSWORD),
-	SlotConnectorReadyForDeviceRemoval(
-			ReadingType.SLOTCONNECTORREADYFORDEVICEREMOVAL),
-	AutomaticBootToDiagnostic(
-			ReadingType.AUTOMATICBOOTTODIAGNOSTIC),
+	SlotConnectorReadyForDeviceRemoval(ReadingType.SLOTCONNECTORREADYFORDEVICEREMOVAL),
+	AutomaticBootToDiagnostic(ReadingType.AUTOMATICBOOTTODIAGNOSTIC),
 	FruDeactivationRequested(ReadingType.FRUDEACTIVATIONREQUESTED),
 	/**
 	 * A user's access has been disabled due to a series of bad password attempts. This offset can be used in
@@ -67,30 +61,23 @@ public enum ReadingType {
 	 */
 	InvalidPasswordDisable(ReadingType.INVALIDPASSWORDDISABLE),
 	EntityPresent(ReadingType.ENTITYPRESENT),
-	SlotPowerOff(
-			ReadingType.SLOTPOWEROFF),
+	SlotPowerOff(ReadingType.SLOTPOWEROFF),
 	SoftwareInitiatedHardReset(ReadingType.SOFTWAREINITIATEDHARDRESET),
-	FruDeactivationInProgress(
-			ReadingType.FRUDEACTIVATIONINPROGRESS),
+	FruDeactivationInProgress(ReadingType.FRUDEACTIVATIONINPROGRESS),
 	/**
 	 * The sensor is known to be in error. It may still be accessible by software.
 	 */
 	SensorFailure(ReadingType.SENSORFAILURE),
 	EntityAbsent(ReadingType.ENTITYABSENT),
-	SoftwareInitiatedWarmReset(
-			ReadingType.SOFTWAREINITIATEDWARMRESET),
+	SoftwareInitiatedWarmReset(ReadingType.SOFTWAREINITIATEDWARMRESET),
 	FruCommunicationLost(ReadingType.FRUCOMMUNICATIONLOST),
-	FruFailure(
-			ReadingType.FRUFAILURE),
+	FruFailure(ReadingType.FRUFAILURE),
 	SystemRestart(ReadingType.SYSTEMRESTART),
-	StateDeasserted(
-			ReadingType.STATEDEASSERTED),
+	StateDeasserted(ReadingType.STATEDEASSERTED),
 	SystemFirmwareError(ReadingType.SYSTEMFIRMWAREERROR),
-	StateAsserted(
-			ReadingType.STATEASSERTED),
+	StateAsserted(ReadingType.STATEASSERTED),
 	SystemFirmwareHang(ReadingType.SYSTEMFIRMWAREHANG),
-	SystemFirmwareProgress(
-			ReadingType.SYSTEMFIRMWAREPROGRESS),
+	SystemFirmwareProgress(ReadingType.SYSTEMFIRMWAREPROGRESS),
 	/**
 	 * Informational. This does not imply whether the hardware change was successful or not. Only that a change
 	 * occurred.
@@ -106,33 +93,24 @@ public enum ReadingType {
 	 * BIOS hangs.
 	 */
 	Frb2HangInPostFailure(ReadingType.FRB2HANGINPOSTFAILURE),
-	HardwareIncompatibilityDetected(
-			ReadingType.HARDWAREINCOMPATIBILITYDETECTED),
+	HardwareIncompatibilityDetected(ReadingType.HARDWAREINCOMPATIBILITYDETECTED),
 	/**
 	 * CPU didn't start.
 	 */
 	Frb3ProcessorStartupFailure(ReadingType.FRB3PROCESSORSTARTUPFAILURE),
-	FirmwareOrSoftwareIncompatibilityDetected(
-			ReadingType.FIRMWAREORSOFTWAREINCOMPATIBILITYDETECTED),
+	FirmwareOrSoftwareIncompatibilityDetected(ReadingType.FIRMWAREORSOFTWAREINCOMPATIBILITYDETECTED),
 	DrivePresence(ReadingType.DRIVEPRESENCE),
-	ConfigurationError(
-			ReadingType.CONFIGURATIONERROR),
+	ConfigurationError(ReadingType.CONFIGURATIONERROR),
 	InvalidOrUnsupportedHardware(ReadingType.INVALIDORUNSUPPORTEDHARDWARE),
-	DriveFault(
-			ReadingType.DRIVEFAULT),
+	DriveFault(ReadingType.DRIVEFAULT),
 	UncorrectableCpuComplexError(ReadingType.UNCORRECTABLECPUCOMPLEXERROR),
-	InvalidOrUnsupportedFirmwareOrSoftware(
-			ReadingType.INVALIDORUNSUPPORTEDFIRMWAREORSOFTWARE),
+	InvalidOrUnsupportedFirmwareOrSoftware(ReadingType.INVALIDORUNSUPPORTEDFIRMWAREORSOFTWARE),
 	PredictiveFailure(ReadingType.PREDICTIVEFAILURE),
-	ProcessorPresenceDetected(
-			ReadingType.PROCESSORPRESENCEDETECTED),
+	ProcessorPresenceDetected(ReadingType.PROCESSORPRESENCEDETECTED),
 	HotSpare(ReadingType.HOTSPARE),
-	ProcessorDisabled(
-			ReadingType.PROCESSORDISABLED),
-	ConsistencyOrParityCheckInProgress(
-			ReadingType.CONSISTENCYORPARITYCHECKINPROGRESS),
-	TerminatorPresenceDetected(
-			ReadingType.TERMINATORPRESENCEDETECTED),
+	ProcessorDisabled(ReadingType.PROCESSORDISABLED),
+	ConsistencyOrParityCheckInProgress(ReadingType.CONSISTENCYORPARITYCHECKINPROGRESS),
+	TerminatorPresenceDetected(ReadingType.TERMINATORPRESENCEDETECTED),
 	SecureModeViolationAttempt(ReadingType.SECUREMODEVIOLATIONATTEMPT),
 	/**
 	 * System powered up, but normal OS operation has shut down and system is awaiting reset pushbutton, powercycle or
@@ -145,28 +123,23 @@ public enum ReadingType {
 	 * automatic thermal throttling or throttling to limit power consumption
 	 */
 	ProcessorAutomaticallyThrottled(ReadingType.PROCESSORAUTOMATICALLYTHROTTLED),
-	PreBootUserPasswordViolation(
-			ReadingType.PREBOOTUSERPASSWORDVIOLATION),
+	PreBootUserPasswordViolation(ReadingType.PREBOOTUSERPASSWORDVIOLATION),
 	/**
 	 * System graceful power down by OS.
 	 */
 	OsGracefulShutdown(ReadingType.OSGRACEFULSHUTDOWN),
 	MachineCheckException(ReadingType.MACHINECHECKEXCEPTION),
-	PreBootSetupPasswordViolation(
-			ReadingType.PREBOOTSETUPPASSWORDVIOLATION),
+	PreBootSetupPasswordViolation(ReadingType.PREBOOTSETUPPASSWORDVIOLATION),
 	SoftOsShutdown(ReadingType.SOFTOSSHUTDOWN),
-	PreBootNetworkPasswordViolation(
-			ReadingType.PREBOOTNETWORKPASSWORDVIOLATION),
+	PreBootNetworkPasswordViolation(ReadingType.PREBOOTNETWORKPASSWORDVIOLATION),
 	LANHeartbeatLost(ReadingType.LANHEARTBEATLOST),
 	/**
 	 * Graceful shutdown request to agent via BMC did not occur due to missing or malfunctioning local agent.
 	 */
 	AgentNotResponding(ReadingType.AGENTNOTRESPONDING),
-	OtherPreBootPasswordViolation(
-			ReadingType.OTHERPREBOOTPASSWORDVIOLATION),
+	OtherPreBootPasswordViolation(ReadingType.OTHERPREBOOTPASSWORDVIOLATION),
 	LANHeartbeat(ReadingType.LANHEARTBEAT),
-	OutOfBandAccessPasswordViolation(
-			ReadingType.OUTOFBANDACCESSPASSWORDVIOLATION),
+	OutOfBandAccessPasswordViolation(ReadingType.OUTOFBANDACCESSPASSWORDVIOLATION),
 	Current(ReadingType.CURRENT),
 	/**
 	 * Device Removed / Device Absent
@@ -178,8 +151,7 @@ public enum ReadingType {
 	 */
 	DevicePresent(ReadingType.DEVICEPRESENT),
 	MemoryScrubFailed(ReadingType.MEMORYSCRUBFAILED),
-	MemoryDeviceDisabled(
-			ReadingType.MEMORYDEVICEDISABLED),
+	MemoryDeviceDisabled(ReadingType.MEMORYDEVICEDISABLED),
 	/**
 	 * Correctable ECC / other correctable memory error logging limit reached
 	 */
@@ -211,36 +183,27 @@ public enum ReadingType {
 	 * devices in this state may produce errors or become inaccessible.
 	 */
 	MemoryCriticalOvertemperature(ReadingType.MEMORYCRITICALOVERTEMPERATURE),
-	SystemReconfigured(
-			ReadingType.SYSTEMRECONFIGURED),
+	SystemReconfigured(ReadingType.SYSTEMRECONFIGURED),
 	OemSystemBootEvent(ReadingType.OEMSYSTEMBOOTEVENT),
-	ABootCompleted(
-			ReadingType.ABOOTCOMPLETED),
-	UndeterminedSystemHardwareFailure(
-			ReadingType.UNDETERMINEDSYSTEMHARDWAREFAILURE),
+	ABootCompleted(ReadingType.ABOOTCOMPLETED),
+	UndeterminedSystemHardwareFailure(ReadingType.UNDETERMINEDSYSTEMHARDWAREFAILURE),
 	TransitionToRunning(ReadingType.TRANSITIONTORUNNING),
-	CBootCompleted(
-			ReadingType.CBOOTCOMPLETED),
+	CBootCompleted(ReadingType.CBOOTCOMPLETED),
 	EntryAddedToAuxiliaryLog(ReadingType.ENTRYADDEDTOAUXILIARYLOG),
-	TransitionToInTest(
-			ReadingType.TRANSITIONTOINTEST),
+	TransitionToInTest(ReadingType.TRANSITIONTOINTEST),
 	PxeBootCompleted(ReadingType.PXEBOOTCOMPLETED),
-	PefAction(
-			ReadingType.PEFACTION),
+	PefAction(ReadingType.PEFACTION),
 	TransitionToPowerOff(ReadingType.TRANSITIONTOPOWEROFF),
-	DiagnosticBootCompleted(
-			ReadingType.DIAGNOSTICBOOTCOMPLETED),
+	DiagnosticBootCompleted(ReadingType.DIAGNOSTICBOOTCOMPLETED),
 	/**
 	 * This event can be used to record when changes are made to the timestamp clock(s) so that relative time
 	 * differences between SEL entries can be determined.
 	 */
 	TimestampClockSynch(ReadingType.TIMESTAMPCLOCKSYNCH),
 	TransitionToOnLine(ReadingType.TRANSITIONTOONLINE),
-	CdRomBootCompleted(
-			ReadingType.CDROMBOOTCOMPLETED),
+	CdRomBootCompleted(ReadingType.CDROMBOOTCOMPLETED),
 	BootSourceSelectionTimeout(ReadingType.BOOTSOURCESELECTIONTIMEOUT),
-	PowerSupplyConfigurationError(
-			ReadingType.POWERSUPPLYCONFIGURATIONERROR),
+	PowerSupplyConfigurationError(ReadingType.POWERSUPPLYCONFIGURATIONERROR),
 	TransitionToOffLine(ReadingType.TRANSITIONTOOFFLINE),
 	/**
 	 * BIOS Watchdog Reset: Watchdog 1 (sensor type 11h, deprecated since IPMI 1.5 in favour of Watchdog 2, 23h).
@@ -274,11 +237,9 @@ public enum ReadingType {
 	 * OS Watchdog pre-timeout Interrupt, non-NMI (Watchdog 1).
 	 */
 	OsWatchdogPreTimeoutInterrupt(ReadingType.OSWATCHDOGPRETIMEOUTINTERRUPT),
-	TimerExpired(
-			ReadingType.TIMEREXPIRED),
+	TimerExpired(ReadingType.TIMEREXPIRED),
 	RomBootCompleted(ReadingType.ROMBOOTCOMPLETED),
-	TransitionToOffDuty(
-			ReadingType.TRANSITIONTOOFFDUTY),
+	TransitionToOffDuty(ReadingType.TRANSITIONTOOFFDUTY),
 	TimerHardReset(ReadingType.TIMERHARDRESET),
 	/**
 	 * Boot device not specified.
@@ -302,26 +263,19 @@ public enum ReadingType {
 	 */
 	BaseOsInstallationFailed(ReadingType.BASEOSINSTALLATIONFAILED),
 	PredictiveFailureDeasserted(ReadingType.PREDICTIVEFAILUREDEASSERTED),
-	TransitionToDegraded(
-			ReadingType.TRANSITIONTODEGRADED),
+	TransitionToDegraded(ReadingType.TRANSITIONTODEGRADED),
 	TimerPowerDown(ReadingType.TIMERPOWERDOWN),
-	AcpiS5EnteredByOverride(
-			ReadingType.ACPIS5ENTEREDBYOVERRIDE),
+	AcpiS5EnteredByOverride(ReadingType.ACPIS5ENTEREDBYOVERRIDE),
 	LANLeashLost(ReadingType.LANLEASHLOST),
-	Predictive(
-			ReadingType.PREDICTIVE),
+	Predictive(ReadingType.PREDICTIVE),
 	TransitionToPowerSave(ReadingType.TRANSITIONTOPOWERSAVE),
-	TimerPowerCycle(
-			ReadingType.TIMERPOWERCYCLE),
+	TimerPowerCycle(ReadingType.TIMERPOWERCYCLE),
 	AcpiLegacyOnState(ReadingType.ACPILEGACYONSTATE),
-	PowerOffOrDown(
-			ReadingType.POWEROFFORDOWN),
+	PowerOffOrDown(ReadingType.POWEROFFORDOWN),
 	UnauthorizedDock(ReadingType.UNAUTHORIZEDDOCK),
-	InstallError(
-			ReadingType.INSTALLERROR),
+	InstallError(ReadingType.INSTALLERROR),
 	AcpiLegacyOffState(ReadingType.ACPILEGACYOFFSTATE),
-	PowerCycle(
-			ReadingType.POWERCYCLE),
+	PowerCycle(ReadingType.POWERCYCLE),
 	/**
 	 * Supports detection of hot plug fan tampering.
 	 */
@@ -331,8 +285,7 @@ public enum ReadingType {
 	 */
 	FullyRedundant(ReadingType.FULLYREDUNDANT),
 	CableInterconnectConnected(ReadingType.CABLEINTERCONNECTCONNECTED),
-	PowerDown240V(
-			ReadingType.POWERDOWN240V),
+	PowerDown240V(ReadingType.POWERDOWN240V),
 	/**
 	 * Entered any non-redundant state, including {@link ReadingType#NonRedundant_InsufficientResources}
 	 */
@@ -342,8 +295,7 @@ public enum ReadingType {
 	 * Incorrect cable connected / Incorrect interconnection
 	 */
 	CableInterconnectConfigurationError(ReadingType.CABLEINTERCONNECTCONFIGURATIONERROR),
-	InterlockPowerDown(
-			ReadingType.INTERLOCKPOWERDOWN),
+	InterlockPowerDown(ReadingType.INTERLOCKPOWERDOWN),
 	/**
 	 * Redundancy still exists, but at a less than full level. For example, a system has four fans, and can tolerate the
 	 * failure of two of them, and presently one has failed.
@@ -361,50 +313,36 @@ public enum ReadingType {
 	 * Redundancy has been lost but unit is functioning with minimum resources needed for 'normal' operation.
 	 */
 	NonRedundant_SufficientResourcesFromRedundant(ReadingType.NONREDUNDANT_SUFFICIENTRESOURCESFROMREDUNDANT),
-	BatteryFailed(
-			ReadingType.BATTERYFAILED),
+	BatteryFailed(ReadingType.BATTERYFAILED),
 	/**
 	 * Unit did not respond to request to turn on.
 	 */
 	PowerUnitSoftPowerControlFailure(ReadingType.POWERUNITSOFTPOWERCONTROLFAILURE),
 	Voltage(ReadingType.VOLTAGE),
-	BatteryPresenceDetected(
-			ReadingType.BATTERYPRESENCEDETECTED),
+	BatteryPresenceDetected(ReadingType.BATTERYPRESENCEDETECTED),
 	PowerUnitFailure(ReadingType.POWERUNITFAILURE),
-	PowerUnitPredictiveFailure(
-			ReadingType.POWERUNITPREDICTIVEFAILURE),
+	PowerUnitPredictiveFailure(ReadingType.POWERUNITPREDICTIVEFAILURE),
 	BusFatalError(ReadingType.BUSFATALERROR),
-	CorrectableMemoryErrorLoggingDisabled(
-			ReadingType.CORRECTABLEMEMORYERRORLOGGINGDISABLED),
+	CorrectableMemoryErrorLoggingDisabled(ReadingType.CORRECTABLEMEMORYERRORLOGGINGDISABLED),
 	BusDegraded(ReadingType.BUSDEGRADED),
-	EventTypeLoggingDisabled(
-			ReadingType.EVENTTYPELOGGINGDISABLED),
+	EventTypeLoggingDisabled(ReadingType.EVENTTYPELOGGINGDISABLED),
 	LogAreaReset(ReadingType.LOGAREARESET),
-	TransitionToOK(
-			ReadingType.TRANSITIONTOOK),
+	TransitionToOK(ReadingType.TRANSITIONTOOK),
 	AllEventLoggingDisabled(ReadingType.ALLEVENTLOGGINGDISABLED),
-	TransitionToNonCriticalFromOK(
-			ReadingType.TRANSITIONTONONCRITICALFROMOK),
-	FruServiceRequestButtonPressed(
-			ReadingType.FRUSERVICEREQUESTBUTTONPRESSED),
+	TransitionToNonCriticalFromOK(ReadingType.TRANSITIONTONONCRITICALFROMOK),
+	FruServiceRequestButtonPressed(ReadingType.FRUSERVICEREQUESTBUTTONPRESSED),
 	SelFull(ReadingType.SELFULL),
-	TransitionToCriticalFromLessSevere(
-			ReadingType.TRANSITIONTOCRITICALFROMLESSSEVERE),
+	TransitionToCriticalFromLessSevere(ReadingType.TRANSITIONTOCRITICALFROMLESSSEVERE),
 	SelAlmostFull(ReadingType.SELALMOSTFULL),
-	TransitionToNonRecoverableFromLessSevere(
-			ReadingType.TRANSITIONTONONRECOVERABLEFROMLESSSEVERE),
-	CorrectableMachineCheckErrorLoggingDisabled(
-			ReadingType.CORRECTABLEMACHINECHECKERRORLOGGINGDISABLED),
-	TransitionToNonCriticalFromMoreSevere(
-			ReadingType.TRANSITIONTONONCRITICALFROMMORESEVERE),
-	TransitionToCriticalFromNonRecoverable(
-			ReadingType.TRANSITIONTOCRITICALFROMNONRECOVERABLE),
+	TransitionToNonRecoverableFromLessSevere(ReadingType.TRANSITIONTONONRECOVERABLEFROMLESSSEVERE),
+	CorrectableMachineCheckErrorLoggingDisabled(ReadingType.CORRECTABLEMACHINECHECKERRORLOGGINGDISABLED),
+	TransitionToNonCriticalFromMoreSevere(ReadingType.TRANSITIONTONONCRITICALFROMMORESEVERE),
+	TransitionToCriticalFromNonRecoverable(ReadingType.TRANSITIONTOCRITICALFROMNONRECOVERABLE),
 	/**
 	 * This is typically connected to a switch that becomes asserted to request removal of the device)
 	 */
 	SlotConnectorDeviceRemovalRequest(ReadingType.SLOTCONNECTORDEVICEREMOVALREQUEST),
-	TransitionToNonRecoverable(
-			ReadingType.TRANSITIONTONONRECOVERABLE),
+	TransitionToNonRecoverable(ReadingType.TRANSITIONTONONRECOVERABLE),
 	EntityDisabled(ReadingType.ENTITYDISABLED),
 	/**
 	 * This is typically connected to a switch that mechanically enables/disables power to the slot, or locks the slot
@@ -413,17 +351,13 @@ public enum ReadingType {
 	 */
 	InterlockAsserted(ReadingType.INTERLOCKASSERTED),
 	Monitor(ReadingType.MONITOR),
-	SlotDisabled(
-			ReadingType.SLOTDISABLED),
+	SlotDisabled(ReadingType.SLOTDISABLED),
 	SlotHoldsSpareDevice(ReadingType.SLOTHOLDSSPAREDEVICE),
-	PlatformGeneratedPage(
-			ReadingType.PLATFORMGENERATEDPAGE),
+	PlatformGeneratedPage(ReadingType.PLATFORMGENERATEDPAGE),
 	PlatformGeneratedLanAlert(ReadingType.PLATFORMGENERATEDLANALERT),
-	PlatformEventTrapGenerated(
-			ReadingType.PLATFORMEVENTTRAPGENERATED),
+	PlatformEventTrapGenerated(ReadingType.PLATFORMEVENTTRAPGENERATED),
 	PlatformGeneratedSnmpTrap(ReadingType.PLATFORMGENERATEDSNMPTRAP),
-	SessionActivated(
-			ReadingType.SESSIONACTIVATED),
+	SessionActivated(ReadingType.SESSIONACTIVATED),
 	/**
 	 * Sensor access degraded or unavailable. A sensor that is degraded will still return valid results, but may be
 	 * operating with a slower response time, or may not detect certain possible states. A sensor that is unavailable is
@@ -441,34 +375,27 @@ public enum ReadingType {
 	 * non-error condition. Note that any commands that are available must function according to specification.
 	 */
 	ManagementControllerOffLine(ReadingType.MANAGEMENTCONTROLLEROFFLINE),
-	SuccessfulHardwareChangeDetected(
-			ReadingType.SUCCESSFULHARDWARECHANGEDETECTED),
+	SuccessfulHardwareChangeDetected(ReadingType.SUCCESSFULHARDWARECHANGEDETECTED),
 	/**
 	 * Controller cannot be accessed because of an error condition
 	 */
 	ManagementControllerUnavailable(ReadingType.MANAGEMENTCONTROLLERUNAVAILABLE),
-	SuccessfulSoftwareOrFWChangeDetected(
-			ReadingType.SUCCESSFULSOFTWAREORFWCHANGEDETECTED),
+	SuccessfulSoftwareOrFWChangeDetected(ReadingType.SUCCESSFULSOFTWAREORFWCHANGEDETECTED),
 	InFailedArray(ReadingType.INFAILEDARRAY),
-	RebuildRemapInProgress(
-			ReadingType.REBUILDREMAPINPROGRESS),
+	RebuildRemapInProgress(ReadingType.REBUILDREMAPINPROGRESS),
 	CorrectableMachineCheckError(ReadingType.CORRECTABLEMACHINECHECKERROR),
-	RebuildRemapAborted(
-			ReadingType.REBUILDREMAPABORTED),
+	RebuildRemapAborted(ReadingType.REBUILDREMAPABORTED),
 	Ierr(ReadingType.IERR),
 	/**
 	 * Chip set did not respond to BMC request to change system power state
 	 */
 	ChipsetSoftPowerControlFailure(ReadingType.CHIPSETSOFTPOWERCONTROLFAILURE),
-	ProcessorThermalTrip(
-			ReadingType.PROCESSORTHERMALTRIP),
+	ProcessorThermalTrip(ReadingType.PROCESSORTHERMALTRIP),
 	ChipsetThermalTrip(ReadingType.CHIPSETTHERMALTRIP),
-	D0PowerState(
-			ReadingType.D0POWERSTATE),
+	D0PowerState(ReadingType.D0POWERSTATE),
 	D1PowerState(ReadingType.D1POWERSTATE),
 	Temperature(ReadingType.TEMPERATURE),
-	D2PowerState(
-			ReadingType.D2POWERSTATE),
+	D2PowerState(ReadingType.D2POWERSTATE),
 	D3PowerState(ReadingType.D3POWERSTATE),
 	/**
 	 * Unexpected error during system startup. Stopped waiting for input or power cycle/reset.
@@ -479,8 +406,7 @@ public enum ReadingType {
 	 */
 	RunTimeCriticalStop(ReadingType.RUNTIMECRITICALSTOP),
 	DeviceDisabled(ReadingType.DEVICEDISABLED),
-	DeviceEnabled(
-			ReadingType.DEVICEENABLED),
+	DeviceEnabled(ReadingType.DEVICEENABLED),
 	/**
 	 * Correctable ECC / other correctable memory error
 	 */
@@ -490,22 +416,15 @@ public enum ReadingType {
 	 */
 	UncorrectableECC(ReadingType.UNCORRECTABLEECC),
 	LimitNotExceeded(ReadingType.LIMITNOTEXCEEDED),
-	LimitExceeded(
-			ReadingType.LIMITEXCEEDED),
+	LimitExceeded(ReadingType.LIMITEXCEEDED),
 	AcpiS0G0Working(ReadingType.ACPIS0G0WORKING),
-	AcpiS1SleepingProcessorContextMaintained(
-			ReadingType.ACPIS1SLEEPINGPROCESSORCONTEXTMAINTAINED),
-	PowerSupplyPresenceDetected(
-			ReadingType.POWERSUPPLYPRESENCEDETECTED),
-	AcpiS2SleepingProcessorContextLost(
-			ReadingType.ACPIS2SLEEPINGPROCESSORCONTEXTLOST),
-	PowerSupplyFailureDetected(
-			ReadingType.POWERSUPPLYFAILUREDETECTED),
+	AcpiS1SleepingProcessorContextMaintained(ReadingType.ACPIS1SLEEPINGPROCESSORCONTEXTMAINTAINED),
+	PowerSupplyPresenceDetected(ReadingType.POWERSUPPLYPRESENCEDETECTED),
+	AcpiS2SleepingProcessorContextLost(ReadingType.ACPIS2SLEEPINGPROCESSORCONTEXTLOST),
+	PowerSupplyFailureDetected(ReadingType.POWERSUPPLYFAILUREDETECTED),
 	TimerInterrupt(ReadingType.TIMERINTERRUPT),
-	AcpiS3SleepingProcessorContextLostMemoryRetained(
-			ReadingType.ACPIS3SLEEPINGPROCESSORCONTEXTLOSTMEMORYRETAINED),
-	PowerSupplyPredictiveFailure(
-			ReadingType.POWERSUPPLYPREDICTIVEFAILURE),
+	AcpiS3SleepingProcessorContextLostMemoryRetained(ReadingType.ACPIS3SLEEPINGPROCESSORCONTEXTLOSTMEMORYRETAINED),
+	PowerSupplyPredictiveFailure(ReadingType.POWERSUPPLYPREDICTIVEFAILURE),
 	Fan(ReadingType.FAN),
 	/**
 	 * Unit has regained minimum resources needed for 'normal' operation. Entered from Non-redundant:Insufficient
@@ -513,116 +432,84 @@ public enum ReadingType {
 	 */
 	NonRedundant_SufficientResourcesFromInsufficientResources(
 			ReadingType.NONREDUNDANT_SUFFICIENTRESOURCESFROMINSUFFICIENTRESOURCES),
-	AcpiS4NonVolatileSleep(
-			ReadingType.ACPIS4NONVOLATILESLEEP),
+	AcpiS4NonVolatileSleep(ReadingType.ACPIS4NONVOLATILESLEEP),
 	PowerSupplyInputLost(ReadingType.POWERSUPPLYINPUTLOST),
 	/**
 	 * Unit has regained minimum resources needed for 'normal' operation. Entered from Non-redundant:Insufficient
 	 * Resources.
 	 */
 	NonRedundant_InsufficientResources(ReadingType.NONREDUNDANT_INSUFFICIENTRESOURCES),
-	AcpiS5G2SoftOff(
-			ReadingType.ACPIS5G2SOFTOFF),
+	AcpiS5G2SoftOff(ReadingType.ACPIS5G2SOFTOFF),
 	PowerSupplyInputLostOrOutOfRange(ReadingType.POWERSUPPLYINPUTLOSTOROUTOFRANGE),
 	/**
 	 * Unit has lost some redundant resource(s) but is still in a redundant state. Entered by a transition from Fully
 	 * Redundant condition.
 	 */
 	RedundancyDegradedFromFullyRedundant(ReadingType.REDUNDANCYDEGRADEDFROMFULLYREDUNDANT),
-	PerformanceMet(
-			ReadingType.PERFORMANCEMET),
+	PerformanceMet(ReadingType.PERFORMANCEMET),
 	AcpiS4S5SoftOffStateUndetermined(ReadingType.ACPIS4S5SOFTOFFSTATEUNDETERMINED),
-	PowerSupplyInputOutOfRange(
-			ReadingType.POWERSUPPLYINPUTOUTOFRANGE),
+	PowerSupplyInputOutOfRange(ReadingType.POWERSUPPLYINPUTOUTOFRANGE),
 	/**
 	 * Unit has regained some resource(s) and is redundant but not fully redundant. Entered from
 	 * Non-redundant:Sufficient Resources or Non-redundant:Insufficient Resources.
 	 */
 	RedundancyDegradedFromNonRedundant(ReadingType.REDUNDANCYDEGRADEDFROMNONREDUNDANT),
-	PerformanceLags(
-			ReadingType.PERFORMANCELAGS),
+	PerformanceLags(ReadingType.PERFORMANCELAGS),
 	AcpiG3MechanicalOff(ReadingType.ACPIG3MECHANICALOFF),
-	AcpiSleepingInS1S2OrS3(
-			ReadingType.ACPISLEEPINGINS1S2ORS3),
+	AcpiSleepingInS1S2OrS3(ReadingType.ACPISLEEPINGINS1S2ORS3),
 	AcpiG1Sleeping(ReadingType.ACPIG1SLEEPING),
-	FrontPanelInterrupt(
-			ReadingType.FRONTPANELINTERRUPT),
+	FrontPanelInterrupt(ReadingType.FRONTPANELINTERRUPT),
 	Informational(ReadingType.INFORMATIONAL),
-	NoBootableMedia(
-			ReadingType.NOBOOTABLEMEDIA),
+	NoBootableMedia(ReadingType.NOBOOTABLEMEDIA),
 	BusTimeout(ReadingType.BUSTIMEOUT),
-	NonBootableDisketteLeftInDrive(
-			ReadingType.NONBOOTABLEDISKETTELEFTINDRIVE),
+	NonBootableDisketteLeftInDrive(ReadingType.NONBOOTABLEDISKETTELEFTINDRIVE),
 	IoChannelCheckNmi(ReadingType.IOCHANNELCHECKNMI),
-	PxeServerNotFound(
-			ReadingType.PXESERVERNOTFOUND),
+	PxeServerNotFound(ReadingType.PXESERVERNOTFOUND),
 	Software(ReadingType.SOFTWARE),
-	InvalidBootSector(
-			ReadingType.INVALIDBOOTSECTOR),
+	InvalidBootSector(ReadingType.INVALIDBOOTSECTOR),
 	PciPErr(ReadingType.PCIPERR),
-	GeneralChassisIntrusion(
-			ReadingType.GENERALCHASSISINTRUSION),
+	GeneralChassisIntrusion(ReadingType.GENERALCHASSISINTRUSION),
 	TransitionToIdle(ReadingType.TRANSITIONTOIDLE),
-	PciSErr(
-			ReadingType.PCISERR),
+	PciSErr(ReadingType.PCISERR),
 	DriveBayIntrusion(ReadingType.DRIVEBAYINTRUSION),
-	TransitionToActive(
-			ReadingType.TRANSITIONTOACTIVE),
+	TransitionToActive(ReadingType.TRANSITIONTOACTIVE),
 	EisaFailSafeTimeout(ReadingType.EISAFAILSAFETIMEOUT),
-	IoCardAreaIntrusion(
-			ReadingType.IOCARDAREAINTRUSION),
+	IoCardAreaIntrusion(ReadingType.IOCARDAREAINTRUSION),
 	TransitionToBusy(ReadingType.TRANSITIONTOBUSY),
-	BusCorrectableError(
-			ReadingType.BUSCORRECTABLEERROR),
+	BusCorrectableError(ReadingType.BUSCORRECTABLEERROR),
 	ProcessorAreaIntrusion(ReadingType.PROCESSORAREAINTRUSION),
-	BusUncorrectableError(
-			ReadingType.BUSUNCORRECTABLEERROR),
+	BusUncorrectableError(ReadingType.BUSUNCORRECTABLEERROR),
 	FatalNmi(ReadingType.FATALNMI),
-	PowerButtonPressed(
-			ReadingType.POWERBUTTONPRESSED),
+	PowerButtonPressed(ReadingType.POWERBUTTONPRESSED),
 	SleepButtonPressed(ReadingType.SLEEPBUTTONPRESSED),
-	FruNotInstalled(
-			ReadingType.FRUNOTINSTALLED),
+	FruNotInstalled(ReadingType.FRUNOTINSTALLED),
 	SlotConnectorFaultStatusAsserted(ReadingType.SLOTCONNECTORFAULTSTATUSASSERTED),
-	PowerUp(
-			ReadingType.POWERUP),
+	PowerUp(ReadingType.POWERUP),
 	ResetButtonPressed(ReadingType.RESETBUTTONPRESSED),
-	LowerNonCriticalGoingLow(
-			ReadingType.LOWERNONCRITICALGOINGLOW),
+	LowerNonCriticalGoingLow(ReadingType.LOWERNONCRITICALGOINGLOW),
 	LowerNonCriticalGoingHigh(ReadingType.LOWERNONCRITICALGOINGHIGH),
-	LowerCriticalGoingLow(
-			ReadingType.LOWERCRITICALGOINGLOW),
+	LowerCriticalGoingLow(ReadingType.LOWERCRITICALGOINGLOW),
 	LowerCriticalGoingHigh(ReadingType.LOWERCRITICALGOINGHIGH),
-	LowerNonRecoverableGoingLow(
-			ReadingType.LOWERNONRECOVERABLEGOINGLOW),
-	LowerNonRecoverableGoingHigh(
-			ReadingType.LOWERNONRECOVERABLEGOINGHIGH),
+	LowerNonRecoverableGoingLow(ReadingType.LOWERNONRECOVERABLEGOINGLOW),
+	LowerNonRecoverableGoingHigh(ReadingType.LOWERNONRECOVERABLEGOINGHIGH),
 	UpperNonCriticalGoingLow(ReadingType.UPPERNONCRITICALGOINGLOW),
-	UpperNonCriticalGoingHigh(
-			ReadingType.UPPERNONCRITICALGOINGHIGH),
+	UpperNonCriticalGoingHigh(ReadingType.UPPERNONCRITICALGOINGHIGH),
 	UpperCriticalGoingLow(ReadingType.UPPERCRITICALGOINGLOW),
-	UpperCriticalGoingHigh(
-			ReadingType.UPPERCRITICALGOINGHIGH),
+	UpperCriticalGoingHigh(ReadingType.UPPERCRITICALGOINGHIGH),
 	UpperNonRecoverableGoingLow(ReadingType.UPPERNONRECOVERABLEGOINGLOW),
-	UpperNonRecoverableGoingHigh(
-			ReadingType.UPPERNONRECOVERABLEGOINGHIGH),
+	UpperNonRecoverableGoingHigh(ReadingType.UPPERNONRECOVERABLEGOINGHIGH),
 	UnknownOEMEvent(ReadingType.UNKNOWNOEM),
-	CoolingDevice(
-			ReadingType.COOLINGDEVICE),
+	CoolingDevice(ReadingType.COOLINGDEVICE),
 	OtherUnitsBasedSensor(ReadingType.OTHERUNITSBASEDSENSOR),
-	PostMemoryResize(
-			ReadingType.POSTMEMORYRESIZE),
+	PostMemoryResize(ReadingType.POSTMEMORYRESIZE),
 	ModuleBoard(ReadingType.MODULEBOARD),
-	MicrocontrollerCoprocessor(
-			ReadingType.MICROCONTROLLERCOPROCESSOR),
+	MicrocontrollerCoprocessor(ReadingType.MICROCONTROLLERCOPROCESSOR),
 	AddInCard(ReadingType.ADDINCARD),
 	Chassis(ReadingType.CHASSIS),
-	OtherFru(
-			ReadingType.OTHERFRU),
+	OtherFru(ReadingType.OTHERFRU),
 	Terminator(ReadingType.TERMINATOR),
 	MonitorAsicIc(ReadingType.MONITORASICIC),
-	Unknown(
-			ReadingType.UNKNOWN),;
+	Unknown(ReadingType.UNKNOWN),;
 
 	private static final int LOWERNONCRITICALGOINGLOW = 256;
 

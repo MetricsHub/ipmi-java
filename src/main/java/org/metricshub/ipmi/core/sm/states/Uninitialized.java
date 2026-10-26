@@ -43,31 +43,15 @@ import org.metricshub.ipmi.core.sm.events.StateMachineEvent;
 public class Uninitialized extends State {
 
 	@Override
-	public void doTransition(
-			StateMachine stateMachine,
-			StateMachineEvent machineEvent) {
+	public void doTransition(StateMachine stateMachine, StateMachineEvent machineEvent) {
 		if (machineEvent instanceof GetChannelCipherSuitesPending) {
 			Default event = (GetChannelCipherSuitesPending) machineEvent;
-			GetChannelCipherSuites cipherSuites = new GetChannelCipherSuites(
-					TypeConverter.intToByte(0xE),
-					(byte) 0);
+			GetChannelCipherSuites cipherSuites = new GetChannelCipherSuites(TypeConverter.intToByte(0xE), (byte) 0);
 			try {
-				stateMachine
-						.setCurrent(
-								new CiphersWaiting(
-										0,
-										event
-												.getSequenceNumber()));
+				stateMachine.setCurrent(new CiphersWaiting(0, event.getSequenceNumber()));
 
 				stateMachine
-						.sendMessage(
-								Encoder
-										.encode(
-												new Protocolv20Encoder(),
-												cipherSuites,
-												event.getSequenceNumber(),
-												0,
-												0));
+						.sendMessage(Encoder.encode(new Protocolv20Encoder(), cipherSuites, event.getSequenceNumber(), 0, 0));
 			} catch (Exception e) {
 				stateMachine.setCurrent(this);
 				stateMachine.doExternalAction(new ErrorAction(e));
@@ -84,17 +68,13 @@ public class Uninitialized extends State {
 					TypeConverter.intToByte(0xe));
 			try {
 				stateMachine.setCurrent(new AuthcapWaiting(event.getSequenceNumber()));
-				stateMachine
-						.sendMessage(Encoder.encode(new Protocolv15Encoder(), authCap, event.getSequenceNumber(), 0, 0));
+				stateMachine.sendMessage(Encoder.encode(new Protocolv15Encoder(), authCap, event.getSequenceNumber(), 0, 0));
 			} catch (Exception e) {
 				stateMachine.setCurrent(this);
 				stateMachine.doExternalAction(new ErrorAction(e));
 			}
 		} else {
-			stateMachine
-					.doExternalAction(
-							new ErrorAction(
-									new IllegalArgumentException("Invalid transition")));
+			stateMachine.doExternalAction(new ErrorAction(new IllegalArgumentException("Invalid transition")));
 		}
 	}
 

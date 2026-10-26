@@ -94,8 +94,7 @@ public final class SelEntryList extends AbstractList<SelEntry> {
 	 * @return the time of the most recent addition, empty when the BMC refused Get SEL Info or reports none
 	 */
 	public Optional<Instant> lastAddition() {
-		return info == null ?
-				Optional.<Instant>empty() : SelEntry.absolute(info.getAdditionTimestamp(), utcOffsetMinutes);
+		return info == null ? Optional.<Instant>empty() : SelEntry.absolute(info.getAdditionTimestamp(), utcOffsetMinutes);
 	}
 
 	/**

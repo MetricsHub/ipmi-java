@@ -46,10 +46,7 @@ public class GetDeviceSdrInfoResponseData implements ResponseData {
 	 * @param populationChangeIndicator the timestamp or counter of the last change of a dynamic population, null for
 	 *        a static one
 	 */
-	public GetDeviceSdrInfoResponseData(
-			int count,
-			boolean dynamicPopulation,
-			int lunsWithSensors,
+	public GetDeviceSdrInfoResponseData(int count, boolean dynamicPopulation, int lunsWithSensors,
 			Long populationChangeIndicator) {
 		this.count = count;
 		this.dynamicPopulation = dynamicPopulation;

@@ -77,14 +77,10 @@ public abstract class PayloadCoder {
 	}
 
 	public PayloadCoder() {
-		setSessionParameters(
-				IpmiVersion.V20,
-				CipherSuite.getEmpty(),
-				AuthenticationType.RMCPPlus);
+		setSessionParameters(IpmiVersion.V20, CipherSuite.getEmpty(), AuthenticationType.RMCPPlus);
 	}
 
-	public PayloadCoder(IpmiVersion version, CipherSuite cipherSuite,
-			AuthenticationType authenticationType) {
+	public PayloadCoder(IpmiVersion version, CipherSuite cipherSuite, AuthenticationType authenticationType) {
 		setSessionParameters(version, cipherSuite, authenticationType);
 	}
 
@@ -104,10 +100,8 @@ public abstract class PayloadCoder {
 			CipherSuite sessionCipherSuite,
 			AuthenticationType sessionAuthenticationType) {
 
-		if (version == IpmiVersion.V20
-				&& sessionAuthenticationType != AuthenticationType.RMCPPlus) {
-			throw new IllegalArgumentException(
-					"Authentication Type must be RMCPPlus for IPMI v2.0 messages");
+		if (version == IpmiVersion.V20 && sessionAuthenticationType != AuthenticationType.RMCPPlus) {
+			throw new IllegalArgumentException("Authentication Type must be RMCPPlus for IPMI v2.0 messages");
 		}
 
 		setIpmiVersion(version);
@@ -165,9 +159,7 @@ public abstract class PayloadCoder {
 	private Ipmiv20Message encodeV20Payload(int messageSequenceNumber, int sessionSequenceNumber, int sessionId)
 			throws NoSuchAlgorithmException,
 			InvalidKeyException {
-		Ipmiv20Message message = new Ipmiv20Message(
-				getCipherSuite()
-						.getConfidentialityAlgorithm());
+		Ipmiv20Message message = new Ipmiv20Message(getCipherSuite().getConfidentialityAlgorithm());
 
 		message.setAuthenticationType(getAuthenticationType());
 
@@ -177,25 +169,15 @@ public abstract class PayloadCoder {
 
 		message.setPayloadType(getSupportedPayloadType());
 
-		message
-				.setPayloadAuthenticated(
-						getCipherSuite()
-								.getIntegrityAlgorithm()
-								.getCode() != SecurityConstants.IA_NONE);
+		message.setPayloadAuthenticated(getCipherSuite().getIntegrityAlgorithm().getCode() != SecurityConstants.IA_NONE);
 
-		message
-				.setPayloadEncrypted(
-						getCipherSuite()
-								.getConfidentialityAlgorithm()
-								.getCode() != SecurityConstants.CA_NONE);
+		message.setPayloadEncrypted(getCipherSuite().getConfidentialityAlgorithm().getCode() != SecurityConstants.CA_NONE);
 
 		message.setPayload(preparePayload(messageSequenceNumber));
 
-		message
-				.setAuthCode(
-						getCipherSuite()
-								.getIntegrityAlgorithm()
-								.generateAuthCode(message.getIntegrityAlgorithmBase(new Protocolv20Encoder())));
+		message.setAuthCode(
+				getCipherSuite().getIntegrityAlgorithm()
+						.generateAuthCode(message.getIntegrityAlgorithmBase(new Protocolv20Encoder())));
 
 		return message;
 	}

@@ -116,9 +116,7 @@ public class DeviceRelativeEntityAssiciationRecord extends SensorRecord {
 	private int entityRangeInstance4;
 
 	@Override
-	protected void populateTypeSpecficValues(
-			byte[] recordData,
-			SensorRecord record) {
+	protected void populateTypeSpecficValues(byte[] recordData, SensorRecord record) {
 
 		setContainerEntityId(TypeConverter.byteToInt(recordData[5]));
 

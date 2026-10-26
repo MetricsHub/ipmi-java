@@ -24,8 +24,7 @@ class IpmiLanMessageTest {
 
 	@Test
 	void aNetworkFunctionCodeTheEnumerationDoesNotListIsEncoded() {
-		byte[] request = new IpmiLanRequest(0x2c, (byte) 0x01, new byte[] { (byte) 0xdc, 0x01 }, (byte) 5)
-				.getPayloadData();
+		byte[] request = new IpmiLanRequest(0x2c, (byte) 0x01, new byte[] { (byte) 0xdc, 0x01 }, (byte) 5).getPayloadData();
 
 		assertEquals(0x2c << 2, request[1] & 0xff); // Group Extension (DCMI), LUN 0
 		assertEquals(0x01, request[5]);

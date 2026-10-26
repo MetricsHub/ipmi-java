@@ -292,9 +292,8 @@ class SensorRecordTest {
 		// A fixed-length record padded with NULs after the name (Fujitsu iRMC S5, HPE iLO 5, Supermicro)
 		assertEquals(
 				"Vcore",
-				((AbstractSensorRecord) SensorRecord
-						.populateSensorRecord(
-								withIdString(FULL_SENSOR_RECORD, 47, 0xc5, 'V', 'c', 'o', 'r', 'e', 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)))
+				((AbstractSensorRecord) SensorRecord.populateSensorRecord(
+						withIdString(FULL_SENSOR_RECORD, 47, 0xc5, 'V', 'c', 'o', 'r', 'e', 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)))
 						.getName());
 		// Bytes after the declared length that are not NULs
 		assertEquals(

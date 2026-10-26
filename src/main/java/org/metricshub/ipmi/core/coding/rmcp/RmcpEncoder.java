@@ -67,8 +67,7 @@ public final class RmcpEncoder {
 		return sequenceNumber;
 	}
 
-	private static byte encodeRMCPClassOfMessage(
-			RmcpClassOfMessage classOfMessage) {
+	private static byte encodeRMCPClassOfMessage(RmcpClassOfMessage classOfMessage) {
 		return TypeConverter.intToByte(classOfMessage.getCode());
 	}
 

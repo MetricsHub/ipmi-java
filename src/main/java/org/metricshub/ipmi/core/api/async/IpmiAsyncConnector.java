@@ -199,8 +199,7 @@ public class IpmiAsyncConnector implements ConnectionListener {
 	 * @throws IOException
 	 *         when the connection cannot be created
 	 */
-	public ConnectionHandle createConnection(InetAddress address, int port)
-			throws IOException {
+	public ConnectionHandle createConnection(InetAddress address, int port) throws IOException {
 		int handle = connectionManager.createConnection(address, port);
 		connectionManager.getConnection(handle).registerListener(this);
 		return new ConnectionHandle(handle, address, port);
@@ -253,16 +252,13 @@ public class IpmiAsyncConnector implements ConnectionListener {
 	 * @throws Exception
 	 *         when sending message to the managed system fails
 	 */
-	public List<CipherSuite> getAvailableCipherSuites(
-			ConnectionHandle connectionHandle)
-			throws Exception {
+	public List<CipherSuite> getAvailableCipherSuites(ConnectionHandle connectionHandle) throws Exception {
 		int tries = 0;
 		List<CipherSuite> result = null;
 		while (tries <= retries && result == null) {
 			try {
 				++tries;
-				result = connectionManager
-						.getAvailableCipherSuites(connectionHandle.getHandle());
+				result = connectionManager.getAvailableCipherSuites(connectionHandle.getHandle());
 			} catch (Exception e) {
 				if (tries > retries || !isRetriable(e)) {
 					throw e;
@@ -329,11 +325,7 @@ public class IpmiAsyncConnector implements ConnectionListener {
 	 *         when sending message to the managed system or initializing
 	 *         one of the cipherSuite's algorithms fails
 	 */
-	public Session openSession(
-			ConnectionHandle connectionHandle,
-			String username,
-			String password,
-			byte[] bmcKey)
+	public Session openSession(ConnectionHandle connectionHandle, String username, String password, byte[] bmcKey)
 			throws Exception {
 		return openSession(
 				connectionHandle,
@@ -371,11 +363,7 @@ public class IpmiAsyncConnector implements ConnectionListener {
 	 *         when sending message to the managed system or initializing
 	 *         one of the cipherSuite's algorithms fails
 	 */
-	public Session openSession(
-			ConnectionHandle connectionHandle,
-			String username,
-			byte[] password,
-			byte[] bmcKey)
+	public Session openSession(ConnectionHandle connectionHandle, String username, byte[] password, byte[] bmcKey)
 			throws Exception {
 		connectionHandle.setUser(username);
 		connectionHandle.setPasswordBytes(password);
@@ -413,8 +401,7 @@ public class IpmiAsyncConnector implements ConnectionListener {
 				break;
 			} catch (IPMIException e) {
 				CompletionCode code = e.getCompletionCode();
-				if (i == roles.length - 1
-						|| code != CompletionCode.UnauthorizedRole && code != CompletionCode.InvalidRole) {
+				if (i == roles.length - 1 || code != CompletionCode.UnauthorizedRole && code != CompletionCode.InvalidRole) {
 					throw e;
 				}
 			}
@@ -423,11 +410,10 @@ public class IpmiAsyncConnector implements ConnectionListener {
 		// Registered once raised: a session the BMC would not raise is closed, and must not be found as an open one
 		raisePrivilege(connectionHandle);
 
-		return sessionManager
-				.registerSession(
-						sessionId,
-						connectionManager.getConnection(connectionHandle.getHandle()).getManagedSystemSessionId(),
-						connectionHandle);
+		return sessionManager.registerSession(
+				sessionId,
+				connectionManager.getConnection(connectionHandle.getHandle()).getManagedSystemSessionId(),
+				connectionHandle);
 	}
 
 	/**
@@ -446,14 +432,13 @@ public class IpmiAsyncConnector implements ConnectionListener {
 		while (true) {
 			try {
 				++tries;
-				return connectionManager
-						.startSession(
-								connectionHandle.getHandle(),
-								connectionHandle.getCipherSuite(),
-								role,
-								username,
-								password,
-								bmcKey);
+				return connectionManager.startSession(
+						connectionHandle.getHandle(),
+						connectionHandle.getCipherSuite(),
+						role,
+						username,
+						password,
+						bmcKey);
 			} catch (Exception e) {
 				if (tries > retries || !isRetriable(e)) {
 					throw e;
@@ -547,11 +532,8 @@ public class IpmiAsyncConnector implements ConnectionListener {
 	 *         when sending message to the managed system or initializing
 	 *         one of the cipherSuite's algorithms fails
 	 */
-	public void closeSession(ConnectionHandle connectionHandle)
-			throws Exception {
-		if (!connectionManager
-				.getConnection(connectionHandle.getHandle())
-				.isSessionValid()) {
+	public void closeSession(ConnectionHandle connectionHandle) throws Exception {
+		if (!connectionManager.getConnection(connectionHandle.getHandle()).isSessionValid()) {
 			return;
 		}
 		int tries = 0;
@@ -559,9 +541,7 @@ public class IpmiAsyncConnector implements ConnectionListener {
 		while (tries <= retries && !succeded) {
 			try {
 				++tries;
-				connectionManager
-						.getConnection(connectionHandle.getHandle())
-						.closeSession();
+				connectionManager.getConnection(connectionHandle.getHandle()).closeSession();
 				sessionManager.unregisterSession(connectionHandle);
 				connectionHandle.wipeCredentials();
 				succeded = true;
@@ -593,11 +573,7 @@ public class IpmiAsyncConnector implements ConnectionListener {
 	 *         when sending message to the managed system or initializing
 	 *         one of the cipherSuite's algorithms fails
 	 */
-	public int sendMessage(
-			ConnectionHandle connectionHandle,
-			PayloadCoder request,
-			boolean isOneWay)
-			throws Exception {
+	public int sendMessage(ConnectionHandle connectionHandle, PayloadCoder request, boolean isOneWay) throws Exception {
 		int tries = 0;
 		int tag = -1;
 		Connection connection = connectionManager.getConnection(connectionHandle.getHandle());
@@ -697,10 +673,7 @@ public class IpmiAsyncConnector implements ConnectionListener {
 			response = new IpmiError(
 					notNullException,
 					tag,
-					new ConnectionHandle(
-							handle,
-							connection.getRemoteMachineAddress(),
-							connection.getRemoteMachinePort()));
+					new ConnectionHandle(handle, connection.getRemoteMachineAddress(), connection.getRemoteMachinePort()));
 		} else {
 			response = new IpmiResponseData(
 					responseData,

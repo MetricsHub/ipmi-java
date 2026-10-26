@@ -100,8 +100,7 @@ public abstract class ActivatePayload<R extends ActivatePayloadResponseData> ext
 
 	@Override
 	protected IpmiPayload preparePayload(int sequenceNumber) throws NoSuchAlgorithmException, InvalidKeyException {
-		byte[] message = MessageComposer
-				.get(REQUEST_DATA_LENGTH)
+		byte[] message = MessageComposer.get(REQUEST_DATA_LENGTH)
 				.appendField(TypeConverter.intToByte(getPayloadType().getCode()))
 				.appendField(TypeConverter.intToByte(payloadInstance))
 				.appendField(prepareAuxilaryRequestData())
@@ -138,10 +137,7 @@ public abstract class ActivatePayload<R extends ActivatePayloadResponseData> ext
 	protected abstract byte[] prepareAuxilaryRequestData();
 
 	@Override
-	public R getResponseData(IpmiMessage message)
-			throws IPMIException,
-			NoSuchAlgorithmException,
-			InvalidKeyException {
+	public R getResponseData(IpmiMessage message) throws IPMIException, NoSuchAlgorithmException, InvalidKeyException {
 		MessageReader messageReader = new MessageReader(validateResponse(message));
 
 		R responseData = createEmptyResponse();

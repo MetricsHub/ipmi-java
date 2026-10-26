@@ -135,7 +135,8 @@ public final class SelEntry {
 	public OptionalLong preInitSeconds() {
 		Date timestamp = record.getTimestamp();
 		return timestamp == null || seconds(timestamp) > LAST_PRE_INIT_TIMESTAMP ?
-				OptionalLong.empty() : OptionalLong.of(seconds(timestamp));
+				OptionalLong.empty() :
+				OptionalLong.of(seconds(timestamp));
 	}
 
 	/**
@@ -294,12 +295,11 @@ public final class SelEntry {
 		String codes = String
 				.format("event type %02Xh offset %Xh", record.getEventType(), record.getEventData()[0] & OFFSET_MASK);
 		if (type == SensorType.Oem || type == SensorType.Reserved) {
-			return String
-					.format(
-							"%s sensor type %02Xh, %s",
-							type == SensorType.Oem ? "OEM" : "Reserved",
-							record.getSensorTypeCode(),
-							codes);
+			return String.format(
+					"%s sensor type %02Xh, %s",
+					type == SensorType.Oem ? "OEM" : "Reserved",
+					record.getSensorTypeCode(),
+					codes);
 		}
 		return (event == ReadingType.Unknown ? "Unknown " : "OEM ") + codes;
 	}
@@ -317,7 +317,8 @@ public final class SelEntry {
 		}
 		long seconds = seconds(timestamp);
 		return seconds <= LAST_PRE_INIT_TIMESTAMP || seconds == UNSPECIFIED_TIMESTAMP ?
-				Optional.<Instant>empty() : Optional.of(timestamp.toInstant().minus(utcOffsetMinutes, ChronoUnit.MINUTES));
+				Optional.<Instant>empty() :
+				Optional.of(timestamp.toInstant().minus(utcOffsetMinutes, ChronoUnit.MINUTES));
 	}
 
 	/**
@@ -382,8 +383,7 @@ public final class SelEntry {
 			text.append(' ').append(preInitSeconds().getAsLong()).append(" s after initialization");
 		}
 		if (isSystemEvent()) {
-			text
-					.append(": ")
+			text.append(": ")
 					.append(Sensor.typeName(record.getSensorType(), record.getSensorTypeCode()))
 					.append(" sensor ")
 					.append(record.getSensorNumber())

@@ -305,15 +305,14 @@ public class SerialOverLan implements Closeable {
 			CipherSuiteSelectionHandler cipherSuiteSelectionHandler)
 			throws SessionException {
 		try {
-			return SessionManager
-					.establishSession(
-							connector,
-							remoteHost,
-							remotePort,
-							user,
-							password == null ? null : password.getBytes(StandardCharsets.UTF_8),
-							bmcKey,
-							cipherSuiteSelectionHandler);
+			return SessionManager.establishSession(
+					connector,
+					remoteHost,
+					remotePort,
+					user,
+					password == null ? null : password.getBytes(StandardCharsets.UTF_8),
+					bmcKey,
+					cipherSuiteSelectionHandler);
 		} catch (SessionException | RuntimeException e) {
 			connector.tearDown();
 			throw e;
@@ -347,10 +346,7 @@ public class SerialOverLan implements Closeable {
 		// The payload is actually activated in a session on the port of the payload, opened with the same credentials
 		// (IPMI 2.0 sections 15.10 and 24.1), or in the session already open there
 		Session alternativeSession = ipmiConnector
-				.getExistingSessionForCriteria(
-						connectionHandle.getRemoteAddress(),
-						solPayloadPort,
-						connectionHandle.getUser());
+				.getExistingSessionForCriteria(connectionHandle.getRemoteAddress(), solPayloadPort, connectionHandle.getUser());
 
 		if (alternativeSession == null) {
 			// The credentials, suite and privilege level of the session given to the console, whose level may be enough
@@ -483,17 +479,14 @@ public class SerialOverLan implements Closeable {
 					}
 					current = next;
 					raisedTo = next;
-				} else
-					if (!deactivated
-							&& code == PAYLOAD_ALREADY_ACTIVE
-							&& isActiveInSession(ipmiConnector, payloadSession)) {
-								// The reply to Activate Payload was lost, and the request sent again found the payload active in this
-								// session: the port and the sizes of the payload are only in that reply, which a new activation gives
-								send(ipmiConnector, connectionHandle, new DeactivatePayload(PayloadType.Sol, payloadInstance));
-								deactivated = true;
-							} else {
-								throw e;
-							}
+				} else if (!deactivated && code == PAYLOAD_ALREADY_ACTIVE && isActiveInSession(ipmiConnector, payloadSession)) {
+					// The reply to Activate Payload was lost, and the request sent again found the payload active in this
+					// session: the port and the sizes of the payload are only in that reply, which a new activation gives
+					send(ipmiConnector, connectionHandle, new DeactivatePayload(PayloadType.Sol, payloadInstance));
+					deactivated = true;
+				} else {
+					throw e;
+				}
 			}
 		}
 	}
@@ -907,11 +900,10 @@ public class SerialOverLan implements Closeable {
 		byte[] remainingCharacterData = characterData;
 
 		while (isNackForMessagePart(responseData, remainingCharacterData.length)) {
-			remainingCharacterData = Arrays
-					.copyOfRange(
-							remainingCharacterData,
-							responseData.getAcceptedCharactersNumber(),
-							remainingCharacterData.length);
+			remainingCharacterData = Arrays.copyOfRange(
+					remainingCharacterData,
+					responseData.getAcceptedCharactersNumber(),
+					remainingCharacterData.length);
 
 			responseData = sendPayload(
 					characterPacket(remainingCharacterData, lineOperations),
@@ -926,12 +918,7 @@ public class SerialOverLan implements Closeable {
 	 * @return a packet of characters, with the line states the console holds
 	 */
 	private SolCoder characterPacket(byte[] characterData, Set<SolOperation> lineOperations) {
-		return new SolCoder(
-				characterData,
-				(byte) 0,
-				(byte) 0,
-				SolAckState.ACK,
-				lineOperations);
+		return new SolCoder(characterData, (byte) 0, (byte) 0, SolAckState.ACK, lineOperations);
 	}
 
 	/**
@@ -941,10 +928,7 @@ public class SerialOverLan implements Closeable {
 	 */
 	private boolean sendMessage(Set<SolOperation> operations) {
 		try {
-			connector
-					.sendOneWayMessage(
-							session.getConnectionHandle(),
-							new SolCoder(operations));
+			connector.sendOneWayMessage(session.getConnectionHandle(), new SolCoder(operations));
 			return true;
 		} catch (Exception e) {
 			if (e instanceof InterruptedException) {
@@ -1040,10 +1024,7 @@ public class SerialOverLan implements Closeable {
 	}
 
 	private void deactivatePayload(ConnectionHandle connectionHandle, int instance) throws Exception {
-		connector
-				.sendMessage(
-						connectionHandle,
-						new DeactivatePayload(PayloadType.Sol, instance));
+		connector.sendMessage(connectionHandle, new DeactivatePayload(PayloadType.Sol, instance));
 	}
 
 	/**
@@ -1117,7 +1098,8 @@ public class SerialOverLan implements Closeable {
 			responseData = null;
 		}
 		return responseData != null ?
-				responseData : (SolResponseData) connector.sendMessage(connectionHandle, payloadCoder);
+				responseData :
+				(SolResponseData) connector.sendMessage(connectionHandle, payloadCoder);
 	}
 
 	private boolean isNackForWholeMessage(SolResponseData responseData) {

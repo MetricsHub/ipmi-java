@@ -70,8 +70,7 @@ public class Rakp3Waiting extends State {
 	 * @param cipherSuite
 	 *        - the {@link CipherSuite} used during this session.
 	 */
-	public Rakp3Waiting(int tag, Rakp1 rakp1,
-			Rakp1ResponseData rakp1ResponseData, CipherSuite cipherSuite) {
+	public Rakp3Waiting(int tag, Rakp1 rakp1, Rakp1ResponseData rakp1ResponseData, CipherSuite cipherSuite) {
 		this.rakp1 = rakp1;
 		this.rakp1ResponseData = rakp1ResponseData;
 		this.cipherSuite = cipherSuite;
@@ -79,18 +78,13 @@ public class Rakp3Waiting extends State {
 	}
 
 	@Override
-	public void doTransition(
-			StateMachine stateMachine,
-			StateMachineEvent machineEvent) {
+	public void doTransition(StateMachine stateMachine, StateMachineEvent machineEvent) {
 		if (machineEvent instanceof DefaultAck) {
 			stateMachine.setCurrent(new Rakp3Complete());
 		} else if (machineEvent instanceof Timeout) {
 			stateMachine.setCurrent(new Authcap());
 		} else {
-			stateMachine
-					.doExternalAction(
-							new ErrorAction(
-									new IllegalArgumentException("Invalid transition")));
+			stateMachine.doExternalAction(new ErrorAction(new IllegalArgumentException("Invalid transition")));
 		}
 	}
 
@@ -99,8 +93,7 @@ public class Rakp3Waiting extends State {
 		if (ProtocolDecoder.decodeAuthenticationType(message) != AuthenticationType.RMCPPlus) {
 			return; // this isn't IPMI v2.0 message so we ignore it
 		}
-		PlainCommandv20Decoder decoder = new PlainCommandv20Decoder(
-				CipherSuite.getEmpty());
+		PlainCommandv20Decoder decoder = new PlainCommandv20Decoder(CipherSuite.getEmpty());
 		if (Protocolv20Decoder.decodePayloadType(message.getData()[1]) != PayloadType.Rakp4) {
 			return;
 		}
@@ -110,15 +103,8 @@ public class Rakp3Waiting extends State {
 		try {
 			ipmiMessage = decoder.decode(message);
 			if (rakp3.isCommandResponse(ipmiMessage)
-					&& TypeConverter
-							.byteToInt(
-									((PlainMessage) ipmiMessage
-											.getPayload()).getPayloadData()[0]) == tag) {
-				stateMachine
-						.doExternalAction(
-								new ResponseAction(
-										rakp3
-												.getResponseData(ipmiMessage)));
+					&& TypeConverter.byteToInt(((PlainMessage) ipmiMessage.getPayload()).getPayloadData()[0]) == tag) {
+				stateMachine.doExternalAction(new ResponseAction(rakp3.getResponseData(ipmiMessage)));
 			}
 		} catch (Exception e) {
 			stateMachine.setCurrent(new Authcap());

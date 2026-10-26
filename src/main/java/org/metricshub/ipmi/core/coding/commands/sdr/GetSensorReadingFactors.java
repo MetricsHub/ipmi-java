@@ -102,8 +102,6 @@ public class GetSensorReadingFactors extends IpmiCommandCoder<GetSensorReadingFa
 		if (raw.length < RESPONSE_LENGTH) {
 			throw new IllegalArgumentException("Invalid data length");
 		}
-		return new GetSensorReadingFactorsResponseData(
-				TypeConverter.byteToInt(raw[0]),
-				new SensorReadingFactors(raw, 1));
+		return new GetSensorReadingFactorsResponseData(TypeConverter.byteToInt(raw[0]), new SensorReadingFactors(raw, 1));
 	}
 }

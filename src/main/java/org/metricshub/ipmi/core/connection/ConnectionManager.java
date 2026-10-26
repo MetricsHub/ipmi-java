@@ -338,8 +338,7 @@ public class ConnectionManager {
 	 * @throws Exception
 	 *         when sending message to the managed system fails
 	 */
-	public List<CipherSuite> getAvailableCipherSuites(int connection)
-			throws Exception {
+	public List<CipherSuite> getAvailableCipherSuites(int connection) throws Exception {
 		int tag = generateSessionlessTag();
 		List<CipherSuite> suites;
 		try {
@@ -416,14 +415,7 @@ public class ConnectionManager {
 		int sessionId;
 		int tag = generateSessionlessTag();
 		try {
-			sessionId = getConnection(connection)
-					.startSession(
-							tag,
-							cipherSuite,
-							privilegeLevel,
-							username,
-							password,
-							bmcKey);
+			sessionId = getConnection(connection).startSession(tag, cipherSuite, privilegeLevel, username, password, bmcKey);
 		} catch (Exception e) {
 			freeTag(tag);
 			throw e;

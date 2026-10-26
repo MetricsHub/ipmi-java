@@ -616,8 +616,7 @@ final class CliArguments implements AutoCloseable {
 	private static char[] decodeUtf8(byte[] bytes, String option) throws CliUsageException {
 		CharBuffer characters = null;
 		try {
-			characters = StandardCharsets.UTF_8
-					.newDecoder()
+			characters = StandardCharsets.UTF_8.newDecoder()
 					.onMalformedInput(CodingErrorAction.REPORT)
 					.onUnmappableCharacter(CodingErrorAction.REPORT)
 					.decode(ByteBuffer.wrap(bytes));

@@ -109,8 +109,7 @@ public class Rakp1 extends IpmiCommandCoder<Rakp1ResponseData> {
 		return managedSystemSessionId;
 	}
 
-	public void setRequestedMaximumPrivilegeLevel(
-			PrivilegeLevel requestedMaximumPrivilegeLevel) {
+	public void setRequestedMaximumPrivilegeLevel(PrivilegeLevel requestedMaximumPrivilegeLevel) {
 		this.requestedMaximumPrivilegeLevel = requestedMaximumPrivilegeLevel;
 	}
 
@@ -212,9 +211,8 @@ public class Rakp1 extends IpmiCommandCoder<Rakp1ResponseData> {
 	 *        - {@link CipherSuite} containing authentication,
 	 *        confidentiality and integrity algorithms for this session.
 	 */
-	public Rakp1(int managedSystemSessionId, PrivilegeLevel privilegeLevel,
-			String username, byte[] password, byte[] bmcKey,
-			CipherSuite cipherSuite) {
+	public Rakp1(int managedSystemSessionId, PrivilegeLevel privilegeLevel, String username, byte[] password,
+			byte[] bmcKey, CipherSuite cipherSuite) {
 		setSessionParameters(IpmiVersion.V20, cipherSuite, AuthenticationType.RMCPPlus);
 		setManagedSystemSessionId(managedSystemSessionId);
 		setRequestedMaximumPrivilegeLevel(privilegeLevel);
@@ -256,8 +254,7 @@ public class Rakp1 extends IpmiCommandCoder<Rakp1ResponseData> {
 		payload[2] = 0; // reserved
 		payload[3] = 0; // reserved
 
-		byte[] sId = TypeConverter
-				.intToLittleEndianByteArray(getManagedSystemSessionId());
+		byte[] sId = TypeConverter.intToLittleEndianByteArray(getManagedSystemSessionId());
 
 		System.arraycopy(sId, 0, payload, 4, 4); // managed system session ID
 
@@ -266,8 +263,7 @@ public class Rakp1 extends IpmiCommandCoder<Rakp1ResponseData> {
 		// number
 
 		// requested privilege level; set name-only lookup
-		payload[24] = TypeConverter
-				.intToByte(encodePrivilegeLevel(requestedMaximumPrivilegeLevel) | 0x10);
+		payload[24] = TypeConverter.intToByte(encodePrivilegeLevel(requestedMaximumPrivilegeLevel) | 0x10);
 
 		payload[25] = 0; // reserved
 		payload[26] = 0; // reserved
@@ -315,9 +311,7 @@ public class Rakp1 extends IpmiCommandCoder<Rakp1ResponseData> {
 
 		data.setStatusCode(payload[1]);
 
-		int length = getCipherSuite()
-				.getAuthenticationAlgorithm()
-				.getKeyLength();
+		int length = getCipherSuite().getAuthenticationAlgorithm().getKeyLength();
 
 		if (payload.length < 40 + length) {
 			throw new IllegalArgumentException("Invalid payload length");
@@ -327,10 +321,7 @@ public class Rakp1 extends IpmiCommandCoder<Rakp1ResponseData> {
 
 		System.arraycopy(payload, 4, buffer, 0, 4);
 
-		data
-				.setRemoteConsoleSessionId(
-						TypeConverter
-								.littleEndianByteArrayToInt(buffer));
+		data.setRemoteConsoleSessionId(TypeConverter.littleEndianByteArrayToInt(buffer));
 
 		byte[] managedSystemGuid = new byte[16];
 
@@ -346,12 +337,8 @@ public class Rakp1 extends IpmiCommandCoder<Rakp1ResponseData> {
 
 		byte[] key = Arrays.copyOfRange(payload, 40, 40 + length);
 
-		if (!getCipherSuite()
-				.getAuthenticationAlgorithm()
-				.checkKeyExchangeAuthenticationCode(
-						prepareKeyExchangeAuthenticationCodeBase(data),
-						key,
-						getPasswordBytes())) {
+		if (!getCipherSuite().getAuthenticationAlgorithm()
+				.checkKeyExchangeAuthenticationCode(prepareKeyExchangeAuthenticationCodeBase(data), key, getPasswordBytes())) {
 			throw new AuthenticationException("Authentication check failed");
 		}
 
@@ -362,37 +349,25 @@ public class Rakp1 extends IpmiCommandCoder<Rakp1ResponseData> {
 	 * @return byte array holding prepared base for calculating
 	 *         KeyExchangeAuthenticationCode for RAKP Message 2
 	 */
-	private byte[] prepareKeyExchangeAuthenticationCodeBase(
-			Rakp1ResponseData responseData) {
+	private byte[] prepareKeyExchangeAuthenticationCodeBase(Rakp1ResponseData responseData) {
 		byte[] usernameBytes = getUsernameBytes();
 		byte[] keac = new byte[58 + usernameBytes.length];
 
-		byte[] rSID = TypeConverter
-				.intToLittleEndianByteArray(
-						responseData
-								.getRemoteConsoleSessionId());
+		byte[] rSID = TypeConverter.intToLittleEndianByteArray(responseData.getRemoteConsoleSessionId());
 
 		System.arraycopy(rSID, 0, keac, 0, 4);
 
-		byte[] mSID = TypeConverter
-				.intToLittleEndianByteArray(getManagedSystemSessionId());
+		byte[] mSID = TypeConverter.intToLittleEndianByteArray(getManagedSystemSessionId());
 
 		System.arraycopy(mSID, 0, keac, 4, 4);
 
 		System.arraycopy(getConsoleRandomNumber(), 0, keac, 8, 16);
 
-		System
-				.arraycopy(
-						responseData.getManagedSystemRandomNumber(),
-						0,
-						keac,
-						24,
-						16);
+		System.arraycopy(responseData.getManagedSystemRandomNumber(), 0, keac, 24, 16);
 
 		System.arraycopy(responseData.getManagedSystemGuid(), 0, keac, 40, 16);
 
-		keac[56] = TypeConverter
-				.intToByte(encodePrivilegeLevel(requestedMaximumPrivilegeLevel) | 0x10);
+		keac[56] = TypeConverter.intToByte(encodePrivilegeLevel(requestedMaximumPrivilegeLevel) | 0x10);
 
 		keac[57] = TypeConverter.intToByte(usernameBytes.length);
 		System.arraycopy(usernameBytes, 0, keac, 58, usernameBytes.length);
@@ -412,9 +387,7 @@ public class Rakp1 extends IpmiCommandCoder<Rakp1ResponseData> {
 	 * @throws InvalidKeyException
 	 *         - when creating of the algorithm key fails
 	 */
-	public byte[] calculateSik(Rakp1ResponseData responseData)
-			throws InvalidKeyException,
-			NoSuchAlgorithmException {
+	public byte[] calculateSik(Rakp1ResponseData responseData) throws InvalidKeyException, NoSuchAlgorithmException {
 		byte[] key = null;
 		// An all-zero Kg is the default value, which means one-key logins (IPMI 2.0 section 13.33)
 		if (getBmcKey() == null || Arrays.equals(getBmcKey(), new byte[getBmcKey().length])) {
@@ -423,11 +396,8 @@ public class Rakp1 extends IpmiCommandCoder<Rakp1ResponseData> {
 			key = getBmcKey();
 		}
 
-		return getCipherSuite()
-				.getAuthenticationAlgorithm()
-				.getKeyExchangeAuthenticationCode(
-						prepareSikBase(responseData),
-						key);
+		return getCipherSuite().getAuthenticationAlgorithm()
+				.getKeyExchangeAuthenticationCode(prepareSikBase(responseData), key);
 	}
 
 	/**
@@ -440,16 +410,9 @@ public class Rakp1 extends IpmiCommandCoder<Rakp1ResponseData> {
 
 		System.arraycopy(getConsoleRandomNumber(), 0, sikBase, 0, 16);
 
-		System
-				.arraycopy(
-						responseData.getManagedSystemRandomNumber(),
-						0,
-						sikBase,
-						16,
-						16);
+		System.arraycopy(responseData.getManagedSystemRandomNumber(), 0, sikBase, 16, 16);
 
-		sikBase[32] = TypeConverter
-				.intToByte(encodePrivilegeLevel(requestedMaximumPrivilegeLevel) | 0x10);
+		sikBase[32] = TypeConverter.intToByte(encodePrivilegeLevel(requestedMaximumPrivilegeLevel) | 0x10);
 
 		sikBase[33] = TypeConverter.intToByte(usernameBytes.length);
 		System.arraycopy(usernameBytes, 0, sikBase, 34, usernameBytes.length);

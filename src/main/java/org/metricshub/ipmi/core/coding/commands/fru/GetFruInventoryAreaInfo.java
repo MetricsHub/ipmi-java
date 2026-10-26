@@ -83,9 +83,7 @@ public class GetFruInventoryAreaInfo extends IpmiCommandCoder<GetFruInventoryAre
 	}
 
 	@Override
-	protected IpmiPayload preparePayload(int sequenceNumber)
-			throws NoSuchAlgorithmException,
-			InvalidKeyException {
+	protected IpmiPayload preparePayload(int sequenceNumber) throws NoSuchAlgorithmException, InvalidKeyException {
 		byte[] payload = new byte[] { TypeConverter.intToByte(fruId) };
 		return new IpmiLanRequest(
 				getNetworkFunction(),
@@ -104,8 +102,7 @@ public class GetFruInventoryAreaInfo extends IpmiCommandCoder<GetFruInventoryAre
 		byte[] raw = validateResponse(message);
 
 		if (raw == null || raw.length != 3) {
-			throw new IllegalArgumentException(
-					"Invalid response payload length");
+			throw new IllegalArgumentException("Invalid response payload length");
 		}
 
 		GetFruInventoryAreaInfoResponseData responseData = new GetFruInventoryAreaInfoResponseData();
@@ -117,18 +114,9 @@ public class GetFruInventoryAreaInfo extends IpmiCommandCoder<GetFruInventoryAre
 		buffer[2] = 0;
 		buffer[3] = 0;
 
-		responseData
-				.setFruInventoryAreaSize(
-						TypeConverter
-								.littleEndianByteArrayToInt(buffer));
+		responseData.setFruInventoryAreaSize(TypeConverter.littleEndianByteArrayToInt(buffer));
 
-		responseData
-				.setFruUnit(
-						BaseUnit
-								.parseInt(
-										TypeConverter
-												.byteToInt(raw[2])
-												& 0x1));
+		responseData.setFruUnit(BaseUnit.parseInt(TypeConverter.byteToInt(raw[2]) & 0x1));
 
 		return responseData;
 	}

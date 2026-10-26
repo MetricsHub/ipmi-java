@@ -25,31 +25,29 @@ class CliArgumentsTest {
 	@Test
 	void shortAndLongOptionsInBothForms() throws Exception {
 		try (
-				CliArguments arguments = CliArguments
-						.parse(
-								new String[]
-								{
-										"-h",
-										"bmc",
-										"-u",
-										"admin",
-										"-p",
-										"secret",
-										"-k",
-										"0x0102",
-										"-P",
-										"1623",
-										"-L",
-										"OPERATOR",
-										"-C",
-										"17,3",
-										"-t",
-										"5000",
-										"--message-timeout=200",
-										"--retries",
-										"0",
-										"-v",
-										"sensors" })) {
+				CliArguments arguments = CliArguments.parse(new String[]
+				{
+						"-h",
+						"bmc",
+						"-u",
+						"admin",
+						"-p",
+						"secret",
+						"-k",
+						"0x0102",
+						"-P",
+						"1623",
+						"-L",
+						"OPERATOR",
+						"-C",
+						"17,3",
+						"-t",
+						"5000",
+						"--message-timeout=200",
+						"--retries",
+						"0",
+						"-v",
+						"sensors" })) {
 			assertEquals(CliArguments.Subcommand.SENSORS, arguments.subcommand());
 			assertEquals("bmc", arguments.hostname());
 			assertEquals("admin", arguments.username());
@@ -64,21 +62,19 @@ class CliArgumentsTest {
 			assertTrue(arguments.verbose());
 		}
 		try (
-				CliArguments arguments = CliArguments
-						.parse(
-								new String[]
-								{
-										"--hostname=bmc",
-										"--username",
-										"",
-										"--password=",
-										"--bmc-key",
-										"0102030405060708090a0b0c0d0e0f1011121314",
-										"--port=623",
-										"--privilege=user",
-										"--cipher-suite=3",
-										"--timeout=1",
-										"chassis" })) {
+				CliArguments arguments = CliArguments.parse(new String[]
+				{
+						"--hostname=bmc",
+						"--username",
+						"",
+						"--password=",
+						"--bmc-key",
+						"0102030405060708090a0b0c0d0e0f1011121314",
+						"--port=623",
+						"--privilege=user",
+						"--cipher-suite=3",
+						"--timeout=1",
+						"chassis" })) {
 			assertEquals("", arguments.username(), "the null user");
 			assertEquals(0, arguments.password().length, "an empty password, not a prompt");
 			assertEquals(20, arguments.bmcKey().length);
@@ -222,9 +218,7 @@ class CliArgumentsTest {
 					usageError(login("raw", netFn, "1")),
 					netFn);
 		}
-		assertEquals(
-				"raw <command> must be a byte in hexadecimal (06, 0x06 or 6)",
-				usageError(login("raw", "6", "0x100")));
+		assertEquals("raw <command> must be a byte in hexadecimal (06, 0x06 or 6)", usageError(login("raw", "6", "0x100")));
 		assertEquals(
 				"raw <data byte> must be a byte in hexadecimal (06, 0x06 or 6)",
 				usageError(login("raw", "6", "1", "1ff")));
@@ -245,9 +239,7 @@ class CliArgumentsTest {
 		assertEquals(PowerCommand.HardReset, parse("power", "reset").powerCommand());
 		assertEquals(PowerCommand.SoftShutdown, parse("power", "soft").powerCommand());
 		assertEquals(PowerCommand.DiagnosticInterrupt, parse("power", "diag").powerCommand());
-		assertEquals(
-				"power requires one action: status, on, off, cycle, reset, soft or diag",
-				usageError(login("power")));
+		assertEquals("power requires one action: status, on, off, cycle, reset, soft or diag", usageError(login("power")));
 		assertEquals(
 				"power requires one action: status, on, off, cycle, reset, soft or diag",
 				usageError(login("power", "On")));

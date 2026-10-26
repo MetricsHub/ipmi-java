@@ -53,9 +53,7 @@ public class Rakp1Complete extends State {
 	}
 
 	@Override
-	public void doTransition(
-			StateMachine stateMachine,
-			StateMachineEvent machineEvent) {
+	public void doTransition(StateMachine stateMachine, StateMachineEvent machineEvent) {
 		if (machineEvent instanceof Rakp2Ack) {
 			Rakp2Ack event = (Rakp2Ack) machineEvent;
 
@@ -67,38 +65,16 @@ public class Rakp1Complete extends State {
 					event.getRakp1ResponseData());
 
 			try {
-				stateMachine
-						.setCurrent(
-								new Rakp3Waiting(
-										event
-												.getSequenceNumber(),
-										rakp1,
-										event
-												.getRakp1ResponseData(),
-										event.getCipherSuite()));
-				stateMachine
-						.sendMessage(
-								Encoder
-										.encode(
-												new Protocolv20Encoder(),
-												rakp3,
-												event.getSequenceNumber(),
-												0,
-												0));
-				stateMachine
-						.doExternalAction(
-								new GetSikAction(
-										rakp1
-												.calculateSik(event.getRakp1ResponseData())));
+				stateMachine.setCurrent(
+						new Rakp3Waiting(event.getSequenceNumber(), rakp1, event.getRakp1ResponseData(), event.getCipherSuite()));
+				stateMachine.sendMessage(Encoder.encode(new Protocolv20Encoder(), rakp3, event.getSequenceNumber(), 0, 0));
+				stateMachine.doExternalAction(new GetSikAction(rakp1.calculateSik(event.getRakp1ResponseData())));
 			} catch (Exception e) {
 				stateMachine.setCurrent(this);
 				stateMachine.doExternalAction(new ErrorAction(e));
 			}
 		} else {
-			stateMachine
-					.doExternalAction(
-							new ErrorAction(
-									new IllegalArgumentException("Invalid transition")));
+			stateMachine.doExternalAction(new ErrorAction(new IllegalArgumentException("Invalid transition")));
 		}
 
 	}

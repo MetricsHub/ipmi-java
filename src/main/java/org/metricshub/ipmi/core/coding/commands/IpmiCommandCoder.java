@@ -153,7 +153,8 @@ public abstract class IpmiCommandCoder<R extends ResponseData> extends PayloadCo
 					completionCode,
 					response.getRawCompletionCode(),
 					completionCode == CompletionCode.Unknown ?
-							describeCommandSpecificCompletionCode(response.getRawCompletionCode()) : null);
+							describeCommandSpecificCompletionCode(response.getRawCompletionCode()) :
+							null);
 		}
 		return response.getIpmiCommandData();
 	}
