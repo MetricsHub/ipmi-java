@@ -35,6 +35,8 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
+import java.util.Spliterator;
+import java.util.Spliterators;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutionException;
@@ -45,6 +47,9 @@ import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.function.BiPredicate;
+import java.util.function.Consumer;
+import java.util.stream.Stream;
+import java.util.stream.StreamSupport;
 
 import org.metricshub.ipmi.core.api.async.ConnectionHandle;
 import org.metricshub.ipmi.core.api.sol.SOLException;
@@ -130,9 +135,11 @@ import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
  * replayed.
  * </p>
  * <p>
- * <b>Threads</b>: a client can be shared between threads; its operations are serialized. BMCs accept a limited
- * number of sessions and drop replies under load, so the client uses a single session, plus one for a Serial over
- * LAN console that the BMC serves on another UDP port. Clients of different BMCs run in parallel.
+ * <b>Threads</b>: a client can be shared between threads; its operations are serialized. A stream
+ * ({@link SensorsRequest#stream()}, {@link FrusRequest#stream()}) reads one element per operation, so the operations
+ * of other threads run between two of its elements. BMCs accept a limited number of sessions and drop replies under
+ * load, so the client uses a single session, plus one for a Serial over LAN console that the BMC serves on another
+ * UDP port. Clients of different BMCs run in parallel.
  * </p>
  * <p>
  * <b>Failures</b> of the BMC and of the network are reported as {@link IpmiClientException}s, whose subclasses say
@@ -363,7 +370,8 @@ public final class IpmiClient implements AutoCloseable {
 	/**
 	 * Reads the sensors of the BMC: {@code sensors().execute()} for all of them, with
 	 * {@link SensorsRequest#types(org.metricshub.ipmi.core.coding.commands.sdr.record.SensorType...) types()} and
-	 * {@link SensorsRequest#names(String...) names()} to select some before their readings are requested.
+	 * {@link SensorsRequest#names(String...) names()} to select some before their readings are requested, and
+	 * {@code sensors().stream()} to get each sensor as soon as it is read.
 	 *
 	 * @return the request to complete
 	 */
@@ -373,7 +381,8 @@ public final class IpmiClient implements AutoCloseable {
 
 	/**
 	 * Reads the FRU inventories of the system: {@code frus().execute()} for all of them, with
-	 * {@link FrusRequest#ids(int...) ids()} to select some. With the SDR cache ({@link Builder#sdrCache(boolean)},
+	 * {@link FrusRequest#ids(int...) ids()} to select some, and {@code frus().stream()} to get each FRU as soon as it
+	 * is read. With the SDR cache ({@link Builder#sdrCache(boolean)},
 	 * enabled by default), {@link #sensors()} and {@link #frus()} share one walk of the SDR repository until Get SDR
 	 * Repository Info reports a change; the repository of a BMC that refuses Get SDR Repository Info is walked again
 	 * by every call.
@@ -521,27 +530,55 @@ public final class IpmiClient implements AutoCloseable {
 
 	SensorList readSensors(BiPredicate<AbstractSensorRecord, String> selection, Duration deadline) {
 		return run("sensors", deadline, true, true, () -> {
-			SdrRepository sdr = repository();
+			SensorCursor cursor = new SensorCursor(repository(), selection);
 			List<Sensor> sensors = new ArrayList<Sensor>();
-			// The controllers behind the BMC, and their LUNs, that did not answer: the walk does not wait for them again
-			Set<Integer> silentOwners = new HashSet<Integer>();
-			for (SensorRecord record : sdr.records()) {
-				// Only the Full and Compact sensor records have a reading (IPMI 2.0 section 43)
-				if (!(record instanceof FullSensorRecord || record instanceof CompactSensorRecord)) {
-					continue;
-				}
-				AbstractSensorRecord sensorRecord = (AbstractSensorRecord) record;
-				// A Compact record with a share count of N describes N sensors with consecutive numbers (IPMI 2.0 table
-				// 43-2, byte 24); a count that runs past sensor number 255 is cut there
-				int first = TypeConverter.byteToInt(sensorRecord.getSensorNumber());
-				for (int instance = 0; instance < Sensor.instances(sensorRecord) && first + instance <= 0xff; instance++) {
-					if (selection.test(sensorRecord, Sensor.instanceName(sensorRecord, instance))) {
-						sensors.add(readSensor(sensorRecord, instance, silentOwners));
-					}
-				}
+			for (Sensor sensor = cursor.next(); sensor != null; sensor = cursor.next()) {
+				sensors.add(sensor);
 			}
-			return new SensorList(sensors, sdr.skippedRecords());
+			return new SensorList(sensors, cursor.skippedRecords);
 		});
+	}
+
+	/**
+	 * Walks the SDR repository now, under the deadline, and returns a stream that reads one selected sensor per
+	 * operation of the client, each under the same deadline.
+	 */
+	Stream<Sensor> streamSensors(
+			BiPredicate<AbstractSensorRecord, String> selection,
+			Duration deadline,
+			Consumer<SkippedRecord> onSkippedRecord) {
+		SensorCursor cursor = run("sensors", deadline, true, true, () -> new SensorCursor(repository(), selection));
+		cursor.skippedRecords.forEach(onSkippedRecord);
+		return stream("sensors", deadline, cursor::next);
+	}
+
+	/**
+	 * Returns a lazy stream of the elements a cursor reads one at a time, each read as an operation of the client under
+	 * the deadline: a session lost while an element is read is replaced and the element read again, and the operations
+	 * of other threads run between two elements. The cursor returns null after the last element.
+	 */
+	private <T> Stream<T> stream(String operation, Duration deadline, Callable<T> cursor) {
+		Spliterator<T> spliterator = new Spliterators.AbstractSpliterator<T>(
+				Long.MAX_VALUE,
+				Spliterator.ORDERED | Spliterator.NONNULL | Spliterator.IMMUTABLE) {
+
+			private boolean ended;
+
+			@Override
+			public boolean tryAdvance(Consumer<? super T> action) {
+				if (ended) {
+					return false;
+				}
+				T element = run(operation, deadline, true, true, cursor);
+				if (element == null) {
+					ended = true;
+					return false;
+				}
+				action.accept(element);
+				return true;
+			}
+		};
+		return StreamSupport.stream(spliterator, false);
 	}
 
 	/**
@@ -659,8 +696,25 @@ public final class IpmiClient implements AutoCloseable {
 	FruList readFrus(Set<Integer> ids, Duration deadline) {
 		return run("FRUs", deadline, true, true, () -> {
 			SdrRepository sdr = repository();
-			return new FruList(FruReader.read(link, sdr.records(), ids), sdr.skippedRecords());
+			FruReader reader = new FruReader(sdr.records(), ids);
+			List<Fru> frus = new ArrayList<Fru>();
+			for (Fru fru = reader.next(link); fru != null; fru = reader.next(link)) {
+				frus.add(fru);
+			}
+			return new FruList(frus, sdr.skippedRecords());
 		});
+	}
+
+	/**
+	 * Walks the SDR repository now, under the deadline, and returns a stream that reads one selected FRU per operation
+	 * of the client, each under the same deadline.
+	 */
+	Stream<Fru> streamFrus(Set<Integer> ids, Duration deadline, Consumer<SkippedRecord> onSkippedRecord) {
+		SdrRepository sdr = run("FRUs", deadline, true, true, this::repository);
+		sdr.skippedRecords().forEach(onSkippedRecord);
+		FruReader reader = new FruReader(sdr.records(), ids);
+		// The link is read when the element is, on the worker thread: it is a new one after a lost session
+		return stream("FRUs", deadline, () -> reader.next(link));
 	}
 
 	SelEntryList readSel(int since, SelEntry sinceEntry, Duration deadline) {
@@ -1133,6 +1187,50 @@ public final class IpmiClient implements AutoCloseable {
 		throw new IpmiClientException(
 				"The BMC " + host + " offers none of the cipher suites " + Arrays.toString(preference) + " (offered: "
 						+ CipherSuite.listIds(offered) + ")");
+	}
+
+	/**
+	 * The selected sensors of a walked repository, read one at a time: the state of a walk that
+	 * {@link IpmiClient#streamSensors} spreads over several operations.
+	 */
+	private final class SensorCursor {
+
+		private final List<AbstractSensorRecord> records = new ArrayList<AbstractSensorRecord>();
+		private final List<Integer> instances = new ArrayList<Integer>();
+		private final List<SkippedRecord> skippedRecords;
+		/** The controllers behind the BMC, and their LUNs, that did not answer: the walk does not wait for them again. */
+		private final Set<Integer> silentOwners = new HashSet<Integer>();
+		private int position;
+
+		SensorCursor(SdrRepository sdr, BiPredicate<AbstractSensorRecord, String> selection) {
+			skippedRecords = sdr.skippedRecords();
+			for (SensorRecord record : sdr.records()) {
+				// Only the Full and Compact sensor records have a reading (IPMI 2.0 section 43)
+				if (!(record instanceof FullSensorRecord || record instanceof CompactSensorRecord)) {
+					continue;
+				}
+				AbstractSensorRecord sensorRecord = (AbstractSensorRecord) record;
+				// A Compact record with a share count of N describes N sensors with consecutive numbers (IPMI 2.0 table
+				// 43-2, byte 24); a count that runs past sensor number 255 is cut there
+				int first = TypeConverter.byteToInt(sensorRecord.getSensorNumber());
+				for (int instance = 0; instance < Sensor.instances(sensorRecord) && first + instance <= 0xff; instance++) {
+					if (selection.test(sensorRecord, Sensor.instanceName(sensorRecord, instance))) {
+						records.add(sensorRecord);
+						instances.add(instance);
+					}
+				}
+			}
+		}
+
+		/** Reads the next sensor, null after the last one. A read that fails leaves its sensor as the next one. */
+		Sensor next() {
+			if (position >= records.size()) {
+				return null;
+			}
+			Sensor sensor = readSensor(records.get(position), instances.get(position), silentOwners);
+			position++;
+			return sensor;
+		}
 	}
 
 	/**

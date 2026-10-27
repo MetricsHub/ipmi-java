@@ -75,6 +75,30 @@ none of the FRUs read so far. A session lost during the operation is reopened an
 run again once, within the same deadline
 ([Session recovery](timeouts-and-errors.html#session-recovery)).
 
+### Streaming the FRUs
+
+`stream()` reads the same FRUs as `execute()`, in the same order, but yields each one as soon as
+it is read and reads the next one only as the stream advances. The stream is a plain, lazy,
+sequential `java.util.stream.Stream`, to close with try-with-resources:
+
+```java
+try (Stream<Fru> frus = bmc.frus().stream()) {
+	frus.filter(fru -> !fru.serialNumber().isEmpty()).forEach(this::inventory);
+}
+```
+
+The contract is the one of [`sensors().stream()`](sensors.html#streaming-the-sensors): the SDR
+repository is walked before `stream()` returns, and the records it skipped are given to
+`onSkippedRecord(Consumer<SkippedRecord>)` before the first FRU (`execute()` reports them to the
+consumer too); each FRU is read as an operation of the client of its own, between which the
+operations of other threads run, and closing the stream early sends no further command; the
+timeout is an **inactivity** timeout, the longest wait for the walk, then for each FRU; a FRU
+that could not be read entirely is yielded with its `problems()`; a session lost while a FRU is
+read is reopened and that FRU read again, without the FRUs already yielded being read again.
+`stream()` throws when the session cannot be opened or the repository cannot be read, and the
+operations of the stream throw when the BMC stops answering, a FRU is not read within the
+timeout, or the client was closed meanwhile.
+
 ### Read size
 
 The FRU data is read in chunks of as many bytes as the controller returns at once. The first Read

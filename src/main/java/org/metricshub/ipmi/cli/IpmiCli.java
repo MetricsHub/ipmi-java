@@ -41,6 +41,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Base64;
 import java.util.Date;
+import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
@@ -49,13 +50,13 @@ import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 import java.util.OptionalDouble;
 import java.util.function.Supplier;
+import java.util.stream.Stream;
 
 import org.metricshub.ipmi.client.BmcCapabilities;
 import org.metricshub.ipmi.client.ChassisStatus;
 import org.metricshub.ipmi.client.DeviceFunction;
 import org.metricshub.ipmi.client.DeviceId;
 import org.metricshub.ipmi.client.Fru;
-import org.metricshub.ipmi.client.FruList;
 import org.metricshub.ipmi.client.FrusRequest;
 import org.metricshub.ipmi.client.IpmiAuthenticationException;
 import org.metricshub.ipmi.client.IpmiClient;
@@ -71,7 +72,6 @@ import org.metricshub.ipmi.client.SelRequest;
 import org.metricshub.ipmi.client.Sensor;
 import org.metricshub.ipmi.client.SensorList;
 import org.metricshub.ipmi.client.SensorsRequest;
-import org.metricshub.ipmi.client.SkippedRecord;
 import org.metricshub.ipmi.client.SolConsole;
 import org.metricshub.ipmi.core.coding.commands.PrivilegeLevel;
 import org.metricshub.ipmi.core.coding.commands.chassis.PowerCommand;
@@ -562,21 +562,25 @@ public final class IpmiCli {
 	}
 
 	private static int sensors(CliArguments arguments, IpmiClient client, PrintStream out, PrintStream err) {
-		SensorsRequest request = client.sensors();
+		SensorsRequest request = client.sensors().onSkippedRecord(record -> diagnostic(err, record.toString()));
 		if (arguments.types() != null) {
 			request.types(arguments.types().toArray(new SensorType[0]));
 		}
 		if (!arguments.names().isEmpty()) {
 			request.names(arguments.names().toArray(new String[0]));
 		}
-		SensorList sensors = timed(arguments, err, "sensors", request::execute);
-		skipped(sensors.skippedRecords(), err);
 		if (arguments.json()) {
-			for (Sensor sensor : sensors) {
-				JsonLinesWriter.write(sensorFields(sensor), out);
-			}
+			// Each sensor is printed as it is read
+			timed(arguments, err, "sensors", () -> {
+				try (Stream<Sensor> sensors = request.stream()) {
+					sensors.forEach(sensor -> JsonLinesWriter.write(sensorFields(sensor), out));
+				}
+				return null;
+			});
 			return 0;
 		}
+		// The table needs the width of its columns: the sensors are collected first
+		SensorList sensors = timed(arguments, err, "sensors", request::execute);
 		List<String[]> rows = new ArrayList<String[]>();
 		boolean longFormat = arguments.longFormat();
 		rows.add(
@@ -692,7 +696,7 @@ public final class IpmiCli {
 	}
 
 	private static int frus(CliArguments arguments, IpmiClient client, PrintStream out, PrintStream err) {
-		FrusRequest request = client.frus();
+		FrusRequest request = client.frus().onSkippedRecord(record -> diagnostic(err, record.toString()));
 		List<Integer> wanted = arguments.fruIds();
 		if (!wanted.isEmpty()) {
 			int[] ids = new int[wanted.size()];
@@ -701,25 +705,31 @@ public final class IpmiCli {
 			}
 			request.ids(ids);
 		}
-		FruList frus = timed(arguments, err, "FRUs", request::execute);
-		skipped(frus.skippedRecords(), err);
-		int code = 0;
 		List<Integer> found = new ArrayList<Integer>();
-		for (Fru fru : frus) {
-			if (arguments.json()) {
-				JsonLinesWriter.write(fruFields(fru), out);
-			} else {
-				if (!found.isEmpty()) {
-					out.println();
+		// Each FRU is printed as it is read
+		int code = timed(arguments, err, "FRUs", () -> {
+			int partial = 0;
+			try (Stream<Fru> frus = request.stream()) {
+				for (Iterator<Fru> each = frus.iterator(); each.hasNext();) {
+					Fru fru = each.next();
+					if (arguments.json()) {
+						JsonLinesWriter.write(fruFields(fru), out);
+					} else {
+						if (!found.isEmpty()) {
+							out.println();
+						}
+						fru(fru, out);
+						out.flush();
+					}
+					found.add(fru.id());
+					for (String problem : fru.problems()) {
+						diagnostic(err, fruLabel(fru) + ": " + problem);
+						partial = EXIT_PARTIAL;
+					}
 				}
-				fru(fru, out);
 			}
-			found.add(fru.id());
-			for (String problem : fru.problems()) {
-				diagnostic(err, fruLabel(fru) + ": " + problem);
-				code = EXIT_PARTIAL;
-			}
-		}
+			return partial;
+		});
 		for (int id : wanted) {
 			if (!found.contains(id)) {
 				diagnostic(err, "no such FRU " + id);
@@ -1239,12 +1249,6 @@ public final class IpmiCli {
 			throw new IOException("stty " + arguments + ": " + text.trim());
 		}
 		return text;
-	}
-
-	private static void skipped(List<SkippedRecord> records, PrintStream err) {
-		for (SkippedRecord record : records) {
-			diagnostic(err, record.toString());
-		}
 	}
 
 	private static int outputFailed(PrintStream err) {

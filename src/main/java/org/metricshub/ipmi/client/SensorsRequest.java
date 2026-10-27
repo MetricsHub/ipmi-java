@@ -29,7 +29,9 @@ import java.util.EnumSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
+import java.util.function.Consumer;
 import java.util.regex.Pattern;
+import java.util.stream.Stream;
 
 import org.metricshub.ipmi.core.coding.commands.sdr.record.AbstractSensorRecord;
 import org.metricshub.ipmi.core.coding.commands.sdr.record.SensorType;
@@ -45,6 +47,7 @@ public final class SensorsRequest {
 	private Set<SensorType> types;
 	private List<Pattern> names;
 	private Duration timeout;
+	private Consumer<SkippedRecord> onSkippedRecord = record -> {};
 
 	SensorsRequest(IpmiClient client) {
 		this.client = client;
@@ -83,9 +86,24 @@ public final class SensorsRequest {
 	}
 
 	/**
-	 * Overrides the deadline of the client for this request.
+	 * Be told of each SDR record the repository walk could not use: the records are given to the consumer, on the
+	 * calling thread, once the walk is done, before {@link #execute()} returns or {@link #stream()} yields its first
+	 * sensor. {@link #execute()} also lists them in {@link SensorList#skippedRecords()}.
 	 *
-	 * @param deadline the time the request may take, session setup included
+	 * @param consumer receives each skipped record, with the reason
+	 * @return this request
+	 */
+	public SensorsRequest onSkippedRecord(Consumer<SkippedRecord> consumer) {
+		this.onSkippedRecord = Objects.requireNonNull(consumer, "consumer");
+		return this;
+	}
+
+	/**
+	 * Overrides the deadline of the client for this request. For {@link #execute()}, it is the time the whole
+	 * operation may take, session setup included; for {@link #stream()}, an <i>inactivity</i> timeout: the longest
+	 * wait for the SDR walk before the first sensor, then for each sensor, with no limit on the whole.
+	 *
+	 * @param deadline the deadline
 	 * @return this request
 	 * @throws IllegalArgumentException when the duration is shorter than one millisecond or longer than
 	 *         {@link Integer#MAX_VALUE} milliseconds
@@ -105,7 +123,44 @@ public final class SensorsRequest {
 	 *         ({@link Sensor#problem()})
 	 */
 	public SensorList execute() {
-		return client.readSensors(this::selects, timeout);
+		SensorList sensors = client.readSensors(this::selects, timeout);
+		sensors.skippedRecords().forEach(onSkippedRecord);
+		return sensors;
+	}
+
+	/**
+	 * Reads the selected sensors and streams them: each sensor is yielded as soon as it is read, in the order of
+	 * {@link #execute()}, and the next one is read only as the stream advances, so that a caller that stops early
+	 * ({@code limit(n)}, {@code findFirst()}) does not pay for the rest.
+	 *
+	 * <pre>
+	 * try (Stream&lt;Sensor&gt; sensors = bmc.sensors().types(SensorType.Temperature).stream()) {
+	 * 	sensors.forEach(sensor -&gt; process(sensor));
+	 * }
+	 * </pre>
+	 * <p>
+	 * <b>Close the stream</b> (try-with-resources), as with {@link java.nio.file.Files#lines}: closing it before the
+	 * last sensor ends the walk, and no further command is sent. The stream holds nothing between two sensors: each
+	 * one is read as an operation of the client of its own, so that the operations of other threads run in between,
+	 * and a stream that is abandoned blocks nothing, not even {@link IpmiClient#close()}.
+	 * </p>
+	 * <p>
+	 * The SDR repository is walked here, and the records it skipped are given to {@link #onSkippedRecord(Consumer)}
+	 * before this method returns. The timeout is an inactivity timeout ({@link #timeout(Duration)}). A sensor that the
+	 * BMC or a controller behind it refuses, or that such a controller does not answer, is yielded with its
+	 * {@link Sensor#problem()}, as with {@link #execute()}. A session lost while a sensor is read is replaced and that
+	 * sensor read again, once; the sensors already yielded are not read again.
+	 * </p>
+	 *
+	 * @return a lazy, sequential stream of the sensors, to use with try-with-resources
+	 * @throws IpmiClientException when the session cannot be opened, the SDR repository cannot be read, or the walk
+	 *         does not complete within the timeout; the same exceptions are thrown from the operations of the stream
+	 *         ({@code forEach}, {@code collect}, {@code iterator().next()}) when the BMC stops answering or a sensor
+	 *         is not read within the timeout
+	 * @throws IllegalStateException from the operations of the stream when the client was closed meanwhile
+	 */
+	public Stream<Sensor> stream() {
+		return client.streamSensors(this::selects, timeout, onSkippedRecord);
 	}
 
 	boolean selects(AbstractSensorRecord record, String name) {

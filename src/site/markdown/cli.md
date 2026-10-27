@@ -102,7 +102,7 @@ A sensor is selected when its type is one of the `--type` values and its name ma
 | `-P, --port <port>` | UDP port of the BMC. Default: 623. |
 | `-L, --privilege <level>` | `user`, `operator`, `administrator` or `auto` (case-insensitive). Default: the lowest level the subcommand needs (see [below](#default-privilege-per-subcommand)). |
 | `-C, --cipher-suite <id>[,<id>...]` | One ID: use exactly this cipher suite, without discovery. Several: the preference order among the suites the BMC offers. Default: `17,3,8,16,2,7,12,11`. Suites without integrity (0, 1, 6, 15) are refused: their replies could be forged. So are the xRC4 suites (4, 5, 9, 10, 13, 14, 18, 19), which the library does not implement. |
-| `-t, --timeout <ms>` | Deadline of the subcommand, in milliseconds. Default: 120000. For `sol`, it bounds the session setup and the payload activation only. |
+| `-t, --timeout <ms>` | Deadline of the subcommand, in milliseconds. Default: 120000. For `sol`, it bounds the session setup and the payload activation only; for `sensors --json` and `fru`, which print each sensor or FRU as it is read, the SDR walk, then each sensor or FRU. |
 | `--message-timeout <ms>` | Per-message timeout. Default: 5000. |
 | `--retries <n>` | Resends of a message that got no reply. Default: 3. |
 | `-v, --verbose` | Print to stderr the address, the user and privilege, the cipher suite preference, the message timeout and retries, and the time of each operation, failed ones included; `sel` and `sol` add a summary (see [`sel`](#sel) and the [SOL console](#interactive-sol-console)). Never prints a secret. |
@@ -381,7 +381,8 @@ CPU2 DTS      3       Temperature  Processor 2      -46      DegreesC  ok
 Exhaust Temp  9       Temperature  SystemChassis 1  22       DegreesC  ok
 ```
 
-With `--json`, one object per sensor, with the fields of [`Sensor`](sensors.html#the-sensor-object).
+With `--json`, one object per sensor, printed as the sensor is read (the text table waits for
+every sensor, to align its columns), with the fields of [`Sensor`](sensors.html#the-sensor-object).
 `status` is the `SensorStatus` name (`OK`, `NON_CRITICAL`, `CRITICAL`, `NON_RECOVERABLE`,
 `UNAVAILABLE`), and `states` is always present, empty when there is none; for a threshold sensor,
 `states` lists the thresholds its reading is at or beyond (`Upper Critical Going High`), which the
@@ -480,8 +481,8 @@ is unique only per controller and LUN, and two FRUs with the same ID are both pr
 ([FRUs of other controllers](fru-inventory.html#frus-of-other-controllers)).
 
 `fru 0 17` reads only these FRUs; an ID that no locator record declares exits with 66
-(`ipmicli: no such FRU 9`), also when another FRU is incomplete. `--json` prints one object per
-FRU, with its `id`, the `address` (8-bit, `32` for the BMC), `lun` and `channel` of its
+(`ipmicli: no such FRU 9`), also when another FRU is incomplete. Each FRU is printed as it is
+read, in both outputs. `--json` prints one object per FRU, with its `id`, the `address` (8-bit, `32` for the BMC), `lun` and `channel` of its
 controller, the summary fields of [`Fru`](fru-inventory.html) (`manufacturer`, `model`,
 `serialNumber`, `partNumber`) and one nested object per area, its empty fields omitted:
 
