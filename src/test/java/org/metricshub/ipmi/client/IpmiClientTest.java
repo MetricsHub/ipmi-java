@@ -817,10 +817,15 @@ class IpmiClientTest {
 			}
 			assertEquals(3, bmc.getCount(NETFN_SENSOR, GET_SENSOR_READING), "limit(1) reads one sensor");
 
+			try (Stream<Sensor> sensors = client.sensors().stream().parallel()) {
+				assertEquals(1, sensors.limit(1).collect(Collectors.toList()).size());
+			}
+			assertEquals(4, bmc.getCount(NETFN_SENSOR, GET_SENSOR_READING), "a parallel stream does not read ahead");
+
 			try (Stream<Sensor> temperatures = client.sensors().types(SensorType.Temperature).stream()) {
 				assertEquals(Arrays.asList("Ambient Temp"), temperatures.map(Sensor::name).collect(Collectors.toList()));
 			}
-			assertEquals(4, bmc.getCount(NETFN_SENSOR, GET_SENSOR_READING), "an unselected sensor costs no round trip");
+			assertEquals(5, bmc.getCount(NETFN_SENSOR, GET_SENSOR_READING), "an unselected sensor costs no round trip");
 			assertEquals(1, bmc.getCount(OPEN_SESSION_REQUEST), "one session for everything");
 
 			skipped.clear();
@@ -870,6 +875,28 @@ class IpmiClientTest {
 			}
 			assertEquals(2, bmc.getCount(OPEN_SESSION_REQUEST), "the lost session is replaced");
 			assertEquals(2, client.frus().execute().size(), "execute() is unchanged");
+		}
+	}
+
+	@Test
+	@Timeout(30)
+	void aStreamReadsFru0NoEarlierThanItsTurn() throws Exception {
+		try (FakeRmcpPlusBmc bmc = bmc()) {
+			// A PSU located before any record of the system board: FRU 0 comes last, after the pass
+			new FakeSdrRepository().add(Fixtures.FRONT_PANEL_FULL_RECORD)
+					.add(fruDeviceLocatorRecord(4, PSU_FRU, EntityId.PowerSupply.getCode(), 1, "PSU 1"))
+					.fru(0, BASE_BOARD_PRODUCT_INFO)
+					.fru(PSU_FRU, BASE_BOARD_PRODUCT_INFO)
+					.install(bmc);
+			try (IpmiClient client = client(bmc).build()) {
+				try (Stream<Fru> frus = client.frus().stream()) {
+					assertEquals(Arrays.asList("PSU 1"), frus.limit(1).map(Fru::name).collect(Collectors.toList()));
+				}
+				assertEquals(1, bmc.getCount(NETFN_STORAGE, GET_FRU_INVENTORY_AREA_INFO), "the PSU only, FRU 0 not yet");
+				assertEquals(
+						Arrays.asList("PSU 1", "System Board"),
+						client.frus().execute().stream().map(Fru::name).collect(Collectors.toList()));
+			}
 		}
 	}
 

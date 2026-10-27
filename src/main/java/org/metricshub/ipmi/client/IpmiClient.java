@@ -578,6 +578,12 @@ public final class IpmiClient implements AutoCloseable {
 				action.accept(element);
 				return true;
 			}
+
+			@Override
+			public Spliterator<T> trySplit() {
+				// The inherited split reads up to 1024 elements ahead: a command-backed source stays sequential
+				return null;
+			}
 		};
 		return StreamSupport.stream(spliterator, false).onClose(() -> ended.set(true));
 	}

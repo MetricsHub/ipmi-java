@@ -100,7 +100,7 @@ final class FruReader {
 	private final Set<Integer> silentControllers = new HashSet<Integer>();
 	/** The bytes each controller and LUN answers to one Read FRU Data, once a refusal made the reader back off. */
 	private final Map<Integer, Integer> readSizes = new HashMap<Integer, Integer>();
-	/** The areas of FRU 0 of the BMC, read before anything else; null until then. */
+	/** The areas of FRU 0 of the BMC, read when a record first needs them or after the pass; null until then. */
 	private List<FruRecord> systemBoard;
 	private List<String> systemBoardProblems = Collections.emptyList();
 	/** The next record of the pass over the FRU Device Locator records. */
@@ -129,15 +129,6 @@ final class FruReader {
 	 */
 	Fru next(Exchange session) {
 		exchange = session;
-		if (systemBoard == null) {
-			// FRU 0 describes the system board on most BMCs; not all of them expose it, and the walk must not depend on it
-			List<String> problems = new ArrayList<String>();
-			List<FruRecord> areas = isSelected(SYSTEM_BOARD_FRU_ID) ?
-					inventory(bmcLocator(), problems) :
-					Collections.<FruRecord>emptyList();
-			systemBoardProblems = problems;
-			systemBoard = areas;
-		}
 		while (index < records.size()) {
 			Fru fru = locate(records.get(index));
 			index++;
@@ -148,7 +139,7 @@ final class FruReader {
 		// FRU 0 of a controller is never located by a FRU Device Locator (IPMI 2.0 table 43-7, byte 7): one the BMC
 		// serves is returned whatever the records, not gated on its MC Device Locator, which Supermicro and Fujitsu
 		// iRMC clear while serving FRU 0
-		if (!systemBoard.isEmpty() && returned.add(SYSTEM_BOARD_KEY)) {
+		if (!systemBoard().isEmpty() && returned.add(SYSTEM_BOARD_KEY)) {
 			FruDeviceLocatorRecord locator = bmcLocator();
 			locator.setFruEntityId(EntityId.SystemBoard.getCode());
 			locator.setName(systemBoardName(systemBoard));
@@ -174,14 +165,14 @@ final class FruReader {
 			if (!locator.isLogical() || !isSelected(locator.getDeviceId()) || returned.contains(key)) {
 				return null;
 			}
-			Fru fru = key == SYSTEM_BOARD_KEY ? new Fru(locator, systemBoard, systemBoardProblems) : read(locator);
+			Fru fru = key == SYSTEM_BOARD_KEY ? new Fru(locator, systemBoard(), systemBoardProblems) : read(locator);
 			returned.add(key);
 			return fru;
 		}
-		if ((!systemBoard.isEmpty() || !systemBoardProblems.isEmpty())
+		if (record instanceof CompactSensorRecord
+				&& EntityId.SystemBoard.equals(((CompactSensorRecord) record).getEntityId())
 				&& !returned.contains(SYSTEM_BOARD_KEY)
-				&& record instanceof CompactSensorRecord
-				&& EntityId.SystemBoard.equals(((CompactSensorRecord) record).getEntityId())) {
+				&& (!systemBoard().isEmpty() || !systemBoardProblems.isEmpty())) {
 			// No locator pointed at FRU 0 so far: build one for the system board, named after whichever area
 			// describes it
 			CompactSensorRecord sensor = (CompactSensorRecord) record;
@@ -214,6 +205,23 @@ final class FruReader {
 		Fru fru = read(locator);
 		returned.add(key(locator));
 		return fru;
+	}
+
+	/**
+	 * The areas of FRU 0 of the BMC, read on the first call: FRU 0 describes the system board on most BMCs, not all of
+	 * them expose it, and the walk must not depend on it. Read no earlier than its turn, so that a stream stopped
+	 * before pays nothing for it; a read that fails leaves it unread for the next call.
+	 */
+	private List<FruRecord> systemBoard() {
+		if (systemBoard == null) {
+			List<String> problems = new ArrayList<String>();
+			List<FruRecord> areas = isSelected(SYSTEM_BOARD_FRU_ID) ?
+					inventory(bmcLocator(), problems) :
+					Collections.<FruRecord>emptyList();
+			systemBoardProblems = problems;
+			systemBoard = areas;
+		}
+		return systemBoard;
 	}
 
 	private Fru read(FruDeviceLocatorRecord locator) {
