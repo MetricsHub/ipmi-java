@@ -550,16 +550,17 @@ public final class IpmiClient implements AutoCloseable {
 			Consumer<SkippedRecord> onSkippedRecord) {
 		SensorCursor cursor = run("sensors", deadline, true, true, () -> new SensorCursor(repository(), selection));
 		cursor.skippedRecords.forEach(onSkippedRecord);
-		return stream("sensors", deadline, cursor::next);
+		return stream("sensors", deadline, cursor);
 	}
 
 	/**
 	 * Returns a lazy stream of the elements a cursor reads one at a time, each read as an operation of the client under
 	 * the deadline: a session lost while an element is read is replaced and the element read again, and the operations
-	 * of other threads run between two elements. The cursor returns null after the last element, and closing the
-	 * stream ends it as well, even for an iterator obtained from it before: no element is read after the close.
+	 * of other threads run between two elements. The stream ends when the cursor says that no element remains, so
+	 * that its end costs no operation and no session, or when the cursor returns null; closing the stream ends it as
+	 * well, even for an iterator obtained from it before: no element is read after the close.
 	 */
-	private <T> Stream<T> stream(String operation, Duration deadline, Callable<T> cursor) {
+	private <T> Stream<T> stream(String operation, Duration deadline, Cursor<T> cursor) {
 		AtomicBoolean ended = new AtomicBoolean();
 		Spliterator<T> spliterator = new Spliterators.AbstractSpliterator<T>(
 				Long.MAX_VALUE,
@@ -570,10 +571,14 @@ public final class IpmiClient implements AutoCloseable {
 				if (ended.get()) {
 					return false;
 				}
-				T element = run(operation, deadline, true, true, cursor);
+				T element = run(operation, deadline, true, true, cursor::next);
 				if (element == null) {
 					ended.set(true);
 					return false;
+				}
+				// The worker is idle once run() returned: the cursor is this thread's to read
+				if (cursor.exhausted()) {
+					ended.set(true);
 				}
 				action.accept(element);
 				return true;
@@ -720,8 +725,30 @@ public final class IpmiClient implements AutoCloseable {
 		SdrRepository sdr = run("FRUs", deadline, true, true, this::repository);
 		sdr.skippedRecords().forEach(onSkippedRecord);
 		FruReader reader = new FruReader(sdr.records(), ids);
-		// The link is read when the element is, on the worker thread: it is a new one after a lost session
-		return stream("FRUs", deadline, () -> reader.next(link));
+		return stream("FRUs", deadline, new Cursor<Fru>() {
+
+			@Override
+			public Fru next() {
+				// The link is read when the element is, on the worker thread: it is a new one after a lost session
+				return reader.next(link);
+			}
+
+			@Override
+			public boolean exhausted() {
+				return reader.exhausted();
+			}
+		});
+	}
+
+	/**
+	 * Fails the read of an element whose caller gave up at its deadline, which interrupts the worker thread: the
+	 * result of the read is discarded, so the cursor must not advance past the element, which is read again by the
+	 * next operation of the stream.
+	 */
+	static void failIfInterrupted(String what) {
+		if (Thread.currentThread().isInterrupted()) {
+			throw new IpmiClientException("The read of " + what + " was given up at the deadline of its caller");
+		}
 	}
 
 	SelEntryList readSel(int since, SelEntry sinceEntry, Duration deadline) {
@@ -1196,11 +1223,23 @@ public final class IpmiClient implements AutoCloseable {
 						+ CipherSuite.listIds(offered) + ")");
 	}
 
+	/** The state of a walk that a stream spreads over several operations: one element per read. */
+	private interface Cursor<T> {
+
+		/** Reads the next element, null after the last one. A read that fails leaves its element as the next one. */
+		T next() throws Exception;
+
+		/** Tells, without a command, whether no element remains: false when one may. */
+		boolean exhausted();
+	}
+
 	/**
 	 * The selected sensors of a walked repository, read one at a time: the state of a walk that
 	 * {@link IpmiClient#streamSensors} spreads over several operations.
 	 */
-	private final class SensorCursor {
+	@SuppressFBWarnings(value = "AT_NONATOMIC_OPERATIONS_ON_SHARED_VARIABLE", justification = "One thread at a time: the worker in next(), the caller in exhausted() once the worker's task"
+			+ " completed, which the Future orders")
+	private final class SensorCursor implements Cursor<Sensor> {
 
 		private final List<AbstractSensorRecord> records = new ArrayList<AbstractSensorRecord>();
 		private final List<Integer> instances = new ArrayList<Integer>();
@@ -1229,14 +1268,20 @@ public final class IpmiClient implements AutoCloseable {
 			}
 		}
 
-		/** Reads the next sensor, null after the last one. A read that fails leaves its sensor as the next one. */
-		Sensor next() {
+		@Override
+		public Sensor next() {
 			if (position >= records.size()) {
 				return null;
 			}
 			Sensor sensor = readSensor(records.get(position), instances.get(position), silentOwners);
+			failIfInterrupted("sensor " + sensor.name());
 			position++;
 			return sensor;
+		}
+
+		@Override
+		public boolean exhausted() {
+			return position >= records.size();
 		}
 	}
 

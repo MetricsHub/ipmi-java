@@ -123,7 +123,9 @@ public final class FrusRequest {
 	 * The SDR repository is walked here, and the records it skipped are given to {@link #onSkippedRecord(Consumer)}
 	 * before this method returns. The timeout is an inactivity timeout ({@link #timeout(Duration)}). A FRU that could
 	 * not be read entirely is yielded with its {@link Fru#problems()}, as with {@link #execute()}. A session lost while
-	 * a FRU is read is replaced and that FRU read again, once; the FRUs already yielded are not read again.
+	 * a FRU is read is replaced and that FRU read again, once; the FRUs already yielded are not read again. A FRU
+	 * whose read the timeout cuts short is not skipped either: the next operation of the stream reads it again, on a
+	 * new session.
 	 * </p>
 	 *
 	 * @return a lazy, sequential stream of the FRUs, to use with try-with-resources

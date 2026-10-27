@@ -149,7 +149,8 @@ public final class SensorsRequest {
 	 * before this method returns. The timeout is an inactivity timeout ({@link #timeout(Duration)}). A sensor that the
 	 * BMC or a controller behind it refuses, or that such a controller does not answer, is yielded with its
 	 * {@link Sensor#problem()}, as with {@link #execute()}. A session lost while a sensor is read is replaced and that
-	 * sensor read again, once; the sensors already yielded are not read again.
+	 * sensor read again, once; the sensors already yielded are not read again. A sensor whose read the timeout cuts
+	 * short is not skipped either: the next operation of the stream reads it again, on a new session.
 	 * </p>
 	 *
 	 * @return a lazy, sequential stream of the sensors, to use with try-with-resources

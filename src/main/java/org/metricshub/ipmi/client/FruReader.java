@@ -161,18 +161,15 @@ final class FruReader {
 	private Fru locate(SensorRecord record) {
 		if (record instanceof FruDeviceLocatorRecord) {
 			FruDeviceLocatorRecord locator = (FruDeviceLocatorRecord) record;
-			int key = key(locator);
-			if (!locator.isLogical() || !isSelected(locator.getDeviceId()) || returned.contains(key)) {
+			if (!locates(locator)) {
 				return null;
 			}
+			int key = key(locator);
 			Fru fru = key == SYSTEM_BOARD_KEY ? new Fru(locator, systemBoard(), systemBoardProblems) : read(locator);
 			returned.add(key);
 			return fru;
 		}
-		if (record instanceof CompactSensorRecord
-				&& EntityId.SystemBoard.equals(((CompactSensorRecord) record).getEntityId())
-				&& !returned.contains(SYSTEM_BOARD_KEY)
-				&& (!systemBoard().isEmpty() || !systemBoardProblems.isEmpty())) {
+		if (anchorsSystemBoard(record) && (!systemBoard().isEmpty() || !systemBoardProblems.isEmpty())) {
 			// No locator pointed at FRU 0 so far: build one for the system board, named after whichever area
 			// describes it
 			CompactSensorRecord sensor = (CompactSensorRecord) record;
@@ -186,10 +183,58 @@ final class FruReader {
 		return null;
 	}
 
+	/**
+	 * Tells, without a command, whether no FRU remains: false when a record may still yield one, FRU 0 of the BMC
+	 * included while it is not read.
+	 */
+	boolean exhausted() {
+		boolean fru0 = !returned.contains(SYSTEM_BOARD_KEY)
+				&& (systemBoard == null ?
+						isSelected(SYSTEM_BOARD_FRU_ID) :
+						!systemBoard.isEmpty() || !systemBoardProblems.isEmpty());
+		for (int i = index; i < records.size(); i++) {
+			SensorRecord record = records.get(i);
+			if (record instanceof FruDeviceLocatorRecord ?
+					locates((FruDeviceLocatorRecord) record) :
+					fru0 && anchorsSystemBoard(record)) {
+				return false;
+			}
+		}
+		if (fru0) {
+			return false;
+		}
+		for (int i = controllerIndex; isSelected(SYSTEM_BOARD_FRU_ID) && i < records.size(); i++) {
+			if (holdsFru0(records.get(i))) {
+				return false;
+			}
+		}
+		return true;
+	}
+
+	/** Tells whether a FRU Device Locator record yields a FRU: a logical, selected one not returned yet. */
+	private boolean locates(FruDeviceLocatorRecord locator) {
+		return locator.isLogical() && isSelected(locator.getDeviceId()) && !returned.contains(key(locator));
+	}
+
+	/**
+	 * Tells whether a record is a Compact sensor of the system board, which stands for FRU 0 of the BMC when no
+	 * locator points at it and it was not returned yet.
+	 */
+	private boolean anchorsSystemBoard(SensorRecord record) {
+		return record instanceof CompactSensorRecord
+				&& EntityId.SystemBoard.equals(((CompactSensorRecord) record).getEntityId())
+				&& !returned.contains(SYSTEM_BOARD_KEY);
+	}
+
+	/** Tells whether a record is an MC Device Locator whose controller holds a FRU 0 (table 43-8, byte 9 bit 3). */
+	private static boolean holdsFru0(SensorRecord record) {
+		return record instanceof ManagementControllerDeviceLocatorRecord
+				&& ((ManagementControllerDeviceLocatorRecord) record).isSupportsFruInventoryDevice();
+	}
+
 	/** Returns FRU 0 of the controller an MC Device Locator record describes, or null when it holds none. */
 	private Fru controllerFru0(SensorRecord record) {
-		if (!(record instanceof ManagementControllerDeviceLocatorRecord)
-				|| !((ManagementControllerDeviceLocatorRecord) record).isSupportsFruInventoryDevice()) {
+		if (!holdsFru0(record)) {
 			return null;
 		}
 		ManagementControllerDeviceLocatorRecord controller = (ManagementControllerDeviceLocatorRecord) record;
@@ -210,7 +255,7 @@ final class FruReader {
 	/**
 	 * The areas of FRU 0 of the BMC, read on the first call: FRU 0 describes the system board on most BMCs, not all of
 	 * them expose it, and the walk must not depend on it. Read no earlier than its turn, so that a stream stopped
-	 * before pays nothing for it; a read that fails leaves it unread for the next call.
+	 * before pays nothing for it; a read that fails, or that its caller gave up, leaves it unread for the next call.
 	 */
 	private List<FruRecord> systemBoard() {
 		if (systemBoard == null) {
@@ -218,6 +263,7 @@ final class FruReader {
 			List<FruRecord> areas = isSelected(SYSTEM_BOARD_FRU_ID) ?
 					inventory(bmcLocator(), problems) :
 					Collections.<FruRecord>emptyList();
+			IpmiClient.failIfInterrupted("FRU " + SYSTEM_BOARD_FRU_ID);
 			systemBoardProblems = problems;
 			systemBoard = areas;
 		}
@@ -226,7 +272,9 @@ final class FruReader {
 
 	private Fru read(FruDeviceLocatorRecord locator) {
 		List<String> problems = new ArrayList<String>();
-		return new Fru(locator, inventory(locator, problems), problems);
+		List<FruRecord> areas = inventory(locator, problems);
+		IpmiClient.failIfInterrupted("FRU " + locator.getDeviceId());
+		return new Fru(locator, areas, problems);
 	}
 
 	private boolean isSelected(int id) {

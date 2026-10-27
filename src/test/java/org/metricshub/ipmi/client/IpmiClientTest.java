@@ -880,6 +880,56 @@ class IpmiClientTest {
 
 	@Test
 	@Timeout(30)
+	void aStreamEndsWithoutASessionAndReadsAgainTheElementItsCallerGaveUp() throws Exception {
+		try (FakeRmcpPlusBmc bmc = bmc()) {
+			// The readings of bmc(), or no reply at all while silent
+			AtomicBoolean silent = new AtomicBoolean();
+			bmc.handle(
+					NETFN_SENSOR,
+					GET_SENSOR_READING,
+					data -> silent.get() ? null : data[0] == TEMPERATURE_SENSOR ? new byte[]
+					{ 0x00, (byte) 0x9a, 0x40, 0x00 } : new byte[] { 0x00, 0x00, 0x40, 0x02 });
+			// A reply the BMC takes longer than the timeout of the request: the caller gives up first
+			try (IpmiClient client = client(bmc).messageTimeout(Duration.ofSeconds(5)).build()) {
+				try (Stream<Sensor> sensors = client.sensors().timeout(Duration.ofMillis(300)).stream()) {
+					Iterator<Sensor> each = sensors.iterator();
+					assertEquals("Ambient Temp", each.next().name());
+					silent.set(true);
+					assertThrows(IpmiTimeoutException.class, each::next);
+					silent.set(false);
+					assertEquals("Fan 1", each.next().name(), "the sensor whose read was given up is read again");
+					assertEquals(2, bmc.getCount(OPEN_SESSION_REQUEST), "on a new session, the state of the old being unknown");
+					assertEquals("Board", each.next().name());
+					// The session is lost after the last sensor: the end of the stream must not open another one
+					bmc.handle(NETFN_CHASSIS, GET_CHASSIS_STATUS, data -> null);
+					assertThrows(IpmiTimeoutException.class, client::chassisStatus);
+					int sessions = bmc.getCount(OPEN_SESSION_REQUEST);
+					assertFalse(each.hasNext());
+					assertEquals(sessions, bmc.getCount(OPEN_SESSION_REQUEST), "the end of the stream opens no session");
+				}
+			}
+		}
+	}
+
+	@Test
+	@Timeout(30)
+	void aFruStreamEndsWithoutASession() throws Exception {
+		try (FakeRmcpPlusBmc bmc = bmc(); IpmiClient client = client(bmc).build()) {
+			try (Stream<Fru> frus = client.frus().stream()) {
+				Iterator<Fru> each = frus.iterator();
+				each.next();
+				assertEquals("PSU 1", each.next().name());
+				bmc.handle(NETFN_CHASSIS, GET_CHASSIS_STATUS, data -> null);
+				assertThrows(IpmiTimeoutException.class, client::chassisStatus);
+				int sessions = bmc.getCount(OPEN_SESSION_REQUEST);
+				assertFalse(each.hasNext());
+				assertEquals(sessions, bmc.getCount(OPEN_SESSION_REQUEST), "the end of the stream opens no session");
+			}
+		}
+	}
+
+	@Test
+	@Timeout(30)
 	void aStreamReadsFru0NoEarlierThanItsTurn() throws Exception {
 		try (FakeRmcpPlusBmc bmc = bmc()) {
 			// A PSU located before any record of the system board: FRU 0 comes last, after the pass

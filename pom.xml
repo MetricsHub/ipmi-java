@@ -208,6 +208,7 @@
 				<version>3.6.0</version>
 				<configuration>
 					<failOnViolation>true</failOnViolation>
+					<violationSeverity>warning</violationSeverity>
 					<configLocation>checkstyle.xml</configLocation>
 				</configuration>
 				<executions>
