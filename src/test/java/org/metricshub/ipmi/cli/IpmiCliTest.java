@@ -315,7 +315,10 @@ class IpmiCliTest {
 
 			int readings = bmc.getCount(NETFN_SENSOR, GET_SENSOR_READING);
 			Result selected = login(bmc, "sensors", "--type", "fan,TEMPERATURE", "--name", "fan*");
-			assertEquals("Name   Type  Reading  Unit  Status\nFan 1  Fan                  Device Present\n", selected.out);
+			assertEquals(
+					"Name              Type                    Reading    Unit          Status\n"
+							+ "Fan 1             Fan                                              Device Present\n",
+					selected.out);
 			assertEquals(readings + 1, bmc.getCount(NETFN_SENSOR, GET_SENSOR_READING), "selected before the readings");
 		}
 	}
@@ -339,10 +342,10 @@ class IpmiCliTest {
 			Result sensors = login(bmc, "sensors");
 			assertEquals(0, sensors.code, sensors.err);
 			assertEquals(
-					"Name          Type         Reading  Unit      Status\n"
-							+ "Ambient Temp  Temperature  44       DegreesC  critical\n"
-							+ "Ambient Temp  Temperature  22       % Rpm     ok\n"
-							+ "OEM Presence  Oem C1h                         Device Present\n",
+					"Name              Type                    Reading    Unit          Status\n"
+							+ "Ambient Temp      Temperature             44         DegreesC      critical\n"
+							+ "Ambient Temp      Temperature             22         % Rpm         ok\n"
+							+ "OEM Presence      Oem C1h                                          Device Present\n",
 					sensors.out);
 			String[] json = login(bmc, "sensors", "--json").out.split("\n");
 			assertTrue(
@@ -365,7 +368,10 @@ class IpmiCliTest {
 					.install(bmc);
 			Result sensors = login(bmc, "sensors");
 			assertEquals(0, sensors.code, sensors.err);
-			assertEquals("Name  Type  Reading  Unit  Status\n      Fan                  Device Present\n", sensors.out);
+			assertEquals(
+					"Name              Type                    Reading    Unit          Status\n"
+							+ "                  Fan                                              Device Present\n",
+					sensors.out);
 			assertTrue(login(bmc, "sensors", "--json").out.startsWith("{\"name\":\"\",\"number\":16,"));
 		}
 	}

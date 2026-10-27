@@ -1,4 +1,4 @@
-Name          Number  Type            Entity             Reading  Unit      Status          LNR  LC  LNC  UNC  UC  UNR  Problem
-Ambient Temp  50      Temperature     FrontPanelBoard 1  22       DegreesC  ok                            38   41  45
-Fan 1         16      Fan             Fan 1                                 Device Present
-Board         17      EntityPresence  SystemBoard 1                         Device Present
+Name              Number  Type                    Entity                    Reading    Unit          Status           LNR      LC       LNC      UNC      UC       UNR      Problem
+Ambient Temp      50      Temperature             FrontPanelBoard 1         22         DegreesC      ok                                          38       41       45
+Fan 1             16      Fan                     Fan 1                                              Device Present
+Board             17      EntityPresence          SystemBoard 1                                      Device Present

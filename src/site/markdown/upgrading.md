@@ -8,8 +8,41 @@ description: What changes when upgrading the IPMI Java Client — from 2.0.00 to
 The sections go from the latest release to the oldest: read them from the version you use up to
 the top of the page. From 1.2.02, that is [Upgrading from 1.2.02](#upgrading-from-1-2-02) (the
 fixes 2.0.00 brings to the protocol core, the decoders and Serial over LAN),
-[Upgrading from 1.x to 2.0.00](#upgrading-from-1-x-to-2-0-00) (the new client API), then
-[Upgrading from 2.0.00 to 2.1.00](#upgrading-from-2-0-00-to-2-1-00).
+[Upgrading from 1.x to 2.0.00](#upgrading-from-1-x-to-2-0-00) (the new client API),
+[Upgrading from 2.0.00 to 2.1.00](#upgrading-from-2-0-00-to-2-1-00), then
+[Upgrading from 2.1.00 to 2.2.00](#upgrading-from-2-1-00-to-2-2-00).
+
+## Upgrading from 2.1.00 to 2.2.00
+
+Version 2.2.00 only adds to the API of 2.1.00: code built against 2.1.00 links and compiles
+unchanged.
+
+### Streaming sensors and FRUs
+
+`sensors().stream()` and `frus().stream()` yield each sensor or FRU as soon as it is read, where
+`execute()` returns once every one is read
+([Streaming the sensors](sensors.html#streaming-the-sensors),
+[Streaming the FRUs](fru-inventory.html#streaming-the-frus)). The stream is a lazy
+`java.util.stream.Stream`, to close with try-with-resources; each element is read as an operation
+of the client of its own, so the timeout of the request is an inactivity timeout, the operations of
+other threads run between two elements, and a session lost while an element is read is reopened
+without the elements already yielded being read again. `onSkippedRecord(Consumer<SkippedRecord>)`
+on both requests reports the SDR records the walk skipped, before the first element; `execute()`
+calls it too, and still lists them in `skippedRecords()`.
+
+### Command-line client
+
+* `sensors` and `fru` print each sensor or FRU as it is read, instead of everything once the
+  operation ends. `-t` bounds, for these two, the SDR walk then each sensor or FRU, not the whole
+  subcommand.
+* **Behavior change.** The columns of the `sensors` table have fixed widths (16 characters for
+  the name, 22 for the type, 9 for the reading, 12 for the unit; `--long` adds 6 for the number,
+  24 for the entity, 15 for the status and 7 for each threshold) instead of the width of their
+  widest value, so that a row is printed before the next sensor is read; a wider cell pushes the
+  rest of its row. Scripts that cut the table at fixed columns must be adjusted; `--json` is the
+  stable format for scripts.
+* **Behavior change.** With `-v`, the time of `sensors` and `fru` is printed after their output,
+  not before: it includes the printing.
 
 ## Upgrading from 2.0.00 to 2.1.00
 

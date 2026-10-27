@@ -69,6 +69,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.EnumSet;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
@@ -78,6 +79,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.BooleanSupplier;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
@@ -786,6 +788,165 @@ class IpmiClientTest {
 			FruList psu = client.frus().ids(PSU_FRU).execute();
 			assertEquals(1, psu.size());
 			assertEquals("PSU 1", psu.get(0).name());
+		}
+	}
+
+	@Test
+	@Timeout(30)
+	void aStreamYieldsEachSensorAsItIsReadAndReadsNoMoreOnceClosed() throws Exception {
+		try (FakeRmcpPlusBmc bmc = bmc(); IpmiClient client = client(bmc).build()) {
+			List<SkippedRecord> skipped = new ArrayList<SkippedRecord>();
+			Iterator<Sensor> each;
+			try (Stream<Sensor> sensors = client.sensors().onSkippedRecord(skipped::add).stream()) {
+				each = sensors.iterator();
+				assertEquals(RECORDS, bmc.getCount(NETFN_STORAGE, GET_SDR), "the repository is walked before the first sensor");
+				assertEquals(1, skipped.size(), "the skipped records are reported before the first sensor");
+				assertEquals(6, skipped.get(0).recordId());
+				assertEquals(0, bmc.getCount(NETFN_SENSOR, GET_SENSOR_READING), "no sensor is read before it is asked for");
+				assertEquals("Ambient Temp", each.next().name());
+				assertEquals(1, bmc.getCount(NETFN_SENSOR, GET_SENSOR_READING), "a sensor is read when the stream advances");
+				assertTrue(client.chassisStatus().powerOn(), "the operations of other threads run between two sensors");
+				assertEquals("Fan 1", each.next().name());
+				assertEquals(2, bmc.getCount(NETFN_SENSOR, GET_SENSOR_READING));
+			}
+			assertFalse(each.hasNext(), "an iterator obtained before the close ends with the stream");
+			assertEquals(2, bmc.getCount(NETFN_SENSOR, GET_SENSOR_READING), "a closed stream reads no further sensor");
+
+			try (Stream<Sensor> sensors = client.sensors().stream()) {
+				assertEquals(1, sensors.limit(1).collect(Collectors.toList()).size());
+			}
+			assertEquals(3, bmc.getCount(NETFN_SENSOR, GET_SENSOR_READING), "limit(1) reads one sensor");
+
+			try (Stream<Sensor> sensors = client.sensors().stream().parallel()) {
+				assertEquals(1, sensors.limit(1).collect(Collectors.toList()).size());
+			}
+			assertEquals(4, bmc.getCount(NETFN_SENSOR, GET_SENSOR_READING), "a parallel stream does not read ahead");
+
+			try (Stream<Sensor> temperatures = client.sensors().types(SensorType.Temperature).stream()) {
+				assertEquals(Arrays.asList("Ambient Temp"), temperatures.map(Sensor::name).collect(Collectors.toList()));
+			}
+			assertEquals(5, bmc.getCount(NETFN_SENSOR, GET_SENSOR_READING), "an unselected sensor costs no round trip");
+			assertEquals(1, bmc.getCount(OPEN_SESSION_REQUEST), "one session for everything");
+
+			skipped.clear();
+			assertEquals(3, client.sensors().onSkippedRecord(skipped::add).execute().size());
+			assertEquals(1, skipped.size(), "execute() reports the skipped records to the consumer too");
+		}
+	}
+
+	@Test
+	@Timeout(30)
+	void aStreamReadsAgainTheSensorBeingReadWhenTheSessionIsLost() throws Exception {
+		try (FakeRmcpPlusBmc bmc = bmc(); IpmiClient client = client(bmc).build()) {
+			List<String> names = new ArrayList<String>();
+			try (Stream<Sensor> sensors = client.sensors().stream()) {
+				Iterator<Sensor> each = sensors.iterator();
+				names.add(each.next().name());
+				bmc.expireSession();
+				while (each.hasNext()) {
+					Sensor sensor = each.next();
+					assertFalse(sensor.problem().isPresent(), sensor.toString());
+					names.add(sensor.name());
+				}
+			}
+			assertEquals(Arrays.asList("Ambient Temp", "Fan 1", "Board"), names, "no sensor is yielded twice or lost");
+			assertEquals(2, bmc.getCount(OPEN_SESSION_REQUEST), "the lost session is replaced");
+		}
+	}
+
+	@Test
+	@Timeout(30)
+	void aStreamYieldsEachFruAsItIsReadAndSurvivesALostSession() throws Exception {
+		try (FakeRmcpPlusBmc bmc = bmc(); IpmiClient client = client(bmc).build()) {
+			List<SkippedRecord> skipped = new ArrayList<SkippedRecord>();
+			try (Stream<Fru> frus = client.frus().onSkippedRecord(skipped::add).stream()) {
+				Iterator<Fru> each = frus.iterator();
+				assertEquals(1, skipped.size(), "the skipped records are reported before the first FRU");
+				assertEquals(0, bmc.getCount(NETFN_STORAGE, GET_FRU_INVENTORY_AREA_INFO));
+				Fru board = each.next();
+				assertEquals(EntityId.SystemBoard, board.entity());
+				assertEquals("IBM", board.manufacturer());
+				assertEquals(1, bmc.getCount(NETFN_STORAGE, GET_FRU_INVENTORY_AREA_INFO), "FRU 0 only, so far");
+				bmc.expireSession();
+				Fru psu = each.next();
+				assertEquals("PSU 1", psu.name());
+				assertTrue(psu.complete(), psu.problems().toString());
+				assertFalse(each.hasNext());
+			}
+			assertEquals(2, bmc.getCount(OPEN_SESSION_REQUEST), "the lost session is replaced");
+			assertEquals(2, client.frus().execute().size(), "execute() is unchanged");
+		}
+	}
+
+	@Test
+	@Timeout(30)
+	void aStreamEndsWithoutASessionAndReadsAgainTheElementItsCallerGaveUp() throws Exception {
+		try (FakeRmcpPlusBmc bmc = bmc()) {
+			// The readings of bmc(), or no reply at all while silent
+			AtomicBoolean silent = new AtomicBoolean();
+			bmc.handle(
+					NETFN_SENSOR,
+					GET_SENSOR_READING,
+					data -> silent.get() ? null : data[0] == TEMPERATURE_SENSOR ? new byte[]
+					{ 0x00, (byte) 0x9a, 0x40, 0x00 } : new byte[] { 0x00, 0x00, 0x40, 0x02 });
+			// A reply the BMC takes longer than the timeout of the request: the caller gives up first
+			try (IpmiClient client = client(bmc).messageTimeout(Duration.ofSeconds(5)).build()) {
+				try (Stream<Sensor> sensors = client.sensors().timeout(Duration.ofMillis(300)).stream()) {
+					Iterator<Sensor> each = sensors.iterator();
+					assertEquals("Ambient Temp", each.next().name());
+					silent.set(true);
+					assertThrows(IpmiTimeoutException.class, each::next);
+					silent.set(false);
+					assertEquals("Fan 1", each.next().name(), "the sensor whose read was given up is read again");
+					assertEquals(2, bmc.getCount(OPEN_SESSION_REQUEST), "on a new session, the state of the old being unknown");
+					assertEquals("Board", each.next().name());
+					// The session is lost after the last sensor: the end of the stream must not open another one
+					bmc.handle(NETFN_CHASSIS, GET_CHASSIS_STATUS, data -> null);
+					assertThrows(IpmiTimeoutException.class, client::chassisStatus);
+					int sessions = bmc.getCount(OPEN_SESSION_REQUEST);
+					assertFalse(each.hasNext());
+					assertEquals(sessions, bmc.getCount(OPEN_SESSION_REQUEST), "the end of the stream opens no session");
+				}
+			}
+		}
+	}
+
+	@Test
+	@Timeout(30)
+	void aFruStreamEndsWithoutASession() throws Exception {
+		try (FakeRmcpPlusBmc bmc = bmc(); IpmiClient client = client(bmc).build()) {
+			try (Stream<Fru> frus = client.frus().stream()) {
+				Iterator<Fru> each = frus.iterator();
+				each.next();
+				assertEquals("PSU 1", each.next().name());
+				bmc.handle(NETFN_CHASSIS, GET_CHASSIS_STATUS, data -> null);
+				assertThrows(IpmiTimeoutException.class, client::chassisStatus);
+				int sessions = bmc.getCount(OPEN_SESSION_REQUEST);
+				assertFalse(each.hasNext());
+				assertEquals(sessions, bmc.getCount(OPEN_SESSION_REQUEST), "the end of the stream opens no session");
+			}
+		}
+	}
+
+	@Test
+	@Timeout(30)
+	void aStreamReadsFru0NoEarlierThanItsTurn() throws Exception {
+		try (FakeRmcpPlusBmc bmc = bmc()) {
+			// A PSU located before any record of the system board: FRU 0 comes last, after the pass
+			new FakeSdrRepository().add(Fixtures.FRONT_PANEL_FULL_RECORD)
+					.add(fruDeviceLocatorRecord(4, PSU_FRU, EntityId.PowerSupply.getCode(), 1, "PSU 1"))
+					.fru(0, BASE_BOARD_PRODUCT_INFO)
+					.fru(PSU_FRU, BASE_BOARD_PRODUCT_INFO)
+					.install(bmc);
+			try (IpmiClient client = client(bmc).build()) {
+				try (Stream<Fru> frus = client.frus().stream()) {
+					assertEquals(Arrays.asList("PSU 1"), frus.limit(1).map(Fru::name).collect(Collectors.toList()));
+				}
+				assertEquals(1, bmc.getCount(NETFN_STORAGE, GET_FRU_INVENTORY_AREA_INFO), "the PSU only, FRU 0 not yet");
+				assertEquals(
+						Arrays.asList("PSU 1", "System Board"),
+						client.frus().execute().stream().map(Fru::name).collect(Collectors.toList()));
+			}
 		}
 	}
 

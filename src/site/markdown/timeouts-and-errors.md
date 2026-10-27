@@ -11,7 +11,7 @@ time. Two timeouts apply, both settings of the [client builder](configuration.ht
 
 | Timeout | Set with | Default | Scope |
 | --- | --- | --- | --- |
-| [Deadline](#deadline) | `timeout(Duration)`, on the builder or on an operation builder | 2 minutes | One operation, session setup included |
+| [Deadline](#deadline) | `timeout(Duration)`, on the builder or on an operation builder | 2 minutes | One operation, session setup included; for a stream, the walk, then each element |
 | [Message timeout](#message-timeout-and-retries) | `messageTimeout(Duration)`, with `retries(int)` | 5 seconds, 3 retries | Each request, including each step of the session handshake |
 
 ## Deadline
@@ -29,6 +29,14 @@ the session was [lost](#session-recovery) while it ran.
 
 An operation abandoned at its deadline leaves no thread that keeps the JVM alive: the threads of
 the library are daemon threads ([Closing the client](configuration.html#closing-the-client)).
+
+A stream ([`sensors().stream()`](sensors.html#streaming-the-sensors),
+[`frus().stream()`](fru-inventory.html#streaming-the-frus)) reads one sensor or FRU per operation,
+as the caller advances it: the deadline bounds the SDR walk before the first element, then the
+read of each element, as an **inactivity** timeout. Nothing bounds the whole stream, which the
+caller consumes at its own pace. An element abandoned at the deadline fails the operation of the
+stream that waited for it (`forEach`, `collect`, `iterator().next()`), and the elements already
+yielded stay yielded.
 
 ## Message timeout and retries
 

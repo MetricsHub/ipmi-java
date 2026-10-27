@@ -68,25 +68,21 @@ public abstract class SensorRecord {
 			sensorRecord = new CompactSensorRecord();
 			break;
 		case RecordTypes.DEVICE_RELATIVE_ENTITY_ASSOCIATION_RECORD:
-			// TODO: Test if server with such records will be available
 			sensorRecord = new DeviceRelativeEntityAssociationRecord();
 			break;
 		case RecordTypes.ENTITY_ASSOCIATION_RECORD://
 			sensorRecord = new EntityAssociationRecord();
 			break;
 		case RecordTypes.EVENT_ONLY_RECORD:
-			// TODO: Test if server with such records will be available
 			sensorRecord = new EventOnlyRecord();
 			break;
 		case RecordTypes.FRU_DEVICE_LOCATOR_RECORD://
 			sensorRecord = new FruDeviceLocatorRecord();
 			break;
 		case RecordTypes.GENERIC_DEVICE_LOCATOR_RECORD:
-			// TODO: Test if server with such records will be available
 			sensorRecord = new GenericDeviceLocatorRecord();
 			break;
 		case RecordTypes.MANAGEMENT_CONTROLLER_CONFIRMATION_RECORD:
-			// TODO: Test if server with such records will be available
 			sensorRecord = new ManagementControllerConfirmationRecord();
 			break;
 		case RecordTypes.MANAGEMENT_CONTROLLER_DEVICE_LOCATOR_RECORD://

@@ -138,6 +138,51 @@ and calling it without arguments selects nothing. The SDR repository is walked (
 the [SDR cache](configuration.html#sdr-cache)) whatever the selection; `timeout()` overrides the
 [deadline](timeouts-and-errors.html#deadline) of the client for this operation.
 
+## Streaming the sensors
+
+`stream()` reads the same sensors as `execute()`, in the same order, but yields each one as soon
+as it is read and reads the next one only as the stream advances: the caller processes the first
+sensors while the last ones are being read, and a caller that stops early (`limit(n)`,
+`findFirst()`) does not pay for the rest. The stream is a plain, lazy, sequential
+`java.util.stream.Stream`; close it with try-with-resources, as a `Files.lines()` stream:
+
+```java
+try (Stream<Sensor> sensors = bmc.sensors().types(SensorType.Temperature).stream()) {
+	sensors.forEach(sensor -> System.out.println(sensor));
+}
+```
+
+* The SDR repository is walked (or taken from the [SDR cache](configuration.html#sdr-cache))
+  before `stream()` returns, so a sensor is never waited for because of the walk. The records the
+  walk skipped are given to `onSkippedRecord(Consumer<SkippedRecord>)` at that point, before the
+  first sensor; `execute()` reports them to the consumer too, besides `skippedRecords()`.
+* Each sensor is read as an operation of the client of its own: the stream holds nothing between
+  two sensors, the operations of other threads run in between, and a stream that is abandoned
+  blocks nothing, not even `close()`. Closing the stream before its last sensor ends the walk: no
+  further command is sent.
+* `timeout(Duration)`, or the [deadline](timeouts-and-errors.html#deadline) of the client, is an
+  **inactivity** timeout: the longest wait for the walk before the first sensor, then for each
+  sensor. Nothing bounds the whole stream, which the caller consumes at its own pace.
+* A sensor the BMC or a controller behind it refuses, or that such a controller does not answer,
+  is yielded with its `problem()`, as with `execute()`. A session lost while a sensor is read is
+  reopened and that sensor read again, once: the sensors already yielded are not read again
+  ([Session recovery](timeouts-and-errors.html#session-recovery)).
+* `stream()` itself throws when the session cannot be opened, the SDR repository cannot be read
+  or the walk does not complete within the timeout ([Errors](#errors)). The same exceptions come
+  from the operations of the stream (`forEach`, `collect`, `iterator().next()`) when the BMC
+  stops answering or a sensor is not read within the timeout, and `IllegalStateException` when
+  the client was closed meanwhile.
+
+The first critical sensor, with the skipped records collected, costs the walk and the sensors
+up to it only:
+
+```java
+List<SkippedRecord> skipped = new ArrayList<>();
+try (Stream<Sensor> sensors = bmc.sensors().onSkippedRecord(skipped::add).stream()) {
+	Optional<Sensor> first = sensors.filter(sensor -> sensor.status() == SensorStatus.CRITICAL).findFirst();
+}
+```
+
 ## The `Sensor` object
 
 Each [`Sensor`](apidocs/org/metricshub/ipmi/client/Sensor.html) holds:
@@ -293,7 +338,7 @@ CPU0_Status: [Presence detected]
 
 The states of a threshold sensor are the thresholds its reading is at or beyond (the comparison
 bits of the Get Sensor Reading reply, IPMI 2.0 table 35-15), in the wording of the same events
-in the SEL ([System Event Log](system-event-log.html)): a temperature at 44 °C with an upper
+in the SEL ([System Event Log](system-event-log.html)): a temperature at 44 Â°C with an upper
 non-critical threshold of 38 and an upper critical one of 41 has the states
 `[Upper Non Critical Going High, Upper Critical Going High]` and the `status()` `CRITICAL`.
 
