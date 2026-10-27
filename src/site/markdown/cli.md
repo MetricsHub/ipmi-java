@@ -102,7 +102,7 @@ A sensor is selected when its type is one of the `--type` values and its name ma
 | `-P, --port <port>` | UDP port of the BMC. Default: 623. |
 | `-L, --privilege <level>` | `user`, `operator`, `administrator` or `auto` (case-insensitive). Default: the lowest level the subcommand needs (see [below](#default-privilege-per-subcommand)). |
 | `-C, --cipher-suite <id>[,<id>...]` | One ID: use exactly this cipher suite, without discovery. Several: the preference order among the suites the BMC offers. Default: `17,3,8,16,2,7,12,11`. Suites without integrity (0, 1, 6, 15) are refused: their replies could be forged. So are the xRC4 suites (4, 5, 9, 10, 13, 14, 18, 19), which the library does not implement. |
-| `-t, --timeout <ms>` | Deadline of the subcommand, in milliseconds. Default: 120000. For `sol`, it bounds the session setup and the payload activation only; for `sensors --json` and `fru`, which print each sensor or FRU as it is read, the SDR walk, then each sensor or FRU. |
+| `-t, --timeout <ms>` | Deadline of the subcommand, in milliseconds. Default: 120000. For `sol`, it bounds the session setup and the payload activation only; for `sensors` and `fru`, which print each sensor or FRU as it is read, the SDR walk, then each sensor or FRU. |
 | `--message-timeout <ms>` | Per-message timeout. Default: 5000. |
 | `--retries <n>` | Resends of a message that got no reply. Default: 3. |
 | `-v, --verbose` | Print to stderr the address, the user and privilege, the cipher suite preference, the message timeout and retries, and the time of each operation, failed ones included; `sel` and `sol` add a summary (see [`sel`](#sel) and the [SOL console](#interactive-sol-console)). Never prints a secret. |
@@ -344,21 +344,22 @@ BMC did.
 
 ```shell-session
 $ ipmicli -h bmc.example.com -u monitor -pf pw.txt sensors
-Name            Type                   Reading  Unit      Status
-Ambient Temp    Temperature            19       DegreesC  ok
-CPU1 DTS        Temperature            -42      DegreesC  ok
-Exhaust Temp    Temperature            22       DegreesC  ok
-Host Power      PowerUnit                                 ok
-System Power    Current                88       Watts     ok
-Fan 1           Fan                    6700     Rpm       ok
-HDD             DriveBay                                  unavailable
-PSU Redundancy  PowerSupply                               Fully Redundant
-System 3.3V     Voltage                3.38     Volts     ok
-PSU1 Present    PowerSupply                               Presence detected
+Name              Type                    Reading    Unit          Status
+Ambient Temp      Temperature             19         DegreesC      ok
+CPU1 DTS          Temperature             -42        DegreesC      ok
+Exhaust Temp      Temperature             22         DegreesC      ok
+Host Power        PowerUnit                                        ok
+System Power      Current                 88         Watts         ok
+Fan 1             Fan                     6700       Rpm           ok
+HDD               DriveBay                                         unavailable
+PSU Redundancy    PowerSupply                                      Fully Redundant
+System 3.3V       Voltage                 3.38       Volts         ok
+PSU1 Present      PowerSupply                                      Presence detected
 ```
 
-(An excerpt: the BMC of this RD350 has 49 sensors.) The columns are aligned on their widest
-value, two spaces apart. The `Reading` is the converted reading of a threshold sensor, rounded to
+(An excerpt: the BMC of this RD350 has 49 sensors.) Each row is printed as its sensor is read,
+so the columns have fixed widths (a wider cell pushes the rest of its row), two spaces apart. The
+`Reading` is the converted reading of a threshold sensor, rounded to
 three decimals, in the `Unit` of its record; a discrete sensor has no reading. A percentage sensor
 shows its unit as `ipmitool` does: `percent`, or `% ` followed by the unit (`% Rpm`). The `Type`
 of an OEM or reserved sensor type gives its code (`Oem C1h`, `Reserved 2Dh`). `Status` is the
@@ -374,15 +375,15 @@ critical and non-critical) and, for a sensor without reading, the reason:
 
 ```shell-session
 $ ipmicli -h bmc.example.com -u monitor -pf pw.txt sensors --type temperature --long
-Name          Number  Type         Entity           Reading  Unit      Status  LNR  LC  LNC  UNC  UC  UNR  Problem
-Ambient Temp  1       Temperature  AirInlet 1       19       DegreesC  ok           3   8    37   39
-CPU1 DTS      2       Temperature  Processor 1      -42      DegreesC  ok
-CPU2 DTS      3       Temperature  Processor 2      -46      DegreesC  ok
-Exhaust Temp  9       Temperature  SystemChassis 1  22       DegreesC  ok
+Name              Number  Type                    Entity                    Reading    Unit          Status           LNR      LC       LNC      UNC      UC       UNR      Problem
+Ambient Temp      1       Temperature             AirInlet 1                19         DegreesC      ok                        3        8        37       39
+CPU1 DTS          2       Temperature             Processor 1               -42        DegreesC      ok
+CPU2 DTS          3       Temperature             Processor 2               -46        DegreesC      ok
+Exhaust Temp      9       Temperature             SystemChassis 1           22         DegreesC      ok
 ```
 
-With `--json`, one object per sensor, printed as the sensor is read (the text table waits for
-every sensor, to align its columns), with the fields of [`Sensor`](sensors.html#the-sensor-object).
+With `--json`, one object per sensor, printed as the sensor is read, with the fields of
+[`Sensor`](sensors.html#the-sensor-object).
 `status` is the `SensorStatus` name (`OK`, `NON_CRITICAL`, `CRITICAL`, `NON_RECOVERABLE`,
 `UNAVAILABLE`), and `states` is always present, empty when there is none; for a threshold sensor,
 `states` lists the thresholds its reading is at or beyond (`Upper Critical Going High`), which the

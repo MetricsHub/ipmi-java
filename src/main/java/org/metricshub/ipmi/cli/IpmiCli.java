@@ -49,6 +49,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 import java.util.OptionalDouble;
+import java.util.function.Consumer;
 import java.util.function.Supplier;
 import java.util.stream.Stream;
 
@@ -70,7 +71,6 @@ import org.metricshub.ipmi.client.SelEntry;
 import org.metricshub.ipmi.client.SelEntryList;
 import org.metricshub.ipmi.client.SelRequest;
 import org.metricshub.ipmi.client.Sensor;
-import org.metricshub.ipmi.client.SensorList;
 import org.metricshub.ipmi.client.SensorsRequest;
 import org.metricshub.ipmi.client.SolConsole;
 import org.metricshub.ipmi.core.coding.commands.PrivilegeLevel;
@@ -111,6 +111,16 @@ public final class IpmiCli {
 	private static final String PROGRAM_NAME_VARIABLE = "IPMICLI_PROGRAM_NAME";
 	private static final int LABEL_WIDTH = 28;
 	private static final int FRU_LABEL_WIDTH = 27;
+
+	/**
+	 * The columns of the sensors table, fixed so that each row is printed as its sensor is read: Name (16, the
+	 * longest ID string), Type, Reading, Unit; Status, the last column, is not padded. A wider cell pushes the rest
+	 * of its row.
+	 */
+	private static final int[] SENSOR_WIDTHS = { 16, 22, 9, 12 };
+
+	/** The columns of {@code sensors --long}: Name, Number, Type, Entity, Reading, Unit, Status, six thresholds. */
+	private static final int[] SENSOR_LONG_WIDTHS = { 16, 6, 22, 24, 9, 12, 15, 7, 7, 7, 7, 7, 7 };
 	private static final String FRU_INDENT = "  ";
 	private static final long NANOS_PER_MILLI = 1_000_000L;
 	private static final long KEY_READER_START_MS = 500L;
@@ -569,22 +579,28 @@ public final class IpmiCli {
 		if (!arguments.names().isEmpty()) {
 			request.names(arguments.names().toArray(new String[0]));
 		}
-		if (arguments.json()) {
-			// Each sensor is printed as it is read
-			timed(arguments, err, "sensors", () -> {
-				try (Stream<Sensor> sensors = request.stream()) {
-					sensors.forEach(sensor -> JsonLinesWriter.write(sensorFields(sensor), out));
-				}
-				return null;
-			});
-			return 0;
-		}
-		// The table needs the width of its columns: the sensors are collected first
-		SensorList sensors = timed(arguments, err, "sensors", request::execute);
-		List<String[]> rows = new ArrayList<String[]>();
 		boolean longFormat = arguments.longFormat();
-		rows.add(
-				longFormat ? new String[]
+		int[] widths = longFormat ? SENSOR_LONG_WIDTHS : SENSOR_WIDTHS;
+		// Each sensor is printed as it is read, the table on fixed column widths
+		Consumer<Sensor> print = arguments.json() ? sensor -> JsonLinesWriter.write(sensorFields(sensor), out) : sensor -> {
+			out.print(row(sensorRow(sensor, longFormat), widths));
+			out.flush();
+		};
+		timed(arguments, err, "sensors", () -> {
+			try (Stream<Sensor> sensors = request.stream()) {
+				if (!arguments.json()) {
+					out.print(row(sensorHeader(longFormat), widths));
+				}
+				sensors.forEach(print);
+			}
+			return null;
+		});
+		return 0;
+	}
+
+	private static String[] sensorHeader(boolean longFormat) {
+		return longFormat ?
+				new String[]
 				{
 						"Name",
 						"Number",
@@ -599,37 +615,38 @@ public final class IpmiCli {
 						"UNC",
 						"UC",
 						"UNR",
-						"Problem" } : new String[]
-						{ "Name", "Type", "Reading", "Unit", "Status" });
-		for (Sensor sensor : sensors) {
-			String reading = number(sensor.reading());
-			String unit = unit(sensor);
-			// A threshold sensor keeps its status (critical...) in the column, its states being the thresholds crossed
-			String status = sensor.states().isEmpty() || isThreshold(sensor) ?
-					sensor.status().name().toLowerCase(Locale.ROOT).replace('_', '-') :
-					String.join(", ", sensor.states());
-			String type = typeName(sensor.type(), sensor.typeCode());
-			rows.add(
-					longFormat ? new String[]
-					{
-							sensor.name(),
-							String.valueOf(sensor.number()),
-							type,
-							sensor.entity() + " " + sensor.entityInstance(),
-							reading,
-							unit,
-							status,
-							number(sensor.lowerNonRecoverable()),
-							number(sensor.lowerCritical()),
-							number(sensor.lowerNonCritical()),
-							number(sensor.upperNonCritical()),
-							number(sensor.upperCritical()),
-							number(sensor.upperNonRecoverable()),
-							sensor.problem().orElse("") } : new String[]
-							{ sensor.name(), type, reading, unit, status });
-		}
-		out.print(table(rows));
-		return 0;
+						"Problem" } :
+				new String[]
+				{ "Name", "Type", "Reading", "Unit", "Status" };
+	}
+
+	private static String[] sensorRow(Sensor sensor, boolean longFormat) {
+		String reading = number(sensor.reading());
+		String unit = unit(sensor);
+		// A threshold sensor keeps its status (critical...) in the column, its states being the thresholds crossed
+		String status = sensor.states().isEmpty() || isThreshold(sensor) ?
+				sensor.status().name().toLowerCase(Locale.ROOT).replace('_', '-') :
+				String.join(", ", sensor.states());
+		String type = typeName(sensor.type(), sensor.typeCode());
+		return longFormat ?
+				new String[]
+				{
+						sensor.name(),
+						String.valueOf(sensor.number()),
+						type,
+						sensor.entity() + " " + sensor.entityInstance(),
+						reading,
+						unit,
+						status,
+						number(sensor.lowerNonRecoverable()),
+						number(sensor.lowerCritical()),
+						number(sensor.lowerNonCritical()),
+						number(sensor.upperNonCritical()),
+						number(sensor.upperCritical()),
+						number(sensor.upperNonRecoverable()),
+						sensor.problem().orElse("") } :
+				new String[]
+				{ sensor.name(), type, reading, unit, status };
 	}
 
 	private static boolean isThreshold(Sensor sensor) {
@@ -1315,17 +1332,25 @@ public final class IpmiCli {
 		}
 		StringBuilder text = new StringBuilder();
 		for (String[] row : rows) {
-			StringBuilder line = new StringBuilder();
-			for (int i = 0; i < row.length; i++) {
-				line.append(i + 1 < row.length ? pad(printable(row[i]), widths[i] + 2) : printable(row[i]));
-			}
-			int end = line.length();
-			while (end > 0 && line.charAt(end - 1) == ' ') {
-				end--;
-			}
-			text.append(line, 0, end).append(System.lineSeparator());
+			text.append(row(row, widths));
 		}
 		return text.toString();
+	}
+
+	/**
+	 * One line of a table: each cell but the last padded to its column width plus two spaces (a wider cell pushes
+	 * the rest of the line), without trailing spaces. The last cell needs no width.
+	 */
+	static String row(String[] cells, int[] widths) {
+		StringBuilder line = new StringBuilder();
+		for (int i = 0; i < cells.length; i++) {
+			line.append(i + 1 < cells.length ? pad(printable(cells[i]), widths[i] + 2) : printable(cells[i]));
+		}
+		int end = line.length();
+		while (end > 0 && line.charAt(end - 1) == ' ') {
+			end--;
+		}
+		return line.substring(0, end) + System.lineSeparator();
 	}
 
 	private static String pad(String text, int width) {

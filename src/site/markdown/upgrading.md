@@ -32,11 +32,17 @@ calls it too, and still lists them in `skippedRecords()`.
 
 ### Command-line client
 
-* `sensors --json` and `fru` print each sensor or FRU as it is read, instead of everything once
-  the operation ends; the `sensors` table still waits for every sensor, to align its columns.
-  `-t` bounds, for these two, the SDR walk then each sensor or FRU, not the whole subcommand.
-* **Behavior change.** With `-v`, the time of `sensors --json` and `fru` is printed after their
-  output, not before: it includes the printing.
+* `sensors` and `fru` print each sensor or FRU as it is read, instead of everything once the
+  operation ends. `-t` bounds, for these two, the SDR walk then each sensor or FRU, not the whole
+  subcommand.
+* **Behavior change.** The columns of the `sensors` table have fixed widths (16 characters for
+  the name, 22 for the type, 9 for the reading, 12 for the unit; `--long` adds 6 for the number,
+  24 for the entity, 15 for the status and 7 for each threshold) instead of the width of their
+  widest value, so that a row is printed before the next sensor is read; a wider cell pushes the
+  rest of its row. Scripts that cut the table at fixed columns must be adjusted; `--json` is the
+  stable format for scripts.
+* **Behavior change.** With `-v`, the time of `sensors` and `fru` is printed after their output,
+  not before: it includes the printing.
 
 ## Upgrading from 2.0.00 to 2.1.00
 
