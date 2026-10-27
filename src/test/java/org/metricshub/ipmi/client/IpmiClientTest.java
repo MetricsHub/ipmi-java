@@ -796,8 +796,9 @@ class IpmiClientTest {
 	void aStreamYieldsEachSensorAsItIsReadAndReadsNoMoreOnceClosed() throws Exception {
 		try (FakeRmcpPlusBmc bmc = bmc(); IpmiClient client = client(bmc).build()) {
 			List<SkippedRecord> skipped = new ArrayList<SkippedRecord>();
+			Iterator<Sensor> each;
 			try (Stream<Sensor> sensors = client.sensors().onSkippedRecord(skipped::add).stream()) {
-				Iterator<Sensor> each = sensors.iterator();
+				each = sensors.iterator();
 				assertEquals(RECORDS, bmc.getCount(NETFN_STORAGE, GET_SDR), "the repository is walked before the first sensor");
 				assertEquals(1, skipped.size(), "the skipped records are reported before the first sensor");
 				assertEquals(6, skipped.get(0).recordId());
@@ -808,6 +809,7 @@ class IpmiClientTest {
 				assertEquals("Fan 1", each.next().name());
 				assertEquals(2, bmc.getCount(NETFN_SENSOR, GET_SENSOR_READING));
 			}
+			assertFalse(each.hasNext(), "an iterator obtained before the close ends with the stream");
 			assertEquals(2, bmc.getCount(NETFN_SENSOR, GET_SENSOR_READING), "a closed stream reads no further sensor");
 
 			try (Stream<Sensor> sensors = client.sensors().stream()) {

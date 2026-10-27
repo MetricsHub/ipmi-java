@@ -46,6 +46,7 @@ import java.util.concurrent.Future;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.BiPredicate;
 import java.util.function.Consumer;
 import java.util.stream.Stream;
@@ -555,30 +556,30 @@ public final class IpmiClient implements AutoCloseable {
 	/**
 	 * Returns a lazy stream of the elements a cursor reads one at a time, each read as an operation of the client under
 	 * the deadline: a session lost while an element is read is replaced and the element read again, and the operations
-	 * of other threads run between two elements. The cursor returns null after the last element.
+	 * of other threads run between two elements. The cursor returns null after the last element, and closing the
+	 * stream ends it as well, even for an iterator obtained from it before: no element is read after the close.
 	 */
 	private <T> Stream<T> stream(String operation, Duration deadline, Callable<T> cursor) {
+		AtomicBoolean ended = new AtomicBoolean();
 		Spliterator<T> spliterator = new Spliterators.AbstractSpliterator<T>(
 				Long.MAX_VALUE,
 				Spliterator.ORDERED | Spliterator.NONNULL | Spliterator.IMMUTABLE) {
 
-			private boolean ended;
-
 			@Override
 			public boolean tryAdvance(Consumer<? super T> action) {
-				if (ended) {
+				if (ended.get()) {
 					return false;
 				}
 				T element = run(operation, deadline, true, true, cursor);
 				if (element == null) {
-					ended = true;
+					ended.set(true);
 					return false;
 				}
 				action.accept(element);
 				return true;
 			}
 		};
-		return StreamSupport.stream(spliterator, false);
+		return StreamSupport.stream(spliterator, false).onClose(() -> ended.set(true));
 	}
 
 	/**
