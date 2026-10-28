@@ -40,7 +40,8 @@ import org.metricshub.ipmi.core.coding.payload.CompletionCode;
 /**
  * Reads the System Event Log entry by entry (IPMI 2.0 section 31): Get SEL Time UTC Offset, Get SEL Info, then Get
  * SEL Entry from the first record ID (0000h) or the one given, following the next record IDs until FFFFh, and Get
- * SEL Info again to see whether the log was erased meanwhile.
+ * SEL Info again to see whether the log was erased meanwhile. {@link #read} does it all at once; a stream opens the
+ * reader with {@link #open} and reads one entry per {@link #next} call.
  */
 final class SelReader {
 
@@ -58,7 +59,8 @@ final class SelReader {
 	private static final int ERASE_WAITS = 20;
 	private static final long MS_PER_SECOND = 1000;
 
-	private final Exchange exchange;
+	/** The session to read from: a new one after a lost session, given with each {@link #next}. */
+	private Exchange exchange;
 	/** 0 until the BMC asks for a reservation: a whole entry is read without one (IPMI 2.0 section 31.5). */
 	private int reservationId;
 	private int utcOffsetMinutes;
@@ -67,6 +69,17 @@ final class SelReader {
 	 * walk.
 	 */
 	private SelEntry anchor;
+	/** Get SEL Info before the walk, the baseline, and after it. */
+	private GetSelInfoResponseData before;
+	private GetSelInfoResponseData after;
+	/** The record ID to read next, {@link #LAST_RECORD_ID} once the last entry is read. */
+	private int next = LAST_RECORD_ID;
+	private final Set<Integer> read = new HashSet<Integer>();
+	private int previous;
+	/** Whether the checks of the end of the walk were done. */
+	private boolean finished;
+	/** Whether the log changed under the walk: an entry named as the next one is gone, or the log was erased. */
+	private boolean changed;
 
 	private SelReader(Exchange exchange) {
 		this.exchange = exchange;
@@ -84,28 +97,165 @@ final class SelReader {
 	 *         a malformed one, or keeps changing the log while it is read
 	 */
 	static SelEntryList read(Exchange exchange, String host, int since, SelEntry sinceEntry) {
-		SelReader reader = new SelReader(exchange);
-		reader.utcOffsetMinutes = reader.utcOffset();
-		GetSelInfoResponseData before = reader.info();
-		List<SelEntry> entries = reader.walk(since, sinceEntry, before);
-		// The anchor is read again before Get SEL Info, so that a change seen by either leaves the info read after it
-		// as the baseline of the second walk
-		boolean changed = entries == null || reader.changed();
-		GetSelInfoResponseData after = reader.info();
-		if (changed || erased(before, after)) {
+		SelReader reader = open(exchange, since, sinceEntry);
+		List<SelEntry> entries = reader.all();
+		if (reader.changed) {
 			// The log changed under the walk (an entry deleted, the log cleared): read it again, once, as it is now, and
 			// whole: the entry after which to read may be another one by now
-			before = after;
-			entries = reader.walk(-1, null, before);
-			changed = entries == null || reader.changed();
-			after = reader.info();
-			if (changed || erased(before, after)) {
+			reader.restart();
+			entries = reader.all();
+			if (reader.changed) {
 				throw new IpmiClientException(
 						"The System Event Log of " + host + " changed twice while it was read: it was erased, or an entry"
 								+ " named as the next one is not there any more");
 			}
 		}
-		return new SelEntryList(entries, after, reader.utcOffsetMinutes);
+		return new SelEntryList(entries, reader.after, reader.utcOffsetMinutes);
+	}
+
+	/**
+	 * Starts a read: Get SEL Time UTC Offset, Get SEL Info, and the entry given to since(), to find the first entry to
+	 * read.
+	 *
+	 * @param exchange the session to read from
+	 * @param since the record ID of the entry after which to read, -1 for the whole log
+	 * @param sinceEntry the entry after which to read, null when the ID alone is given or for the whole log
+	 * @return the reader, positioned on the first entry to read
+	 * @throws IpmiClientException when the BMC does not answer, or refuses a command the read cannot do without
+	 */
+	static SelReader open(Exchange exchange, int since, SelEntry sinceEntry) {
+		SelReader reader = new SelReader(exchange);
+		reader.utcOffsetMinutes = reader.utcOffset();
+		reader.before = reader.info();
+		reader.locate(since, sinceEntry);
+		return reader;
+	}
+
+	/** Starts the walk again, whole, with the Get SEL Info read after the first walk as the baseline. */
+	private void restart() {
+		before = after;
+		after = null;
+		anchor = null;
+		read.clear();
+		finished = false;
+		changed = false;
+		locate(-1, null);
+	}
+
+	/** Finds the first entry to read. */
+	private void locate(int since, SelEntry sinceEntry) {
+		int sinceId = sinceEntry != null ? sinceEntry.id() : since;
+		previous = sinceId;
+		if (before != null && before.getEntriesCount() == 0) {
+			// An empty log is not walked: Get SEL Entry fails on it
+			return;
+		}
+		next = FIRST_RECORD_ID;
+		if (sinceId >= 0) {
+			// The entry read last gives the next one. When the log does not hold it any more, or holds another entry
+			// under its ID (the log was cleared and its IDs started over), the whole log is read
+			GetSelEntryResponseData last = entry(sinceId);
+			if (last != null
+					&& last.getSelRecord().getRecordId() == sinceId
+					&& (sinceEntry == null || sinceEntry.equals(new SelEntry(last.getSelRecord())))) {
+				next = last.getNextRecordId();
+				anchor = new SelEntry(last.getSelRecord());
+			}
+		}
+	}
+
+	/** Tells, without a command, whether the last entry was read. */
+	boolean exhausted() {
+		return next == LAST_RECORD_ID;
+	}
+
+	/**
+	 * Tells whether the log changed under the walk (an entry named as the next one is not there any more, the log was
+	 * erased): known once {@link #next} returned null or the last entry.
+	 */
+	boolean changed() {
+		return changed;
+	}
+
+	private List<SelEntry> all() {
+		List<SelEntry> entries = new ArrayList<SelEntry>();
+		for (SelEntry entry = next(exchange); entry != null; entry = next(exchange)) {
+			entries.add(entry);
+		}
+		return entries;
+	}
+
+	/**
+	 * Reads the next entry. The checks of the end of the walk (the anchor read again, Get SEL Info) are part of the
+	 * read of the last entry, so that the end of a stream costs no further operation, and of the first call on an
+	 * empty log. A read that fails leaves its entry as the next one.
+	 *
+	 * @param session the session to read from
+	 * @return the entry, null after the last one, or when the log changed under the walk ({@link #changed()})
+	 * @throws IpmiClientException when the BMC does not answer, refuses the entry, or returns a malformed one
+	 */
+	SelEntry next(Exchange session) {
+		this.exchange = session;
+		if (next == LAST_RECORD_ID) {
+			if (!finished) {
+				finish();
+			}
+			return null;
+		}
+		GetSelEntryResponseData reply = entry(next);
+		if (reply == null) {
+			// Nothing at the first record: an empty log (of a BMC that refuses Get SEL Info, or cleared just now).
+			// Nothing at a record another entry named as the next one: the log changed under the walk
+			changed = next != FIRST_RECORD_ID;
+			next = LAST_RECORD_ID;
+			finish();
+			return null;
+		}
+		SelEntry entry = new SelEntry(reply.getSelRecord(), utcOffsetMinutes);
+		if (entry.id() <= FIRST_RECORD_ID || entry.id() >= LAST_RECORD_ID) {
+			// 0000h and FFFFh are selectors, not the IDs of entries (IPMI 2.0 section 31.5 and table 32-1)
+			throw new IpmiClientException(
+					String.format("The System Event Log answered an entry whose record ID is %04Xh", entry.id()));
+		}
+		if (next != FIRST_RECORD_ID && entry.id() != next) {
+			// A malformed reply: following it would skip the entry asked for
+			throw new IpmiClientException(
+					String.format("The System Event Log answered entry %04Xh when asked for entry %04Xh", entry.id(), next));
+		}
+		int following = reply.getNextRecordId();
+		boolean self = following == entry.id();
+		if (read.contains(entry.id()) || self) {
+			// A BMC whose next record IDs loop would be read for ever
+			throw new IpmiClientException(
+					String.format(
+							"The System Event Log loops: entry %04Xh names entry %04Xh as the next one, which was read already",
+							self ? entry.id() : previous,
+							entry.id()));
+		}
+		if (anchor == null) {
+			anchor = entry;
+		}
+		if (following == LAST_RECORD_ID) {
+			finish();
+		}
+		// The caller gave up at its deadline: the entry is read again by the next operation of a stream
+		IpmiClient.failIfInterrupted("SEL entry " + entry.id());
+		read.add(entry.id());
+		previous = entry.id();
+		next = following;
+		return entry;
+	}
+
+	/**
+	 * Ends the walk: the anchor is read again, then Get SEL Info, so that a change seen by either leaves the info read
+	 * after it as the baseline of a second walk.
+	 */
+	private void finish() {
+		finished = true;
+		// A change known already (an entry gone) needs no confirmation by the anchor
+		changed = changed || anchorChanged();
+		after = info();
+		changed |= erased(before, after);
 	}
 
 	/**
@@ -121,7 +271,7 @@ final class SelReader {
 	 * entry the walk read) is still in the log, byte for byte: a log cleared and filled again while it was walked holds
 	 * another entry under its ID, even when two erases within a second left the erase timestamp unchanged.
 	 */
-	private boolean changed() {
+	private boolean anchorChanged() {
 		if (anchor == null) {
 			return false;
 		}
@@ -181,70 +331,6 @@ final class SelReader {
 			}
 			throw e;
 		}
-	}
-
-	/**
-	 * Walks the log.
-	 *
-	 * @return the entries, or null when an entry named as the next one is not there any more: the log changed under
-	 *         the walk
-	 */
-	private List<SelEntry> walk(int since, SelEntry sinceEntry, GetSelInfoResponseData info) {
-		List<SelEntry> entries = new ArrayList<SelEntry>();
-		anchor = null;
-		if (info != null && info.getEntriesCount() == 0) {
-			return entries;
-		}
-		int next = FIRST_RECORD_ID;
-		int sinceId = sinceEntry != null ? sinceEntry.id() : since;
-		if (sinceId >= 0) {
-			// The entry read last gives the next one. When the log does not hold it any more, or holds another entry
-			// under its ID (the log was cleared and its IDs started over), the whole log is read
-			GetSelEntryResponseData last = entry(sinceId);
-			if (last != null
-					&& last.getSelRecord().getRecordId() == sinceId
-					&& (sinceEntry == null || sinceEntry.equals(new SelEntry(last.getSelRecord())))) {
-				next = last.getNextRecordId();
-				anchor = new SelEntry(last.getSelRecord());
-			}
-		}
-		Set<Integer> read = new HashSet<Integer>();
-		int previous = sinceId;
-		while (next != LAST_RECORD_ID) {
-			GetSelEntryResponseData reply = entry(next);
-			if (reply == null) {
-				// Nothing at the first record: an empty log (of a BMC that refuses Get SEL Info, or cleared just now).
-				// Nothing at a record another entry named as the next one: the log changed under the walk
-				return next == FIRST_RECORD_ID && entries.isEmpty() ? entries : null;
-			}
-			SelEntry entry = new SelEntry(reply.getSelRecord(), utcOffsetMinutes);
-			if (entry.id() <= FIRST_RECORD_ID || entry.id() >= LAST_RECORD_ID) {
-				// 0000h and FFFFh are selectors, not the IDs of entries (IPMI 2.0 section 31.5 and table 32-1)
-				throw new IpmiClientException(
-						String.format("The System Event Log answered an entry whose record ID is %04Xh", entry.id()));
-			}
-			if (next != FIRST_RECORD_ID && entry.id() != next) {
-				// A malformed reply: following it would skip the entry asked for
-				throw new IpmiClientException(
-						String.format("The System Event Log answered entry %04Xh when asked for entry %04Xh", entry.id(), next));
-			}
-			if (anchor == null) {
-				anchor = entry;
-			}
-			boolean self = reply.getNextRecordId() == entry.id();
-			if (!read.add(entry.id()) || self) {
-				// A BMC whose next record IDs loop would be read for ever
-				throw new IpmiClientException(
-						String.format(
-								"The System Event Log loops: entry %04Xh names entry %04Xh as the next one, which was read already",
-								self ? entry.id() : previous,
-								entry.id()));
-			}
-			entries.add(entry);
-			previous = entry.id();
-			next = reply.getNextRecordId();
-		}
-		return entries;
 	}
 
 	/**

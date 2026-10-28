@@ -952,6 +952,90 @@ class IpmiClientTest {
 
 	@Test
 	@Timeout(30)
+	void aSelStreamYieldsEachEntryAsItIsReadAndSurvivesALostSession() throws Exception {
+		try (FakeRmcpPlusBmc bmc = bmc(); IpmiClient client = client(bmc).build()) {
+			List<Integer> ids = new ArrayList<Integer>();
+			Iterator<SelEntry> each;
+			try (Stream<SelEntry> entries = client.sel().stream()) {
+				each = entries.iterator();
+				assertEquals(1, bmc.getCount(NETFN_STORAGE, GET_SEL_INFO), "Get SEL Info before the first entry");
+				assertEquals(0, bmc.getCount(NETFN_STORAGE, GET_SEL_ENTRY), "no entry is read before it is asked for");
+				ids.add(each.next().id());
+				assertEquals(1, bmc.getCount(NETFN_STORAGE, GET_SEL_ENTRY), "an entry is read when the stream advances");
+				assertTrue(client.chassisStatus().powerOn(), "the operations of other threads run between two entries");
+				bmc.expireSession();
+				ids.add(each.next().id());
+				assertEquals(2, bmc.getCount(OPEN_SESSION_REQUEST), "the lost session is replaced");
+				while (each.hasNext()) {
+					ids.add(each.next().id());
+				}
+			}
+			assertEquals(Arrays.asList(1, 2, 3, 4, 5, 6), ids, "no entry is yielded twice or lost");
+			assertEquals(6 + 1, bmc.getCount(NETFN_STORAGE, GET_SEL_ENTRY), "the first entry again, with the last one");
+			assertEquals(2, bmc.getCount(NETFN_STORAGE, GET_SEL_INFO), "Get SEL Info again, with the last entry");
+
+			try (Stream<SelEntry> entries = client.sel().since(3).stream()) {
+				assertEquals(Arrays.asList(4, 5, 6), entries.map(SelEntry::id).collect(Collectors.toList()));
+			}
+			try (Stream<SelEntry> entries = client.sel().since(6).stream()) {
+				assertFalse(entries.iterator().hasNext(), "nothing after the last entry");
+			}
+			int reads = bmc.getCount(NETFN_STORAGE, GET_SEL_ENTRY);
+			try (Stream<SelEntry> entries = client.sel().stream()) {
+				assertEquals(1, entries.limit(1).collect(Collectors.toList()).size());
+			}
+			assertEquals(reads + 1, bmc.getCount(NETFN_STORAGE, GET_SEL_ENTRY), "limit(1) reads one entry");
+			assertEquals(6, client.sel().execute().size(), "execute() is unchanged");
+		}
+	}
+
+	@Test
+	@Timeout(30)
+	void aSelStreamFailsWhenTheLogChangesUnderIt() throws Exception {
+		try (FakeRmcpPlusBmc bmc = new FakeRmcpPlusBmc(SUITES, USER, utf8(PASSWORD), null)) {
+			FakeSel sel = Fixtures.sel();
+			sel.install(bmc);
+			try (IpmiClient client = client(bmc).build()) {
+				// An entry named as the next one is gone: the stream cannot start over as execute() does
+				sel.vanishOnce(3);
+				try (Stream<SelEntry> entries = client.sel().stream()) {
+					Iterator<SelEntry> each = entries.iterator();
+					assertEquals(1, each.next().id());
+					assertEquals(2, each.next().id());
+					IpmiClientException e = assertThrows(IpmiClientException.class, each::next);
+					assertTrue(e.getMessage().contains("changed while it was streamed"), e.getMessage());
+				}
+				assertEquals(6, client.sel().execute().size(), "execute() starts over once");
+
+				// The log is cleared and filled again under the stream: the first entry, read again with the last one,
+				// is another record
+				try (Stream<SelEntry> entries = client.sel().stream()) {
+					Iterator<SelEntry> each = entries.iterator();
+					for (int id = 1; id <= 5; id++) {
+						assertEquals(id, each.next().id());
+					}
+					sel.clear();
+					for (int id = 1; id <= 6; id++) {
+						sel.add(
+								systemEvent(
+										id,
+										SEL_RESET_TIME + 1000 + id,
+										SensorType.Fan.getCode(),
+										FAN_SENSOR,
+										0x0a,
+										true,
+										0x01,
+										0xff,
+										0xff));
+					}
+					assertThrows(IpmiClientException.class, each::next);
+				}
+			}
+		}
+	}
+
+	@Test
+	@Timeout(30)
 	void aRefusedReadingAndAnUnreadableFruAreReportedInTheResult() throws Exception {
 		try (FakeRmcpPlusBmc bmc = bmc()) {
 			new FakeSdrRepository().add(Fixtures.FRONT_PANEL_FULL_RECORD)

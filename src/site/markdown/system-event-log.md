@@ -1,5 +1,5 @@
-keywords: events, alerts, sel entry, sel entry list, oem sel record, threshold event, utc offset, polling, since, clear sel, ipmitool sel elist
-description: Read the System Event Log (SEL) of a server through its BMC — how the entries are read and when the read fails, the SelEntry object with its sensor, event, direction and timestamp, the SelEntryList result, OEM entries, and polling for new entries with since().
+keywords: events, alerts, sel entry, sel entry list, oem sel record, threshold event, utc offset, polling, since, stream, clear sel, ipmitool sel elist
+description: Read the System Event Log (SEL) of a server through its BMC — how the entries are read and when the read fails, the SelEntry object with its sensor, event, direction and timestamp, the SelEntryList result, streaming the entries, OEM entries, and polling for new entries with since().
 
 # System Event Log
 
@@ -78,6 +78,54 @@ SelEntryList entries = bmc.sel().timeout(Duration.ofMinutes(5)).execute();
 The read needs the **User** privilege, like the other read operations, and is
 [retried once](timeouts-and-errors.html#session-recovery) on a new session when the session is
 lost while it runs.
+
+### Streaming the entries
+
+`stream()` reads the same entries as `execute()`, in the same order, but yields each one as soon
+as it is read and reads the next one only as the stream advances: the caller processes the first
+entries while the last ones are being read, and a caller that stops early (`limit(n)`,
+`findFirst()`) does not pay for the rest. The stream is a plain, lazy, sequential
+`java.util.stream.Stream`; close it with try-with-resources, as a `Files.lines()` stream, and as
+[`sensors().stream()`](sensors.html#streaming-the-sensors):
+
+```java
+try (Stream<SelEntry> entries = bmc.sel().since(lastSeen).stream()) {
+	entries.forEach(entry -> alert(entry));
+}
+```
+
+* Get SEL Time UTC Offset and Get SEL Info are sent, and the entry given to `since()` read,
+  before `stream()` returns (steps 1 and 2 [above](#how-the-log-is-read) up to the first entry).
+  The checks of step 3 come with the last entry: the first entry is read again and Get SEL Info
+  sent before that entry is yielded, so the end of the stream costs no further command.
+* Each entry is read as an operation of the client of its own: the stream holds nothing between
+  two entries, the operations of other threads run in between, and a stream that is abandoned
+  blocks nothing, not even `close()`. Closing the stream before its last entry ends the walk: no
+  further command is sent.
+* `timeout(Duration)`, or the [deadline](timeouts-and-errors.html#deadline) of the client, is an
+  **inactivity** timeout: the longest wait for the commands before the first entry, then for each
+  entry. Nothing bounds the whole stream, which the caller consumes at its own pace. A log of 643
+  entries that `execute()` reads in 20 s is streamed at the same pace, one round trip per entry,
+  but the first entry arrives after the first round trip.
+* A session lost while an entry is read is reopened and that entry read again, once: the entries
+  already yielded are not read again
+  ([Session recovery](timeouts-and-errors.html#session-recovery)).
+* A log that **changes while it is streamed** cannot be read again from the start, as
+  `execute()` does, since its entries are yielded already: the operation of the stream that sees
+  the change fails with `IpmiClientException` (an entry named as the next one is gone, `CBh`) or,
+  with the last entry, when the first entry read again is gone or is another one, or the erase
+  timestamp of Get SEL Info changed. The caller reads the whole log again, with `execute()` or a
+  new stream. A Clear SEL in progress (`81h`) is waited out, as with `execute()`.
+* `stream()` itself throws when the session cannot be opened, the BMC refuses Get SEL Time UTC
+  Offset or Get SEL Info with a code other than "not implemented", or the commands before the
+  first entry do not complete within the timeout ([below](#when-the-read-fails)). The same
+  exceptions come from the operations of the stream (`forEach`, `collect`, `iterator().next()`)
+  when the BMC stops answering, refuses an entry, returns a malformed one, or an entry is not
+  read within the timeout, and `IllegalStateException` when the client was closed meanwhile.
+
+The stream has no `SelEntryList`: what Get SEL Info says of the whole log (`totalEntries()`,
+`lastAddition()`, `lastErase()`) comes with `execute()` only. The timestamps of the entries are
+UTC all the same, the offset of a local SEL time applied ([Timestamps](#timestamps)).
 
 ### When the read fails
 
@@ -304,9 +352,10 @@ When the log was cleared since, the record IDs started over: the BMC holds **ano
 under the ID of the last one seen, or none, and the **whole log** is read (`lastErase()` is then
 more recent than the previous read).
 
-`since(int recordId)` does the same with the ID alone, for a cursor kept across restarts. It
-takes a record ID of 1 to 65534 and throws `IllegalArgumentException` otherwise: for the first
-read, call `sel().execute()`. Of `since(entry)` and `since(id)`, the last one called counts.
+`since(int recordId)` does the same with the ID alone, for a cursor kept across restarts. Both
+work with [`stream()`](#streaming-the-entries) as with `execute()`. `since(int)` takes a record
+ID of 1 to 65534 and throws `IllegalArgumentException` otherwise: for the first read, call
+`sel().execute()`. Of `since(entry)` and `since(id)`, the last one called counts.
 `since(int)` cannot tell a log cleared and filled up to that ID again from the one it read
 before: keep the `lastErase()` of the previous read with the cursor, and when a read reports a
 more recent one, read the whole log again with `sel().execute()`, as the entries up to that ID

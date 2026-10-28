@@ -1,5 +1,5 @@
 keywords: upgrade, migration, automatic-module-name, jpms, module name, deprecated aliases, release notes, breaking changes, behavior change, 2.1, 2.0, sensor owner, send message, get device sdr, lun, shared records, share count, non-linear, get sensor reading factors, sensor resolution, watchdog, read fru data, fru device locator, spd, dimm, pirom, processor, md5-128, maximumavailable, fluent client, builder, device id, raw, dcmi, network function, ipmiclientexception, slf4j, ipmicli, standalone jar, sel, system event log, chassis control, chassis identify, protected fields, accessors, abstractsensorrecord, validateresponse, utf-8, bmc key, cipher suite, integrity, org.sentrysoftware
-description: What changes when upgrading the IPMI Java Client — from 2.0.00 to 2.1.00, from 1.x to 2.0.00 (the fluent client, the System Event Log, the fixes made since 1.2.02), from 1.2.01, and from the org.sentrysoftware:ipmi artifact of 1.2.00 and earlier.
+description: What changes when upgrading the IPMI Java Client — from 2.2.00 to 2.3.00, from 2.1.00 to 2.2.00, from 2.0.00 to 2.1.00, from 1.x to 2.0.00 (the fluent client, the System Event Log, the fixes made since 1.2.02), from 1.2.01, and from the org.sentrysoftware:ipmi artifact of 1.2.00 and earlier.
 
 # Upgrading
 
@@ -9,8 +9,23 @@ The sections go from the latest release to the oldest: read them from the versio
 the top of the page. From 1.2.02, that is [Upgrading from 1.2.02](#upgrading-from-1-2-02) (the
 fixes 2.0.00 brings to the protocol core, the decoders and Serial over LAN),
 [Upgrading from 1.x to 2.0.00](#upgrading-from-1-x-to-2-0-00) (the new client API),
-[Upgrading from 2.0.00 to 2.1.00](#upgrading-from-2-0-00-to-2-1-00), then
-[Upgrading from 2.1.00 to 2.2.00](#upgrading-from-2-1-00-to-2-2-00).
+[Upgrading from 2.0.00 to 2.1.00](#upgrading-from-2-0-00-to-2-1-00),
+[Upgrading from 2.1.00 to 2.2.00](#upgrading-from-2-1-00-to-2-2-00), then
+[Upgrading from 2.2.00 to 2.3.00](#upgrading-from-2-2-00-to-2-3-00).
+
+## Upgrading from 2.2.00 to 2.3.00
+
+Version 2.3.00 only adds to the API of 2.2.00: code built against 2.2.00 links and compiles
+unchanged.
+
+### Streaming the System Event Log
+
+`sel().stream()` yields each entry of the System Event Log as soon as it is read, as
+`sensors().stream()` and `frus().stream()` do for the sensors and FRUs
+([Streaming the entries](system-event-log.html#streaming-the-entries)). It takes the same
+`since()` and `timeout()` as `execute()`, the timeout being an inactivity timeout. A log that
+changes while it is streamed fails the stream instead of being read again from the start, as
+`execute()` does, since its entries are yielded already.
 
 ## Upgrading from 2.1.00 to 2.2.00
 
