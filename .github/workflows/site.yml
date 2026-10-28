@@ -1,0 +1,63 @@
+# Rebuilds the documentation site of a release and deploys it to GitHub Pages, to publish documentation fixes made
+# after the release: the code is the one of the release tag, src/site and README.md the ones of the selected branch
+# (main, the only branch the github-pages environment deploys).
+
+name: Deploy Site
+run-name: Deploy the site of v${{ inputs.releaseVersion }}
+
+on:
+  workflow_dispatch:
+    inputs:
+      releaseVersion:
+        description: "Released version whose site to rebuild"
+        required: true
+        default: ""
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Build the site of v${{ inputs.releaseVersion }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: v${{ inputs.releaseVersion }}
+          fetch-depth: 0
+
+      - name: Take src/site and README.md from ${{ github.ref_name }}
+        run: |
+          rm -rf src/site
+          git checkout ${{ github.sha }} -- src/site README.md
+
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: "17"
+          cache: maven
+
+      - name: Build the site
+        run: mvn -B -DskipTests verify site
+
+      - uses: actions/upload-pages-artifact@v5
+        with:
+          path: ./target/site
+
+  deploy:
+    name: Deploy GitHub Pages
+    needs: build
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v5
