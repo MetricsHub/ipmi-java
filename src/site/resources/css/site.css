@@ -57,16 +57,42 @@
 	font-display: swap;
 }
 
-/* MetricsHub fonts */
+/* Open Sans font (variable, latin subset, SIL Open Font License) */
+@font-face {
+	font-family: 'Open Sans';
+	src: url('../fonts/OpenSans-Variable.woff2') format('woff2');
+	font-weight: 300 800;
+	font-style: normal;
+	font-display: swap;
+}
+
+@font-face {
+	font-family: 'Open Sans';
+	src: url('../fonts/OpenSans-Variable-Italic.woff2') format('woff2');
+	font-weight: 300 800;
+	font-style: italic;
+	font-display: swap;
+}
+
+/* MetricsHub fonts: Poppins for the site title (banner) and the page title (H1), Open Sans for everything else.
+   The skin derives the banner and H1 fonts from --title-font, which also sets the menu titles */
 :root {
-	--title-font: "Poppins", sans-serif;
-	--heading-font: "Poppins", sans-serif;
-	--content-font: "Poppins", sans-serif;
+	--title-font: "Open Sans", sans-serif;
+	--heading-font: "Open Sans", sans-serif;
+	--content-font: "Open Sans", sans-serif;
+	--banner-font: "Poppins", sans-serif;
+	--main-title-font: "Poppins", sans-serif;
 
 	--content-font-size: 15px;
 	--banner-font-size: 40px;
 	--banner-font-weight: 800;
 
+}
+
+/* The skin also uses the H1 font for the side table of contents heading and the keyword labels */
+.toc-side-container .toc > .toc-heading,
+.main-content .document-footer .keywords .label {
+	font-family: var(--title-font);
 }
 
  /* MetricsHub colors */
