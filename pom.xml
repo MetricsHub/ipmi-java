@@ -79,7 +79,7 @@
 		<!-- Reproducible Build -->
 		<!-- See https://maven.apache.org/guides/mini/guide-reproducible-builds.html -->
 		<!-- Also drives the Maven site copyright year and "Documentation as of" date; bumped at release. -->
-		<project.build.outputTimestamp>2026-10-27T23:46:35Z</project.build.outputTimestamp>
+		<project.build.outputTimestamp>2026-10-28T22:55:04Z</project.build.outputTimestamp>
 	</properties>
 
 	<dependencyManagement>
