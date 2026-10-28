@@ -68,7 +68,6 @@ import org.metricshub.ipmi.client.IpmiTimeoutException;
 import org.metricshub.ipmi.client.PowerEvent;
 import org.metricshub.ipmi.client.RawResponse;
 import org.metricshub.ipmi.client.SelEntry;
-import org.metricshub.ipmi.client.SelEntryList;
 import org.metricshub.ipmi.client.SelRequest;
 import org.metricshub.ipmi.client.Sensor;
 import org.metricshub.ipmi.client.SensorsRequest;
@@ -121,6 +120,13 @@ public final class IpmiCli {
 
 	/** The columns of {@code sensors --long}: Name, Number, Type, Entity, Reading, Unit, Status, six thresholds. */
 	private static final int[] SENSOR_LONG_WIDTHS = { 16, 6, 22, 24, 9, 12, 15, 7, 7, 7, 7, 7, 7 };
+
+	/**
+	 * The columns of the sel table, fixed so that each row is printed as its entry is read: ID (5, up to 65534), Time
+	 * (20, an ISO-8601 instant), Type, Sensor, Event (48, the longest wording); Direction, the last column, is not
+	 * padded.
+	 */
+	private static final int[] SEL_WIDTHS = { 5, 20, 22, 6, 48 };
 	private static final String FRU_INDENT = "  ";
 	private static final long NANOS_PER_MILLI = 1_000_000L;
 	private static final long KEY_READER_START_MS = 500L;
@@ -952,38 +958,31 @@ public final class IpmiCli {
 		if (arguments.since() >= 0) {
 			request.since(arguments.since());
 		}
-		SelEntryList entries = timed(arguments, err, "SEL", request::execute);
-		if (arguments.verbose() && entries.totalEntries().isPresent()) {
-			diagnostic(
-					err,
-					"SEL: " + entries.totalEntries().getAsInt() + " entries, last addition "
-							+ entries.lastAddition().map(Instant::toString).orElse("unknown") + ", last erase "
-							+ entries.lastErase().map(Instant::toString).orElse("unknown") + ", SEL time UTC offset "
-							+ entries.utcOffsetMinutes() + " min");
-		}
-		if (arguments.json()) {
-			for (SelEntry entry : entries) {
-				JsonLinesWriter.write(selFields(entry), out);
+		// Each entry is printed as it is read, the table on fixed column widths
+		Consumer<SelEntry> print = arguments.json() ? entry -> JsonLinesWriter.write(selFields(entry), out) : entry -> {
+			out.print(row(selRow(entry), SEL_WIDTHS));
+			out.flush();
+		};
+		timed(arguments, err, "SEL", () -> {
+			try (Stream<SelEntry> entries = request.stream()) {
+				if (!arguments.json()) {
+					out.print(row(new String[] { "ID", "Time", "Type", "Sensor", "Event", "Direction" }, SEL_WIDTHS));
+				}
+				entries.forEach(print);
 			}
-			return 0;
-		}
-		List<String[]> rows = new ArrayList<String[]>();
-		rows.add(new String[] { "ID", "Time", "Type", "Sensor", "Event", "Direction" });
-		for (SelEntry entry : entries) {
-			rows.add(
-					new String[]
-					{
-							String.valueOf(entry.id()),
-							entry.timestamp().map(Instant::toString).orElse(preInit(entry)),
-							entry.sensorType()
-									.map(type -> typeName(type, entry.sensorTypeCode().getAsInt()))
-									.orElse(entry.type().name()),
-							entry.sensorNumber().isPresent() ? String.valueOf(entry.sensorNumber().getAsInt()) : "",
-							entry.description(),
-							entry.direction().map(direction -> direction.name().toLowerCase(Locale.ROOT)).orElse("") });
-		}
-		out.print(table(rows));
+			return null;
+		});
 		return 0;
+	}
+
+	private static String[] selRow(SelEntry entry) {
+		return new String[] {
+				String.valueOf(entry.id()),
+				entry.timestamp().map(Instant::toString).orElse(preInit(entry)),
+				entry.sensorType().map(type -> typeName(type, entry.sensorTypeCode().getAsInt())).orElse(entry.type().name()),
+				entry.sensorNumber().isPresent() ? String.valueOf(entry.sensorNumber().getAsInt()) : "",
+				entry.description(),
+				entry.direction().map(direction -> direction.name().toLowerCase(Locale.ROOT)).orElse("") };
 	}
 
 	private static String preInit(SelEntry entry) {

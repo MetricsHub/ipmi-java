@@ -31,9 +31,10 @@ An operation abandoned at its deadline leaves no thread that keeps the JVM alive
 the library are daemon threads ([Closing the client](configuration.html#closing-the-client)).
 
 A stream ([`sensors().stream()`](sensors.html#streaming-the-sensors),
-[`frus().stream()`](fru-inventory.html#streaming-the-frus)) reads one sensor or FRU per operation,
-as the caller advances it: the deadline bounds the SDR walk before the first element, then the
-read of each element, as an **inactivity** timeout. Nothing bounds the whole stream, which the
+[`frus().stream()`](fru-inventory.html#streaming-the-frus),
+[`sel().stream()`](system-event-log.html#streaming-the-entries)) reads one sensor, FRU or SEL entry
+per operation, as the caller advances it: the deadline bounds the SDR walk, or the commands sent
+before the first SEL entry, then the read of each element, as an **inactivity** timeout. Nothing bounds the whole stream, which the
 caller consumes at its own pace. An element abandoned at the deadline fails the operation of the
 stream that waited for it (`forEach`, `collect`, `iterator().next()`), and the elements already
 yielded stay yielded.

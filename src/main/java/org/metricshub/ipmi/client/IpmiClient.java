@@ -137,10 +137,10 @@ import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
  * </p>
  * <p>
  * <b>Threads</b>: a client can be shared between threads; its operations are serialized. A stream
- * ({@link SensorsRequest#stream()}, {@link FrusRequest#stream()}) reads one element per operation, so the operations
- * of other threads run between two of its elements. BMCs accept a limited number of sessions and drop replies under
- * load, so the client uses a single session, plus one for a Serial over LAN console that the BMC serves on another
- * UDP port. Clients of different BMCs run in parallel.
+ * ({@link SensorsRequest#stream()}, {@link FrusRequest#stream()}, {@link SelRequest#stream()}) reads one element per
+ * operation, so the operations of other threads run between two of its elements. BMCs accept a limited number of
+ * sessions and drop replies under load, so the client uses a single session, plus one for a Serial over LAN console
+ * that the BMC serves on another UDP port. Clients of different BMCs run in parallel.
  * </p>
  * <p>
  * <b>Failures</b> of the BMC and of the network are reported as {@link IpmiClientException}s, whose subclasses say
@@ -753,6 +753,33 @@ public final class IpmiClient implements AutoCloseable {
 
 	SelEntryList readSel(int since, SelEntry sinceEntry, Duration deadline) {
 		return run("SEL", deadline, true, true, () -> SelReader.read(link, host, since, sinceEntry));
+	}
+
+	/**
+	 * Finds the first entry to read now, under the deadline (Get SEL Time UTC Offset, Get SEL Info, and the entry given
+	 * to since()), and returns a stream that reads one entry per operation of the client, each under the same deadline.
+	 */
+	Stream<SelEntry> streamSel(int since, SelEntry sinceEntry, Duration deadline) {
+		SelReader reader = run("SEL", deadline, true, true, () -> SelReader.open(link, since, sinceEntry));
+		return stream("SEL", deadline, new Cursor<SelEntry>() {
+
+			@Override
+			public SelEntry next() {
+				SelEntry entry = reader.next(link);
+				if (reader.changed()) {
+					// Unlike execute(), a stream cannot read the log again from the start: its entries are yielded already
+					throw new IpmiClientException(
+							"The System Event Log of " + host + " changed while it was streamed: it was erased, or an entry"
+									+ " named as the next one is not there any more");
+				}
+				return entry;
+			}
+
+			@Override
+			public boolean exhausted() {
+				return reader.exhausted();
+			}
+		});
 	}
 
 	SolConsole openSol(Duration deadline) {

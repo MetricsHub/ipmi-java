@@ -54,7 +54,7 @@ try (IpmiClient bmc = IpmiClient.builder("bmc.example.com").credentials("monitor
 }
 ```
 
-`sensors().stream()` and `frus().stream()` yield each sensor or FRU as soon as it is read, for a caller that processes them as they come or stops early ([Streaming the sensors](https://metricshub.org/ipmi-java/sensors.html#streaming-the-sensors)).
+`sensors().stream()`, `frus().stream()` and `sel().stream()` yield each sensor, FRU or SEL entry as soon as it is read, for a caller that processes them as they come or stops early ([Streaming the sensors](https://metricshub.org/ipmi-java/sensors.html#streaming-the-sensors)).
 
 A client owns one RMCP+ session, opened by the first operation and closed by `close()`: always use it in a try-with-resources block. The BMC must have IPMI over LAN enabled, and the account needs:
 

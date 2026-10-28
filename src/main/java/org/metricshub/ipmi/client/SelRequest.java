@@ -24,10 +24,12 @@ package org.metricshub.ipmi.client;
 
 import java.time.Duration;
 import java.util.Objects;
+import java.util.stream.Stream;
 
 /**
  * Reads the System Event Log: {@code bmc.sel().execute()} for every entry, {@code bmc.sel().since(entry).execute()}
- * for the entries added after one already read.
+ * for the entries added after one already read, and {@code bmc.sel().stream()} to get each entry as soon as it is
+ * read.
  */
 public final class SelRequest {
 
@@ -81,9 +83,11 @@ public final class SelRequest {
 	}
 
 	/**
-	 * Overrides the deadline of the client for this request.
+	 * Overrides the deadline of the client for this request. For {@link #execute()}, it is the time the whole
+	 * operation may take, session setup included; for {@link #stream()}, an <i>inactivity</i> timeout: the longest
+	 * wait for the commands sent before the first entry, then for each entry, with no limit on the whole.
 	 *
-	 * @param deadline the time the request may take, session setup included
+	 * @param deadline the deadline
 	 * @return this request
 	 * @throws IllegalArgumentException when the duration is shorter than one millisecond or longer than
 	 *         {@link Integer#MAX_VALUE} milliseconds
@@ -108,5 +112,46 @@ public final class SelRequest {
 	 */
 	public SelEntryList execute() {
 		return client.readSel(since, sinceEntry, timeout);
+	}
+
+	/**
+	 * Reads the entries and streams them: each entry is yielded as soon as it is read, in the order of the log, and
+	 * the next one is read only as the stream advances, so that the caller processes the first entries while the last
+	 * ones are being read, and a caller that stops early ({@code limit(n)}, {@code findFirst()}) does not pay for the
+	 * rest.
+	 *
+	 * <pre>
+	 * try (Stream&lt;SelEntry&gt; entries = bmc.sel().since(lastSeen).stream()) {
+	 * 	entries.forEach(entry -&gt; alert(entry));
+	 * }
+	 * </pre>
+	 * <p>
+	 * <b>Close the stream</b> (try-with-resources), as with {@link java.nio.file.Files#lines}: closing it before the
+	 * last entry ends the walk, and no further command is sent. The stream holds nothing between two entries: each
+	 * one is read as an operation of the client of its own, so that the operations of other threads run in between,
+	 * and a stream that is abandoned blocks nothing, not even {@link IpmiClient#close()}.
+	 * </p>
+	 * <p>
+	 * Get SEL Time UTC Offset and Get SEL Info are sent, and the entry given to {@code since()} read, before this
+	 * method returns; the checks of {@link #execute()} that the log did not change during the read come with its last
+	 * entry. The timeout is an inactivity timeout ({@link #timeout(Duration)}). A session lost while an entry is read
+	 * is replaced and that entry read again, once; the entries already yielded are not read again. An entry whose
+	 * read the timeout cuts short is not skipped either: the next operation of the stream reads it again, on a new
+	 * session. A log that changes while it is streamed (an entry deleted, the log cleared) cannot be read again from
+	 * the start, as {@link #execute()} does, since its entries are yielded already: the stream fails instead, with
+	 * {@link IpmiClientException}, and the caller reads the whole log again.
+	 * </p>
+	 *
+	 * @return a lazy, sequential stream of the entries, to use with try-with-resources
+	 * @throws IpmiClientException when the session cannot be opened, the BMC refuses Get SEL Time UTC Offset or Get
+	 *         SEL Info with a code other than "not implemented", or the commands before the first entry do not
+	 *         complete within the timeout; the same exceptions are thrown from the operations of the stream
+	 *         ({@code forEach}, {@code collect}, {@code iterator().next()}) when the BMC stops answering, refuses an
+	 *         entry, returns a malformed one, an entry is not read within the timeout, or the log changed during the
+	 *         read
+	 * @throws IllegalStateException from the operations of the stream when the client was closed meanwhile
+	 */
+	public Stream<SelEntry> stream() {
+		return client.streamSel(since, sinceEntry, timeout);
 	}
 }
