@@ -27,6 +27,21 @@ unchanged.
 changes while it is streamed fails the stream instead of being read again from the start, as
 `execute()` does, since its entries are yielded already.
 
+### Command-line client
+
+* `sel` prints each entry as it is read, instead of the whole log once it is read, as `sensors`
+  and `fru` do since 2.2.00. `-t` bounds the commands sent before the first entry, then each
+  entry, not the whole subcommand.
+* **Behavior change.** The columns of the `sel` table have fixed widths (5 characters for the
+  ID, 20 for the time, 22 for the type, 6 for the sensor number, 48 for the event) instead of
+  the width of their widest value, so that a row is printed before the next entry is read; a
+  wider cell pushes the rest of its row. Scripts that cut the table at fixed columns must be
+  adjusted; `--json` is the stable format for scripts.
+* **Behavior change.** `-v sel` no longer prints the `SEL:` summary of Get SEL Info (the number
+  of entries, the times of the last addition and erase, the UTC offset of the SEL time): the
+  stream has no `SelEntryList`. `raw 0x0a 0x40` prints the response data of Get SEL Info. With
+  `-v`, the time of `sel` is printed after its output, not before: it includes the printing.
+
 ## Upgrading from 2.1.00 to 2.2.00
 
 Version 2.2.00 only adds to the API of 2.1.00: code built against 2.1.00 links and compiles

@@ -383,16 +383,15 @@ if (reply.completionCode() != CompletionCode.Ok) {
 
 ```shell-session
 $ ipmicli -h bmc.example.com -u monitor -pf pw.txt sel
-ID  Time                  Type                  Sensor  Event                      Direction
-1   2023-03-15T17:06:39Z  EventLoggingDisabled  114     Log area reset/cleared     assertion
-2   pre-init 39s          PowerSupply           101     Power Supply AC lost       assertion
-3   pre-init 44s          PowerSupply           101     Power Supply AC lost       deassertion
-4   2023-04-03T09:35:31Z  OsBoot                0       Installation started       assertion
-5   2024-03-28T15:20:37Z  PowerSupply           100     Power Supply AC lost       assertion
-6   2024-03-28T15:20:37Z  PowerSupply           116     Redundancy Lost            assertion
-7   2024-03-28T15:20:42Z  PowerSupply           100     Power Supply AC lost       deassertion
+ID     Time                  Type                    Sensor  Event                                             Direction
+1      2023-03-15T17:06:39Z  EventLoggingDisabled    114     Log area reset/cleared                            assertion
+2      pre-init 39s          PowerSupply             101     Power Supply AC lost                              assertion
+3      pre-init 44s          PowerSupply             101     Power Supply AC lost                              deassertion
+4      2023-04-03T09:35:31Z  OsBoot                  0       Installation started                              assertion
+5      2024-03-28T15:20:37Z  PowerSupply             100     Power Supply AC lost                              assertion
+6      2024-03-28T15:20:37Z  PowerSupply             116     Redundancy Lost                                   assertion
+7      2024-03-28T15:20:42Z  PowerSupply             100     Power Supply AC lost                              deassertion
 ```
 
-(The first entries of a Dell iDRAC.) See [`sel`](cli.html#sel) in the manual of the command-line
-client: `--since <id>`, `--json`, and `-v` for a summary of the log (its entries, last addition
-and erase, and the UTC offset of its SEL time).
+(The first entries of a Dell iDRAC.) Each entry is printed as it is read. See
+[`sel`](cli.html#sel) in the manual of the command-line client: `--since <id>` and `--json`.

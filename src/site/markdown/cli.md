@@ -102,10 +102,10 @@ A sensor is selected when its type is one of the `--type` values and its name ma
 | `-P, --port <port>` | UDP port of the BMC. Default: 623. |
 | `-L, --privilege <level>` | `user`, `operator`, `administrator` or `auto` (case-insensitive). Default: the lowest level the subcommand needs (see [below](#default-privilege-per-subcommand)). |
 | `-C, --cipher-suite <id>[,<id>...]` | One ID: use exactly this cipher suite, without discovery. Several: the preference order among the suites the BMC offers. Default: `17,3,8,16,2,7,12,11`. Suites without integrity (0, 1, 6, 15) are refused: their replies could be forged. So are the xRC4 suites (4, 5, 9, 10, 13, 14, 18, 19), which the library does not implement. |
-| `-t, --timeout <ms>` | Deadline of the subcommand, in milliseconds. Default: 120000. For `sol`, it bounds the session setup and the payload activation only; for `sensors` and `fru`, which print each sensor or FRU as it is read, the SDR walk, then each sensor or FRU. |
+| `-t, --timeout <ms>` | Deadline of the subcommand, in milliseconds. Default: 120000. For `sol`, it bounds the session setup and the payload activation only; for `sensors`, `fru` and `sel`, which print each sensor, FRU or entry as it is read, the SDR walk (the commands before the first entry, for `sel`), then each sensor, FRU or entry. |
 | `--message-timeout <ms>` | Per-message timeout. Default: 5000. |
 | `--retries <n>` | Resends of a message that got no reply. Default: 3. |
-| `-v, --verbose` | Print to stderr the address, the user and privilege, the cipher suite preference, the message timeout and retries, and the time of each operation, failed ones included; `sel` and `sol` add a summary (see [`sel`](#sel) and the [SOL console](#interactive-sol-console)). Never prints a secret. |
+| `-v, --verbose` | Print to stderr the address, the user and privilege, the cipher suite preference, the message timeout and retries, and the time of each operation, failed ones included; `sol` adds a summary (see the [SOL console](#interactive-sol-console)). Never prints a secret. |
 | `--help` | Print the usage summary. |
 | `--version` | Print the version of the build. |
 
@@ -507,15 +507,15 @@ An incomplete FRU has `"complete":false` and a `problems` array.
 
 ```shell-session
 $ ipmicli -h bmc.example.com -u monitor -pf pw.txt sel
-ID   Time                  Type                  Sensor  Event                                          Direction
-1    2024-05-15T08:15:25Z  EventLoggingDisabled  254     Log area reset/cleared                         assertion
-2    2024-05-15T08:16:11Z  OemTimestamped                OEM data 02 01 05 00 00 00
-3    2024-05-15T08:16:11Z  OemTimestamped                OEM data 02 08 05 00 00 00
-5    2024-05-15T08:23:27Z  PowerUnit             100     Power off/down                                 assertion
-6    2024-05-15T08:23:34Z  PowerUnit             100     Power off/down                                 deassertion
-7    2024-05-15T08:24:15Z  VersionChange         0       Firmware or software incompatibility detected  assertion
-640  pre-init 315532807s   PowerSupply           219     Presence detected                              assertion
-643  pre-init 315532815s   PowerSupply           156     Fully Redundant                                assertion
+ID     Time                  Type                    Sensor  Event                                             Direction
+1      2024-05-15T08:15:25Z  EventLoggingDisabled    254     Log area reset/cleared                            assertion
+2      2024-05-15T08:16:11Z  OemTimestamped                  OEM data 02 01 05 00 00 00
+3      2024-05-15T08:16:11Z  OemTimestamped                  OEM data 02 08 05 00 00 00
+5      2024-05-15T08:23:27Z  PowerUnit               100     Power off/down                                    assertion
+6      2024-05-15T08:23:34Z  PowerUnit               100     Power off/down                                    deassertion
+7      2024-05-15T08:24:15Z  VersionChange           0       Firmware or software incompatibility detected     assertion
+640    pre-init 315532807s   PowerSupply             219     Presence detected                                 assertion
+643    pre-init 315532815s   PowerSupply             156     Fully Redundant                                   assertion
 ```
 
 (An excerpt: the log of this RD350 has 643 entries, 358 of them OEM records.) One line per entry
@@ -525,14 +525,17 @@ the `Pre-Init` of `ipmitool`; empty for an OEM entry without timestamp), the sen
 system event (with its code for an OEM or reserved sensor type: `Oem C1h`) or the record type of
 an OEM one, the sensor number, the event in the wording of
 `ipmiutil` (of `ipmitool` for the few events `ipmiutil` does not name) or the OEM bytes, and
-`assertion` or `deassertion`. The times are UTC whatever the BMC keeps (it reports the offset of
-a local SEL time with Get SEL Time UTC Offset). `-v` adds to stderr what Get SEL Info says of the
-log: its number of entries, the time of the last addition and erase, and that offset.
+`assertion` or `deassertion`. Each row is printed as its entry is read, so the columns have fixed
+widths (a wider cell pushes the rest of its row), two spaces apart, as with `sensors`. The times
+are UTC whatever the BMC keeps (it reports the offset of a local SEL time with Get SEL Time UTC
+Offset).
 
 `--since <id>` prints only the entries after the given record ID, normally the ID of the last
 entry of the previous run; the header alone means no new entry. When the BMC no longer holds that
 entry (the log was cleared), the whole log is printed. A log cleared and filled up to that ID
-again goes unnoticed: compare the `last erase` time that `-v` prints between runs.
+again goes unnoticed: compare the most recent erase timestamp of Get SEL Info between runs
+(`raw 0x0a 0x40`: bytes 10 to 13 of the response data, seconds since 1970, least significant
+byte first).
 
 `--json` prints one object per entry with the fields of
 [`SelEntry`](system-event-log.html#the-selentry-object): `id`, `type` (`System`,
@@ -758,7 +761,7 @@ ipmicli -h bmc.example.com -u admin -pf pw.txt raw 0x2c 0x01 0xdc 0x01
 | `ipmitool -I lanplus ... fru print` | `ipmicli ... fru` |
 | `ipmitool -I lanplus ... fru print 17` | `ipmicli ... fru 17` |
 | `ipmitool -I lanplus ... sel list` or `sel elist` | `ipmicli ... sel` (the sensor numbers, not the names) |
-| `ipmitool -I lanplus ... sel info` | `ipmicli ... -v sel --since <last id>` (the `SEL:` line of Get SEL Info goes to stderr; `sel` also reads the entries, and `--since` limits them to the new ones) |
+| `ipmitool -I lanplus ... sel info` | `ipmicli ... raw 0x0a 0x40` (the response data of Get SEL Info, not decoded) |
 | `ipmitool -I lanplus ... sol activate` | `ipmicli ... sol` |
 | `ipmitool -I lanplus ... sol deactivate` | None: `sol` itself deactivates a console left active by a session the BMC no longer has, and never the console of a live session |
 | `ipmitool -I lanplus ... dcmi ...`, `chassis bootdev`, `mc reset` | No subcommand: `raw` with the bytes of the command (see the DCMI [example](#examples)) |
