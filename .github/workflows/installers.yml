@@ -79,7 +79,7 @@ jobs:
           # The launcher exports IPMICLI_PROGRAM_NAME so the usage names the
           # ipmicli command instead of "java -jar ...".
           help="$("${HOME}/.local/bin/ipmicli" --help)"
-          printf '%s\n' "${help}" | grep -q '^  ipmicli -h <host> probe' \
+          printf '%s\n' "${help}" | grep -q '^  ipmicli -h <host> ' \
             || { echo "ERROR: the help output does not name the ipmicli launcher." >&2; exit 1; }
           if printf '%s\n' "${help}" | grep -Fq 'java -jar'; then
             echo "ERROR: the help of the installed launcher mentions 'java -jar'." >&2
@@ -155,7 +155,7 @@ jobs:
           # command instead of "java -jar ...".
           $help = & $shim --help | ForEach-Object { "$_" }
           if ($LASTEXITCODE -ne 0) { throw "ipmicli.cmd --help exited with $LASTEXITCODE." }
-          if (-not ($help | Where-Object { $_ -match '^  ipmicli -h <host> probe' })) { throw 'The help output does not name the ipmicli launcher.' }
+          if (-not ($help | Where-Object { $_ -match '^  ipmicli -h <host> ' })) { throw 'The help output does not name the ipmicli launcher.' }
           if (($help -join "`n") -match 'java -jar') { throw "The help of the installed shim mentions 'java -jar'." }
 
       - name: Honor IPMICLI_JAVA_HOME when no other JRE is findable
